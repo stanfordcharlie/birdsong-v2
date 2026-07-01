@@ -1,13 +1,201 @@
 import { NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
+import {
+  buildInterviewSystemPrompt,
+  KICKOFF_MESSAGE,
+  CLOSING_MESSAGE,
+  COMPLETE_TOKEN,
+  MAX_EXCHANGES,
+} from "@/lib/interview/prompt";
+import { extractInterviewInsights } from "@/lib/interview/extract";
+import { sendLeadNotification } from "@/lib/email/lead-notification";
+import type { InterviewMessage } from "@/lib/interview/types";
+import type { Database, Json } from "@/types/database";
+
+type AdminClient = ReturnType<typeof createAdminClient>;
+type Survey = Database["public"]["Tables"]["surveys"]["Row"];
+type ResponseRow = Database["public"]["Tables"]["responses"]["Row"];
 
 // POST /api/interview/continue
-// Body: { responseId, message }
+// Body: { response_id, message }
 // Appends the respondent's message, calls Claude for the next turn (or to
 // wrap up + score the lead once the interview is complete), and persists
 // the updated transcript.
-export async function POST() {
-  // TODO: load the response row, append message, call Claude, extract pain
-  // points / lead score on completion, persist, and notify via Resend when
-  // the lead is hot.
-  return NextResponse.json({ error: "Not implemented" }, { status: 501 });
+export async function POST(request: Request) {
+  let body: { response_id?: string; message?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const { response_id, message } = body;
+
+  if (!response_id || typeof response_id !== "string") {
+    return NextResponse.json({ error: "response_id is required" }, { status: 400 });
+  }
+  if (!message || typeof message !== "string" || !message.trim()) {
+    return NextResponse.json({ error: "message is required" }, { status: 400 });
+  }
+
+  console.log(`[interview/continue] response_id=${response_id}`);
+
+  const supabase = createAdminClient();
+
+  const { data: response, error: fetchError } = await supabase
+    .from("responses")
+    .select("*")
+    .eq("id", response_id)
+    .maybeSingle();
+
+  if (fetchError) {
+    console.error("[interview/continue] responses fetch failed:", fetchError);
+    return NextResponse.json({ error: fetchError.message }, { status: 500 });
+  }
+  if (!response) {
+    console.error(`[interview/continue] response not found for id=${response_id}`);
+    return NextResponse.json({ error: "Response not found" }, { status: 404 });
+  }
+  if (response.completed) {
+    console.error(`[interview/continue] response_id=${response_id} already completed`);
+    return NextResponse.json({ error: "This interview has already ended" }, { status: 409 });
+  }
+
+  const { data: survey, error: surveyError } = await supabase
+    .from("surveys")
+    .select("*")
+    .eq("id", response.survey_id)
+    .maybeSingle();
+
+  if (surveyError) {
+    console.error("[interview/continue] survey lookup failed:", surveyError);
+    return NextResponse.json({ error: surveyError.message }, { status: 500 });
+  }
+  if (!survey) {
+    console.error(`[interview/continue] survey not found for id=${response.survey_id}`);
+    return NextResponse.json({ error: "Survey not found" }, { status: 404 });
+  }
+
+  const history = (response.messages as unknown as InterviewMessage[] | null) ?? [];
+  const updatedHistory: InterviewMessage[] = [...history, { role: "user", content: message }];
+
+  // The exchange count is enforced here rather than trusted to the model:
+  // it's a hard limit, so we stop calling Claude for new questions once hit
+  // instead of relying on the system prompt alone.
+  const exchangeCount = updatedHistory.filter((m) => m.role === "user").length;
+  if (exchangeCount >= MAX_EXCHANGES) {
+    return completeInterview(supabase, response_id, updatedHistory, survey, response);
+  }
+
+  const anthropic = getAnthropicClient();
+  const systemPrompt = buildInterviewSystemPrompt(survey, exchangeCount);
+
+  const claudeMessages: Anthropic.MessageParam[] = [
+    { role: "user", content: KICKOFF_MESSAGE },
+    ...updatedHistory.map((m) => ({ role: m.role, content: m.content })),
+  ];
+
+  const completion = await anthropic.messages.create({
+    model: INTERVIEW_MODEL,
+    max_tokens: 512,
+    system: systemPrompt,
+    messages: claudeMessages,
+  });
+
+  const reply = completion.content
+    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("")
+    .trim();
+
+  if (!reply) {
+    return NextResponse.json({ error: "Failed to generate the next question" }, { status: 502 });
+  }
+
+  // The model is instructed to reply with exactly this token, but it
+  // sometimes wraps it in a closing sentence anyway; matching on inclusion
+  // (rather than equality) keeps a stray sentinel from leaking into the
+  // respondent-facing transcript.
+  if (reply.includes(COMPLETE_TOKEN)) {
+    return completeInterview(supabase, response_id, updatedHistory, survey, response);
+  }
+
+  const finalHistory: InterviewMessage[] = [
+    ...updatedHistory,
+    { role: "assistant", content: reply },
+  ];
+
+  const { error: updateError } = await supabase
+    .from("responses")
+    .update({ messages: finalHistory as unknown as Json })
+    .eq("id", response_id);
+
+  if (updateError) {
+    console.error("[interview/continue] responses update failed:", updateError);
+    return NextResponse.json({ error: updateError.message }, { status: 500 });
+  }
+
+  console.log(`[interview/continue] response_id=${response_id} exchange=${exchangeCount} persisted`);
+
+  return NextResponse.json({
+    response_id,
+    message: reply,
+    complete: false,
+  });
+}
+
+async function completeInterview(
+  supabase: AdminClient,
+  responseId: string,
+  history: InterviewMessage[],
+  survey: Survey,
+  response: ResponseRow
+) {
+  const { painPoints, leadScore } = await extractInterviewInsights(history);
+
+  const { error: updateError } = await supabase
+    .from("responses")
+    .update({
+      messages: history as unknown as Json,
+      completed: true,
+      pain_points: painPoints as unknown as Json,
+      lead_score: leadScore,
+    })
+    .eq("id", responseId);
+
+  if (updateError) {
+    console.error("[interview/continue] completion update failed:", updateError);
+    return NextResponse.json({ error: updateError.message }, { status: 500 });
+  }
+
+  console.log(`[interview/continue] response_id=${responseId} completed, lead_score=${leadScore}`);
+
+  // Best-effort: the respondent's completion shouldn't fail because the
+  // notification email did.
+  try {
+    const { data: ownerData } = await supabase.auth.admin.getUserById(survey.user_id);
+    const ownerEmail = ownerData?.user?.email;
+    if (ownerEmail) {
+      await sendLeadNotification({
+        survey: { id: survey.id, title: survey.title },
+        respondentName: response.respondent_name,
+        respondentEmail: response.respondent_email,
+        leadScore,
+        painPoints,
+        ownerEmail,
+      });
+    } else {
+      console.error(`No email on file for survey owner ${survey.user_id}; skipping notification`);
+    }
+  } catch (err) {
+    console.error("Failed to send lead notification email", err);
+  }
+
+  return NextResponse.json({
+    response_id: responseId,
+    message: CLOSING_MESSAGE,
+    complete: true,
+  });
 }

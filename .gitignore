@@ -28,6 +28,9 @@ yarn-error.log*
 # local env files
 .env*.local
 
+# personal Claude Code permission approvals, not shared project config
+.claude/settings.local.json
+
 # vercel
 .vercel
 
