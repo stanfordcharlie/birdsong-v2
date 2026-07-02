@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ResponsesTable } from "./ResponsesTable";
 import { SurveyUrl } from "./SurveyUrl";
 import { SurveyForm, type SurveyFormValues } from "@/components/SurveyForm";
+import { parseEnabledRespondentFields } from "@/lib/surveys/respondent-fields";
 
 export default async function SurveyDetailPage({
   params,
@@ -28,6 +29,7 @@ export default async function SurveyDetailPage({
     .eq("survey_id", id)
     .order("created_at", { ascending: false });
 
+  const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
   const initialValues: SurveyFormValues = {
     title: survey.title,
     slug: survey.slug,
@@ -37,6 +39,9 @@ export default async function SurveyDetailPage({
     tone: survey.tone ?? "",
     numQuestions: survey.num_questions != null ? String(survey.num_questions) : "",
     giftCardAmount: survey.gift_card_amount != null ? String(survey.gift_card_amount) : "",
+    collectPhone: enabledFields.includes("phone"),
+    collectJobTitle: enabledFields.includes("job_title"),
+    collectCompany: enabledFields.includes("company"),
   };
 
   return (

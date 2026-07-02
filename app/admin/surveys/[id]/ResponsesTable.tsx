@@ -29,6 +29,12 @@ export function ResponsesTable({ responses }: { responses: ResponseRow[] }) {
           const isExpanded = expandedId === r.id;
           const messages = (r.messages as unknown as InterviewMessage[] | null) ?? [];
           const painPoints = (r.pain_points as unknown as string[] | null) ?? [];
+          const customValues = (r.custom_field_values as Record<string, unknown> | null) ?? {};
+          const extraInfo = [
+            r.respondent_phone ? `Phone: ${r.respondent_phone}` : null,
+            typeof customValues.job_title === "string" ? `Job title: ${customValues.job_title}` : null,
+            typeof customValues.company === "string" ? `Company: ${customValues.company}` : null,
+          ].filter(Boolean);
 
           return (
             <Fragment key={r.id}>
@@ -46,6 +52,9 @@ export function ResponsesTable({ responses }: { responses: ResponseRow[] }) {
                 <tr className="border-b bg-neutral-50">
                   <td colSpan={5} className="px-4 py-4">
                     <div className="flex flex-col gap-4">
+                      {extraInfo.length > 0 && (
+                        <p className="text-sm text-neutral-600">{extraInfo.join(" · ")}</p>
+                      )}
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-neutral-500">
                           Pain points

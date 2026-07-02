@@ -3,6 +3,8 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import type { Json } from "@/types/database";
+import type { OptionalRespondentField } from "@/lib/surveys/respondent-fields";
 
 const MAX_SLUG_LENGTH = 60;
 
@@ -29,6 +31,9 @@ export type SurveyFormValues = {
   tone: string;
   numQuestions: string;
   giftCardAmount: string;
+  collectPhone: boolean;
+  collectJobTitle: boolean;
+  collectCompany: boolean;
 };
 
 const EMPTY_VALUES: SurveyFormValues = {
@@ -40,11 +45,17 @@ const EMPTY_VALUES: SurveyFormValues = {
   tone: "",
   numQuestions: "",
   giftCardAmount: "",
+  collectPhone: false,
+  collectJobTitle: false,
+  collectCompany: false,
 };
 
 type SurveyFormProps =
   | { mode: "create" }
   | { mode: "edit"; surveyId: string; initialValues: SurveyFormValues };
+
+const inputBase = "rounded border bg-white px-3 py-2 text-neutral-900";
+const invalidBorder = "border-red-500";
 
 export function SurveyForm(props: SurveyFormProps) {
   const router = useRouter();
@@ -64,17 +75,26 @@ export function SurveyForm(props: SurveyFormProps) {
   const [tone, setTone] = useState(initial.tone);
   const [numQuestions, setNumQuestions] = useState(initial.numQuestions);
   const [giftCardAmount, setGiftCardAmount] = useState(initial.giftCardAmount);
+  const [collectPhone, setCollectPhone] = useState(initial.collectPhone);
+  const [collectJobTitle, setCollectJobTitle] = useState(initial.collectJobTitle);
+  const [collectCompany, setCollectCompany] = useState(initial.collectCompany);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [guideLoading, setGuideLoading] = useState(false);
   const [guideError, setGuideError] = useState<string | null>(null);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   useEffect(() => {
     if (!slugTouched) {
       setSlug(slugify(title));
     }
   }, [title, slugTouched]);
+
+  const titleInvalid = attemptedSubmit && !title.trim();
+  const slugInvalid = attemptedSubmit && !slugify(slug);
+  const guideInvalid = attemptedSubmit && !questionGuide.trim();
+  const numQuestionsInvalid = attemptedSubmit && !numQuestions.trim();
 
   async function handleSpruceUp() {
     setGuideError(null);
@@ -106,10 +126,11 @@ export function SurveyForm(props: SurveyFormProps) {
     e.preventDefault();
     setError(null);
     setSaved(false);
+    setAttemptedSubmit(true);
 
     const baseSlug = slugify(slug);
-    if (!baseSlug) {
-      setError("Slug can't be empty.");
+    if (!title.trim() || !baseSlug || !questionGuide.trim() || !numQuestions.trim()) {
+      setError("Please fill in all required fields.");
       return;
     }
 
@@ -121,6 +142,12 @@ export function SurveyForm(props: SurveyFormProps) {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in.");
 
+      const enabledFields: OptionalRespondentField[] = [
+        ...(collectPhone ? (["phone"] as const) : []),
+        ...(collectJobTitle ? (["job_title"] as const) : []),
+        ...(collectCompany ? (["company"] as const) : []),
+      ];
+
       const payload = {
         title,
         topic: topic || null,
@@ -129,6 +156,7 @@ export function SurveyForm(props: SurveyFormProps) {
         tone: tone || null,
         num_questions: numQuestions ? Number(numQuestions) : null,
         gift_card_amount: giftCardAmount ? Number(giftCardAmount) : null,
+        custom_fields: enabledFields as Json,
       };
 
       let candidateSlug = baseSlug;
@@ -187,18 +215,22 @@ export function SurveyForm(props: SurveyFormProps) {
   return (
     <form onSubmit={handleSubmit} className="flex max-w-lg flex-col gap-4">
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">Title</span>
+        <span className="text-sm font-medium">
+          Title <span className="text-red-600">*</span>
+        </span>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          required
-          className="rounded border bg-white px-3 py-2 text-neutral-900"
+          className={`${inputBase} ${titleInvalid ? invalidBorder : ""}`}
         />
+        {titleInvalid && <span className="text-xs text-red-600">Required</span>}
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">Slug</span>
+        <span className="text-sm font-medium">
+          Slug <span className="text-red-600">*</span>
+        </span>
         <input
           type="text"
           value={slug}
@@ -206,10 +238,10 @@ export function SurveyForm(props: SurveyFormProps) {
             setSlugTouched(true);
             setSlug(e.target.value);
           }}
-          required
-          className="rounded border bg-white px-3 py-2 font-mono text-sm text-neutral-900"
+          className={`${inputBase} font-mono text-sm ${slugInvalid ? invalidBorder : ""}`}
         />
         <span className="text-xs text-neutral-500">{`/survey/${slug || "..."}`}</span>
+        {slugInvalid && <span className="text-xs text-red-600">Required</span>}
       </label>
 
       <label className="flex flex-col gap-1">
@@ -218,7 +250,7 @@ export function SurveyForm(props: SurveyFormProps) {
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           rows={2}
-          className="rounded border bg-white px-3 py-2 text-neutral-900"
+          className={inputBase}
         />
       </label>
 
@@ -228,7 +260,7 @@ export function SurveyForm(props: SurveyFormProps) {
           type="text"
           value={sponsor}
           onChange={(e) => setSponsor(e.target.value)}
-          className="rounded border bg-white px-3 py-2 text-neutral-900"
+          className={inputBase}
         />
       </label>
 
@@ -239,13 +271,15 @@ export function SurveyForm(props: SurveyFormProps) {
           onChange={(e) => setSponsorContext(e.target.value)}
           rows={2}
           placeholder="Optional — helps AI tailor the question guide toward relevant problems"
-          className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
+          className={`${inputBase} placeholder:text-neutral-400`}
         />
       </label>
 
       <label className="flex flex-col gap-1">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Question guide</span>
+          <span className="text-sm font-medium">
+            Question guide <span className="text-red-600">*</span>
+          </span>
           <button
             type="button"
             onClick={handleSpruceUp}
@@ -259,8 +293,9 @@ export function SurveyForm(props: SurveyFormProps) {
           value={questionGuide}
           onChange={(e) => setQuestionGuide(e.target.value)}
           rows={5}
-          className="rounded border bg-white px-3 py-2 text-neutral-900"
+          className={`${inputBase} ${guideInvalid ? invalidBorder : ""}`}
         />
+        {guideInvalid && <span className="text-xs text-red-600">Required</span>}
         {guideError && <span className="text-sm text-red-600">{guideError}</span>}
       </label>
 
@@ -271,20 +306,23 @@ export function SurveyForm(props: SurveyFormProps) {
           value={tone}
           onChange={(e) => setTone(e.target.value)}
           placeholder="e.g. warm, curious, conversational"
-          className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
+          className={`${inputBase} placeholder:text-neutral-400`}
         />
       </label>
 
       <div className="flex gap-4">
         <label className="flex flex-1 flex-col gap-1">
-          <span className="text-sm font-medium">Number of questions</span>
+          <span className="text-sm font-medium">
+            Number of questions <span className="text-red-600">*</span>
+          </span>
           <input
             type="number"
             min="1"
             value={numQuestions}
             onChange={(e) => setNumQuestions(e.target.value)}
-            className="rounded border bg-white px-3 py-2 text-neutral-900"
+            className={`${inputBase} ${numQuestionsInvalid ? invalidBorder : ""}`}
           />
+          {numQuestionsInvalid && <span className="text-xs text-red-600">Required</span>}
         </label>
 
         <label className="flex flex-1 flex-col gap-1">
@@ -294,9 +332,40 @@ export function SurveyForm(props: SurveyFormProps) {
             min="0"
             value={giftCardAmount}
             onChange={(e) => setGiftCardAmount(e.target.value)}
-            className="rounded border bg-white px-3 py-2 text-neutral-900"
+            className={inputBase}
           />
         </label>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <h3 className="text-xs font-semibold uppercase text-neutral-500">Respondent info</h3>
+        <p className="text-xs text-neutral-500">Name and email are always collected.</p>
+        <div className="flex flex-col gap-1">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={collectPhone}
+              onChange={(e) => setCollectPhone(e.target.checked)}
+            />
+            Phone number
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={collectJobTitle}
+              onChange={(e) => setCollectJobTitle(e.target.checked)}
+            />
+            Job title
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={collectCompany}
+              onChange={(e) => setCollectCompany(e.target.checked)}
+            />
+            Company name
+          </label>
+        </div>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

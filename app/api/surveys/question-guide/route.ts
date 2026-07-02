@@ -3,11 +3,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
 
-const SYSTEM_PROMPT = `You help B2B market researchers draft the question guide for an AI-moderated customer discovery interview.
+const SYSTEM_PROMPT = `You help B2B market researchers draft the research brief that drives an AI-moderated customer discovery interview. The interviewer treats this brief as strategic direction, not a script, so it needs to convey intent, not just topics.
 
-Given the survey's topic, tone, and what the sponsoring company does, write a short, numbered list (4-6 items) of open-ended discovery topics or questions. They should read as natural, peer-level curiosity, not a pitch, and should be the kind of questions whose honest answers would naturally surface the workflows, frustrations, or unmet needs that the sponsor's product or service could plausibly address, without ever mentioning the sponsor by name or steering toward a sales pitch.
+Given the survey's topic, tone, and what the sponsoring company does, write a short, numbered list (4-6 items) of open-ended discovery questions. For each item, give the core question, then in parentheses a brief note on the specific signal it's meant to surface, so the interviewer knows what's worth digging into if the respondent's answer touches on it.
 
-This guide is internal direction for the AI interviewer, not something read aloud to respondents, so it's fine to be direct about what you want surfaced.
+The questions should read as natural, peer-level curiosity, not a pitch, and should be the kind whose honest answers would naturally surface the workflows, frustrations, or unmet needs that the sponsor's product or service could plausibly address, without ever mentioning the sponsor by name or steering toward a sales pitch.
+
+This is internal direction for the AI interviewer, not something read aloud to respondents, so it's fine to be direct in the parenthetical about what you want surfaced.
 
 Respond with only the numbered list, nothing else.`;
 

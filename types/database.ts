@@ -124,6 +124,103 @@ export type Database = {
           },
         ];
       };
+      profiles: {
+        Row: {
+          user_id: string;
+          company_name: string | null;
+          what_we_sell: string | null;
+          target_icp: string | null;
+          value_prop: string | null;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          company_name?: string | null;
+          what_we_sell?: string | null;
+          target_icp?: string | null;
+          value_prop?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          company_name?: string | null;
+          what_we_sell?: string | null;
+          target_icp?: string | null;
+          value_prop?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profiles_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      roadmap_items: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          status: "done" | "in_progress" | "planned";
+          category: string | null;
+          created_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          status?: "done" | "in_progress" | "planned";
+          category?: string | null;
+          created_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string | null;
+          status?: "done" | "in_progress" | "planned";
+          category?: string | null;
+          created_at?: string;
+          completed_at?: string | null;
+        };
+        Relationships: [];
+      };
+      auth_events: {
+        Row: {
+          id: string;
+          user_id: string;
+          email: string | null;
+          event_type: "signup" | "login";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          email?: string | null;
+          event_type: "signup" | "login";
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          email?: string | null;
+          event_type?: "signup" | "login";
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "auth_events_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

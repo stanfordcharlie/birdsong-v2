@@ -3,14 +3,50 @@
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import type { Database } from "@/types/database";
 import type { InterviewMessage } from "@/lib/interview/types";
+import {
+  parseEnabledRespondentFields,
+  OPTIONAL_RESPONDENT_FIELD_LABELS,
+} from "@/lib/surveys/respondent-fields";
 
 type Survey = Database["public"]["Tables"]["surveys"]["Row"];
 type Stage = "intro" | "chat" | "complete";
 
+// num_questions is a loose guideline (the model may run shorter or longer),
+// so progress is capped short of 100% until the interview actually
+// completes rather than implying a precision the estimate doesn't have.
+function ProgressBar({
+  answered,
+  target,
+  complete,
+}: {
+  answered: number;
+  target: number;
+  complete: boolean;
+}) {
+  const percent = complete ? 100 : Math.min(Math.round((answered / target) * 100), 90);
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-200">
+        <div
+          className="h-full rounded-full bg-black transition-all duration-500"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <span className="w-9 shrink-0 text-right text-xs text-neutral-500">
+        {complete ? "Done" : `${percent}%`}
+      </span>
+    </div>
+  );
+}
+
 export function InterviewFlow({ survey }: { survey: Survey }) {
+  const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
   const [stage, setStage] = useState<Stage>("intro");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
+  const [company, setCompany] = useState("");
   const [responseId, setResponseId] = useState<string | null>(null);
   const [messages, setMessages] = useState<InterviewMessage[]>([]);
   const [answer, setAnswer] = useState("");
@@ -39,6 +75,11 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
           survey_id: survey.id,
           respondent_name: name,
           respondent_email: email,
+          respondent_phone: enabledFields.includes("phone") ? phone : undefined,
+          custom_field_values: {
+            ...(enabledFields.includes("job_title") && jobTitle ? { job_title: jobTitle } : {}),
+            ...(enabledFields.includes("company") && company ? { company } : {}),
+          },
         }),
       });
       const data = await res.json();
@@ -109,6 +150,33 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
             required
             className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
           />
+          {enabledFields.includes("phone") && (
+            <input
+              type="tel"
+              placeholder={OPTIONAL_RESPONDENT_FIELD_LABELS.phone}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
+            />
+          )}
+          {enabledFields.includes("job_title") && (
+            <input
+              type="text"
+              placeholder={OPTIONAL_RESPONDENT_FIELD_LABELS.job_title}
+              value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
+              className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
+            />
+          )}
+          {enabledFields.includes("company") && (
+            <input
+              type="text"
+              placeholder={OPTIONAL_RESPONDENT_FIELD_LABELS.company}
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
+            />
+          )}
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             type="submit"
@@ -124,15 +192,19 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
 
   if (stage === "complete") {
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
+        <ProgressBar answered={0} target={survey.num_questions ?? 8} complete />
         <h1 className="text-xl font-semibold">Thanks!</h1>
         <p className="text-sm text-neutral-600">{closingMessage}</p>
       </div>
     );
   }
 
+  const answeredCount = messages.filter((m) => m.role === "user").length;
+
   return (
     <div className="flex flex-col gap-4">
+      <ProgressBar answered={answeredCount} target={survey.num_questions ?? 8} complete={false} />
       <h1 className="text-lg font-semibold">{survey.title}</h1>
       <div className="flex flex-col gap-3">
         {messages.map((m, i) => (

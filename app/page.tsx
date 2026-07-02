@@ -22,6 +22,24 @@ export default function Home() {
         >
           Admin
         </Link>
+        <Link
+          href="/admin/signup"
+          className="rounded border px-4 py-2 text-sm text-neutral-900"
+        >
+          Sign up
+        </Link>
+        <Link
+          href="/admin/profile"
+          className="rounded border px-4 py-2 text-sm text-neutral-900"
+        >
+          Company Profile
+        </Link>
+        <Link
+          href="/admin/roadmap"
+          className="rounded border px-4 py-2 text-sm text-neutral-900"
+        >
+          Roadmap
+        </Link>
       </div>
     </div>
   );

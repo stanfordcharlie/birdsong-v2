@@ -2,52 +2,57 @@
 
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { logLoginEvent } from "@/lib/auth-events";
 
-export default function AdminLoginPage() {
-  const [email, setEmail] = useState("");
+export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (password !== confirmPassword) {
+      setError("Passwords don't match.");
+      return;
+    }
+
     setLoading(true);
     const supabase = createClient();
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.updateUser({ password });
     if (error) {
-      setError(error.message);
+      setError(
+        error.message.includes("Auth session missing")
+          ? "This reset link has expired or already been used. Request a new one."
+          : error.message
+      );
       setLoading(false);
       return;
     }
-    if (data.user) {
-      await logLoginEvent(supabase, data.user.id, data.user.email ?? null);
-    }
-    // Full navigation so middleware re-reads the freshly set auth cookies.
     window.location.assign("/admin");
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center">
       <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
-        <h1 className="text-xl font-semibold">Log in</h1>
+        <h1 className="text-xl font-semibold">Set a new password</h1>
         <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          type="password"
+          placeholder="New password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
           required
+          minLength={6}
           className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
         />
         <input
           type="password"
-          name="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Confirm new password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
           required
+          minLength={6}
           className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
         />
         {error && <p className="text-sm text-red-600">{error}</p>}
@@ -56,16 +61,8 @@ export default function AdminLoginPage() {
           disabled={loading}
           className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
         >
-          {loading ? "Logging in..." : "Log in"}
+          {loading ? "Saving..." : "Set new password"}
         </button>
-        <div className="flex flex-col items-center gap-1">
-          <a href="/admin/signup" className="text-sm text-neutral-500 underline">
-            Need an account? Sign up
-          </a>
-          <a href="/admin/forgot-password" className="text-sm text-neutral-500 underline">
-            Forgot your password?
-          </a>
-        </div>
       </form>
     </div>
   );

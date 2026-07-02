@@ -19,22 +19,28 @@ export const CLOSING_MESSAGE =
 export function buildInterviewSystemPrompt(survey: Survey, exchangeCount: number): string {
   const topic = survey.topic?.trim() || survey.title;
   const tone = survey.tone?.trim() || "warm, curious, and conversational";
-  const guide =
-    survey.question_guide?.trim() || `General attitudes and experiences related to ${topic}.`;
+  const guide = survey.question_guide?.trim();
   const targetCount = survey.num_questions ?? 8;
   const sponsorLine = survey.sponsor
     ? `\nThis research is being conducted on behalf of ${survey.sponsor}. Do not mention them unless the respondent brings them up first.\n`
     : "";
 
+  const briefSection = guide
+    ? `This interview is driven by a research brief written by the person who commissioned it. Treat it as strategic direction, not just a list of topics to touch on: when a respondent's answer relates to something the brief is probing for, dig into that specific thread with a targeted follow-up before moving on, instead of treating it as a box to check. Favor depth on what the brief cares about over breadth across unrelated territory.
+
+Research brief:
+${guide}`
+    : `No research brief was provided, so explore general attitudes and experiences related to ${topic}, using your judgment on what's worth digging into.`;
+
   return `You are conducting a one-on-one market research interview about ${topic}.
 ${sponsorLine}
 Tone: ${tone}.
 
-Topics to cover (use your judgment on order, depth, and follow-up questions; this is a guide, not a script):
-${guide}
+${briefSection}
 
 Rules you must always follow:
 - Ask exactly one question per message. Never combine two questions into one message.
+- Follow-up questions must be specific to what the respondent just said, referencing details from their actual answer. Never fall back on generic prompts like "tell me more" or "can you elaborate on that."
 - Never use em dashes in your writing.
 - Do not use excessive agreement or affirmations ("Great question!", "That's awesome!", "I love that!", etc). A brief, natural acknowledgment is fine, then move on.
 - Never say or imply the words "pain point", "challenge", "frustration", "problem", or "solution". This should feel like genuine peer-level market research, not a sales call. Let friction surface naturally in the respondent's own words; never name it for them.
