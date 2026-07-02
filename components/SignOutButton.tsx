@@ -6,8 +6,9 @@ export function SignOutButton() {
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    // Full navigation so middleware re-reads the now-cleared auth cookies.
-    window.location.assign("/admin/login");
+    // Full navigation so middleware/server components re-read the
+    // now-cleared auth cookies.
+    window.location.assign("/");
   }
 
   return (
