@@ -34,12 +34,6 @@ export default function Home() {
         >
           Company Profile
         </Link>
-        <Link
-          href="/admin/roadmap"
-          className="rounded border px-4 py-2 text-sm text-neutral-900"
-        >
-          Roadmap
-        </Link>
       </div>
     </div>
   );

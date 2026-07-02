@@ -26,9 +26,6 @@ export default async function AdminLayout({
             <Link href="/admin/profile" className="underline">
               Company Profile
             </Link>
-            <Link href="/admin/roadmap" className="underline">
-              Roadmap
-            </Link>
           </nav>
           {user && (
             <div className="flex items-center gap-3 border-l pl-6 text-sm text-neutral-600">

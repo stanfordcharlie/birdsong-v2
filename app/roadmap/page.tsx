@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const STATUS_LABELS = {
   done: "Done",
@@ -8,8 +8,12 @@ const STATUS_LABELS = {
 
 const STATUS_ORDER = ["done", "in_progress", "planned"] as const;
 
+// Deliberately outside /admin and unlinked from any nav: reachable only by
+// whoever has the direct URL, not gated behind login. Uses the admin
+// client to read since roadmap_items' RLS requires an authenticated
+// session, which a visitor here won't have.
 export default async function RoadmapPage() {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: items } = await supabase
     .from("roadmap_items")
@@ -23,7 +27,7 @@ export default async function RoadmapPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex max-w-4xl flex-col gap-6 p-8">
       <h1 className="text-xl font-semibold">Roadmap</h1>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         {STATUS_ORDER.map((status) => (
