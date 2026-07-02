@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
@@ -37,20 +38,18 @@ export default function ResetPasswordPage() {
     <div className="flex min-h-screen items-center justify-center">
       <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
         <h1 className="text-xl font-semibold">Set a new password</h1>
-        <input
-          type="password"
+        <PasswordInput
           placeholder="New password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={setPassword}
           required
           minLength={6}
           className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
         />
-        <input
-          type="password"
+        <PasswordInput
           placeholder="Confirm new password"
           value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
+          onChange={setConfirmPassword}
           required
           minLength={6}
           className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"

@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { logLoginEvent } from "@/lib/auth-events";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -41,12 +42,11 @@ export default function AdminLoginPage() {
           required
           className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
         />
-        <input
-          type="password"
+        <PasswordInput
           name="password"
           placeholder="Password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={setPassword}
           required
           className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
         />
