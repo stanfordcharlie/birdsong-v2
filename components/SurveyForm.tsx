@@ -29,7 +29,6 @@ export type SurveyFormValues = {
   title: string;
   slug: string;
   topic: string;
-  sponsor: string;
   questionGuide: string;
   tone: string;
   numQuestions: string;
@@ -43,7 +42,6 @@ const EMPTY_VALUES: SurveyFormValues = {
   title: "",
   slug: "",
   topic: "",
-  sponsor: "",
   questionGuide: "",
   tone: "",
   numQuestions: "",
@@ -71,8 +69,6 @@ export function SurveyForm(props: SurveyFormProps) {
   // slug auto-syncs with the title, and only until the user edits it.
   const [slugTouched, setSlugTouched] = useState(isEdit);
   const [topic, setTopic] = useState(initial.topic);
-  const [sponsor, setSponsor] = useState(initial.sponsor);
-  const [sponsorContext, setSponsorContext] = useState("");
   const [questionGuide, setQuestionGuide] = useState(initial.questionGuide);
   const [tone, setTone] = useState(initial.tone);
   const [numQuestions, setNumQuestions] = useState(initial.numQuestions);
@@ -109,8 +105,6 @@ export function SurveyForm(props: SurveyFormProps) {
           title,
           topic,
           tone,
-          sponsor,
-          sponsor_context: sponsorContext,
           existing_guide: questionGuide,
         }),
       });
@@ -153,7 +147,6 @@ export function SurveyForm(props: SurveyFormProps) {
       const payload = {
         title,
         topic: topic || null,
-        sponsor: sponsor || null,
         question_guide: questionGuide || null,
         tone: tone || null,
         num_questions: numQuestions ? Number(numQuestions) : null,
@@ -249,21 +242,6 @@ export function SurveyForm(props: SurveyFormProps) {
       <label className="flex flex-col gap-1">
         <span className="text-sm font-medium text-card-foreground">Topic</span>
         <Textarea value={topic} onChange={(e) => setTopic(e.target.value)} rows={2} />
-      </label>
-
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-card-foreground">Sponsor</span>
-        <Input type="text" value={sponsor} onChange={(e) => setSponsor(e.target.value)} />
-      </label>
-
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-card-foreground">What does the sponsor do?</span>
-        <Textarea
-          value={sponsorContext}
-          onChange={(e) => setSponsorContext(e.target.value)}
-          rows={2}
-          placeholder="Optional — helps AI tailor the question guide toward relevant problems"
-        />
       </label>
 
       <label className="flex flex-col gap-1">

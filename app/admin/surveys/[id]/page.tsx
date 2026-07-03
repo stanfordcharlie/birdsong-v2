@@ -35,7 +35,6 @@ export default async function SurveyDetailPage({
     title: survey.title,
     slug: survey.slug,
     topic: survey.topic ?? "",
-    sponsor: survey.sponsor ?? "",
     questionGuide: survey.question_guide ?? "",
     tone: survey.tone ?? "",
     numQuestions: survey.num_questions != null ? String(survey.num_questions) : "",
