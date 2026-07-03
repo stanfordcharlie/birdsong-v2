@@ -27,9 +27,6 @@ export default async function Home() {
             <Link href="/admin">Admin</Link>
           </Button>
           <Button asChild variant="secondary">
-            <Link href="/admin/signup">Sign up</Link>
-          </Button>
-          <Button asChild variant="secondary">
             <Link href="/admin/profile">Company Profile</Link>
           </Button>
         </div>
