@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useRef, useEffect, type FormEvent } from "react";
-import { Input } from "@/components/ui/input";
+import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent } from "react";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { OPENING_MESSAGE } from "@/lib/profile-onboarding/prompt";
 import type { OnboardingMessage, ResearchResult } from "@/lib/profile-onboarding/types";
 import type { ProfileFormValues } from "./ProfileForm";
 
-// Assistant messages mark the one key phrase worth skimming with markdown
-// bold (**like this**) per the system prompt; render that as real bold
-// instead of showing the raw asterisks.
+// Assistant messages mark the key phrase worth skimming with markdown bold
+// (**like this**) per the system prompt; render that as real bold instead
+// of showing the raw asterisks.
 function renderWithBold(text: string) {
   return text
     .split(/(\*\*[^*]+\*\*)/g)
@@ -35,14 +35,13 @@ export function ProfileOnboarding({
   const [loading, setLoading] = useState(false);
   const [researching, setResearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!loading) inputRef.current?.focus();
   }, [loading, messages.length]);
 
-  async function handleSend(e: FormEvent) {
-    e.preventDefault();
+  async function submitAnswer() {
     if (!answer.trim() || loading) return;
     setError(null);
 
@@ -86,6 +85,18 @@ export function ProfileOnboarding({
     }
   }
 
+  function handleFormSubmit(e: FormEvent) {
+    e.preventDefault();
+    submitAnswer();
+  }
+
+  function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      submitAnswer();
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3">
@@ -94,8 +105,8 @@ export function ProfileOnboarding({
             key={i}
             className={
               m.role === "assistant"
-                ? "rounded-control bg-secondary px-3 py-2 text-sm text-secondary-foreground"
-                : "self-end rounded-control bg-primary px-3 py-2 text-sm text-primary-foreground"
+                ? "whitespace-pre-wrap break-words rounded-control bg-secondary px-3 py-2 text-sm text-secondary-foreground"
+                : "self-end whitespace-pre-wrap break-words rounded-control bg-primary px-3 py-2 text-sm text-primary-foreground"
             }
           >
             {m.role === "assistant" ? renderWithBold(m.content) : m.content}
@@ -107,15 +118,16 @@ export function ProfileOnboarding({
           </div>
         )}
       </div>
-      <form onSubmit={handleSend} className="flex gap-2">
-        <Input
+      <form onSubmit={handleFormSubmit} className="flex gap-2">
+        <Textarea
           ref={inputRef}
-          type="text"
           placeholder="Type your answer..."
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
+          onKeyDown={handleKeyDown}
           disabled={loading}
-          className="flex-1"
+          rows={2}
+          className="flex-1 resize-none"
         />
         <Button type="submit" disabled={loading || !answer.trim()}>
           Send
