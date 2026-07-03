@@ -7,6 +7,21 @@ import { OPENING_MESSAGE } from "@/lib/profile-onboarding/prompt";
 import type { OnboardingMessage, ResearchResult } from "@/lib/profile-onboarding/types";
 import type { ProfileFormValues } from "./ProfileForm";
 
+// Assistant messages mark the one key phrase worth skimming with markdown
+// bold (**like this**) per the system prompt; render that as real bold
+// instead of showing the raw asterisks.
+function renderWithBold(text: string) {
+  return text
+    .split(/(\*\*[^*]+\*\*)/g)
+    .map((part, i) =>
+      part.startsWith("**") && part.endsWith("**") ? (
+        <strong key={i}>{part.slice(2, -2)}</strong>
+      ) : (
+        part
+      )
+    );
+}
+
 export function ProfileOnboarding({
   onComplete,
 }: {
@@ -83,7 +98,7 @@ export function ProfileOnboarding({
                 : "self-end rounded-control bg-primary px-3 py-2 text-sm text-primary-foreground"
             }
           >
-            {m.content}
+            {m.role === "assistant" ? renderWithBold(m.content) : m.content}
           </div>
         ))}
         {loading && (
