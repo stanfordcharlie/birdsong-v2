@@ -4,6 +4,7 @@ import { ResponsesTable } from "./ResponsesTable";
 import { SurveyUrl } from "./SurveyUrl";
 import { SurveyForm, type SurveyFormValues } from "@/components/SurveyForm";
 import { parseEnabledRespondentFields } from "@/lib/surveys/respondent-fields";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function SurveyDetailPage({
   params,
@@ -47,15 +48,21 @@ export default async function SurveyDetailPage({
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
-        <h1 className="text-xl font-semibold">{survey.title}</h1>
-        <p className="text-sm text-neutral-500">{responses?.length ?? 0} responses</p>
+        <h1 className="text-xl font-semibold text-card-foreground">{survey.title}</h1>
+        <p className="text-sm text-muted-foreground">{responses?.length ?? 0} responses</p>
         <SurveyUrl slug={survey.slug} />
       </div>
 
-      <div className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase text-neutral-500">Survey details</h2>
-        <SurveyForm mode="edit" surveyId={survey.id} initialValues={initialValues} />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Survey details
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SurveyForm mode="edit" surveyId={survey.id} initialValues={initialValues} />
+        </CardContent>
+      </Card>
 
       <ResponsesTable responses={responses ?? []} />
     </div>

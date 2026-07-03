@@ -1,5 +1,15 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient();
@@ -22,44 +32,50 @@ export default async function AdminDashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Your Surveys</h1>
-        <Link
-          href="/admin/surveys/new"
-          className="rounded bg-black px-3 py-2 text-sm text-white"
-        >
-          New survey
-        </Link>
+        <h1 className="text-xl font-semibold text-card-foreground">Your Surveys</h1>
+        <Button asChild>
+          <Link href="/admin/surveys/new">New survey</Link>
+        </Button>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error.message}</p>}
+      {error && <p className="text-sm text-destructive">{error.message}</p>}
 
       {!error && (!surveys || surveys.length === 0) && (
-        <p className="text-sm text-neutral-500">No surveys yet.</p>
+        <p className="text-sm text-muted-foreground">No surveys yet.</p>
       )}
 
       {surveys && surveys.length > 0 && (
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left">
-              <th className="py-2 pr-4">Title</th>
-              <th className="py-2 pr-4">Slug</th>
-              <th className="py-2 pr-4">Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {surveys.map((survey) => (
-              <tr key={survey.id} className="border-b hover:bg-neutral-50">
-                <td className="py-2 pr-4">
-                  <Link href={`/admin/surveys/${survey.id}`} className="underline">
-                    {survey.title}
-                  </Link>
-                </td>
-                <td className="py-2 pr-4 font-mono text-xs text-neutral-600">{survey.slug}</td>
-                <td className="py-2 pr-4">{new Date(survey.created_at).toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Title</TableHead>
+                <TableHead>Slug</TableHead>
+                <TableHead>Created</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {surveys.map((survey) => (
+                <TableRow key={survey.id}>
+                  <TableCell>
+                    <Link
+                      href={`/admin/surveys/${survey.id}`}
+                      className="font-medium text-card-foreground hover:text-primary"
+                    >
+                      {survey.title}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {survey.slug}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {new Date(survey.created_at).toLocaleString()}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
       )}
     </div>
   );

@@ -26,7 +26,7 @@ export function buildInterviewSystemPrompt(survey: Survey, exchangeCount: number
     : "";
 
   const briefSection = guide
-    ? `This interview is driven by a research brief written by the person who commissioned it. Treat it as strategic direction, not just a list of topics to touch on: when a respondent's answer relates to something the brief is probing for, dig into that specific thread with a targeted follow-up before moving on, instead of treating it as a box to check. Favor depth on what the brief cares about over breadth across unrelated territory.
+    ? `This interview is driven by a research brief written by the person who commissioned it. The brief contains notes and angles to explore, not ready-made questions — you always write your own natural, conversational questions in the moment; never read a brief item aloud verbatim. Treat it as strategic direction: when a respondent's answer relates to something the brief is probing for, dig into that specific thread with a targeted follow-up before moving on, instead of treating it as a box to check. Favor depth on what the brief cares about over breadth across unrelated territory.
 
 Research brief:
 ${guide}`

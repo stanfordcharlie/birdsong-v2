@@ -3,6 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 export type ProfileFormValues = {
   companyName: string;
@@ -57,58 +60,42 @@ export function ProfileForm({ initialValues }: { initialValues: ProfileFormValue
   return (
     <form onSubmit={handleSubmit} className="flex max-w-lg flex-col gap-4">
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">Company name</span>
-        <input
-          type="text"
-          value={companyName}
-          onChange={(e) => setCompanyName(e.target.value)}
-          className="rounded border bg-white px-3 py-2 text-neutral-900"
-        />
+        <span className="text-sm font-medium text-card-foreground">Company name</span>
+        <Input type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">What do you sell?</span>
-        <textarea
-          value={whatWeSell}
-          onChange={(e) => setWhatWeSell(e.target.value)}
-          rows={3}
-          className="rounded border bg-white px-3 py-2 text-neutral-900"
-        />
+        <span className="text-sm font-medium text-card-foreground">What do you sell?</span>
+        <Textarea value={whatWeSell} onChange={(e) => setWhatWeSell(e.target.value)} rows={3} />
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">Target ICP</span>
-        <textarea
+        <span className="text-sm font-medium text-card-foreground">Target ICP</span>
+        <Textarea
           value={targetIcp}
           onChange={(e) => setTargetIcp(e.target.value)}
           rows={3}
           placeholder="Industry, company size, roles you sell to"
-          className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
         />
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">Value proposition</span>
-        <textarea
+        <span className="text-sm font-medium text-card-foreground">Value proposition</span>
+        <Textarea
           value={valueProp}
           onChange={(e) => setValueProp(e.target.value)}
           rows={3}
           placeholder="Core pitch / what makes you different"
-          className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
         />
       </label>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-        >
+        <Button type="submit" disabled={loading}>
           {loading ? "Saving..." : "Save changes"}
-        </button>
-        {saved && <span className="text-sm text-neutral-500">Saved.</span>}
+        </Button>
+        {saved && <span className="text-sm text-muted-foreground">Saved.</span>}
       </div>
     </form>
   );

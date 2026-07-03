@@ -12,7 +12,11 @@ export function SignOutButton() {
   }
 
   return (
-    <button type="button" onClick={handleSignOut} className="text-sm text-neutral-600 underline">
+    <button
+      type="button"
+      onClick={handleSignOut}
+      className="text-sm text-sidebar-foreground transition-colors hover:text-sidebar-active-foreground"
+    >
       Sign out
     </button>
   );

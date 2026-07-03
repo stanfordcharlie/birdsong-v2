@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PasswordInput } from "@/components/PasswordInput";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
@@ -35,34 +37,34 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
-        <h1 className="text-xl font-semibold">Set a new password</h1>
-        <PasswordInput
-          placeholder="New password"
-          value={password}
-          onChange={setPassword}
-          required
-          minLength={6}
-          className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
-        />
-        <PasswordInput
-          placeholder="Confirm new password"
-          value={confirmPassword}
-          onChange={setConfirmPassword}
-          required
-          minLength={6}
-          className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-        >
-          {loading ? "Saving..." : "Set new password"}
-        </button>
-      </form>
+    <div className="flex min-h-screen items-center justify-center bg-page px-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle>Set a new password</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <PasswordInput
+              placeholder="New password"
+              value={password}
+              onChange={setPassword}
+              required
+              minLength={6}
+            />
+            <PasswordInput
+              placeholder="Confirm new password"
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              required
+              minLength={6}
+            />
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button type="submit" disabled={loading}>
+              {loading ? "Saving..." : "Set new password"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 type PasswordInputProps = {
   value: string;
@@ -18,7 +19,7 @@ export function PasswordInput({
   placeholder,
   required,
   minLength,
-  className = "",
+  className,
   name,
 }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
@@ -33,14 +34,17 @@ export function PasswordInput({
         onChange={(e) => onChange(e.target.value)}
         required={required}
         minLength={minLength}
-        className={`w-full pr-10 ${className}`}
+        className={cn(
+          "flex h-9 w-full rounded-control border border-input bg-card px-3 py-2 pr-10 text-sm text-card-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+          className
+        )}
       />
       <button
         type="button"
         onClick={() => setVisible((v) => !v)}
         aria-label={visible ? "Hide password" : "Show password"}
         tabIndex={-1}
-        className="absolute inset-y-0 right-0 flex items-center px-3 text-neutral-500"
+        className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground"
       >
         {visible ? <EyeOffIcon /> : <EyeIcon />}
       </button>

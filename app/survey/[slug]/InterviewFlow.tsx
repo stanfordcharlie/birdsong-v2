@@ -7,6 +7,8 @@ import {
   parseEnabledRespondentFields,
   OPTIONAL_RESPONDENT_FIELD_LABELS,
 } from "@/lib/surveys/respondent-fields";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type Survey = Database["public"]["Tables"]["surveys"]["Row"];
 type Stage = "intro" | "chat" | "complete";
@@ -26,13 +28,13 @@ function ProgressBar({
   const percent = complete ? 100 : Math.min(Math.round((answered / target) * 100), 90);
   return (
     <div className="flex items-center gap-2">
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-200">
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
         <div
-          className="h-full rounded-full bg-black transition-all duration-500"
+          className="h-full rounded-full bg-primary transition-all duration-500"
           style={{ width: `${percent}%` }}
         />
       </div>
-      <span className="w-9 shrink-0 text-right text-xs text-neutral-500">
+      <span className="w-9 shrink-0 text-right text-xs text-muted-foreground">
         {complete ? "Done" : `${percent}%`}
       </span>
     </div>
@@ -126,65 +128,56 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
   if (stage === "intro") {
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="text-xl font-semibold">{survey.title}</h1>
-        {survey.topic && <p className="text-sm text-neutral-600">{survey.topic}</p>}
+        <h1 className="text-xl font-semibold text-card-foreground">{survey.title}</h1>
+        {survey.topic && <p className="text-sm text-muted-foreground">{survey.topic}</p>}
         {survey.gift_card_amount ? (
-          <p className="text-sm text-neutral-600">
+          <p className="text-sm text-muted-foreground">
             Complete this interview for a ${survey.gift_card_amount} gift card.
           </p>
         ) : null}
         <form onSubmit={handleStart} className="flex flex-col gap-3">
-          <input
+          <Input
             type="text"
             placeholder="Your name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
           />
-          <input
+          <Input
             type="email"
             placeholder="Your email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
           />
           {enabledFields.includes("phone") && (
-            <input
+            <Input
               type="tel"
               placeholder={OPTIONAL_RESPONDENT_FIELD_LABELS.phone}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
             />
           )}
           {enabledFields.includes("job_title") && (
-            <input
+            <Input
               type="text"
               placeholder={OPTIONAL_RESPONDENT_FIELD_LABELS.job_title}
               value={jobTitle}
               onChange={(e) => setJobTitle(e.target.value)}
-              className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
             />
           )}
           {enabledFields.includes("company") && (
-            <input
+            <Input
               type="text"
               placeholder={OPTIONAL_RESPONDENT_FIELD_LABELS.company}
               value={company}
               onChange={(e) => setCompany(e.target.value)}
-              className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
             />
           )}
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-          >
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button type="submit" disabled={loading}>
             {loading ? "Starting..." : "Start"}
-          </button>
+          </Button>
         </form>
       </div>
     );
@@ -194,8 +187,8 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
     return (
       <div className="flex flex-col gap-3">
         <ProgressBar answered={0} target={survey.num_questions ?? 8} complete />
-        <h1 className="text-xl font-semibold">Thanks!</h1>
-        <p className="text-sm text-neutral-600">{closingMessage}</p>
+        <h1 className="text-xl font-semibold text-card-foreground">Thanks!</h1>
+        <p className="text-sm text-muted-foreground">{closingMessage}</p>
       </div>
     );
   }
@@ -205,15 +198,15 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
   return (
     <div className="flex flex-col gap-4">
       <ProgressBar answered={answeredCount} target={survey.num_questions ?? 8} complete={false} />
-      <h1 className="text-lg font-semibold">{survey.title}</h1>
+      <h1 className="text-lg font-semibold text-card-foreground">{survey.title}</h1>
       <div className="flex flex-col gap-3">
         {messages.map((m, i) => (
           <div
             key={i}
             className={
               m.role === "assistant"
-                ? "rounded bg-neutral-100 px-3 py-2 text-sm text-neutral-900"
-                : "self-end rounded bg-black px-3 py-2 text-sm text-white"
+                ? "rounded-control bg-secondary px-3 py-2 text-sm text-secondary-foreground"
+                : "self-end rounded-control bg-primary px-3 py-2 text-sm text-primary-foreground"
             }
           >
             {m.content}
@@ -221,24 +214,20 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
         ))}
       </div>
       <form onSubmit={handleSend} className="flex gap-2">
-        <input
+        <Input
           ref={answerInputRef}
           type="text"
           placeholder="Type your answer..."
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
           disabled={loading}
-          className="flex-1 rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
+          className="flex-1"
         />
-        <button
-          type="submit"
-          disabled={loading || !answer.trim()}
-          className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-        >
+        <Button type="submit" disabled={loading || !answer.trim()}>
           {loading ? "..." : "Send"}
-        </button>
+        </Button>
       </form>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

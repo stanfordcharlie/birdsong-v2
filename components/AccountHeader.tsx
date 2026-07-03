@@ -11,21 +11,27 @@ export async function AccountHeader() {
   } = await supabase.auth.getUser();
 
   return (
-    <header className="flex items-center justify-between border-b px-6 py-4">
-      <Link href="/" className="font-semibold">
+    <header className="flex items-center justify-between border-b border-sidebar-border bg-sidebar px-6 py-4">
+      <Link href="/" className="font-semibold text-sidebar-active-foreground">
         Birdsong Admin
       </Link>
       <div className="flex items-center gap-6">
-        <nav className="flex gap-4 text-sm text-neutral-600">
-          <Link href="/admin" className="underline">
+        <nav className="flex gap-5 text-sm font-medium">
+          <Link
+            href="/admin"
+            className="text-sidebar-foreground transition-colors hover:text-sidebar-active-foreground"
+          >
             Surveys
           </Link>
-          <Link href="/admin/profile" className="underline">
+          <Link
+            href="/admin/profile"
+            className="text-sidebar-foreground transition-colors hover:text-sidebar-active-foreground"
+          >
             Company Profile
           </Link>
         </nav>
         {user && (
-          <div className="flex items-center gap-3 border-l pl-6 text-sm text-neutral-600">
+          <div className="flex items-center gap-3 border-l border-sidebar-border pl-6 text-sm text-sidebar-foreground">
             <span>{user.email}</span>
             <SignOutButton />
           </div>

@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Json } from "@/types/database";
 import type { OptionalRespondentField } from "@/lib/surveys/respondent-fields";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 const MAX_SLUG_LENGTH = 60;
 
@@ -54,8 +57,7 @@ type SurveyFormProps =
   | { mode: "create" }
   | { mode: "edit"; surveyId: string; initialValues: SurveyFormValues };
 
-const inputBase = "rounded border bg-white px-3 py-2 text-neutral-900";
-const invalidBorder = "border-red-500";
+const invalidBorder = "border-destructive focus-visible:ring-destructive";
 
 export function SurveyForm(props: SurveyFormProps) {
   const router = useRouter();
@@ -215,170 +217,159 @@ export function SurveyForm(props: SurveyFormProps) {
   return (
     <form onSubmit={handleSubmit} className="flex max-w-lg flex-col gap-4">
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">
-          Title <span className="text-red-600">*</span>
+        <span className="text-sm font-medium text-card-foreground">
+          Title <span className="text-destructive">*</span>
         </span>
-        <input
+        <Input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className={`${inputBase} ${titleInvalid ? invalidBorder : ""}`}
+          className={titleInvalid ? invalidBorder : ""}
         />
-        {titleInvalid && <span className="text-xs text-red-600">Required</span>}
+        {titleInvalid && <span className="text-xs text-destructive">Required</span>}
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">
-          Slug <span className="text-red-600">*</span>
+        <span className="text-sm font-medium text-card-foreground">
+          Slug <span className="text-destructive">*</span>
         </span>
-        <input
+        <Input
           type="text"
           value={slug}
           onChange={(e) => {
             setSlugTouched(true);
             setSlug(e.target.value);
           }}
-          className={`${inputBase} font-mono text-sm ${slugInvalid ? invalidBorder : ""}`}
+          className={`font-mono text-sm ${slugInvalid ? invalidBorder : ""}`}
         />
-        <span className="text-xs text-neutral-500">{`/survey/${slug || "..."}`}</span>
-        {slugInvalid && <span className="text-xs text-red-600">Required</span>}
+        <span className="text-xs text-muted-foreground">{`/survey/${slug || "..."}`}</span>
+        {slugInvalid && <span className="text-xs text-destructive">Required</span>}
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">Topic</span>
-        <textarea
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          rows={2}
-          className={inputBase}
-        />
+        <span className="text-sm font-medium text-card-foreground">Topic</span>
+        <Textarea value={topic} onChange={(e) => setTopic(e.target.value)} rows={2} />
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">Sponsor</span>
-        <input
-          type="text"
-          value={sponsor}
-          onChange={(e) => setSponsor(e.target.value)}
-          className={inputBase}
-        />
+        <span className="text-sm font-medium text-card-foreground">Sponsor</span>
+        <Input type="text" value={sponsor} onChange={(e) => setSponsor(e.target.value)} />
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">What does the sponsor do?</span>
-        <textarea
+        <span className="text-sm font-medium text-card-foreground">What does the sponsor do?</span>
+        <Textarea
           value={sponsorContext}
           onChange={(e) => setSponsorContext(e.target.value)}
           rows={2}
           placeholder="Optional — helps AI tailor the question guide toward relevant problems"
-          className={`${inputBase} placeholder:text-neutral-400`}
         />
       </label>
 
       <label className="flex flex-col gap-1">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">
-            Question guide <span className="text-red-600">*</span>
+          <span className="text-sm font-medium text-card-foreground">
+            Question guide <span className="text-destructive">*</span>
           </span>
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={handleSpruceUp}
             disabled={guideLoading}
-            className="rounded border px-2 py-1 text-xs text-neutral-900 disabled:opacity-50"
           >
             {guideLoading ? "Sprucing up..." : "Spruce up with AI"}
-          </button>
+          </Button>
         </div>
-        <textarea
+        <Textarea
           value={questionGuide}
           onChange={(e) => setQuestionGuide(e.target.value)}
           rows={5}
-          className={`${inputBase} ${guideInvalid ? invalidBorder : ""}`}
+          className={guideInvalid ? invalidBorder : ""}
         />
-        {guideInvalid && <span className="text-xs text-red-600">Required</span>}
-        {guideError && <span className="text-sm text-red-600">{guideError}</span>}
+        {guideInvalid && <span className="text-xs text-destructive">Required</span>}
+        {guideError && <span className="text-sm text-destructive">{guideError}</span>}
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">Tone</span>
-        <input
+        <span className="text-sm font-medium text-card-foreground">Tone</span>
+        <Input
           type="text"
           value={tone}
           onChange={(e) => setTone(e.target.value)}
           placeholder="e.g. warm, curious, conversational"
-          className={`${inputBase} placeholder:text-neutral-400`}
         />
       </label>
 
       <div className="flex gap-4">
         <label className="flex flex-1 flex-col gap-1">
-          <span className="text-sm font-medium">
-            Number of questions <span className="text-red-600">*</span>
+          <span className="text-sm font-medium text-card-foreground">
+            Number of questions <span className="text-destructive">*</span>
           </span>
-          <input
+          <Input
             type="number"
             min="1"
             value={numQuestions}
             onChange={(e) => setNumQuestions(e.target.value)}
-            className={`${inputBase} ${numQuestionsInvalid ? invalidBorder : ""}`}
+            className={numQuestionsInvalid ? invalidBorder : ""}
           />
-          {numQuestionsInvalid && <span className="text-xs text-red-600">Required</span>}
+          {numQuestionsInvalid && <span className="text-xs text-destructive">Required</span>}
         </label>
 
         <label className="flex flex-1 flex-col gap-1">
-          <span className="text-sm font-medium">Gift card amount ($)</span>
-          <input
+          <span className="text-sm font-medium text-card-foreground">Gift card amount ($)</span>
+          <Input
             type="number"
             min="0"
             value={giftCardAmount}
             onChange={(e) => setGiftCardAmount(e.target.value)}
-            className={inputBase}
           />
         </label>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <h3 className="text-xs font-semibold uppercase text-neutral-500">Respondent info</h3>
-        <p className="text-xs text-neutral-500">Name and email are always collected.</p>
-        <div className="flex flex-col gap-1">
-          <label className="flex items-center gap-2 text-sm">
+      <div className="flex flex-col gap-2 rounded-control border border-border bg-secondary/40 p-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Respondent info
+        </h3>
+        <p className="text-xs text-muted-foreground">Name and email are always collected.</p>
+        <div className="flex flex-col gap-1.5">
+          <label className="flex items-center gap-2 text-sm text-card-foreground">
             <input
               type="checkbox"
               checked={collectPhone}
               onChange={(e) => setCollectPhone(e.target.checked)}
+              className="accent-primary"
             />
             Phone number
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-sm text-card-foreground">
             <input
               type="checkbox"
               checked={collectJobTitle}
               onChange={(e) => setCollectJobTitle(e.target.checked)}
+              className="accent-primary"
             />
             Job title
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-sm text-card-foreground">
             <input
               type="checkbox"
               checked={collectCompany}
               onChange={(e) => setCollectCompany(e.target.checked)}
+              className="accent-primary"
             />
             Company name
           </label>
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-        >
+        <Button type="submit" disabled={loading}>
           {loading ? "Saving..." : isEdit ? "Save changes" : "Create survey"}
-        </button>
-        {saved && <span className="text-sm text-neutral-500">Saved.</span>}
+        </Button>
+        {saved && <span className="text-sm text-muted-foreground">Saved.</span>}
       </div>
     </form>
   );

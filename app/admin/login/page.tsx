@@ -4,6 +4,9 @@ import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { logLoginEvent } from "@/lib/auth-events";
 import { PasswordInput } from "@/components/PasswordInput";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -30,43 +33,46 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
-        <h1 className="text-xl font-semibold">Log in</h1>
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
-        />
-        <PasswordInput
-          name="password"
-          placeholder="Password"
-          value={password}
-          onChange={setPassword}
-          required
-          className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-        >
-          {loading ? "Logging in..." : "Log in"}
-        </button>
-        <div className="flex flex-col items-center gap-1">
-          <a href="/admin/signup" className="text-sm text-neutral-500 underline">
-            Need an account? Sign up
-          </a>
-          <a href="/admin/forgot-password" className="text-sm text-neutral-500 underline">
-            Forgot your password?
-          </a>
-        </div>
-      </form>
+    <div className="flex min-h-screen items-center justify-center bg-page px-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle>Log in</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <Input
+              type="email"
+              name="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <PasswordInput
+              name="password"
+              placeholder="Password"
+              value={password}
+              onChange={setPassword}
+              required
+            />
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button type="submit" disabled={loading}>
+              {loading ? "Logging in..." : "Log in"}
+            </Button>
+            <div className="flex flex-col items-center gap-1">
+              <a href="/admin/signup" className="text-sm text-muted-foreground hover:text-card-foreground">
+                Need an account? Sign up
+              </a>
+              <a
+                href="/admin/forgot-password"
+                className="text-sm text-muted-foreground hover:text-card-foreground"
+              >
+                Forgot your password?
+              </a>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

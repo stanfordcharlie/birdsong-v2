@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { ProfileForm } from "./ProfileForm";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -31,15 +32,19 @@ export default async function ProfilePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold">Company Profile</h1>
-      <ProfileForm
-        initialValues={{
-          companyName: profile?.company_name ?? "",
-          whatWeSell: profile?.what_we_sell ?? "",
-          targetIcp: profile?.target_icp ?? "",
-          valueProp: profile?.value_prop ?? "",
-        }}
-      />
+      <h1 className="text-xl font-semibold text-card-foreground">Company Profile</h1>
+      <Card>
+        <CardContent className="pt-6">
+          <ProfileForm
+            initialValues={{
+              companyName: profile?.company_name ?? "",
+              whatWeSell: profile?.what_we_sell ?? "",
+              targetIcp: profile?.target_icp ?? "",
+              valueProp: profile?.value_prop ?? "",
+            }}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

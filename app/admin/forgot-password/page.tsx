@@ -2,6 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -27,41 +30,47 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="flex w-full max-w-sm flex-col gap-2 text-center">
-          <h1 className="text-xl font-semibold">Check your email</h1>
-          <p className="text-sm text-neutral-600">
-            If an account exists for {email}, we sent a link to reset your password.
-          </p>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-page px-4">
+        <Card className="w-full max-w-sm">
+          <CardContent className="flex flex-col gap-2 pt-6 text-center">
+            <h1 className="text-xl font-semibold text-card-foreground">Check your email</h1>
+            <p className="text-sm text-muted-foreground">
+              If an account exists for {email}, we sent a link to reset your password.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
-        <h1 className="text-xl font-semibold">Reset your password</h1>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="rounded border bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400"
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-        >
-          {loading ? "Sending..." : "Send reset link"}
-        </button>
-        <a href="/admin/login" className="text-center text-sm text-neutral-500 underline">
-          Back to log in
-        </a>
-      </form>
+    <div className="flex min-h-screen items-center justify-center bg-page px-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle>Reset your password</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <Input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button type="submit" disabled={loading}>
+              {loading ? "Sending..." : "Send reset link"}
+            </Button>
+            <a
+              href="/admin/login"
+              className="text-center text-sm text-muted-foreground hover:text-card-foreground"
+            >
+              Back to log in
+            </a>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
