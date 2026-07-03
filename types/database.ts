@@ -131,6 +131,8 @@ export type Database = {
           what_we_sell: string | null;
           target_icp: string | null;
           value_prop: string | null;
+          enrichment_sources: Json;
+          last_enriched_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -139,6 +141,8 @@ export type Database = {
           what_we_sell?: string | null;
           target_icp?: string | null;
           value_prop?: string | null;
+          enrichment_sources?: Json;
+          last_enriched_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -147,6 +151,8 @@ export type Database = {
           what_we_sell?: string | null;
           target_icp?: string | null;
           value_prop?: string | null;
+          enrichment_sources?: Json;
+          last_enriched_at?: string | null;
           created_at?: string;
         };
         Relationships: [

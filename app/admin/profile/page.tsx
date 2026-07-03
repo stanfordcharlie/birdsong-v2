@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { ProfileForm } from "./ProfileForm";
+import { ProfileGate } from "./ProfileGate";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default async function ProfilePage() {
@@ -30,12 +30,17 @@ export default async function ProfilePage() {
     }
   }
 
+  const hasExistingData = Boolean(
+    profile?.company_name || profile?.what_we_sell || profile?.target_icp || profile?.value_prop
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold text-card-foreground">Company Profile</h1>
       <Card>
         <CardContent className="pt-6">
-          <ProfileForm
+          <ProfileGate
+            hasExistingData={hasExistingData}
             initialValues={{
               companyName: profile?.company_name ?? "",
               whatWeSell: profile?.what_we_sell ?? "",

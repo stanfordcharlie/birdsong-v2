@@ -1,0 +1,112 @@
+"use client";
+
+import { useState, useRef, useEffect, type FormEvent } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { OPENING_MESSAGE } from "@/lib/profile-onboarding/prompt";
+import type { OnboardingMessage, ResearchResult } from "@/lib/profile-onboarding/types";
+import type { ProfileFormValues } from "./ProfileForm";
+
+export function ProfileOnboarding({
+  onComplete,
+}: {
+  onComplete: (values: ProfileFormValues, research: ResearchResult | null) => void;
+}) {
+  const [messages, setMessages] = useState<OnboardingMessage[]>([
+    { role: "assistant", content: OPENING_MESSAGE },
+  ]);
+  const [answer, setAnswer] = useState("");
+  const [research, setResearch] = useState<ResearchResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [researching, setResearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!loading) inputRef.current?.focus();
+  }, [loading, messages.length]);
+
+  async function handleSend(e: FormEvent) {
+    e.preventDefault();
+    if (!answer.trim() || loading) return;
+    setError(null);
+
+    const isFirstAnswer = messages.filter((m) => m.role === "user").length === 0;
+    const newMessages: OnboardingMessage[] = [...messages, { role: "user", content: answer }];
+    setMessages(newMessages);
+    setAnswer("");
+    setResearching(isFirstAnswer);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/profile/onboarding/continue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: newMessages, research }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong");
+
+      const latestResearch: ResearchResult | null = data.research ?? null;
+      setResearch(latestResearch);
+
+      if (data.complete) {
+        onComplete(
+          {
+            companyName: data.extracted.companyName,
+            whatWeSell: data.extracted.whatWeSell,
+            targetIcp: data.extracted.targetIcp,
+            valueProp: data.extracted.valueProp,
+          },
+          latestResearch
+        );
+      } else {
+        setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+      setResearching(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
+        {messages.map((m, i) => (
+          <div
+            key={i}
+            className={
+              m.role === "assistant"
+                ? "rounded-control bg-secondary px-3 py-2 text-sm text-secondary-foreground"
+                : "self-end rounded-control bg-primary px-3 py-2 text-sm text-primary-foreground"
+            }
+          >
+            {m.content}
+          </div>
+        ))}
+        {loading && (
+          <div className="rounded-control bg-secondary px-3 py-2 text-sm text-muted-foreground">
+            {researching ? "Researching your company..." : "Thinking..."}
+          </div>
+        )}
+      </div>
+      <form onSubmit={handleSend} className="flex gap-2">
+        <Input
+          ref={inputRef}
+          type="text"
+          placeholder="Type your answer..."
+          value={answer}
+          onChange={(e) => setAnswer(e.target.value)}
+          disabled={loading}
+          className="flex-1"
+        />
+        <Button type="submit" disabled={loading || !answer.trim()}>
+          Send
+        </Button>
+      </form>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  );
+}
