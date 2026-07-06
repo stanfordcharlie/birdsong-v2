@@ -45,7 +45,10 @@ export function AdminSidebar() {
     <aside className="group fixed left-0 top-0 z-40 flex h-screen w-14 flex-col bg-[#111111] transition-all duration-200 ease-out hover:w-56">
       {/* Logo */}
       <div className="flex h-14 items-center overflow-hidden px-4">
-        <span className="text-lg font-bold text-white">B</span>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/birdsong_logo_mark_v2.svg" alt="Birdsong" width={32} height={32} className="h-6 w-6" />
+        </span>
         <span className="ml-2 whitespace-nowrap text-sm font-semibold text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100">
           Birdsong
         </span>
