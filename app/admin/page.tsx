@@ -1,82 +1,44 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
-export default async function AdminDashboardPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // surveys_public_read (RLS) intentionally allows anyone to read any
-  // survey, since the unauthenticated respondent flow needs to look one up
-  // by slug. That means an unfiltered select here would return every
-  // admin's surveys, not just the current one's, so ownership has to be
-  // filtered explicitly rather than left to RLS.
-  const { data: surveys, error } = await supabase
-    .from("surveys")
-    .select("*")
-    .eq("user_id", user?.id ?? "")
-    .order("created_at", { ascending: false });
-
+export default function AdminHomePage() {
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-card-foreground">Your Surveys</h1>
-        <Button asChild>
-          <Link href="/admin/surveys/new">New survey</Link>
-        </Button>
+    <div className="flex flex-1 flex-col items-center justify-center gap-10 p-8">
+
+      {/* Welcome card */}
+      <div className="flex w-full max-w-lg flex-col items-center gap-2 text-center">
+        <h1 className="text-2xl font-bold tracking-tight text-[#0a0a0a]">Welcome to Birdsong</h1>
+        <p className="text-sm text-muted-foreground">
+          What would you like to do?
+        </p>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error.message}</p>}
+      {/* Action cards */}
+      <div className="grid w-full max-w-lg grid-cols-1 gap-3">
+        <Link href="/admin/surveys/new" className="group flex items-center justify-between rounded-2xl border border-[#e5e7eb] bg-white p-5 shadow-sm transition-all hover:border-[#0a0a0a] hover:shadow-md">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-semibold text-[#0a0a0a]">Create a new survey</span>
+            <span className="text-xs text-muted-foreground">Build and launch an AI-moderated interview</span>
+          </div>
+          <svg className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </Link>
 
-      {!error && (!surveys || surveys.length === 0) && (
-        <p className="text-sm text-muted-foreground">No surveys yet.</p>
-      )}
+        <Link href="/admin/surveys" className="group flex items-center justify-between rounded-2xl border border-[#e5e7eb] bg-white p-5 shadow-sm transition-all hover:border-[#0a0a0a] hover:shadow-md">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-semibold text-[#0a0a0a]">View dashboard</span>
+            <span className="text-xs text-muted-foreground">See your surveys, responses, and leads</span>
+          </div>
+          <svg className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </Link>
 
-      {surveys && surveys.length > 0 && (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Slug</TableHead>
-                <TableHead>Created</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {surveys.map((survey) => (
-                <TableRow key={survey.id}>
-                  <TableCell>
-                    <Link
-                      href={`/admin/surveys/${survey.id}`}
-                      className="font-medium text-card-foreground hover:text-primary"
-                    >
-                      {survey.title}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {survey.slug}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(survey.created_at).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
-      )}
+        <Link href="/admin/profile" className="group flex items-center justify-between rounded-2xl border border-[#e5e7eb] bg-white p-5 shadow-sm transition-all hover:border-[#0a0a0a] hover:shadow-md">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-semibold text-[#0a0a0a]">Company profile</span>
+            <span className="text-xs text-muted-foreground">Set your ICP, brand voice, and survey defaults</span>
+          </div>
+          <svg className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </Link>
+      </div>
+
     </div>
   );
 }
