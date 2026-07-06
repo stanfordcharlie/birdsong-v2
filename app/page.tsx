@@ -1,16 +1,8 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { AccountHeader } from "@/components/AccountHeader";
 
-export default async function Home() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-[#f8f8f7]">
-      {user && <AccountHeader />}
       <div className="flex flex-1 flex-col items-center justify-center gap-10 p-8">
 
         {/* Welcome card */}

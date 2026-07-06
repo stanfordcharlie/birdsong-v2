@@ -1,4 +1,4 @@
-import { AccountHeader } from "@/components/AccountHeader";
+import { AdminSidebar } from "@/components/AdminSidebar";
 
 export default function AdminLayout({
   children,
@@ -6,9 +6,9 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-page text-card-foreground">
-      <AccountHeader />
-      <main className="p-6">{children}</main>
+    <div className="flex min-h-screen bg-page text-card-foreground">
+      <AdminSidebar />
+      <main className="flex-1 pl-14">{children}</main>
     </div>
   );
 }
