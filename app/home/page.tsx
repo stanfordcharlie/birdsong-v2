@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/server";
 
 const STEPS = [
   {
@@ -20,7 +22,18 @@ const STEPS = [
   },
 ];
 
-export default function MarketingHomePage() {
+export default async function MarketingHomePage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Signed-in visitors landing on the public marketing URL (bare domain,
+  // bookmark, back button) belong in the app, not looking at the pitch.
+  if (user) {
+    redirect("/admin");
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <MarketingNav />

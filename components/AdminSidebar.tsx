@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignOutButton } from "./SignOutButton";
+import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   {
@@ -38,21 +39,58 @@ const NAV_ITEMS = [
   },
 ];
 
-export function AdminSidebar() {
+function SidebarToggleIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <line x1="9" y1="3" x2="9" y2="21" />
+    </svg>
+  );
+}
+
+export function AdminSidebar({
+  expanded,
+  onToggle,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   const pathname = usePathname();
 
   return (
-    <aside className="group fixed left-0 top-0 z-40 flex h-screen w-14 flex-col bg-[#111111] transition-all duration-200 ease-out hover:w-56">
+    <aside
+      className={cn(
+        "fixed left-0 top-0 z-40 flex h-screen flex-col bg-[#111111] transition-all duration-200 ease-out",
+        expanded ? "w-56" : "w-14"
+      )}
+    >
       {/* Logo */}
       <Link href="/admin" className="flex h-14 items-center overflow-hidden px-4">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/birdsong_logo_mark_v2.svg" alt="Birdsong" width={32} height={32} className="h-6 w-6" />
         </span>
-        <span className="ml-2 whitespace-nowrap text-sm font-semibold text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+        <span
+          className={cn(
+            "ml-2 whitespace-nowrap text-sm font-semibold text-white transition-opacity duration-150",
+            expanded ? "opacity-100" : "opacity-0"
+          )}
+        >
           Birdsong
         </span>
       </Link>
+
+      {/* Sidebar toggle */}
+      <div className="flex items-center justify-center px-2 pb-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] transition-colors hover:bg-white/10 hover:text-white"
+        >
+          <SidebarToggleIcon />
+        </button>
+      </div>
 
       {/* Nav items */}
       <nav className="flex flex-1 flex-col gap-1 px-2 py-3">
@@ -76,7 +114,12 @@ export function AdminSidebar() {
               }`}
             >
               <span className="flex h-5 w-5 shrink-0 items-center justify-center">{item.icon}</span>
-              <span className="whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+              <span
+                className={cn(
+                  "whitespace-nowrap transition-opacity duration-150",
+                  expanded ? "opacity-100" : "opacity-0"
+                )}
+              >
                 {item.label}
               </span>
             </Link>
@@ -94,7 +137,12 @@ export function AdminSidebar() {
               <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
           </span>
-          <span className="whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+          <span
+            className={cn(
+              "whitespace-nowrap transition-opacity duration-150",
+              expanded ? "opacity-100" : "opacity-0"
+            )}
+          >
             <SignOutButton />
           </span>
         </div>

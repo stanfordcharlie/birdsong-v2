@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function AdminHomePage() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-10 p-8">
+    <div className="flex flex-1 flex-col items-center justify-center gap-10">
 
       {/* Welcome card */}
       <div className="flex w-full max-w-lg flex-col items-center gap-2 text-center">
