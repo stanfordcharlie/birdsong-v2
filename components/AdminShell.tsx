@@ -4,12 +4,22 @@ import { useState } from "react";
 import { AdminSidebar } from "./AdminSidebar";
 import { cn } from "@/lib/utils";
 
-export function AdminShell({ children }: { children: React.ReactNode }) {
+export function AdminShell({
+  children,
+  userEmail,
+}: {
+  children: React.ReactNode;
+  userEmail: string | null;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="flex min-h-screen bg-page text-card-foreground">
-      <AdminSidebar expanded={expanded} onToggle={() => setExpanded((prev) => !prev)} />
+      <AdminSidebar
+        expanded={expanded}
+        onToggle={() => setExpanded((prev) => !prev)}
+        userEmail={userEmail}
+      />
       <main
         className={cn(
           "flex-1 transition-all duration-200 ease-out",

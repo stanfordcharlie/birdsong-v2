@@ -7,6 +7,16 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   {
+    href: "/admin",
+    label: "Dashboard",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9.5 12 3l9 6.5" />
+        <path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/surveys",
     label: "Surveys",
     icon: (
@@ -48,14 +58,28 @@ function SidebarToggleIcon() {
   );
 }
 
+// Flyout label for the icon-only rail, anchored to the right edge of
+// whichever icon it's wrapped around (a tight `group/tooltip relative`
+// wrapper, not the full row, so it lines up with the icon itself).
+function IconTooltip({ label }: { label: string }) {
+  return (
+    <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-[#111111] px-2 py-1 text-xs font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/tooltip:opacity-100">
+      {label}
+    </span>
+  );
+}
+
 export function AdminSidebar({
   expanded,
   onToggle,
+  userEmail,
 }: {
   expanded: boolean;
   onToggle: () => void;
+  userEmail: string | null;
 }) {
   const pathname = usePathname();
+  const initial = (userEmail?.trim()?.[0] ?? "?").toUpperCase();
 
   return (
     <aside
@@ -64,87 +88,99 @@ export function AdminSidebar({
         expanded ? "w-56" : "w-14"
       )}
     >
-      {/* Logo */}
-      <Link href="/admin" className="flex h-14 items-center overflow-hidden px-4">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/birdsong_logo_mark_v2.svg" alt="Birdsong" width={32} height={32} className="h-6 w-6" />
-        </span>
-        <span
-          className={cn(
-            "ml-2 whitespace-nowrap text-sm font-semibold text-white transition-opacity duration-150",
-            expanded ? "opacity-100" : "opacity-0"
-          )}
-        >
-          Birdsong
-        </span>
-      </Link>
-
-      {/* Sidebar toggle */}
-      <div className="flex items-center justify-center px-2 pb-2">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] transition-colors hover:bg-white/10 hover:text-white"
-        >
-          <SidebarToggleIcon />
-        </button>
+      {/* Header: logo + wordmark + toggle inline when expanded, just the
+          toggle when collapsed (mirrors Jack & Jill's sidebar header). */}
+      <div className="flex h-14 items-center px-4">
+        {expanded ? (
+          <>
+            <Link href="/admin" className="flex flex-1 items-center gap-2 overflow-hidden">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/birdsong_logo_mark_v2.svg" alt="Birdsong" width={32} height={32} className="h-6 w-6" />
+              </span>
+              <span className="whitespace-nowrap text-sm font-semibold text-white">Birdsong</span>
+            </Link>
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-label="Collapse sidebar"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <SidebarToggleIcon />
+            </button>
+          </>
+        ) : (
+          <div className="group/tooltip relative mx-auto flex">
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-label="Expand sidebar"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <SidebarToggleIcon />
+            </button>
+            <IconTooltip label="Expand sidebar" />
+          </div>
+        )}
       </div>
 
       {/* Nav items */}
       <nav className="flex flex-1 flex-col gap-1 px-2 py-3">
         {NAV_ITEMS.map((item) => {
-          // "/admin/surveys" is a prefix of "/admin/surveys/new", which has
-          // its own nav entry, so it needs an explicit carve-out to avoid
-          // both items lighting up together on the new-survey page.
+          // "/admin" is a prefix of every other admin route, and
+          // "/admin/surveys" is a prefix of "/admin/surveys/new" (which has
+          // its own nav entry), so both need explicit carve-outs to avoid
+          // multiple items lighting up together.
           const isActive =
-            item.href === "/admin/surveys"
-              ? pathname === "/admin/surveys" ||
-                (pathname.startsWith("/admin/surveys/") && !pathname.startsWith("/admin/surveys/new"))
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
+            item.href === "/admin"
+              ? pathname === "/admin"
+              : item.href === "/admin/surveys"
+                ? pathname === "/admin/surveys" ||
+                  (pathname.startsWith("/admin/surveys/") && !pathname.startsWith("/admin/surveys/new"))
+                : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex h-10 items-center gap-3 overflow-hidden rounded-lg px-2 text-sm transition-colors ${
-                isActive
-                  ? "bg-white/15 text-white"
-                  : "text-[#9ca3af] hover:bg-white/8 hover:text-white"
-              }`}
-            >
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center">{item.icon}</span>
-              <span
-                className={cn(
-                  "whitespace-nowrap transition-opacity duration-150",
-                  expanded ? "opacity-100" : "opacity-0"
-                )}
+            <div key={item.href} className="group/tooltip relative flex w-full">
+              <Link
+                href={item.href}
+                className={`flex h-10 w-full items-center gap-3 overflow-hidden rounded-lg px-2 text-sm transition-colors ${
+                  isActive
+                    ? "bg-white/15 text-white"
+                    : "text-[#9ca3af] hover:bg-white/8 hover:text-white"
+                }`}
               >
-                {item.label}
-              </span>
-            </Link>
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center">{item.icon}</span>
+                <span
+                  className={cn(
+                    "whitespace-nowrap transition-opacity duration-150",
+                    expanded ? "opacity-100" : "opacity-0"
+                  )}
+                >
+                  {item.label}
+                </span>
+              </Link>
+              {!expanded && <IconTooltip label={item.label} />}
+            </div>
           );
         })}
       </nav>
 
-      {/* Bottom: sign out */}
-      <div className="flex items-center overflow-hidden border-t border-white/10 px-2 py-3">
-        <div className="flex h-10 w-full items-center gap-3 overflow-hidden rounded-lg px-2">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[#9ca3af]">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-          </span>
-          <span
-            className={cn(
-              "whitespace-nowrap transition-opacity duration-150",
-              expanded ? "opacity-100" : "opacity-0"
-            )}
-          >
-            <SignOutButton />
-          </span>
+      {/* Bottom: account avatar (first initial of the user's email) + sign out */}
+      <div className="flex items-center border-t border-white/10 px-2 py-3">
+        <div className="group/tooltip relative flex w-full">
+          <div className="flex h-10 w-full items-center gap-3 overflow-hidden rounded-lg px-2">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+              {initial}
+            </span>
+            <span
+              className={cn(
+                "whitespace-nowrap transition-opacity duration-150",
+                expanded ? "opacity-100" : "opacity-0"
+              )}
+            >
+              <SignOutButton />
+            </span>
+          </div>
+          {!expanded && <IconTooltip label="Sign out" />}
         </div>
       </div>
     </aside>

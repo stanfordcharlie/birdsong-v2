@@ -5,22 +5,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { OPENING_MESSAGE } from "@/lib/profile-onboarding/prompt";
 import type { OnboardingMessage, ResearchResult } from "@/lib/profile-onboarding/types";
+import { renderWithBold } from "@/lib/chat/render-with-bold";
 import type { ProfileFormValues } from "./ProfileForm";
-
-// Assistant messages mark the key phrase worth skimming with markdown bold
-// (**like this**) per the system prompt; render that as real bold instead
-// of showing the raw asterisks.
-function renderWithBold(text: string) {
-  return text
-    .split(/(\*\*[^*]+\*\*)/g)
-    .map((part, i) =>
-      part.startsWith("**") && part.endsWith("**") ? (
-        <strong key={i}>{part.slice(2, -2)}</strong>
-      ) : (
-        part
-      )
-    );
-}
 
 export function ProfileOnboarding({
   onComplete,

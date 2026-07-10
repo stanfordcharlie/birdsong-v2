@@ -14,6 +14,7 @@ export type Database = {
           id: string;
           slug: string;
           title: string;
+          external_title: string | null;
           topic: string | null;
           sponsor: string | null;
           question_guide: string | null;
@@ -28,6 +29,7 @@ export type Database = {
           id?: string;
           slug: string;
           title: string;
+          external_title?: string | null;
           topic?: string | null;
           sponsor?: string | null;
           question_guide?: string | null;
@@ -42,6 +44,7 @@ export type Database = {
           id?: string;
           slug?: string;
           title?: string;
+          external_title?: string | null;
           topic?: string | null;
           sponsor?: string | null;
           question_guide?: string | null;

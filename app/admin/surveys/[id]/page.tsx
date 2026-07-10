@@ -33,6 +33,7 @@ export default async function SurveyDetailPage({
   const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
   const initialValues: SurveyFormValues = {
     title: survey.title,
+    externalTitle: survey.external_title ?? "",
     slug: survey.slug,
     topic: survey.topic ?? "",
     questionGuide: survey.question_guide ?? "",

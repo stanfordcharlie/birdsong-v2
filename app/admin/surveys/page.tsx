@@ -49,7 +49,7 @@ export default async function AdminDashboardPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Title</TableHead>
+                <TableHead>Internal name</TableHead>
                 <TableHead>Slug</TableHead>
                 <TableHead>Created</TableHead>
               </TableRow>

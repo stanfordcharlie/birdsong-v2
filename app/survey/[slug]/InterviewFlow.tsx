@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, type FormEvent } from "react";
+import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent } from "react";
 import type { Database } from "@/types/database";
 import type { InterviewMessage } from "@/lib/interview/types";
 import {
@@ -9,16 +9,21 @@ import {
 } from "@/lib/surveys/respondent-fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
+import { renderWithBold } from "@/lib/chat/render-with-bold";
 import { cn } from "@/lib/utils";
 
 type Survey = Database["public"]["Tables"]["surveys"]["Row"];
 type Stage = "intro" | "chat" | "complete";
 
+// Light "received message" treatment (matches the profile-onboarding chat)
+// instead of a solid dark bubble, so bolded phrases read clearly and the
+// two sides of the conversation are easy to tell apart at a glance.
 const ASSISTANT_BUBBLE =
-  "max-w-[80%] rounded-2xl bg-sidebar px-4 py-2.5 text-sm leading-relaxed text-sidebar-active-foreground";
+  "max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground";
 const RESPONDENT_BUBBLE =
-  "self-end max-w-[80%] rounded-2xl bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground";
+  "self-end max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground";
 
 function wait(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -37,24 +42,41 @@ function wordRevealDelayMs() {
   return 40 + Math.random() * 20;
 }
 
+// If a respondent starts typing a follow-up thought right after sending
+// (e.g. they forgot to mention something) before the next question has
+// appeared, don't let it pop in over them mid-keystroke: hold it back
+// until they've paused typing for this long.
+const TYPING_PAUSE_MS = 10000;
+
 function TypingDots() {
   return (
     <div className={cn(ASSISTANT_BUBBLE, "flex w-fit items-center gap-1 py-3")}>
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-sidebar-foreground [animation-delay:-0.3s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-sidebar-foreground [animation-delay:-0.15s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-sidebar-foreground" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
     </div>
   );
 }
 
-// num_questions is a loose guideline (the model may run shorter or longer),
-// so progress is capped short of 100% until the interview actually
-// completes rather than implying a precision the estimate doesn't have.
+// num_questions is a loose guideline the model is explicitly allowed to run
+// longer than, so progress can't just hard-cap at 90% once answered reaches
+// target: that plateaus visibly (looks "stuck") for the many surveys that
+// run past their nominal question count. Past the guideline, keep creeping
+// up with diminishing returns instead of flatlining, and never claim 100%
+// short of the interview actually completing.
+function computeProgressPercent(answered: number, target: number): number {
+  if (answered < target) {
+    return Math.round((answered / target) * 90);
+  }
+  const overage = answered - target;
+  return Math.min(90 + Math.round(9 * (overage / (overage + target))), 99);
+}
+
 // Rendered as a hairline at the very top of the viewport rather than a
 // labeled form-wizard bar, since a respondent mid-conversation doesn't need
 // (or want) a percentage readout.
 function TopProgressLine({ answered, target }: { answered: number; target: number }) {
-  const percent = Math.min(Math.round((answered / target) * 100), 90);
+  const percent = computeProgressPercent(answered, target);
   return (
     <div className="fixed inset-x-0 top-0 z-30 h-0.5">
       <div
@@ -63,6 +85,14 @@ function TopProgressLine({ answered, target }: { answered: number; target: numbe
       />
     </div>
   );
+}
+
+// Respondents are one-and-done: a survey they've already finished should
+// never show the intro form again, whether from revisiting the URL, a hard
+// refresh, or (in dev) a Fast Refresh remount. localStorage, not just React
+// state, is what makes that stick across a full page reload.
+function completionStorageKey(surveyId: string) {
+  return `birdsong-survey-complete:${surveyId}`;
 }
 
 function SendIcon() {
@@ -99,15 +129,36 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
   const [error, setError] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [streamingText, setStreamingText] = useState<string | null>(null);
-  const answerInputRef = useRef<HTMLInputElement>(null);
+  const answerInputRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const isMountedRef = useRef(true);
+  // Epoch 0 so a fresh page load with no typing yet never waits.
+  const lastKeystrokeAtRef = useRef(0);
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(completionStorageKey(survey.id));
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as {
+          closingMessage: string;
+          messages: InterviewMessage[];
+        };
+        setClosingMessage(parsed.closingMessage);
+        setMessages(parsed.messages);
+        setStage("complete");
+      } catch {
+        // Ignore anything from an older, incompatible storage format.
+      }
+    }
+    // Only ever meant to run once, against whatever's in storage at mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Refocus the answer box whenever it becomes usable again (first question,
@@ -122,10 +173,21 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, isTyping, streamingText]);
 
+  async function waitForRespondentToPauseTyping() {
+    while (isMountedRef.current) {
+      const idleMs = Date.now() - lastKeystrokeAtRef.current;
+      if (idleMs >= TYPING_PAUSE_MS) return;
+      await wait(TYPING_PAUSE_MS - idleMs);
+    }
+  }
+
   // Shows a typing indicator, then reveals the reply word by word, so
   // Claude's side of the conversation paces like a real texting app instead
   // of appearing all at once.
   async function revealAssistantMessage(content: string) {
+    await waitForRespondentToPauseTyping();
+    if (!isMountedRef.current) return;
+
     setIsTyping(true);
     setStreamingText(null);
     await wait(typingDelayMs(content.length));
@@ -174,14 +236,20 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
     }
   }
 
-  async function handleSend(e: FormEvent) {
-    e.preventDefault();
-    if (!answer.trim() || !responseId) return;
+  async function submitAnswer() {
+    if (!answer.trim() || !responseId || loading) return;
     setError(null);
     setLoading(true);
     const userMessage: InterviewMessage = { role: "user", content: answer };
-    setMessages((prev) => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setAnswer("");
+    // The textarea's height is grown via direct DOM mutation as the
+    // respondent types (see onChange below), so clearing the React state
+    // alone doesn't shrink it back down; reset it explicitly.
+    if (answerInputRef.current) {
+      answerInputRef.current.style.height = "auto";
+    }
     try {
       const res = await fetch("/api/interview/continue", {
         method: "POST",
@@ -191,6 +259,10 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to continue the interview");
       if (data.complete) {
+        window.localStorage.setItem(
+          completionStorageKey(survey.id),
+          JSON.stringify({ closingMessage: data.message, messages: updatedMessages })
+        );
         setClosingMessage(data.message);
         setStage("complete");
         setLoading(false);
@@ -203,12 +275,28 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
     }
   }
 
+  function handleSend(e: FormEvent) {
+    e.preventDefault();
+    submitAnswer();
+  }
+
+  // Enter sends the answer; Shift+Enter falls through to the textarea's
+  // default behavior and inserts a newline instead.
+  function handleAnswerKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      submitAnswer();
+    }
+  }
+
   if (stage === "intro") {
     return (
       <div className="mx-auto max-w-xl px-4 py-12">
         <Card>
           <CardContent className="flex flex-col gap-4 p-6">
-            <h1 className="text-xl font-semibold text-card-foreground">{survey.title}</h1>
+            <h1 className="text-xl font-semibold text-card-foreground">
+              {survey.external_title || survey.title}
+            </h1>
             {survey.topic && <p className="text-sm text-muted-foreground">{survey.topic}</p>}
             {survey.gift_card_amount ? (
               <p className="text-sm text-muted-foreground">
@@ -267,13 +355,21 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
 
   if (stage === "complete") {
     return (
-      <div className="mx-auto max-w-xl px-4 py-12">
-        <Card>
-          <CardContent className="flex flex-col gap-3 p-6">
-            <h1 className="text-xl font-semibold text-card-foreground">Thanks!</h1>
-            <p className="text-sm text-muted-foreground">{closingMessage}</p>
-          </CardContent>
-        </Card>
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-12">
+        <div className="flex flex-col gap-2 text-center">
+          <h1 className="text-xl font-semibold text-card-foreground">Thanks!</h1>
+          <p className="text-sm text-muted-foreground">{closingMessage}</p>
+        </div>
+        <div className="flex flex-col gap-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Your responses
+          </h2>
+          {messages.map((m, i) => (
+            <div key={i} className={m.role === "assistant" ? ASSISTANT_BUBBLE : RESPONDENT_BUBBLE}>
+              {m.role === "assistant" ? renderWithBold(m.content) : m.content}
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -286,18 +382,25 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
 
       <header className="sticky top-0 z-20 bg-page/95 backdrop-blur-sm">
         <div className="mx-auto w-full max-w-2xl px-6 pb-3 pt-8">
-          <h1 className="text-sm font-medium text-muted-foreground">{survey.title}</h1>
+          <h1 className="text-sm font-medium text-muted-foreground">
+            {survey.external_title || survey.title}
+          </h1>
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-6 py-2">
+      {/* pb-28 clears the sticky composer below: without it the last
+          message/bottomRef lands right at the viewport edge and ends up
+          hidden behind the composer instead of scrolled fully into view. */}
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-6 py-2 pb-28">
         {messages.map((m, i) => (
           <div key={i} className={m.role === "assistant" ? ASSISTANT_BUBBLE : RESPONDENT_BUBBLE}>
-            {m.content}
+            {m.role === "assistant" ? renderWithBold(m.content) : m.content}
           </div>
         ))}
         {isTyping && <TypingDots />}
-        {streamingText !== null && <div className={ASSISTANT_BUBBLE}>{streamingText}</div>}
+        {streamingText !== null && (
+          <div className={ASSISTANT_BUBBLE}>{renderWithBold(streamingText)}</div>
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -305,16 +408,22 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
         <div className="mx-auto w-full max-w-2xl px-6 pb-6 pt-3">
           <form
             onSubmit={handleSend}
-            className="flex items-center gap-2 rounded-full bg-card px-2 py-2 shadow-sm ring-1 ring-border focus-within:ring-2 focus-within:ring-ring"
+            className="flex items-end gap-2 rounded-3xl bg-card px-2 py-2 shadow-sm ring-1 ring-border focus-within:ring-2 focus-within:ring-ring"
           >
-            <input
+            <Textarea
               ref={answerInputRef}
-              type="text"
               placeholder="Type your answer..."
               value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              disabled={loading}
-              className="flex-1 bg-transparent px-3 py-2 text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              onChange={(e) => {
+                setAnswer(e.target.value);
+                lastKeystrokeAtRef.current = Date.now();
+                const el = e.target;
+                el.style.height = "auto";
+                el.style.height = `${el.scrollHeight}px`;
+              }}
+              onKeyDown={handleAnswerKeyDown}
+              rows={1}
+              className="max-h-36 flex-1 resize-none overflow-y-auto rounded-none border-0 bg-transparent px-3 py-2 text-sm text-card-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
             />
             <button
               type="submit"

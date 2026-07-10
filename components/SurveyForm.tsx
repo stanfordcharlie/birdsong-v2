@@ -27,6 +27,7 @@ function slugify(input: string): string {
 
 export type SurveyFormValues = {
   title: string;
+  externalTitle: string;
   slug: string;
   topic: string;
   questionGuide: string;
@@ -40,6 +41,7 @@ export type SurveyFormValues = {
 
 const EMPTY_VALUES: SurveyFormValues = {
   title: "",
+  externalTitle: "",
   slug: "",
   topic: "",
   questionGuide: "",
@@ -63,6 +65,7 @@ export function SurveyForm(props: SurveyFormProps) {
   const initial = isEdit ? props.initialValues : EMPTY_VALUES;
 
   const [title, setTitle] = useState(initial.title);
+  const [externalTitle, setExternalTitle] = useState(initial.externalTitle);
   const [slug, setSlug] = useState(initial.slug);
   // An existing survey's slug is already published, so it must never
   // silently change just because the title changed; only a create-mode
@@ -90,6 +93,7 @@ export function SurveyForm(props: SurveyFormProps) {
   }, [title, slugTouched]);
 
   const titleInvalid = attemptedSubmit && !title.trim();
+  const externalTitleInvalid = attemptedSubmit && !externalTitle.trim();
   const slugInvalid = attemptedSubmit && !slugify(slug);
   const guideInvalid = attemptedSubmit && !questionGuide.trim();
   const numQuestionsInvalid = attemptedSubmit && !numQuestions.trim();
@@ -125,7 +129,13 @@ export function SurveyForm(props: SurveyFormProps) {
     setAttemptedSubmit(true);
 
     const baseSlug = slugify(slug);
-    if (!title.trim() || !baseSlug || !questionGuide.trim() || !numQuestions.trim()) {
+    if (
+      !title.trim() ||
+      !externalTitle.trim() ||
+      !baseSlug ||
+      !questionGuide.trim() ||
+      !numQuestions.trim()
+    ) {
       setError("Please fill in all required fields.");
       return;
     }
@@ -146,6 +156,7 @@ export function SurveyForm(props: SurveyFormProps) {
 
       const payload = {
         title,
+        external_title: externalTitle,
         topic: topic || null,
         question_guide: questionGuide || null,
         tone: tone || null,
@@ -211,7 +222,10 @@ export function SurveyForm(props: SurveyFormProps) {
     <form onSubmit={handleSubmit} className="flex max-w-lg flex-col gap-4">
       <label className="flex flex-col gap-1">
         <span className="text-sm font-medium text-card-foreground">
-          Title <span className="text-destructive">*</span>
+          Internal name <span className="text-destructive">*</span>
+        </span>
+        <span className="text-xs text-muted-foreground">
+          For your own reference in the admin dashboard. Respondents never see this.
         </span>
         <Input
           type="text"
@@ -220,6 +234,22 @@ export function SurveyForm(props: SurveyFormProps) {
           className={titleInvalid ? invalidBorder : ""}
         />
         {titleInvalid && <span className="text-xs text-destructive">Required</span>}
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-sm font-medium text-card-foreground">
+          External name <span className="text-destructive">*</span>
+        </span>
+        <span className="text-xs text-muted-foreground">
+          Shown to respondents on the interview page itself.
+        </span>
+        <Input
+          type="text"
+          value={externalTitle}
+          onChange={(e) => setExternalTitle(e.target.value)}
+          className={externalTitleInvalid ? invalidBorder : ""}
+        />
+        {externalTitleInvalid && <span className="text-xs text-destructive">Required</span>}
       </label>
 
       <label className="flex flex-col gap-1">
