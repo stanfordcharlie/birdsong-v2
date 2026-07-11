@@ -30,15 +30,6 @@ function wait(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
-// Mimics natural reply pacing: a short "reading + thinking" pause that scales
-// gently with reply length, jittered so it doesn't feel like a fixed timer.
-function typingDelayMs(replyLength: number) {
-  const base = 600 + Math.random() * 300;
-  const perChar = 15 + Math.random() * 5;
-  const jitter = Math.random() * 400 - 200;
-  return Math.min(Math.max(base + replyLength * perChar + jitter, 500), 2800);
-}
-
 function wordRevealDelayMs() {
   return 40 + Math.random() * 20;
 }
@@ -185,19 +176,18 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
     }
   }
 
-  // Shows a typing indicator, then reveals the reply word by word, so
+  // The typing indicator is already showing by the time this runs (callers
+  // turn it on immediately when they send, before the fetch that produces
+  // `content` even resolves) — this just holds it up if the respondent is
+  // mid-keystroke on a follow-up, then reveals the reply word by word so
   // Claude's side of the conversation paces like a real texting app instead
   // of appearing all at once.
   async function revealAssistantMessage(content: string) {
     await waitForRespondentToPauseTyping();
     if (!isMountedRef.current) return;
 
-    setIsTyping(true);
-    setStreamingText(null);
-    await wait(typingDelayMs(content.length));
-    if (!isMountedRef.current) return;
-
     setIsTyping(false);
+    setStreamingText(null);
     const words = content.split(" ");
     for (let i = 1; i <= words.length; i++) {
       setStreamingText(words.slice(0, i).join(" "));
@@ -214,6 +204,7 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    setIsTyping(true);
     try {
       const res = await fetch("/api/interview/start", {
         method: "POST",
@@ -241,6 +232,7 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
       setStage("chat");
       await revealAssistantMessage(data.message);
     } catch (err) {
+      setIsTyping(false);
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);
     }
@@ -250,6 +242,7 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
     if (!answer.trim() || !responseId || loading) return;
     setError(null);
     setLoading(true);
+    setIsTyping(true);
     const userMessage: InterviewMessage = { role: "user", content: answer };
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
@@ -280,6 +273,7 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
           completionStorageKey(survey.id),
           JSON.stringify({ closingMessage: data.message, messages: updatedMessages })
         );
+        setIsTyping(false);
         setClosingMessage(data.message);
         setStage("complete");
         setLoading(false);
@@ -287,6 +281,7 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
         await revealAssistantMessage(data.message);
       }
     } catch (err) {
+      setIsTyping(false);
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);
     }
