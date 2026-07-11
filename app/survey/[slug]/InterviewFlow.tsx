@@ -164,9 +164,19 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
     }
   }, [stage, loading]);
 
+  // Instant, not smooth: streamingText updates every ~40-60ms as words
+  // reveal, and each update grows the bubble (and therefore bottomRef's
+  // position) a little more. Smooth scrolling can't finish one ~300-500ms
+  // animation before the next call interrupts it with an already-stale
+  // target, so across a whole reply the view visibly stalls or never
+  // catches up. Firing instantly on every update reads as continuous
+  // tracking anyway given how frequent the updates are, without the
+  // interrupted-animation class of bugs. `stage` is included so switching
+  // into the chat view (a fresh mount of the scrollable area and bottomRef)
+  // also scrolls immediately, not just on the next message/typing change.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, isTyping, streamingText]);
+    bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [stage, messages, isTyping, streamingText]);
 
   async function waitForRespondentToPauseTyping() {
     while (isMountedRef.current) {
