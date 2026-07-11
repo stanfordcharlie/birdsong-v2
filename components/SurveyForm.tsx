@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Json } from "@/types/database";
 import {
+  OPTIONAL_RESPONDENT_FIELD_LABELS,
   slugifyCustomFieldKey,
   type CustomRespondentFieldDef,
-  type OptionalRespondentField,
 } from "@/lib/surveys/respondent-fields";
 import { SurveyOnboardingChat } from "@/components/SurveyOnboardingChat";
 import { SURVEY_TONE_OPTIONS, type ExtractedSurveyDetails } from "@/lib/survey-onboarding/types";
@@ -48,6 +48,10 @@ export type SurveyFormValues = {
   collectJobTitle: boolean;
   collectCompany: boolean;
   collectLinkedin: boolean;
+  phoneLabel: string;
+  jobTitleLabel: string;
+  companyLabel: string;
+  linkedinLabel: string;
   customFields: CustomRespondentFieldDef[];
 };
 
@@ -68,6 +72,10 @@ const EMPTY_VALUES: SurveyFormValues = {
   collectJobTitle: false,
   collectCompany: false,
   collectLinkedin: false,
+  phoneLabel: OPTIONAL_RESPONDENT_FIELD_LABELS.phone,
+  jobTitleLabel: OPTIONAL_RESPONDENT_FIELD_LABELS.job_title,
+  companyLabel: OPTIONAL_RESPONDENT_FIELD_LABELS.company,
+  linkedinLabel: OPTIONAL_RESPONDENT_FIELD_LABELS.linkedin,
   customFields: [],
 };
 
@@ -106,6 +114,10 @@ export function SurveyForm(props: SurveyFormProps) {
   const [collectJobTitle, setCollectJobTitle] = useState(initial.collectJobTitle);
   const [collectCompany, setCollectCompany] = useState(initial.collectCompany);
   const [collectLinkedin, setCollectLinkedin] = useState(initial.collectLinkedin);
+  const [phoneLabel, setPhoneLabel] = useState(initial.phoneLabel);
+  const [jobTitleLabel, setJobTitleLabel] = useState(initial.jobTitleLabel);
+  const [companyLabel, setCompanyLabel] = useState(initial.companyLabel);
+  const [linkedinLabel, setLinkedinLabel] = useState(initial.linkedinLabel);
   const [customFields, setCustomFields] = useState<CustomRespondentFieldDef[]>(
     initial.customFields
   );
@@ -214,11 +226,34 @@ export function SurveyForm(props: SurveyFormProps) {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in.");
 
-      const enabledFields: OptionalRespondentField[] = [
-        ...(collectPhone ? (["phone"] as const) : []),
-        ...(collectJobTitle ? (["job_title"] as const) : []),
-        ...(collectCompany ? (["company"] as const) : []),
-        ...(collectLinkedin ? (["linkedin"] as const) : []),
+      const enabledFields: CustomRespondentFieldDef[] = [
+        ...(collectPhone
+          ? [{ key: "phone", label: phoneLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.phone }]
+          : []),
+        ...(collectJobTitle
+          ? [
+              {
+                key: "job_title",
+                label: jobTitleLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.job_title,
+              },
+            ]
+          : []),
+        ...(collectCompany
+          ? [
+              {
+                key: "company",
+                label: companyLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.company,
+              },
+            ]
+          : []),
+        ...(collectLinkedin
+          ? [
+              {
+                key: "linkedin",
+                label: linkedinLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.linkedin,
+              },
+            ]
+          : []),
       ];
 
       const payload = {
@@ -358,7 +393,12 @@ export function SurveyForm(props: SurveyFormProps) {
                   onChange={(e) => setCollectPhone(e.target.checked)}
                   className="accent-primary"
                 />
-                Phone number
+                <Input
+                  type="text"
+                  value={phoneLabel}
+                  onChange={(e) => setPhoneLabel(e.target.value)}
+                  className="h-7 flex-1 text-sm"
+                />
               </label>
               <label className="flex items-center gap-2 text-sm text-card-foreground">
                 <input
@@ -367,7 +407,12 @@ export function SurveyForm(props: SurveyFormProps) {
                   onChange={(e) => setCollectJobTitle(e.target.checked)}
                   className="accent-primary"
                 />
-                Job title
+                <Input
+                  type="text"
+                  value={jobTitleLabel}
+                  onChange={(e) => setJobTitleLabel(e.target.value)}
+                  className="h-7 flex-1 text-sm"
+                />
               </label>
               <label className="flex items-center gap-2 text-sm text-card-foreground">
                 <input
@@ -376,7 +421,12 @@ export function SurveyForm(props: SurveyFormProps) {
                   onChange={(e) => setCollectCompany(e.target.checked)}
                   className="accent-primary"
                 />
-                Company name
+                <Input
+                  type="text"
+                  value={companyLabel}
+                  onChange={(e) => setCompanyLabel(e.target.value)}
+                  className="h-7 flex-1 text-sm"
+                />
               </label>
               <label className="flex items-center gap-2 text-sm text-card-foreground">
                 <input
@@ -385,7 +435,12 @@ export function SurveyForm(props: SurveyFormProps) {
                   onChange={(e) => setCollectLinkedin(e.target.checked)}
                   className="accent-primary"
                 />
-                LinkedIn URL
+                <Input
+                  type="text"
+                  value={linkedinLabel}
+                  onChange={(e) => setLinkedinLabel(e.target.value)}
+                  className="h-7 flex-1 text-sm"
+                />
               </label>
             </div>
 

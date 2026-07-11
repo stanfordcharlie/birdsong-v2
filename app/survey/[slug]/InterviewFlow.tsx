@@ -6,7 +6,7 @@ import type { InterviewMessage } from "@/lib/interview/types";
 import {
   parseCustomRespondentFieldDefs,
   parseEnabledRespondentFields,
-  OPTIONAL_RESPONDENT_FIELD_LABELS,
+  parsePresetFieldLabel,
 } from "@/lib/surveys/respondent-fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -260,6 +260,13 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
     if (answerInputRef.current) {
       answerInputRef.current.style.height = "auto";
     }
+    // The keystrokes that just composed this answer shouldn't count as
+    // "still typing" against the next reveal's pause check — without this
+    // reset, every send looks stalled for a full TYPING_PAUSE_MS because
+    // the respondent's last keystroke (finishing their answer) was just
+    // now. Only keystrokes typed *after* this point (a follow-up while
+    // waiting) should ever trigger that pause.
+    lastKeystrokeAtRef.current = 0;
     try {
       const res = await fetch("/api/interview/continue", {
         method: "POST",
@@ -331,7 +338,7 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
               {enabledFields.includes("phone") && (
                 <Input
                   type="tel"
-                  placeholder={OPTIONAL_RESPONDENT_FIELD_LABELS.phone}
+                  placeholder={parsePresetFieldLabel(survey.custom_fields, "phone")}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                 />
@@ -339,7 +346,7 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
               {enabledFields.includes("job_title") && (
                 <Input
                   type="text"
-                  placeholder={OPTIONAL_RESPONDENT_FIELD_LABELS.job_title}
+                  placeholder={parsePresetFieldLabel(survey.custom_fields, "job_title")}
                   value={jobTitle}
                   onChange={(e) => setJobTitle(e.target.value)}
                 />
@@ -347,7 +354,7 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
               {enabledFields.includes("company") && (
                 <Input
                   type="text"
-                  placeholder={OPTIONAL_RESPONDENT_FIELD_LABELS.company}
+                  placeholder={parsePresetFieldLabel(survey.custom_fields, "company")}
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
                 />
@@ -355,7 +362,7 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
               {enabledFields.includes("linkedin") && (
                 <Input
                   type="url"
-                  placeholder={OPTIONAL_RESPONDENT_FIELD_LABELS.linkedin}
+                  placeholder={parsePresetFieldLabel(survey.custom_fields, "linkedin")}
                   value={linkedin}
                   onChange={(e) => setLinkedin(e.target.value)}
                 />

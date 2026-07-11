@@ -3,10 +3,7 @@
 import { Fragment, useState } from "react";
 import type { Database } from "@/types/database";
 import type { InterviewMessage } from "@/lib/interview/types";
-import {
-  OPTIONAL_RESPONDENT_FIELD_LABELS,
-  type CustomRespondentFieldDef,
-} from "@/lib/surveys/respondent-fields";
+import { parseCustomRespondentFieldDefs, parsePresetFieldLabel } from "@/lib/surveys/respondent-fields";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -22,21 +19,24 @@ type ResponseRow = Database["public"]["Tables"]["responses"]["Row"];
 
 export function ResponsesTable({
   responses,
-  customFieldDefs = [],
+  surveyCustomFields = [],
 }: {
   responses: ResponseRow[];
-  customFieldDefs?: CustomRespondentFieldDef[];
+  surveyCustomFields?: unknown;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // job_title/company/linkedin are presets stored in custom_field_values
-  // under those exact keys; admin-defined fields use their own generated
-  // keys. Both need a human label when displaying a response.
+  // under those exact keys (using whatever label the admin set, or the
+  // default); admin-defined fields use their own generated keys. Both need
+  // a human label when displaying a response.
   const customFieldLabels: Record<string, string> = {
-    job_title: OPTIONAL_RESPONDENT_FIELD_LABELS.job_title,
-    company: OPTIONAL_RESPONDENT_FIELD_LABELS.company,
-    linkedin: OPTIONAL_RESPONDENT_FIELD_LABELS.linkedin,
-    ...Object.fromEntries(customFieldDefs.map((field) => [field.key, field.label])),
+    job_title: parsePresetFieldLabel(surveyCustomFields, "job_title"),
+    company: parsePresetFieldLabel(surveyCustomFields, "company"),
+    linkedin: parsePresetFieldLabel(surveyCustomFields, "linkedin"),
+    ...Object.fromEntries(
+      parseCustomRespondentFieldDefs(surveyCustomFields).map((field) => [field.key, field.label])
+    ),
   };
 
   if (responses.length === 0) {

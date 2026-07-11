@@ -6,6 +6,7 @@ import { SurveyForm, type SurveyFormValues } from "@/components/SurveyForm";
 import {
   parseCustomRespondentFieldDefs,
   parseEnabledRespondentFields,
+  parsePresetFieldLabel,
 } from "@/lib/surveys/respondent-fields";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -52,6 +53,10 @@ export default async function SurveyDetailPage({
     collectJobTitle: enabledFields.includes("job_title"),
     collectCompany: enabledFields.includes("company"),
     collectLinkedin: enabledFields.includes("linkedin"),
+    phoneLabel: parsePresetFieldLabel(survey.custom_fields, "phone"),
+    jobTitleLabel: parsePresetFieldLabel(survey.custom_fields, "job_title"),
+    companyLabel: parsePresetFieldLabel(survey.custom_fields, "company"),
+    linkedinLabel: parsePresetFieldLabel(survey.custom_fields, "linkedin"),
     customFields: customFieldDefs,
   };
 
@@ -74,7 +79,7 @@ export default async function SurveyDetailPage({
         </CardContent>
       </Card>
 
-      <ResponsesTable responses={responses ?? []} customFieldDefs={customFieldDefs} />
+      <ResponsesTable responses={responses ?? []} surveyCustomFields={survey.custom_fields} />
     </div>
   );
 }
