@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ProfileOnboarding } from "./ProfileOnboarding";
+import { ProfileEditChat } from "./ProfileEditChat";
 import { ProfileForm, type ProfileFormValues } from "./ProfileForm";
 import type { ResearchResult } from "@/lib/profile-onboarding/types";
 
@@ -18,6 +19,16 @@ export function ProfileGate({
   );
   const [justOnboarded, setJustOnboarded] = useState(false);
   const [autoSaveFailed, setAutoSaveFailed] = useState(false);
+  // ProfileForm only reads its initialValues once, at mount, since it owns
+  // its own field state for direct typing. Bumping this key forces a
+  // remount whenever the edit chat applies a change, so the form picks up
+  // the new values instead of showing stale ones underneath the chat.
+  const [formKey, setFormKey] = useState(0);
+
+  function handleEditApplied(updated: ProfileFormValues) {
+    setValues(updated);
+    setFormKey((prev) => prev + 1);
+  }
 
   async function handleOnboardingComplete(
     completedValues: ProfileFormValues,
@@ -76,7 +87,8 @@ export function ProfileGate({
           Couldn&apos;t save that automatically. Review below and click Save changes to try again.
         </p>
       )}
-      <ProfileForm initialValues={values} />
+      <ProfileEditChat currentValues={values} onUpdate={handleEditApplied} />
+      <ProfileForm key={formKey} initialValues={values} />
     </div>
   );
 }

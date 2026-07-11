@@ -488,26 +488,29 @@ export function SurveyForm(props: SurveyFormProps) {
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <label className="flex flex-1 flex-col gap-1">
                     <span className="text-xs text-muted-foreground">Industry</span>
-                    <Input
-                      type="text"
+                    <Textarea
                       value={targetIndustry}
                       onChange={(e) => setTargetIndustry(e.target.value)}
+                      rows={2}
+                      className="resize-none text-sm"
                     />
                   </label>
                   <label className="flex flex-1 flex-col gap-1">
                     <span className="text-xs text-muted-foreground">Job title</span>
-                    <Input
-                      type="text"
+                    <Textarea
                       value={targetJobTitle}
                       onChange={(e) => setTargetJobTitle(e.target.value)}
+                      rows={2}
+                      className="resize-none text-sm"
                     />
                   </label>
                   <label className="flex flex-1 flex-col gap-1">
                     <span className="text-xs text-muted-foreground">Company size</span>
-                    <Input
-                      type="text"
+                    <Textarea
                       value={targetCompanySize}
                       onChange={(e) => setTargetCompanySize(e.target.value)}
+                      rows={2}
+                      className="resize-none text-sm"
                     />
                   </label>
                 </div>
