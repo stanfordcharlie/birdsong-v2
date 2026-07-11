@@ -3,6 +3,10 @@
 import { Fragment, useState } from "react";
 import type { Database } from "@/types/database";
 import type { InterviewMessage } from "@/lib/interview/types";
+import {
+  OPTIONAL_RESPONDENT_FIELD_LABELS,
+  type CustomRespondentFieldDef,
+} from "@/lib/surveys/respondent-fields";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,8 +20,24 @@ import {
 
 type ResponseRow = Database["public"]["Tables"]["responses"]["Row"];
 
-export function ResponsesTable({ responses }: { responses: ResponseRow[] }) {
+export function ResponsesTable({
+  responses,
+  customFieldDefs = [],
+}: {
+  responses: ResponseRow[];
+  customFieldDefs?: CustomRespondentFieldDef[];
+}) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // job_title/company/linkedin are presets stored in custom_field_values
+  // under those exact keys; admin-defined fields use their own generated
+  // keys. Both need a human label when displaying a response.
+  const customFieldLabels: Record<string, string> = {
+    job_title: OPTIONAL_RESPONDENT_FIELD_LABELS.job_title,
+    company: OPTIONAL_RESPONDENT_FIELD_LABELS.company,
+    linkedin: OPTIONAL_RESPONDENT_FIELD_LABELS.linkedin,
+    ...Object.fromEntries(customFieldDefs.map((field) => [field.key, field.label])),
+  };
 
   if (responses.length === 0) {
     return <p className="text-sm text-muted-foreground">No responses yet.</p>;
@@ -43,10 +63,9 @@ export function ResponsesTable({ responses }: { responses: ResponseRow[] }) {
             const customValues = (r.custom_field_values as Record<string, unknown> | null) ?? {};
             const extraInfo = [
               r.respondent_phone ? `Phone: ${r.respondent_phone}` : null,
-              typeof customValues.job_title === "string"
-                ? `Job title: ${customValues.job_title}`
-                : null,
-              typeof customValues.company === "string" ? `Company: ${customValues.company}` : null,
+              ...Object.entries(customValues)
+                .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+                .map(([key, value]) => `${customFieldLabels[key] ?? key}: ${value}`),
             ].filter(Boolean);
 
             return (

@@ -17,6 +17,9 @@ export type Database = {
           external_title: string | null;
           topic: string | null;
           sponsor: string | null;
+          target_industry: string | null;
+          target_job_title: string | null;
+          target_company_size: string | null;
           question_guide: string | null;
           tone: string | null;
           num_questions: number | null;
@@ -32,6 +35,9 @@ export type Database = {
           external_title?: string | null;
           topic?: string | null;
           sponsor?: string | null;
+          target_industry?: string | null;
+          target_job_title?: string | null;
+          target_company_size?: string | null;
           question_guide?: string | null;
           tone?: string | null;
           num_questions?: number | null;
@@ -47,6 +53,9 @@ export type Database = {
           external_title?: string | null;
           topic?: string | null;
           sponsor?: string | null;
+          target_industry?: string | null;
+          target_job_title?: string | null;
+          target_company_size?: string | null;
           question_guide?: string | null;
           tone?: string | null;
           num_questions?: number | null;

@@ -3,7 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { ResponsesTable } from "./ResponsesTable";
 import { SurveyUrl } from "./SurveyUrl";
 import { SurveyForm, type SurveyFormValues } from "@/components/SurveyForm";
-import { parseEnabledRespondentFields } from "@/lib/surveys/respondent-fields";
+import {
+  parseCustomRespondentFieldDefs,
+  parseEnabledRespondentFields,
+} from "@/lib/surveys/respondent-fields";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function SurveyDetailPage({
@@ -31,11 +34,16 @@ export default async function SurveyDetailPage({
     .order("created_at", { ascending: false });
 
   const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
+  const customFieldDefs = parseCustomRespondentFieldDefs(survey.custom_fields);
   const initialValues: SurveyFormValues = {
     title: survey.title,
     externalTitle: survey.external_title ?? "",
     slug: survey.slug,
+    sponsor: survey.sponsor ?? "",
     topic: survey.topic ?? "",
+    targetIndustry: survey.target_industry ?? "",
+    targetJobTitle: survey.target_job_title ?? "",
+    targetCompanySize: survey.target_company_size ?? "",
     questionGuide: survey.question_guide ?? "",
     tone: survey.tone ?? "",
     numQuestions: survey.num_questions != null ? String(survey.num_questions) : "",
@@ -43,6 +51,8 @@ export default async function SurveyDetailPage({
     collectPhone: enabledFields.includes("phone"),
     collectJobTitle: enabledFields.includes("job_title"),
     collectCompany: enabledFields.includes("company"),
+    collectLinkedin: enabledFields.includes("linkedin"),
+    customFields: customFieldDefs,
   };
 
   return (
@@ -64,7 +74,7 @@ export default async function SurveyDetailPage({
         </CardContent>
       </Card>
 
-      <ResponsesTable responses={responses ?? []} />
+      <ResponsesTable responses={responses ?? []} customFieldDefs={customFieldDefs} />
     </div>
   );
 }

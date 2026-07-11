@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent } from 
 import type { Database } from "@/types/database";
 import type { InterviewMessage } from "@/lib/interview/types";
 import {
+  parseCustomRespondentFieldDefs,
   parseEnabledRespondentFields,
   OPTIONAL_RESPONDENT_FIELD_LABELS,
 } from "@/lib/surveys/respondent-fields";
@@ -115,12 +116,15 @@ function SendIcon() {
 
 export function InterviewFlow({ survey }: { survey: Survey }) {
   const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
+  const customFieldDefs = parseCustomRespondentFieldDefs(survey.custom_fields);
   const [stage, setStage] = useState<Stage>("intro");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [company, setCompany] = useState("");
+  const [linkedin, setLinkedin] = useState("");
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [responseId, setResponseId] = useState<string | null>(null);
   const [messages, setMessages] = useState<InterviewMessage[]>([]);
   const [answer, setAnswer] = useState("");
@@ -222,6 +226,12 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
           custom_field_values: {
             ...(enabledFields.includes("job_title") && jobTitle ? { job_title: jobTitle } : {}),
             ...(enabledFields.includes("company") && company ? { company } : {}),
+            ...(enabledFields.includes("linkedin") && linkedin ? { linkedin } : {}),
+            ...Object.fromEntries(
+              customFieldDefs
+                .filter((field) => customFieldValues[field.key]?.trim())
+                .map((field) => [field.key, customFieldValues[field.key].trim()])
+            ),
           },
         }),
       });
@@ -342,6 +352,25 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
                   onChange={(e) => setCompany(e.target.value)}
                 />
               )}
+              {enabledFields.includes("linkedin") && (
+                <Input
+                  type="url"
+                  placeholder={OPTIONAL_RESPONDENT_FIELD_LABELS.linkedin}
+                  value={linkedin}
+                  onChange={(e) => setLinkedin(e.target.value)}
+                />
+              )}
+              {customFieldDefs.map((field) => (
+                <Input
+                  key={field.key}
+                  type="text"
+                  placeholder={field.label}
+                  value={customFieldValues[field.key] ?? ""}
+                  onChange={(e) =>
+                    setCustomFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                  }
+                />
+              ))}
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" disabled={loading}>
                 {loading ? "Starting..." : "Start"}
