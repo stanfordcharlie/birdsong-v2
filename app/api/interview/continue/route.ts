@@ -153,7 +153,7 @@ async function completeInterview(
   survey: Survey,
   response: ResponseRow
 ) {
-  const { painPoints, leadScore } = await extractInterviewInsights(history);
+  const { painPoints, leadScore, summary, callScript } = await extractInterviewInsights(history);
 
   const { error: updateError } = await supabase
     .from("responses")
@@ -162,6 +162,8 @@ async function completeInterview(
       completed: true,
       pain_points: painPoints as unknown as Json,
       lead_score: leadScore,
+      summary,
+      call_script: { opener: callScript.opener, talking_points: callScript.talkingPoints } as unknown as Json,
     })
     .eq("id", responseId);
 

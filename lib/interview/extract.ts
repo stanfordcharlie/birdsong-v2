@@ -2,14 +2,26 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient, INTERVIEW_MODEL } from "./anthropic";
 import type { InterviewMessage } from "./types";
 
+export type CallScript = {
+  opener: string;
+  talkingPoints: string[];
+};
+
 export type InterviewInsights = {
   painPoints: string[];
   leadScore: number;
+  summary: string;
+  callScript: CallScript;
 };
 
-const FALLBACK_INSIGHTS: InterviewInsights = { painPoints: [], leadScore: 5 };
+const FALLBACK_INSIGHTS: InterviewInsights = {
+  painPoints: [],
+  leadScore: 5,
+  summary: "",
+  callScript: { opener: "", talkingPoints: [] },
+};
 
-const EXTRACTION_SYSTEM_PROMPT = `You analyze a completed market research interview transcript and extract structured insights. You are an analyst, not the interviewer, and you never address the respondent directly.
+const EXTRACTION_SYSTEM_PROMPT = `You analyze a completed market research interview transcript and extract structured insights for the sales rep who will follow up with this respondent. You are an analyst, not the interviewer, and you never address the respondent directly.
 
 Score the lead from 1 to 10 using this rubric:
 - 9-10: the respondent mentioned budget, timeline, or being actively in the market for a solution.
@@ -21,11 +33,18 @@ If you are uncertain where the interview falls, default conservatively to 5.
 
 Also list the distinct pain points, challenges, or frustrations the respondent actually expressed, phrased in or close to their own words. If none were expressed, return an empty list.
 
+Write a one to two sentence summary of the interview a rep can read in a few seconds before a call.
+
+Write a call script for the rep:
+- opener: one to two sentences the rep can literally say to open the call. Reference something specific and true from this transcript (a tool they mentioned, a workflow they described, something they said), never a generic opener that could apply to any respondent.
+- talking_points: the 2 to 3 most glaring pain points from this specific interview, phrased as short things for the rep to bring up in conversation, not a restatement of the pain_points list.
+
 Call the record_interview_insights tool exactly once with your findings.`;
 
 const INSIGHTS_TOOL: Anthropic.Tool = {
   name: "record_interview_insights",
-  description: "Record the pain points and lead score extracted from a completed interview transcript.",
+  description:
+    "Record the pain points, lead score, summary, and call script extracted from a completed interview transcript.",
   input_schema: {
     type: "object",
     properties: {
@@ -41,8 +60,30 @@ const INSIGHTS_TOOL: Anthropic.Tool = {
         maximum: 10,
         description: "Lead score from 1 to 10 per the rubric.",
       },
+      summary: {
+        type: "string",
+        description: "A one to two sentence summary of the interview for a rep to skim.",
+      },
+      call_script: {
+        type: "object",
+        properties: {
+          opener: {
+            type: "string",
+            description:
+              "One to two sentences the rep can say to open the call, referencing something specific from this transcript.",
+          },
+          talking_points: {
+            type: "array",
+            items: { type: "string" },
+            minItems: 2,
+            maxItems: 3,
+            description: "The 2 to 3 most glaring pain points from this interview, phrased as talking points.",
+          },
+        },
+        required: ["opener", "talking_points"],
+      },
     },
-    required: ["pain_points", "lead_score"],
+    required: ["pain_points", "lead_score", "summary", "call_script"],
   },
 };
 
@@ -71,7 +112,12 @@ export async function extractInterviewInsights(
   );
   if (!toolUse) return FALLBACK_INSIGHTS;
 
-  const input = toolUse.input as { pain_points?: unknown; lead_score?: unknown };
+  const input = toolUse.input as {
+    pain_points?: unknown;
+    lead_score?: unknown;
+    summary?: unknown;
+    call_script?: unknown;
+  };
 
   const painPoints = Array.isArray(input.pain_points)
     ? input.pain_points.filter((p): p is string => typeof p === "string")
@@ -85,5 +131,15 @@ export async function extractInterviewInsights(
       ? input.lead_score
       : FALLBACK_INSIGHTS.leadScore;
 
-  return { painPoints, leadScore };
+  const summary = typeof input.summary === "string" ? input.summary : FALLBACK_INSIGHTS.summary;
+
+  const rawCallScript = input.call_script as { opener?: unknown; talking_points?: unknown } | undefined;
+  const callScript: CallScript = {
+    opener: typeof rawCallScript?.opener === "string" ? rawCallScript.opener : "",
+    talkingPoints: Array.isArray(rawCallScript?.talking_points)
+      ? rawCallScript.talking_points.filter((p): p is string => typeof p === "string").slice(0, 3)
+      : [],
+  };
+
+  return { painPoints, leadScore, summary, callScript };
 }

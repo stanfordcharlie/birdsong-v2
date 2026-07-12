@@ -79,7 +79,7 @@ export default async function SurveyDetailPage({
         </CardContent>
       </Card>
 
-      <ResponsesTable responses={responses ?? []} surveyCustomFields={survey.custom_fields} />
+      <ResponsesTable responses={responses ?? []} />
     </div>
   );
 }

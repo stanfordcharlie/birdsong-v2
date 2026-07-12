@@ -86,6 +86,9 @@ export type Database = {
           lead_score: number | null;
           completed: boolean;
           custom_field_values: Json;
+          status: string;
+          call_script: Json | null;
+          summary: string | null;
           user_id: string;
           created_at: string;
         };
@@ -100,6 +103,9 @@ export type Database = {
           lead_score?: number | null;
           completed?: boolean;
           custom_field_values?: Json;
+          status?: string;
+          call_script?: Json | null;
+          summary?: string | null;
           // Populated server-side by the set_response_user_id trigger; safe
           // to omit on insert even though the column is NOT NULL.
           user_id?: string;
@@ -116,6 +122,9 @@ export type Database = {
           lead_score?: number | null;
           completed?: boolean;
           custom_field_values?: Json;
+          status?: string;
+          call_script?: Json | null;
+          summary?: string | null;
           user_id?: string;
           created_at?: string;
         };

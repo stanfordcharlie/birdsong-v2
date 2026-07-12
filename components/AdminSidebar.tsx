@@ -36,6 +36,16 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    href: "/admin/settings",
+    label: "Settings",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+      </svg>
+    ),
+  },
 ];
 
 function SidebarToggleIcon() {
@@ -149,23 +159,43 @@ export function AdminSidebar({
         })}
       </nav>
 
-      {/* Bottom: account avatar (first initial of the user's email) + sign out */}
+      {/* Bottom: account avatar. Hovering it (in either sidebar state)
+          reveals a small menu with Settings and Sign out, flush against the
+          avatar row (no margin gap) so moving the cursor up into the menu
+          doesn't cross a dead zone and prematurely end the hover. */}
       <div className="flex items-center border-t border-white/10 px-2 py-3">
-        <div className="group/tooltip relative flex w-full">
+        <div className="group/account relative flex w-full">
           <div className="flex h-10 w-full items-center gap-3 overflow-hidden rounded-lg px-2">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
               {initial}
             </span>
             <span
               className={cn(
-                "whitespace-nowrap transition-opacity duration-150",
+                "truncate whitespace-nowrap text-sm text-[#9ca3af] transition-opacity duration-150",
                 expanded ? "opacity-100" : "opacity-0"
               )}
             >
-              <SignOutButton />
+              {userEmail ?? "Account"}
             </span>
           </div>
-          {!expanded && <IconTooltip label="Sign out" />}
+
+          <div className="pointer-events-none absolute bottom-full left-0 z-50 w-48 rounded-lg border border-white/10 bg-[#1a1a1a] p-1 opacity-0 shadow-lg transition-opacity duration-150 group-hover/account:pointer-events-auto group-hover/account:opacity-100">
+            <Link
+              href="/admin/settings"
+              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[#9ca3af] transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+                </svg>
+              </span>
+              Settings
+            </Link>
+            <div className="rounded-md px-2 py-1.5 text-sm text-[#9ca3af] transition-colors hover:bg-white/10 hover:text-white">
+              <SignOutButton />
+            </div>
+          </div>
         </div>
       </div>
     </aside>
