@@ -124,6 +124,7 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
   const [error, setError] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [streamingText, setStreamingText] = useState<string | null>(null);
+  const [showResponses, setShowResponses] = useState(false);
   const answerInputRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const isMountedRef = useRef(true);
@@ -396,21 +397,43 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
 
   if (stage === "complete") {
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-12">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-12">
         <div className="flex flex-col gap-2 text-center">
           <h1 className="text-xl font-semibold text-card-foreground">Thanks!</h1>
           <p className="text-sm text-muted-foreground">{closingMessage}</p>
         </div>
-        <div className="flex flex-col gap-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Your responses
-          </h2>
-          {messages.map((m, i) => (
-            <div key={i} className={m.role === "assistant" ? ASSISTANT_BUBBLE : RESPONDENT_BUBBLE}>
-              {m.role === "assistant" ? renderWithBold(m.content) : m.content}
-            </div>
-          ))}
-        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowResponses((prev) => !prev)}
+          className="mx-auto flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-card-foreground"
+          aria-expanded={showResponses}
+        >
+          {showResponses ? "Hide your responses" : "See your responses"}
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={cn("transition-transform", showResponses ? "rotate-180" : "")}
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        {showResponses && (
+          <div className="flex flex-col gap-3">
+            {messages.map((m, i) => (
+              <div key={i} className={m.role === "assistant" ? ASSISTANT_BUBBLE : RESPONDENT_BUBBLE}>
+                {m.role === "assistant" ? renderWithBold(m.content) : m.content}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
