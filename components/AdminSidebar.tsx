@@ -27,17 +27,6 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: "/admin/surveys/new",
-    label: "New Survey",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" />
-        <line x1="12" y1="8" x2="12" y2="16" />
-        <line x1="8" y1="12" x2="16" y2="12" />
-      </svg>
-    ),
-  },
-  {
     href: "/admin/profile",
     label: "Company Profile",
     icon: (
@@ -127,17 +116,13 @@ export function AdminSidebar({
       {/* Nav items */}
       <nav className="flex flex-1 flex-col gap-1 px-2 py-3">
         {NAV_ITEMS.map((item) => {
-          // "/admin" is a prefix of every other admin route, and
-          // "/admin/surveys" is a prefix of "/admin/surveys/new" (which has
-          // its own nav entry), so both need explicit carve-outs to avoid
-          // multiple items lighting up together.
+          // "/admin" is a prefix of every other admin route, so it needs an
+          // exact-match carve-out to avoid lighting up alongside whichever
+          // other item actually matches the current page.
           const isActive =
             item.href === "/admin"
               ? pathname === "/admin"
-              : item.href === "/admin/surveys"
-                ? pathname === "/admin/surveys" ||
-                  (pathname.startsWith("/admin/surveys/") && !pathname.startsWith("/admin/surveys/new"))
-                : pathname === item.href || pathname.startsWith(`${item.href}/`);
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <div key={item.href} className="group/tooltip relative flex w-full">
               <Link

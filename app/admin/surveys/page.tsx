@@ -56,12 +56,16 @@ export default async function AdminDashboardPage() {
             </TableHeader>
             <TableBody>
               {surveys.map((survey) => (
-                <TableRow key={survey.id}>
+                <TableRow key={survey.id} className="relative">
                   <TableCell>
                     <Link
                       href={`/admin/surveys/${survey.id}`}
                       className="font-medium text-card-foreground hover:text-primary"
                     >
+                      {/* Stretches to fill the whole row (position:relative
+                          on TableRow above), so anywhere in the row is
+                          clickable, not just this text. */}
+                      <span className="absolute inset-0" />
                       {survey.title}
                     </Link>
                   </TableCell>
