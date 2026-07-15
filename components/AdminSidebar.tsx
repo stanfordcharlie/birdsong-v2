@@ -165,7 +165,10 @@ export function AdminSidebar({
           doesn't cross a dead zone and prematurely end the hover. */}
       <div className="flex items-center border-t border-white/10 px-2 py-3">
         <div className="group/account relative flex w-full">
-          <div className="flex h-10 w-full items-center gap-3 overflow-hidden rounded-lg px-2">
+          <Link
+            href="/admin/settings"
+            className="flex h-10 w-full items-center gap-3 overflow-hidden rounded-lg px-2 transition-colors hover:bg-white/8"
+          >
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
               {initial}
             </span>
@@ -177,7 +180,7 @@ export function AdminSidebar({
             >
               {userEmail ?? "Account"}
             </span>
-          </div>
+          </Link>
 
           <div className="pointer-events-none absolute bottom-full left-0 z-50 w-48 rounded-lg border border-white/10 bg-[#1a1a1a] p-1 opacity-0 shadow-lg transition-opacity duration-150 group-hover/account:pointer-events-auto group-hover/account:opacity-100">
             <Link

@@ -71,6 +71,26 @@ export default async function ResponseDetailPage({
     ? [callScript.opener, "", ...callScript.talkingPoints.map((point) => `- ${point}`)].join("\n")
     : "";
 
+  const rawSignals = response.signals as
+    | {
+        economic_buyer?: unknown;
+        decision_criteria?: unknown;
+        decision_process?: unknown;
+        metrics?: unknown;
+        champion?: unknown;
+      }
+    | null;
+  const signals = [
+    { label: "Economic buyer", value: rawSignals?.economic_buyer },
+    { label: "Decision criteria", value: rawSignals?.decision_criteria },
+    { label: "Decision process", value: rawSignals?.decision_process },
+    { label: "Metrics", value: rawSignals?.metrics },
+    { label: "Champion", value: rawSignals?.champion },
+  ].filter(
+    (signal): signal is { label: string; value: string } =>
+      typeof signal.value === "string" && signal.value.trim().length > 0
+  );
+
   const initial = (
     response.respondent_name?.trim()?.[0] ??
     response.respondent_email?.trim()?.[0] ??
@@ -150,21 +170,38 @@ export default async function ResponseDetailPage({
         </Card>
       )}
 
-      {/* Pain points, collapsed by default */}
-      <details className="rounded-card border border-border bg-card p-4">
-        <summary className="cursor-pointer text-sm font-medium text-card-foreground">
-          Pain points ({painPoints.length})
-        </summary>
-        {painPoints.length > 0 ? (
-          <ul className="mt-3 list-disc pl-5 text-sm text-card-foreground">
-            {painPoints.map((point, i) => (
-              <li key={i}>{point}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-3 text-sm text-muted-foreground">None extracted.</p>
-        )}
-      </details>
+      {/* Pain and signals, side by side */}
+      <Card>
+        <CardContent className="grid grid-cols-1 gap-6 p-6 md:grid-cols-2">
+          <div className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold text-card-foreground">Pain</h2>
+            {painPoints.length > 0 ? (
+              <ul className="list-disc pl-5 text-sm text-card-foreground">
+                {painPoints.map((point, i) => (
+                  <li key={i}>{point}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">None extracted.</p>
+            )}
+          </div>
+          <div className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold text-card-foreground">Signals</h2>
+            {signals.length > 0 ? (
+              signals.map((signal) => (
+                <div key={signal.label} className="flex flex-col gap-1">
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {signal.label}
+                  </span>
+                  <p className="text-sm text-card-foreground">{signal.value}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">None surfaced.</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Full transcript, collapsed by default */}
       <details className="rounded-card border border-border bg-card p-4">
