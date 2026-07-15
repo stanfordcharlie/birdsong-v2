@@ -50,8 +50,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Survey not found" }, { status: 404 });
   }
 
+  // Survey owner's company profile (what they sell, value prop), used to
+  // keep the interview anchored to the company's actual product surface
+  // area instead of drifting wherever the respondent's last answer leads.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("what_we_sell, target_icp, value_prop")
+    .eq("user_id", survey.user_id)
+    .maybeSingle();
+
   const anthropic = getAnthropicClient();
-  const systemPrompt = buildInterviewSystemPrompt(survey, 1);
+  const systemPrompt = buildInterviewSystemPrompt(
+    survey,
+    1,
+    profile
+      ? { whatWeSell: profile.what_we_sell, targetIcp: profile.target_icp, valueProp: profile.value_prop }
+      : null
+  );
 
   const completion = await anthropic.messages.create({
     model: INTERVIEW_MODEL,

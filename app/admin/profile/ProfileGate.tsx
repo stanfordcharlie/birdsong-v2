@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { ProfileOnboarding } from "./ProfileOnboarding";
+import { CompanyProfileWizard } from "./CompanyProfileWizard";
 import { ProfileEditChat } from "./ProfileEditChat";
 import { ProfileForm, type ProfileFormValues } from "./ProfileForm";
 import type { ResearchResult } from "@/lib/profile-onboarding/types";
@@ -72,7 +72,7 @@ export function ProfileGate({
   }
 
   if (!values) {
-    return <ProfileOnboarding onComplete={handleOnboardingComplete} />;
+    return <CompanyProfileWizard onComplete={handleOnboardingComplete} />;
   }
 
   return (

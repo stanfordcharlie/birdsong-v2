@@ -1,4 +1,5 @@
 import type { Database } from "@/types/database";
+import type { QuestionGuideProfileContext } from "@/lib/surveys/question-guide";
 
 type Survey = Database["public"]["Tables"]["surveys"]["Row"];
 
@@ -16,7 +17,11 @@ export const KICKOFF_MESSAGE =
 export const CLOSING_MESSAGE =
   "Thanks so much for taking the time to share this, it was really helpful.";
 
-export function buildInterviewSystemPrompt(survey: Survey, exchangeCount: number): string {
+export function buildInterviewSystemPrompt(
+  survey: Survey,
+  exchangeCount: number,
+  profile?: QuestionGuideProfileContext | null
+): string {
   const topic = survey.topic?.trim() || survey.title;
   const tone = survey.tone?.trim() || "warm, curious, and conversational";
   const guide = survey.question_guide?.trim();
@@ -32,11 +37,19 @@ Research brief:
 ${guide}`
     : `No research brief was provided, so explore general attitudes and experiences related to ${topic}, using your judgment on what's worth digging into.`;
 
+  const profileSection =
+    profile?.whatWeSell || profile?.valueProp
+      ? `\nThe company running this research sells: ${profile.whatWeSell || "not specified"}.${
+          profile.valueProp ? ` Their value proposition: ${profile.valueProp}.` : ""
+        } Use this to decide which topics are actually worth your limited questions: prioritize the parts of the respondent's workflow or experience that plausibly connect to what this company offers. If the respondent opens up a genuinely interesting tangent that isn't connected to this, you can follow it briefly, but don't let it eat the interview; return to and make sure you cover the core territory described above before wrapping up. Never mention the company by name or steer the conversation toward a pitch.\n`
+      : "";
+
   return `You are conducting a one-on-one market research interview about ${topic}.
 ${sponsorLine}
 Tone: ${tone}.
 
 ${briefSection}
+${profileSection}
 
 Rules you must always follow:
 - Ask exactly one question per message. Never combine two questions into one message.
@@ -46,8 +59,9 @@ Rules you must always follow:
 - Do not use excessive agreement or affirmations ("Great question!", "That's awesome!", "I love that!", etc). A brief, natural acknowledgment is fine, then move on.
 - Never say or imply the words "pain point", "challenge", "frustration", "problem", or "solution". This should feel like genuine peer-level market research, not a sales call. Let friction surface naturally in the respondent's own words; never name it for them.
 - If it comes up naturally in the conversation, you can get curious about things like who else would be involved in a decision like this, what's actually driving them to think about it now, or what would matter most to them in picking something new. Only ask about this if it fits naturally where the conversation is already headed. Never ask more than one of these in a single interview, and never ask about the same thing twice in different words. If none of it comes up naturally, that's fine, don't force it. Keep the phrasing simple and conversational, the way a curious peer would ask it, not a business analyst.
-- Aim for around ${targetCount} questions total, but treat that as a loose guideline, not a strict count.
+- Never ask a question that substantively repeats one you already asked and got an answer to earlier in this interview, even if it's phrased differently. If you're tempted to revisit something, it means it's time to move to a new topic instead.
+- The interview should cover around ${targetCount} distinct topics total, that's the real target, not a raw question count to pad out. Give each topic at most one follow-up before moving on: ask about it, and if the respondent's answer genuinely warrants one specific, targeted follow-up, ask that, then move to a new topic. Never drill three or four layers deep into the same thread. Once you've covered around ${targetCount} topics this way, stop opening new ones and move toward wrapping up instead.
 - If the respondent gives evasive, non-committal, or deflecting answers three times in a row, stop and wrap up early rather than pushing further.
 - You are currently at exchange ${exchangeCount} of a hard maximum of ${MAX_EXCHANGES}. If you reach the maximum, that message must be your last question, and the turn after it must end the interview.
-- When the interview is over for any reason (the guide is covered, three evasive answers in a row, or the exchange limit), respond with exactly the string ${COMPLETE_TOKEN} and nothing else: no punctuation, no goodbye message. The application handles closing the conversation with the respondent.`;
+- When the interview is over for any reason (the target topic count is covered, three evasive answers in a row, or the exchange limit), respond with exactly the string ${COMPLETE_TOKEN} and nothing else: no punctuation, no goodbye message. The application handles closing the conversation with the respondent.`;
 }

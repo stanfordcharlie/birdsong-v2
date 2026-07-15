@@ -89,8 +89,23 @@ export async function POST(request: Request) {
     return completeInterview(supabase, response_id, updatedHistory, survey, response);
   }
 
+  // Survey owner's company profile (what they sell, value prop), used to
+  // keep the interview anchored to the company's actual product surface
+  // area instead of drifting wherever the respondent's last answer leads.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("what_we_sell, target_icp, value_prop")
+    .eq("user_id", survey.user_id)
+    .maybeSingle();
+
   const anthropic = getAnthropicClient();
-  const systemPrompt = buildInterviewSystemPrompt(survey, exchangeCount);
+  const systemPrompt = buildInterviewSystemPrompt(
+    survey,
+    exchangeCount,
+    profile
+      ? { whatWeSell: profile.what_we_sell, targetIcp: profile.target_icp, valueProp: profile.value_prop }
+      : null
+  );
 
   const claudeMessages: Anthropic.MessageParam[] = [
     { role: "user", content: KICKOFF_MESSAGE },
