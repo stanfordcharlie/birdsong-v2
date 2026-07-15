@@ -89,8 +89,8 @@ function StepFooter({ onNext, nextLabel = "OK" }: { onNext: () => void; nextLabe
 // actually looks like before creating the survey. Placeholders keep it from
 // ever looking broken while the real fields are still blank.
 function SurveyPreviewPanel({ externalTitle, slug }: { externalTitle: string; slug: string }) {
-  const previewSlug = slugify(slug) || "parks-and-rec";
-  const previewTitle = externalTitle.trim() || "your survey title";
+  const previewSlug = slugify(slug) || "birdsong-research";
+  const previewTitle = externalTitle.trim() || "Birdsong Research";
 
   return (
     <div className="flex flex-col gap-2">
@@ -106,9 +106,26 @@ function SurveyPreviewPanel({ externalTitle, slug }: { externalTitle: string; sl
             birdsong.app/survey/<span className="text-card-foreground">{previewSlug}</span>
           </div>
         </div>
+        {/* Mirrors the real respondent intro card (the "intro" stage in
+            app/survey/[slug]/InterviewFlow.tsx): title, topic line, and the
+            respondent-info fields, so this previews the actual first thing a
+            respondent sees, not just the headline in isolation. */}
         <div className="bg-page p-6">
-          <div className="rounded-card border border-border bg-card p-6">
+          <div className="flex flex-col gap-4 rounded-card border border-border bg-card p-6">
             <h1 className="text-xl font-semibold text-card-foreground">{previewTitle}</h1>
+            <p className="text-sm text-muted-foreground">
+              A few quick questions about how your team handles this today.
+            </p>
+            <div className="flex flex-col gap-3">
+              <Input type="text" placeholder="Your name" readOnly tabIndex={-1} className="pointer-events-none" />
+              <Input type="email" placeholder="Your email" readOnly tabIndex={-1} className="pointer-events-none" />
+              <Input type="tel" placeholder="Phone number" readOnly tabIndex={-1} className="pointer-events-none" />
+              <Input type="text" placeholder="Job title" readOnly tabIndex={-1} className="pointer-events-none" />
+              <Input type="text" placeholder="Company name" readOnly tabIndex={-1} className="pointer-events-none" />
+              <Button type="button" tabIndex={-1} className="pointer-events-none">
+                Start
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -133,8 +150,12 @@ export function NewSurveyWizard() {
   const [phoneLabel, setPhoneLabel] = useState(OPTIONAL_RESPONDENT_FIELD_LABELS.phone);
   const [jobTitleLabel, setJobTitleLabel] = useState(OPTIONAL_RESPONDENT_FIELD_LABELS.job_title);
   const [companyLabel, setCompanyLabel] = useState(OPTIONAL_RESPONDENT_FIELD_LABELS.company);
+  const [phoneRequired, setPhoneRequired] = useState(false);
+  const [jobTitleRequired, setJobTitleRequired] = useState(false);
+  const [companyRequired, setCompanyRequired] = useState(false);
   const [customFields, setCustomFields] = useState<CustomRespondentFieldDef[]>([]);
   const [newCustomFieldLabel, setNewCustomFieldLabel] = useState("");
+  const [newCustomFieldRequired, setNewCustomFieldRequired] = useState(false);
 
   const [titleError, setTitleError] = useState(false);
   const [externalTitleError, setExternalTitleError] = useState(false);
@@ -203,12 +224,19 @@ export function NewSurveyWizard() {
       suffix += 1;
     }
 
-    setCustomFields((prev) => [...prev, { key, label }]);
+    setCustomFields((prev) => [...prev, { key, label, required: newCustomFieldRequired }]);
     setNewCustomFieldLabel("");
+    setNewCustomFieldRequired(false);
   }
 
   function removeCustomField(key: string) {
     setCustomFields((prev) => prev.filter((field) => field.key !== key));
+  }
+
+  function toggleCustomFieldRequired(key: string) {
+    setCustomFields((prev) =>
+      prev.map((field) => (field.key === key ? { ...field, required: !field.required } : field))
+    );
   }
 
   async function createSurvey(extracted: ExtractedSurveyDetails) {
@@ -223,13 +251,20 @@ export function NewSurveyWizard() {
 
       const enabledFields: CustomRespondentFieldDef[] = [
         ...(collectPhone
-          ? [{ key: "phone", label: phoneLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.phone }]
+          ? [
+              {
+                key: "phone",
+                label: phoneLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.phone,
+                required: phoneRequired,
+              },
+            ]
           : []),
         ...(collectJobTitle
           ? [
               {
                 key: "job_title",
                 label: jobTitleLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.job_title,
+                required: jobTitleRequired,
               },
             ]
           : []),
@@ -238,6 +273,7 @@ export function NewSurveyWizard() {
               {
                 key: "company",
                 label: companyLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.company,
+                required: companyRequired,
               },
             ]
           : []),
@@ -428,54 +464,90 @@ export function NewSurveyWizard() {
               onBack={goBack}
               footer={<StepFooter onNext={goNext} />}
             >
-              <div
-                className="flex flex-col gap-3"
-                onKeyDown={(e) => handleEnterKey(e, goNext)}
-              >
+              <div className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="flex items-center gap-2 text-sm text-card-foreground">
+                  <div className="flex items-center gap-2 text-sm text-card-foreground">
                     <input
                       autoFocus
                       type="checkbox"
                       checked={collectPhone}
                       onChange={(e) => setCollectPhone(e.target.checked)}
+                      onKeyDown={(e) => handleEnterKey(e, goNext)}
                       className="accent-primary"
                     />
                     <Input
                       type="text"
                       value={phoneLabel}
                       onChange={(e) => setPhoneLabel(e.target.value)}
+                      onKeyDown={(e) => handleEnterKey(e, goNext)}
                       className="h-7 flex-1 text-sm"
                     />
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-card-foreground">
+                    <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={phoneRequired}
+                        onChange={(e) => setPhoneRequired(e.target.checked)}
+                        onKeyDown={(e) => handleEnterKey(e, goNext)}
+                        disabled={!collectPhone}
+                        className="accent-primary"
+                      />
+                      Required
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-card-foreground">
                     <input
                       type="checkbox"
                       checked={collectJobTitle}
                       onChange={(e) => setCollectJobTitle(e.target.checked)}
+                      onKeyDown={(e) => handleEnterKey(e, goNext)}
                       className="accent-primary"
                     />
                     <Input
                       type="text"
                       value={jobTitleLabel}
                       onChange={(e) => setJobTitleLabel(e.target.value)}
+                      onKeyDown={(e) => handleEnterKey(e, goNext)}
                       className="h-7 flex-1 text-sm"
                     />
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-card-foreground">
+                    <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={jobTitleRequired}
+                        onChange={(e) => setJobTitleRequired(e.target.checked)}
+                        onKeyDown={(e) => handleEnterKey(e, goNext)}
+                        disabled={!collectJobTitle}
+                        className="accent-primary"
+                      />
+                      Required
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-card-foreground">
                     <input
                       type="checkbox"
                       checked={collectCompany}
                       onChange={(e) => setCollectCompany(e.target.checked)}
+                      onKeyDown={(e) => handleEnterKey(e, goNext)}
                       className="accent-primary"
                     />
                     <Input
                       type="text"
                       value={companyLabel}
                       onChange={(e) => setCompanyLabel(e.target.value)}
+                      onKeyDown={(e) => handleEnterKey(e, goNext)}
                       className="h-7 flex-1 text-sm"
                     />
-                  </label>
+                    <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={companyRequired}
+                        onChange={(e) => setCompanyRequired(e.target.checked)}
+                        onKeyDown={(e) => handleEnterKey(e, goNext)}
+                        disabled={!collectCompany}
+                        className="accent-primary"
+                      />
+                      Required
+                    </label>
+                  </div>
                 </div>
 
                 {customFields.length > 0 && (
@@ -486,14 +558,25 @@ export function NewSurveyWizard() {
                         className="flex items-center justify-between gap-2 text-sm text-card-foreground"
                       >
                         <span>{field.label}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeCustomField(field.key)}
-                          className="text-xs text-muted-foreground hover:text-destructive"
-                          aria-label={`Remove ${field.label}`}
-                        >
-                          Remove
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              checked={field.required === true}
+                              onChange={() => toggleCustomFieldRequired(field.key)}
+                              className="accent-primary"
+                            />
+                            Required
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => removeCustomField(field.key)}
+                            className="text-xs text-muted-foreground hover:text-destructive"
+                            aria-label={`Remove ${field.label}`}
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -507,13 +590,21 @@ export function NewSurveyWizard() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
-                        e.stopPropagation();
                         addCustomField();
                       }
                     }}
                     placeholder="Custom field, e.g. Team size"
                     className="h-8 text-sm"
                   />
+                  <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={newCustomFieldRequired}
+                      onChange={(e) => setNewCustomFieldRequired(e.target.checked)}
+                      className="accent-primary"
+                    />
+                    Required
+                  </label>
                   <Button
                     type="button"
                     variant="secondary"

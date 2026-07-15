@@ -32,12 +32,14 @@ export function parseEnabledRespondentFields(customFields: unknown): OptionalRes
 
 // Beyond the fixed presets above, an admin can define their own one-off
 // respondent fields (e.g. "Team size"). Both these and label-customized
-// presets live in the same surveys.custom_fields array as {key, label}
-// objects — no schema change needed since the column was already untyped
-// jsonb.
+// presets live in the same surveys.custom_fields array as {key, label,
+// required?} objects, no schema change needed since the column was
+// already untyped jsonb. `required` defaults to false when absent, so
+// existing data (saved before this field existed) stays non-required.
 export type CustomRespondentFieldDef = {
   key: string;
   label: string;
+  required?: boolean;
 };
 
 const CUSTOM_FIELD_KEY_PREFIX = "custom_";
@@ -76,6 +78,22 @@ export function parsePresetFieldLabel(
     if (override) return override.label;
   }
   return OPTIONAL_RESPONDENT_FIELD_LABELS[presetKey];
+}
+
+// Same lookup as parsePresetFieldLabel but for the required flag. Absent
+// (bare key string, or an object that predates this field) means false,
+// matching the field's original, always-optional behavior.
+export function parsePresetFieldRequired(
+  customFields: unknown,
+  presetKey: OptionalRespondentField
+): boolean {
+  if (Array.isArray(customFields)) {
+    const override = customFields.find(
+      (entry): entry is CustomRespondentFieldDef => isFieldDefShape(entry) && entry.key === presetKey
+    );
+    if (override) return override.required === true;
+  }
+  return false;
 }
 
 // Fields the admin defined themselves, beyond the presets — object entries

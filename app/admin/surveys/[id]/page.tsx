@@ -7,6 +7,7 @@ import {
   parseCustomRespondentFieldDefs,
   parseEnabledRespondentFields,
   parsePresetFieldLabel,
+  parsePresetFieldRequired,
 } from "@/lib/surveys/respondent-fields";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -57,6 +58,10 @@ export default async function SurveyDetailPage({
     jobTitleLabel: parsePresetFieldLabel(survey.custom_fields, "job_title"),
     companyLabel: parsePresetFieldLabel(survey.custom_fields, "company"),
     linkedinLabel: parsePresetFieldLabel(survey.custom_fields, "linkedin"),
+    phoneRequired: parsePresetFieldRequired(survey.custom_fields, "phone"),
+    jobTitleRequired: parsePresetFieldRequired(survey.custom_fields, "job_title"),
+    companyRequired: parsePresetFieldRequired(survey.custom_fields, "company"),
+    linkedinRequired: parsePresetFieldRequired(survey.custom_fields, "linkedin"),
     customFields: customFieldDefs,
   };
 

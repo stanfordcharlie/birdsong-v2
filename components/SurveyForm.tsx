@@ -37,6 +37,10 @@ export type SurveyFormValues = {
   jobTitleLabel: string;
   companyLabel: string;
   linkedinLabel: string;
+  phoneRequired: boolean;
+  jobTitleRequired: boolean;
+  companyRequired: boolean;
+  linkedinRequired: boolean;
   customFields: CustomRespondentFieldDef[];
 };
 
@@ -61,6 +65,10 @@ const EMPTY_VALUES: SurveyFormValues = {
   jobTitleLabel: OPTIONAL_RESPONDENT_FIELD_LABELS.job_title,
   companyLabel: OPTIONAL_RESPONDENT_FIELD_LABELS.company,
   linkedinLabel: OPTIONAL_RESPONDENT_FIELD_LABELS.linkedin,
+  phoneRequired: false,
+  jobTitleRequired: false,
+  companyRequired: false,
+  linkedinRequired: false,
   customFields: [],
 };
 
@@ -103,10 +111,15 @@ export function SurveyForm(props: SurveyFormProps) {
   const [jobTitleLabel, setJobTitleLabel] = useState(initial.jobTitleLabel);
   const [companyLabel, setCompanyLabel] = useState(initial.companyLabel);
   const [linkedinLabel, setLinkedinLabel] = useState(initial.linkedinLabel);
+  const [phoneRequired, setPhoneRequired] = useState(initial.phoneRequired);
+  const [jobTitleRequired, setJobTitleRequired] = useState(initial.jobTitleRequired);
+  const [companyRequired, setCompanyRequired] = useState(initial.companyRequired);
+  const [linkedinRequired, setLinkedinRequired] = useState(initial.linkedinRequired);
   const [customFields, setCustomFields] = useState<CustomRespondentFieldDef[]>(
     initial.customFields
   );
   const [newCustomFieldLabel, setNewCustomFieldLabel] = useState("");
+  const [newCustomFieldRequired, setNewCustomFieldRequired] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -153,12 +166,19 @@ export function SurveyForm(props: SurveyFormProps) {
       suffix += 1;
     }
 
-    setCustomFields((prev) => [...prev, { key, label }]);
+    setCustomFields((prev) => [...prev, { key, label, required: newCustomFieldRequired }]);
     setNewCustomFieldLabel("");
+    setNewCustomFieldRequired(false);
   }
 
   function removeCustomField(key: string) {
     setCustomFields((prev) => prev.filter((field) => field.key !== key));
+  }
+
+  function toggleCustomFieldRequired(key: string) {
+    setCustomFields((prev) =>
+      prev.map((field) => (field.key === key ? { ...field, required: !field.required } : field))
+    );
   }
 
   async function handleSpruceUp() {
@@ -213,13 +233,20 @@ export function SurveyForm(props: SurveyFormProps) {
 
       const enabledFields: CustomRespondentFieldDef[] = [
         ...(collectPhone
-          ? [{ key: "phone", label: phoneLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.phone }]
+          ? [
+              {
+                key: "phone",
+                label: phoneLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.phone,
+                required: phoneRequired,
+              },
+            ]
           : []),
         ...(collectJobTitle
           ? [
               {
                 key: "job_title",
                 label: jobTitleLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.job_title,
+                required: jobTitleRequired,
               },
             ]
           : []),
@@ -228,6 +255,7 @@ export function SurveyForm(props: SurveyFormProps) {
               {
                 key: "company",
                 label: companyLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.company,
+                required: companyRequired,
               },
             ]
           : []),
@@ -236,6 +264,7 @@ export function SurveyForm(props: SurveyFormProps) {
               {
                 key: "linkedin",
                 label: linkedinLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.linkedin,
+                required: linkedinRequired,
               },
             ]
           : []),
@@ -371,7 +400,7 @@ export function SurveyForm(props: SurveyFormProps) {
             </h3>
             <p className="text-xs text-muted-foreground">Name and email are always collected.</p>
             <div className="flex flex-col gap-1.5">
-              <label className="flex items-center gap-2 text-sm text-card-foreground">
+              <div className="flex items-center gap-2 text-sm text-card-foreground">
                 <input
                   type="checkbox"
                   checked={collectPhone}
@@ -384,8 +413,18 @@ export function SurveyForm(props: SurveyFormProps) {
                   onChange={(e) => setPhoneLabel(e.target.value)}
                   className="h-7 flex-1 text-sm"
                 />
-              </label>
-              <label className="flex items-center gap-2 text-sm text-card-foreground">
+                <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={phoneRequired}
+                    onChange={(e) => setPhoneRequired(e.target.checked)}
+                    disabled={!collectPhone}
+                    className="accent-primary"
+                  />
+                  Required
+                </label>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-card-foreground">
                 <input
                   type="checkbox"
                   checked={collectJobTitle}
@@ -398,8 +437,18 @@ export function SurveyForm(props: SurveyFormProps) {
                   onChange={(e) => setJobTitleLabel(e.target.value)}
                   className="h-7 flex-1 text-sm"
                 />
-              </label>
-              <label className="flex items-center gap-2 text-sm text-card-foreground">
+                <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={jobTitleRequired}
+                    onChange={(e) => setJobTitleRequired(e.target.checked)}
+                    disabled={!collectJobTitle}
+                    className="accent-primary"
+                  />
+                  Required
+                </label>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-card-foreground">
                 <input
                   type="checkbox"
                   checked={collectCompany}
@@ -412,8 +461,18 @@ export function SurveyForm(props: SurveyFormProps) {
                   onChange={(e) => setCompanyLabel(e.target.value)}
                   className="h-7 flex-1 text-sm"
                 />
-              </label>
-              <label className="flex items-center gap-2 text-sm text-card-foreground">
+                <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={companyRequired}
+                    onChange={(e) => setCompanyRequired(e.target.checked)}
+                    disabled={!collectCompany}
+                    className="accent-primary"
+                  />
+                  Required
+                </label>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-card-foreground">
                 <input
                   type="checkbox"
                   checked={collectLinkedin}
@@ -426,7 +485,17 @@ export function SurveyForm(props: SurveyFormProps) {
                   onChange={(e) => setLinkedinLabel(e.target.value)}
                   className="h-7 flex-1 text-sm"
                 />
-              </label>
+                <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={linkedinRequired}
+                    onChange={(e) => setLinkedinRequired(e.target.checked)}
+                    disabled={!collectLinkedin}
+                    className="accent-primary"
+                  />
+                  Required
+                </label>
+              </div>
             </div>
 
             {customFields.length > 0 && (
@@ -437,14 +506,25 @@ export function SurveyForm(props: SurveyFormProps) {
                     className="flex items-center justify-between gap-2 text-sm text-card-foreground"
                   >
                     <span>{field.label}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeCustomField(field.key)}
-                      className="text-xs text-muted-foreground hover:text-destructive"
-                      aria-label={`Remove ${field.label}`}
-                    >
-                      Remove
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={field.required === true}
+                          onChange={() => toggleCustomFieldRequired(field.key)}
+                          className="accent-primary"
+                        />
+                        Required
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => removeCustomField(field.key)}
+                        className="text-xs text-muted-foreground hover:text-destructive"
+                        aria-label={`Remove ${field.label}`}
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -464,6 +544,15 @@ export function SurveyForm(props: SurveyFormProps) {
                 placeholder="Custom field, e.g. Team size"
                 className="h-8 text-sm"
               />
+              <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={newCustomFieldRequired}
+                  onChange={(e) => setNewCustomFieldRequired(e.target.checked)}
+                  className="accent-primary"
+                />
+                Required
+              </label>
               <Button
                 type="button"
                 variant="secondary"

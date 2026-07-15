@@ -7,6 +7,8 @@ import {
   parseCustomRespondentFieldDefs,
   parseEnabledRespondentFields,
   parsePresetFieldLabel,
+  parsePresetFieldRequired,
+  type OptionalRespondentField,
 } from "@/lib/surveys/respondent-fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,6 +110,13 @@ function SendIcon() {
 export function InterviewFlow({ survey }: { survey: Survey }) {
   const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
   const customFieldDefs = parseCustomRespondentFieldDefs(survey.custom_fields);
+  // Placeholder text is the only visible label these fields have, so a
+  // required one gets a trailing " *" appended to it as the sole visual
+  // cue, matching the asterisk convention used elsewhere in the admin UI.
+  function fieldPlaceholder(key: OptionalRespondentField): string {
+    const label = parsePresetFieldLabel(survey.custom_fields, key);
+    return parsePresetFieldRequired(survey.custom_fields, key) ? `${label} *` : label;
+  }
   const [stage, setStage] = useState<Stage>("intro");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -126,7 +135,6 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [showResponses, setShowResponses] = useState(false);
   const answerInputRef = useRef<HTMLTextAreaElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
   const isMountedRef = useRef(true);
   // Epoch 0 so a fresh page load with no typing yet never waits.
   const lastKeystrokeAtRef = useRef(0);
@@ -166,17 +174,24 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
   }, [stage, loading]);
 
   // Instant, not smooth: streamingText updates every ~40-60ms as words
-  // reveal, and each update grows the bubble (and therefore bottomRef's
-  // position) a little more. Smooth scrolling can't finish one ~300-500ms
-  // animation before the next call interrupts it with an already-stale
-  // target, so across a whole reply the view visibly stalls or never
-  // catches up. Firing instantly on every update reads as continuous
-  // tracking anyway given how frequent the updates are, without the
-  // interrupted-animation class of bugs. `stage` is included so switching
-  // into the chat view (a fresh mount of the scrollable area and bottomRef)
-  // also scrolls immediately, not just on the next message/typing change.
+  // reveal, and each update grows the bubble a little more. Smooth
+  // scrolling can't finish one ~300-500ms animation before the next call
+  // interrupts it with an already-stale target, so across a whole reply
+  // the view visibly stalls or never catches up. Firing instantly on every
+  // update reads as continuous tracking anyway given how frequent the
+  // updates are, without the interrupted-animation class of bugs.
+  //
+  // window.scrollTo to the full document height, not bottomRef.scrollIntoView:
+  // scrollIntoView computes its target from the element's bounding rect at
+  // call time, and with the sticky header/composer plus a growing bubble
+  // in the same tick, that rect can be stale by the time the browser acts
+  // on it, leaving the view a bubble or two behind. Scrolling the window
+  // straight to document.documentElement.scrollHeight has no such
+  // intermediate geometry to go stale. `stage` is included so switching
+  // into the chat view scrolls immediately too, not just on the next
+  // message/typing change.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
   }, [stage, messages, isTyping, streamingText]);
 
   async function waitForRespondentToPauseTyping() {
@@ -344,44 +359,49 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
               {enabledFields.includes("phone") && (
                 <Input
                   type="tel"
-                  placeholder={parsePresetFieldLabel(survey.custom_fields, "phone")}
+                  placeholder={fieldPlaceholder("phone")}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  required={parsePresetFieldRequired(survey.custom_fields, "phone")}
                 />
               )}
               {enabledFields.includes("job_title") && (
                 <Input
                   type="text"
-                  placeholder={parsePresetFieldLabel(survey.custom_fields, "job_title")}
+                  placeholder={fieldPlaceholder("job_title")}
                   value={jobTitle}
                   onChange={(e) => setJobTitle(e.target.value)}
+                  required={parsePresetFieldRequired(survey.custom_fields, "job_title")}
                 />
               )}
               {enabledFields.includes("company") && (
                 <Input
                   type="text"
-                  placeholder={parsePresetFieldLabel(survey.custom_fields, "company")}
+                  placeholder={fieldPlaceholder("company")}
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
+                  required={parsePresetFieldRequired(survey.custom_fields, "company")}
                 />
               )}
               {enabledFields.includes("linkedin") && (
                 <Input
                   type="url"
-                  placeholder={parsePresetFieldLabel(survey.custom_fields, "linkedin")}
+                  placeholder={fieldPlaceholder("linkedin")}
                   value={linkedin}
                   onChange={(e) => setLinkedin(e.target.value)}
+                  required={parsePresetFieldRequired(survey.custom_fields, "linkedin")}
                 />
               )}
               {customFieldDefs.map((field) => (
                 <Input
                   key={field.key}
                   type="text"
-                  placeholder={field.label}
+                  placeholder={field.required ? `${field.label} *` : field.label}
                   value={customFieldValues[field.key] ?? ""}
                   onChange={(e) =>
                     setCustomFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))
                   }
+                  required={field.required === true}
                 />
               ))}
               {error && <p className="text-sm text-destructive">{error}</p>}
@@ -452,9 +472,9 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
         </div>
       </header>
 
-      {/* pb-28 clears the sticky composer below: without it the last
-          message/bottomRef lands right at the viewport edge and ends up
-          hidden behind the composer instead of scrolled fully into view. */}
+      {/* pb-28 clears the sticky composer below: without it the last message
+          lands right at the document edge and ends up hidden behind the
+          composer instead of visible once scrolled fully to the bottom. */}
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-6 py-2 pb-28">
         {messages.map((m, i) => (
           <div key={i} className={m.role === "assistant" ? ASSISTANT_BUBBLE : RESPONDENT_BUBBLE}>
@@ -465,7 +485,6 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
         {streamingText !== null && (
           <div className={ASSISTANT_BUBBLE}>{renderWithBold(streamingText)}</div>
         )}
-        <div ref={bottomRef} />
       </div>
 
       <div className="sticky bottom-0 z-20 bg-page">

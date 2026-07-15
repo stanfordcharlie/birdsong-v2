@@ -88,10 +88,14 @@ export function AdminSidebar({
       )}
     >
       {/* Header: toggle is always the first element at the same fixed
-          position (px-4 from the left, same size) in both states, so it
-          never moves out from under the cursor after a click. The logo +
-          wordmark appear next to it only when expanded. */}
-      <div className="flex h-14 items-center gap-2 px-4">
+          position (px-3 from the left, same size) in both states, so it
+          never moves out from under the cursor after a click. px-3 (not
+          px-4) is deliberate: 12px padding + the 32px button + 12px exactly
+          fills the 56px collapsed rail, centering it there; px-4 would
+          overflow the button past the nominal right padding and leave it
+          looking pushed right. The logo + wordmark appear next to it only
+          when expanded. */}
+      <div className="flex h-14 items-center gap-2 px-3">
         <div className="group/tooltip relative flex shrink-0">
           <button
             type="button"

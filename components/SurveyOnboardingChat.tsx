@@ -71,12 +71,15 @@ export function SurveyOnboardingChat({
   }
 
   // Bounded panel with its own internal scroll, same pinning pattern as
-  // app/survey/[slug]/InterviewFlow.tsx: the composer sits outside the
-  // scrollable message area (so it never moves as the thread grows) instead
-  // of flowing below it and pushing the whole page down.
+  // app/survey/[slug]/InterviewFlow.tsx: the message list caps its own
+  // height and scrolls internally, and the composer is a plain sibling
+  // directly below it, not a flex-1/shrink-0 split. That keeps the
+  // composer always visible right under the thread, whether the
+  // conversation is one message (a short box, no leftover blank space)
+  // or many (the list scrolls, the composer still never moves).
   return (
-    <div className="flex h-[28rem] flex-col overflow-hidden rounded-control border border-border">
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
+    <div className="flex flex-col overflow-hidden rounded-control border border-border">
+      <div className="flex max-h-96 flex-col gap-3 overflow-y-auto px-3 py-3">
         {messages.map((m, i) => (
           <div
             key={i}
@@ -100,7 +103,7 @@ export function SurveyOnboardingChat({
           <form>, and nested <form> elements are invalid HTML that browsers
           will misparse, so submission is wired up via onClick/onKeyDown
           directly instead. */}
-      <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-card p-3">
+      <div className="flex flex-col gap-2 border-t border-border bg-card p-3">
         <div className="flex gap-2">
           <Textarea
             ref={inputRef}
