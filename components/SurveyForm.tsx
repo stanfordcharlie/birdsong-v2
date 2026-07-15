@@ -11,25 +11,10 @@ import {
 } from "@/lib/surveys/respondent-fields";
 import { SurveyOnboardingChat } from "@/components/SurveyOnboardingChat";
 import { SURVEY_TONE_OPTIONS, type ExtractedSurveyDetails } from "@/lib/survey-onboarding/types";
+import { slugify } from "@/lib/surveys/slugify";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-
-const MAX_SLUG_LENGTH = 60;
-
-function slugify(input: string): string {
-  const base = input
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  if (base.length <= MAX_SLUG_LENGTH) return base;
-
-  const truncated = base.slice(0, MAX_SLUG_LENGTH);
-  const lastHyphen = truncated.lastIndexOf("-");
-  return (lastHyphen > 0 ? truncated.slice(0, lastHyphen) : truncated).replace(/-+$/, "");
-}
 
 export type SurveyFormValues = {
   title: string;

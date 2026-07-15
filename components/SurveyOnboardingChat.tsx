@@ -19,10 +19,19 @@ export function SurveyOnboardingChat({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!loading) inputRef.current?.focus();
   }, [loading, messages.length]);
+
+  // Same instant (not smooth) scroll-to-latest pattern as
+  // app/survey/[slug]/InterviewFlow.tsx: fires on every message or loading
+  // change so the view tracks continuously as the panel grows, instead of a
+  // smooth-scroll animation racing (and losing to) the next update.
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [messages, loading]);
 
   async function submitAnswer() {
     if (!answer.trim() || loading) return;
@@ -61,9 +70,13 @@ export function SurveyOnboardingChat({
     }
   }
 
+  // Bounded panel with its own internal scroll, same pinning pattern as
+  // app/survey/[slug]/InterviewFlow.tsx: the composer sits outside the
+  // scrollable message area (so it never moves as the thread grows) instead
+  // of flowing below it and pushing the whole page down.
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3">
+    <div className="flex h-[28rem] flex-col overflow-hidden rounded-control border border-border">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
         {messages.map((m, i) => (
           <div
             key={i}
@@ -81,27 +94,30 @@ export function SurveyOnboardingChat({
             Thinking...
           </div>
         )}
+        <div ref={bottomRef} />
       </div>
       {/* Not a <form>: this whole chat renders inside SurveyForm's own outer
           <form>, and nested <form> elements are invalid HTML that browsers
           will misparse, so submission is wired up via onClick/onKeyDown
           directly instead. */}
-      <div className="flex gap-2">
-        <Textarea
-          ref={inputRef}
-          placeholder="Type your answer..."
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={loading}
-          rows={2}
-          className="flex-1 resize-none"
-        />
-        <Button type="button" onClick={submitAnswer} disabled={loading || !answer.trim()}>
-          Send
-        </Button>
+      <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-card p-3">
+        <div className="flex gap-2">
+          <Textarea
+            ref={inputRef}
+            placeholder="Type your answer..."
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={loading}
+            rows={2}
+            className="flex-1 resize-none"
+          />
+          <Button type="button" onClick={submitAnswer} disabled={loading || !answer.trim()}>
+            Send
+          </Button>
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }
