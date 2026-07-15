@@ -87,39 +87,30 @@ export function AdminSidebar({
         expanded ? "w-56" : "w-14"
       )}
     >
-      {/* Header: logo + wordmark + toggle inline when expanded, just the
-          toggle when collapsed (mirrors Jack & Jill's sidebar header). */}
-      <div className="flex h-14 items-center px-4">
-        {expanded ? (
-          <>
-            <Link href="/admin" className="flex flex-1 items-center gap-2 overflow-hidden">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/birdsong_logo_mark_v2.svg" alt="Birdsong" width={32} height={32} className="h-6 w-6" />
-              </span>
-              <span className="whitespace-nowrap text-sm font-semibold text-white">Birdsong</span>
-            </Link>
-            <button
-              type="button"
-              onClick={onToggle}
-              aria-label="Collapse sidebar"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] transition-colors hover:bg-white/10 hover:text-white"
-            >
-              <SidebarToggleIcon />
-            </button>
-          </>
-        ) : (
-          <div className="group/tooltip relative mx-auto flex">
-            <button
-              type="button"
-              onClick={onToggle}
-              aria-label="Expand sidebar"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] transition-colors hover:bg-white/10 hover:text-white"
-            >
-              <SidebarToggleIcon />
-            </button>
-            <IconTooltip label="Expand sidebar" />
-          </div>
+      {/* Header: toggle is always the first element at the same fixed
+          position (px-4 from the left, same size) in both states, so it
+          never moves out from under the cursor after a click. The logo +
+          wordmark appear next to it only when expanded. */}
+      <div className="flex h-14 items-center gap-2 px-4">
+        <div className="group/tooltip relative flex shrink-0">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <SidebarToggleIcon />
+          </button>
+          {!expanded && <IconTooltip label="Expand sidebar" />}
+        </div>
+        {expanded && (
+          <Link href="/admin" className="flex flex-1 items-center gap-2 overflow-hidden">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/birdsong_logo_mark_v2.svg" alt="Birdsong" width={32} height={32} className="h-6 w-6" />
+            </span>
+            <span className="whitespace-nowrap text-sm font-semibold text-white">Birdsong</span>
+          </Link>
         )}
       </div>
 
