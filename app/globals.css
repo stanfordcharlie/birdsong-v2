@@ -65,6 +65,18 @@ body {
   background: var(--background);
 }
 
+/* Tailwind's own preflight (@tailwind base above) already sets this, so
+   this is belt-and-suspenders rather than a fix for an observed bug here.
+   Called out explicitly per the company profile setup flow's design
+   handoff, which hit this as a real issue in its own plain-HTML prototype
+   (no Tailwind base reset there). */
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

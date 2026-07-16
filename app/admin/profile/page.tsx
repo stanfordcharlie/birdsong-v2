@@ -1,6 +1,5 @@
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { ProfileGate } from "./ProfileGate";
-import { Card, CardContent } from "@/components/ui/card";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -27,26 +26,36 @@ export default async function ProfilePage() {
     }
   }
 
-  const hasExistingData = Boolean(
-    profile?.company_name || profile?.what_we_sell || profile?.target_icp || profile?.value_prop
-  );
+  // onboarding_completed_at (not "does any field have a value") is the
+  // gate now: the redesigned setup flow autosaves every field as the
+  // admin fills it in, so a profile can have a company name saved from a
+  // half-finished session. Only an explicit "Finish setup" sets this.
+  const hasExistingData = Boolean(profile?.onboarding_completed_at);
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold text-card-foreground">Company Profile</h1>
-      <Card>
-        <CardContent className="pt-6">
-          <ProfileGate
-            hasExistingData={hasExistingData}
-            initialValues={{
-              companyName: profile?.company_name ?? "",
-              whatWeSell: profile?.what_we_sell ?? "",
-              targetIcp: profile?.target_icp ?? "",
-              valueProp: profile?.value_prop ?? "",
-            }}
-          />
-        </CardContent>
-      </Card>
-    </div>
+    <ProfileGate
+      hasExistingData={hasExistingData}
+      initialValues={{
+        companyName: profile?.company_name ?? "",
+        whatWeSell: profile?.what_we_sell ?? "",
+        targetIcp: profile?.target_icp ?? "",
+        valueProp: profile?.value_prop ?? "",
+        logoUrl: profile?.logo_url ?? null,
+      }}
+      setupInitialData={{
+        companyName: profile?.company_name ?? "",
+        industry: profile?.industry ?? "",
+        teamSize: profile?.team_size ?? "",
+        website: profile?.website ?? "",
+        linkedin: profile?.linkedin ?? "",
+        description: profile?.what_we_sell ?? "",
+        audience: profile?.target_icp ?? "",
+        valueProp: profile?.value_prop ?? "",
+        tone: profile?.tone ?? "",
+        avoid: profile?.words_to_avoid ?? "",
+        contactName: profile?.contact_name ?? "",
+        contactEmail: profile?.contact_email ?? "",
+      }}
+    />
   );
 }

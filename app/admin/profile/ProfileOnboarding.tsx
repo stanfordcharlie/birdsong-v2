@@ -57,6 +57,7 @@ export function ProfileOnboarding({
             whatWeSell: data.extracted.whatWeSell,
             targetIcp: data.extracted.targetIcp,
             valueProp: data.extracted.valueProp,
+            logoUrl: null,
           },
           latestResearch
         );

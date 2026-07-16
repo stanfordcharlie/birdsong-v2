@@ -1,0 +1,12 @@
+{
+  "projectId": "8ad57c95-ea98-4ba5-968a-39df4900c5c4",
+  "pkg": "birdsong-ui",
+  "globalName": "Birdsong",
+  "shape": "package",
+  "entry": "dist/index.js",
+  "srcDir": "components/ui",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".design-sync/.cache/tailwind-build.css",
+  "extraFonts": [".design-sync/fonts/inter.css"],
+  "readmeHeader": ".design-sync/conventions.md"
+}

@@ -107,7 +107,13 @@ function SendIcon() {
   );
 }
 
-export function InterviewFlow({ survey }: { survey: Survey }) {
+export function InterviewFlow({
+  survey,
+  logoUrl,
+}: {
+  survey: Survey;
+  logoUrl: string | null;
+}) {
   const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
   const customFieldDefs = parseCustomRespondentFieldDefs(survey.custom_fields);
   // Placeholder text is the only visible label these fields have, so a
@@ -332,6 +338,10 @@ export function InterviewFlow({ survey }: { survey: Survey }) {
       <div className="mx-auto max-w-xl px-4 py-12">
         <Card>
           <CardContent className="flex flex-col gap-4 p-6">
+            {survey.sponsor && logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt={survey.sponsor} className="h-8 w-auto object-contain" />
+            )}
             <h1 className="text-xl font-semibold text-card-foreground">
               {survey.external_title || survey.title}
             </h1>
