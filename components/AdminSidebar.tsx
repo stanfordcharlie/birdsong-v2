@@ -96,17 +96,14 @@ export function AdminSidebar({
           looking pushed right. The logo + wordmark appear next to it only
           when expanded. */}
       <div className="flex h-14 items-center gap-2 px-3">
-        <div className="group/tooltip relative flex shrink-0">
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] transition-colors hover:bg-white/10 hover:text-white"
-          >
-            <SidebarToggleIcon />
-          </button>
-          {!expanded && <IconTooltip label="Expand sidebar" />}
-        </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] transition-colors hover:bg-white/10 hover:text-white"
+        >
+          <SidebarToggleIcon />
+        </button>
         {expanded && (
           <Link href="/admin" className="flex flex-1 items-center gap-2 overflow-hidden">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white">
