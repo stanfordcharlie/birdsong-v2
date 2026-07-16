@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ResponsesTable } from "./ResponsesTable";
 import { SurveyUrl } from "./SurveyUrl";
+import { SurveyStatusToggle } from "./SurveyStatusToggle";
 import { SurveyForm, type SurveyFormValues } from "@/components/SurveyForm";
 import {
   parseCustomRespondentFieldDefs,
@@ -64,7 +65,10 @@ export default async function SurveyDetailPage({
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
-        <h1 className="text-xl font-semibold text-card-foreground">{survey.title}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold text-card-foreground">{survey.title}</h1>
+          <SurveyStatusToggle surveyId={survey.id} status={survey.status} />
+        </div>
         <p className="text-sm text-muted-foreground">{responses?.length ?? 0} responses</p>
         <SurveyUrl slug={survey.slug} />
       </div>

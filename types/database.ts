@@ -25,6 +25,7 @@ export type Database = {
           num_questions: number | null;
           gift_card_amount: number | null;
           custom_fields: Json;
+          status: string;
           user_id: string;
           created_at: string;
         };
@@ -43,6 +44,7 @@ export type Database = {
           num_questions?: number | null;
           gift_card_amount?: number | null;
           custom_fields?: Json;
+          status?: string;
           user_id: string;
           created_at?: string;
         };
@@ -61,6 +63,7 @@ export type Database = {
           num_questions?: number | null;
           gift_card_amount?: number | null;
           custom_fields?: Json;
+          status?: string;
           user_id?: string;
           created_at?: string;
         };
