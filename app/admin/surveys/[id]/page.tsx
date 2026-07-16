@@ -19,21 +19,17 @@ export default async function SurveyDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: survey } = await supabase
-    .from("surveys")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  // Neither query depends on the other's result (responses is filtered by
+  // the route param, not by anything read off the survey row), so they run
+  // concurrently instead of the survey fetch blocking the responses fetch.
+  const [{ data: survey }, { data: responses }] = await Promise.all([
+    supabase.from("surveys").select("*").eq("id", id).maybeSingle(),
+    supabase.from("responses").select("*").eq("survey_id", id).order("created_at", { ascending: false }),
+  ]);
 
   if (!survey) {
     notFound();
   }
-
-  const { data: responses } = await supabase
-    .from("responses")
-    .select("*")
-    .eq("survey_id", id)
-    .order("created_at", { ascending: false });
 
   const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
   const customFieldDefs = parseCustomRespondentFieldDefs(survey.custom_fields);
