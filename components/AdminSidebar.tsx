@@ -26,6 +26,17 @@ function HomeIcon() {
   );
 }
 
+function LeadsIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M3.5 20c0-3 2.5-5 5.5-5s5.5 2 5.5 5" />
+      <path d="M16 5.5a3.5 3.5 0 0 1 0 5" />
+      <path d="M17.5 15.5c2 .8 3 2.4 3 4.5" />
+    </svg>
+  );
+}
+
 function SurveysIcon() {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
@@ -52,10 +63,11 @@ function CompanyProfileIcon() {
   );
 }
 
-// Nav icon set (house/clipboard/building) — apply the same icons to any new
-// admin nav items going forward, for consistency.
+// Nav icon set (house/people/clipboard/building) — same hand-drawn stroke
+// style for any new admin nav items going forward, for consistency.
 const NAV_ITEMS = [
   { href: "/admin", label: "Home", icon: HomeIcon },
+  { href: "/admin/leads", label: "Leads", icon: LeadsIcon },
   { href: "/admin/surveys", label: "Surveys", icon: SurveysIcon },
   { href: "/admin/profile", label: "Company profile", icon: CompanyProfileIcon },
 ];

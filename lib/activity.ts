@@ -29,7 +29,7 @@ export async function getRecentActivity(
   const since = new Date(Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const { data: responses } = await supabase
     .from("responses")
-    .select("survey_id, status, created_at")
+    .select("survey_id, status, created_at, is_test")
     .in("survey_id", surveyIds)
     .gte("created_at", since)
     .order("created_at", { ascending: false });
@@ -38,7 +38,8 @@ export async function getRecentActivity(
   const qualifiedBuckets = new Map<string, Bucket>();
 
   for (const r of responses ?? []) {
-    if (r.status === "not_a_fit") continue;
+    // Owner test runs aren't activity, same as not-a-fit responses.
+    if (r.is_test || r.status === "not_a_fit") continue;
     const buckets = r.status === "qualified" ? qualifiedBuckets : newBuckets;
     const existing = buckets.get(r.survey_id);
     if (existing) {

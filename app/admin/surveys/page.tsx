@@ -25,7 +25,11 @@ export default async function AdminDashboardPage() {
   // same unaggregated approach the survey detail page already uses for its
   // own single-survey response count.
   const { data: responseRows } = surveyIds.length
-    ? await supabase.from("responses").select("survey_id").in("survey_id", surveyIds)
+    ? await supabase
+        .from("responses")
+        .select("survey_id")
+        .in("survey_id", surveyIds)
+        .eq("is_test", false)
     : { data: [] as { survey_id: string }[] };
 
   const responseCounts = new Map<string, number>();

@@ -266,6 +266,18 @@ async function completeInterview(
 
   console.log(`[interview/continue] response_id=${responseId} completed, lead_score=${leadScore}`);
 
+  // Test runs still go through extraction above (the owner wants to see
+  // real scores and call scripts for their dry runs) but never notify —
+  // the email is the "new lead" signal and a test is not a lead.
+  if (response.is_test) {
+    console.log(`[interview/continue] response_id=${responseId} is a test run; skipping lead notification`);
+    return NextResponse.json({
+      response_id: responseId,
+      message: CLOSING_MESSAGE,
+      complete: true,
+    });
+  }
+
   // Best-effort: the respondent's completion shouldn't fail because the
   // notification email did.
   try {

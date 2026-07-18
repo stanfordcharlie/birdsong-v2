@@ -71,7 +71,9 @@ export default async function SurveyDetailPage({
     ...customFieldDefs.map((field) => ({ label: field.label, required: field.required === true })),
   ];
 
-  const responseList = responses ?? [];
+  // Owner test runs are excluded from the stats and the table both — they
+  // remain reachable via their direct /admin/responses/[id] links.
+  const responseList = (responses ?? []).filter((r) => !r.is_test);
   const qualifiedCount = responseList.filter((r) => r.status === "qualified").length;
   const completionRate =
     responseList.length > 0

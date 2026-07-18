@@ -10,6 +10,7 @@ import {
   parsePresetFieldRequired,
   type OptionalRespondentField,
 } from "@/lib/surveys/respondent-fields";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -113,9 +114,14 @@ function ArrowIcon() {
 export function InterviewFlow({
   survey,
   logoUrl,
+  isTest = false,
 }: {
   survey: Survey;
   logoUrl: string | null;
+  // Owner-verified server-side by the page; drives the "Test mode" marker,
+  // the is_test flag on the start call (re-verified by the route), and
+  // skipping completion persistence so previews are repeatable.
+  isTest?: boolean;
 }) {
   const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
   const customFieldDefs = parseCustomRespondentFieldDefs(survey.custom_fields);
@@ -167,6 +173,9 @@ export function InterviewFlow({
   }, []);
 
   useEffect(() => {
+    // Test mode ignores stored completion: a real respondent is
+    // one-and-done, but the owner needs to preview repeatedly.
+    if (isTest) return;
     const stored = window.localStorage.getItem(completionStorageKey(survey.id));
     if (stored) {
       try {
@@ -240,6 +249,7 @@ export function InterviewFlow({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           survey_id: survey.id,
+          ...(isTest ? { is_test: true } : {}),
           respondent_name: name,
           respondent_email: email,
           respondent_phone: enabledFields.includes("phone") ? phone : undefined,
@@ -290,10 +300,12 @@ export function InterviewFlow({
       if (!res.ok) throw new Error(data.error || "Failed to continue the interview");
       setFailedMessage(null);
       if (data.complete) {
-        window.localStorage.setItem(
-          completionStorageKey(survey.id),
-          JSON.stringify({ closingMessage: data.message, messages: historyForCompletion })
-        );
+        if (!isTest) {
+          window.localStorage.setItem(
+            completionStorageKey(survey.id),
+            JSON.stringify({ closingMessage: data.message, messages: historyForCompletion })
+          );
+        }
         setIsTyping(false);
         setClosingMessage(data.message);
         setStage("complete");
@@ -396,6 +408,11 @@ export function InterviewFlow({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt={survey.sponsor} className="h-8 w-auto object-contain" />
           )}
+          {isTest && (
+            <div>
+              <Badge variant="warning">Test mode</Badge>
+            </div>
+          )}
           <h1 className="font-serif text-[28px] font-normal text-card-foreground">{surveyName}</h1>
           {survey.topic && <p className="text-[15px] text-muted-foreground">{survey.topic}</p>}
           {survey.gift_card_amount ? (
@@ -484,7 +501,10 @@ export function InterviewFlow({
             <BirdGlyph />
             <span className="text-sm font-semibold">{surveyName}</span>
           </div>
-          <span className="text-[13px] font-medium text-faint">Complete</span>
+          <div className="flex items-center gap-2.5">
+            {isTest && <Badge variant="warning">Test mode</Badge>}
+            <span className="text-[13px] font-medium text-faint">Complete</span>
+          </div>
         </div>
 
         <div className="flex flex-1 items-center justify-center px-10 pb-24">
@@ -547,7 +567,10 @@ export function InterviewFlow({
           <BirdGlyph />
           <span className="text-sm font-semibold">{surveyName}</span>
         </div>
-        <span className="text-[13px] font-medium text-faint">Question {answeredCount + 1}</span>
+        <div className="flex items-center gap-2.5">
+          {isTest && <Badge variant="warning">Test mode</Badge>}
+          <span className="text-[13px] font-medium text-faint">Question {answeredCount + 1}</span>
+        </div>
       </div>
 
       <div className="flex flex-1 items-center justify-center px-10 pb-24 pt-8">

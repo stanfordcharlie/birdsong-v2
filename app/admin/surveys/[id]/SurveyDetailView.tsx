@@ -136,9 +136,13 @@ export function SurveyDetailView({
         <div className="flex items-end justify-between gap-6">
           <h1 className="font-serif text-[40px] font-normal text-card-foreground">{survey.title}</h1>
           <div className="flex shrink-0 gap-2.5">
+            {/* ?test=1: owner-verified server-side; lets the admin run the
+                interview (even on a draft) without creating a real lead,
+                firing the email, or skewing stats. The Share link below
+                stays the clean respondent URL. */}
             <Button type="button" variant="secondary" size="sm" asChild>
-              <a href={`/survey/${survey.slug}`} target="_blank" rel="noreferrer">
-                Preview
+              <a href={`/survey/${survey.slug}?test=1`} target="_blank" rel="noreferrer">
+                Preview interview
               </a>
             </Button>
             <Button type="button" size="sm" onClick={handleShare}>
@@ -211,7 +215,7 @@ export function SurveyDetailView({
         <div className="flex max-w-[620px] items-center gap-6 rounded-card border border-border bg-card px-5 py-4">
           <span className="flex-1 text-sm font-medium text-card-foreground">Try the interview yourself</span>
           <a
-            href={`/survey/${survey.slug}`}
+            href={`/survey/${survey.slug}?test=1`}
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-1.5 text-sm font-semibold text-indigo transition-colors hover:text-indigo/80"

@@ -9,12 +9,19 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "not_a_fit", label: "Not a fit" },
 ];
 
+// Shared between the response detail page and the Leads queue. Optimistic:
+// the select flips immediately and reverts on failure. onStatusChange fires
+// with the same optimistic timing (and again with the old value on revert)
+// so a parent list can keep its own copy of the row in sync — e.g. the
+// Leads queue's status filter reacting to an inline change.
 export function StatusControl({
   responseId,
   initialStatus,
+  onStatusChange,
 }: {
   responseId: string;
   initialStatus: string;
+  onStatusChange?: (status: string) => void;
 }) {
   const [status, setStatus] = useState(initialStatus);
   const [loading, setLoading] = useState(false);
@@ -25,6 +32,7 @@ export function StatusControl({
     setLoading(true);
     const previousStatus = status;
     setStatus(newStatus);
+    onStatusChange?.(newStatus);
     try {
       const res = await fetch(`/api/responses/${responseId}/status`, {
         method: "PATCH",
@@ -35,6 +43,7 @@ export function StatusControl({
       if (!res.ok) throw new Error(data.error || "Failed to update status");
     } catch (err) {
       setStatus(previousStatus);
+      onStatusChange?.(previousStatus);
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
@@ -47,6 +56,7 @@ export function StatusControl({
         value={status}
         onChange={(e) => handleChange(e.target.value)}
         disabled={loading}
+        aria-label="Lead status"
         className="flex h-9 rounded-control border border-input bg-card px-3 py-2 text-sm text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {STATUS_OPTIONS.map((option) => (

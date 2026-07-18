@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createCookieClient } from "@/lib/supabase/server";
 import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
 import { buildInterviewSystemPrompt, buildKickoffMessage } from "@/lib/interview-prompt";
 import { parseChips } from "@/lib/interview/chips";
@@ -26,6 +27,7 @@ import type { Json } from "@/types/database";
 export async function POST(request: Request) {
   let body: {
     survey_id?: string;
+    is_test?: unknown;
     respondent_name?: string;
     respondent_email?: string;
     respondent_phone?: string;
@@ -82,12 +84,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Survey not found" }, { status: 404 });
   }
 
+  // A test run is only honored when the caller's cookie session belongs to
+  // this survey's owner — the body flag alone is never trusted, so a
+  // random caller sending is_test:true gets the normal rules (including
+  // the draft gate below) with the flag silently ignored.
+  let isTest = false;
+  if (body.is_test === true) {
+    const cookieClient = await createCookieClient();
+    const {
+      data: { user },
+    } = await cookieClient.auth.getUser();
+    if (user && user.id === survey.user_id) {
+      isTest = true;
+      console.log(`[interview/start] test run by owner for survey_id=${survey_id}`);
+    }
+  }
+
   // Defense in depth: the public survey page already gates on this, but
   // this endpoint is directly callable and must not trust that a caller
   // came through the gated page. Checked before any Anthropic call or
   // responses row is created, so a draft survey never burns tokens or
-  // pollutes the lead queue.
-  if (survey.status !== "live") {
+  // pollutes the lead queue. Owner-verified test runs are exempt — the
+  // point of previewing is doing it before the survey goes live.
+  if (survey.status !== "live" && !isTest) {
     console.error(`[interview/start] survey_id=${survey_id} is not live (status=${survey.status})`);
     return NextResponse.json({ error: "This survey isn't available" }, { status: 403 });
   }
@@ -154,6 +173,7 @@ export async function POST(request: Request) {
       custom_field_values: sanitizedCustomFieldValues as Json,
       messages: messages as unknown as Json,
       session_token: sessionToken,
+      ...(isTest ? { is_test: true } : {}),
     })
     .select("id")
     .single();

@@ -5,7 +5,7 @@ import type { InterviewMessage } from "@/lib/interview/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge, type badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { StatusControl } from "./StatusControl";
+import { StatusControl } from "@/components/StatusControl";
 import { CopyScriptButton } from "./CopyScriptButton";
 import type { VariantProps } from "class-variance-authority";
 
@@ -124,6 +124,7 @@ export default async function ResponseDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {response.is_test && <Badge variant="warning">Test response</Badge>}
           <Badge variant="default">Lead score {response.lead_score ?? "—"}</Badge>
           <Badge variant={STATUS_BADGE_VARIANT[status] ?? "default"}>
             {STATUS_LABELS[status] ?? status}
