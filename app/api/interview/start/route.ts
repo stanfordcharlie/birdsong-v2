@@ -4,6 +4,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
 import { buildInterviewSystemPrompt, buildKickoffMessage } from "@/lib/interview-prompt";
 import { parseChips } from "@/lib/interview/chips";
+import { generateSessionToken } from "@/lib/interview/token";
+import { getClientIp, isRateLimited, startRateLimiter } from "@/lib/interview/rate-limit";
+import {
+  EMAIL_MAX_LENGTH,
+  NAME_MAX_LENGTH,
+  isValidEmail,
+  sanitizeCustomFieldValues,
+  truncate,
+} from "@/lib/interview/validation";
 import type { InterviewMessage } from "@/lib/interview/types";
 import type { Json } from "@/types/database";
 
@@ -11,6 +20,9 @@ import type { Json } from "@/types/database";
 // Body: { survey_id, respondent_name?, respondent_email?, respondent_phone?, custom_field_values? }
 // Creates a `responses` row (unauthenticated, public) and returns the first
 // interview message from Claude.
+//
+// CAPTCHA (e.g. Turnstile/hCaptcha) would slot in right here, verified
+// before the rate-limit check below even runs — not added in this pass.
 export async function POST(request: Request) {
   let body: {
     survey_id?: string;
@@ -25,12 +37,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { survey_id, respondent_name, respondent_email, respondent_phone, custom_field_values } =
-    body;
+  const { survey_id, respondent_phone, custom_field_values } = body;
 
   if (!survey_id || typeof survey_id !== "string") {
     return NextResponse.json({ error: "survey_id is required" }, { status: 400 });
   }
+
+  const clientIp = getClientIp(request);
+  if (await isRateLimited(startRateLimiter, clientIp)) {
+    return NextResponse.json(
+      { error: "Too many interviews started from this connection, please try again in a bit." },
+      { status: 429 }
+    );
+  }
+
+  const respondent_name =
+    typeof body.respondent_name === "string" ? truncate(body.respondent_name.trim(), NAME_MAX_LENGTH) : undefined;
+
+  const respondent_email =
+    typeof body.respondent_email === "string" ? truncate(body.respondent_email.trim(), EMAIL_MAX_LENGTH) : undefined;
+
+  if (respondent_email && !isValidEmail(respondent_email)) {
+    return NextResponse.json({ error: "That doesn't look like a valid email address." }, { status: 400 });
+  }
+
+  const sanitizedCustomFieldValues = sanitizeCustomFieldValues(custom_field_values);
 
   console.log(`[interview/start] survey_id=${survey_id} respondent_email=${respondent_email ?? "none"}`);
 
@@ -63,7 +94,7 @@ export async function POST(request: Request) {
 
   const respondent = {
     name: respondent_name ?? null,
-    customFieldValues: custom_field_values ?? {},
+    customFieldValues: sanitizedCustomFieldValues,
   };
 
   const anthropic = getAnthropicClient();
@@ -98,6 +129,11 @@ export async function POST(request: Request) {
 
   const messages: InterviewMessage[] = [{ role: "assistant", content: openingQuestion }];
 
+  // Bound to this row and required on every /api/interview/continue call
+  // from here on, so a guessable response_id UUID alone is never enough to
+  // post messages into someone else's interview.
+  const sessionToken = generateSessionToken();
+
   const { data: response, error: insertError } = await supabase
     .from("responses")
     .insert({
@@ -105,8 +141,9 @@ export async function POST(request: Request) {
       respondent_name: respondent_name ?? null,
       respondent_email: respondent_email ?? null,
       respondent_phone: respondent_phone ?? null,
-      custom_field_values: (custom_field_values ?? {}) as Json,
+      custom_field_values: sanitizedCustomFieldValues as Json,
       messages: messages as unknown as Json,
+      session_token: sessionToken,
     })
     .select("id")
     .single();
@@ -122,5 +159,6 @@ export async function POST(request: Request) {
     response_id: response.id,
     message: openingQuestion,
     chips,
+    token: sessionToken,
   });
 }

@@ -11,6 +11,14 @@ import {
 } from "@/lib/interview-prompt";
 import { extractInterviewInsights } from "@/lib/interview/extract";
 import { parseChips } from "@/lib/interview/chips";
+import { tokensMatch } from "@/lib/interview/token";
+import {
+  continueIpRateLimiter,
+  continueResponseRateLimiter,
+  getClientIp,
+  isRateLimited,
+} from "@/lib/interview/rate-limit";
+import { MESSAGE_MAX_LENGTH } from "@/lib/interview/validation";
 import { sendLeadNotification } from "@/lib/email/lead-notification";
 import type { InterviewMessage } from "@/lib/interview/types";
 import type { Database, Json } from "@/types/database";
@@ -25,20 +33,38 @@ type ResponseRow = Database["public"]["Tables"]["responses"]["Row"];
 // wrap up + score the lead once the interview is complete), and persists
 // the updated transcript.
 export async function POST(request: Request) {
-  let body: { response_id?: string; message?: string };
+  let body: { response_id?: string; message?: string; token?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { response_id, message } = body;
+  const { response_id, message, token } = body;
 
   if (!response_id || typeof response_id !== "string") {
     return NextResponse.json({ error: "response_id is required" }, { status: 400 });
   }
   if (!message || typeof message !== "string" || !message.trim()) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
+  }
+  if (message.length > MESSAGE_MAX_LENGTH) {
+    return NextResponse.json(
+      { error: "That message is a bit long, try trimming it down." },
+      { status: 400 }
+    );
+  }
+
+  const clientIp = getClientIp(request);
+  const [ipLimited, responseLimited] = await Promise.all([
+    isRateLimited(continueIpRateLimiter, clientIp),
+    isRateLimited(continueResponseRateLimiter, response_id),
+  ]);
+  if (ipLimited || responseLimited) {
+    return NextResponse.json(
+      { error: "You're sending messages a bit too fast, give it a moment." },
+      { status: 429 }
+    );
   }
 
   console.log(`[interview/continue] response_id=${response_id}`);
@@ -59,6 +85,16 @@ export async function POST(request: Request) {
     console.error(`[interview/continue] response not found for id=${response_id}`);
     return NextResponse.json({ error: "Response not found" }, { status: 404 });
   }
+
+  // response_id is a guessable/enumerable UUID, not a credential — the
+  // session token minted at /api/interview/start is what actually proves
+  // this caller owns this interview. Checked before the completed/exchange
+  // logic below runs.
+  if (!token || typeof token !== "string" || !response.session_token || !tokensMatch(token, response.session_token)) {
+    console.error(`[interview/continue] response_id=${response_id} invalid or missing session token`);
+    return NextResponse.json({ error: "This interview session is no longer valid." }, { status: 401 });
+  }
+
   if (response.completed) {
     console.error(`[interview/continue] response_id=${response_id} already completed`);
     return NextResponse.json({ error: "This interview has already ended" }, { status: 409 });

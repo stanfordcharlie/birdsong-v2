@@ -131,6 +131,10 @@ export function InterviewFlow({
   const [linkedin, setLinkedin] = useState("");
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [responseId, setResponseId] = useState<string | null>(null);
+  // Kept in memory only (never localStorage) — proves to /api/interview/continue
+  // that this tab is the one that started this interview, since response_id
+  // alone is a guessable UUID, not a credential.
+  const sessionTokenRef = useRef<string | null>(null);
   const [messages, setMessages] = useState<InterviewMessage[]>([]);
   const [answer, setAnswer] = useState("");
   const [closingMessage, setClosingMessage] = useState("");
@@ -244,6 +248,7 @@ export function InterviewFlow({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to start the interview");
       setResponseId(data.response_id);
+      sessionTokenRef.current = data.token ?? null;
       setStage("chat");
       await revealAssistantMessage(data.message, data.chips ?? []);
     } catch (err) {
@@ -280,7 +285,11 @@ export function InterviewFlow({
       const res = await fetch("/api/interview/continue", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ response_id: responseId, message: userMessage.content }),
+        body: JSON.stringify({
+          response_id: responseId,
+          message: userMessage.content,
+          token: sessionTokenRef.current,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to continue the interview");
