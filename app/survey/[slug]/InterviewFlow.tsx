@@ -39,8 +39,10 @@ function wordRevealDelayMs() {
 const TYPING_PAUSE_MS = 10000;
 
 function TypingDots() {
+  // Purely decorative — the hidden status live region in the chat stage is
+  // what tells screen reader users Wren is typing.
   return (
-    <div className="flex items-center gap-1.5 py-2">
+    <div aria-hidden="true" className="flex items-center gap-1.5 py-2">
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-faint [animation-delay:-0.3s]" />
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-faint [animation-delay:-0.15s]" />
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-faint" />
@@ -64,8 +66,10 @@ function computeProgressPercent(answered: number, target: number): number {
 
 function TopProgressLine({ answered, target }: { answered: number; target: number }) {
   const percent = computeProgressPercent(answered, target);
+  // aria-hidden: decorative reinforcement of the "Question N" header text,
+  // which is what actually conveys position to screen reader users.
   return (
-    <div className="fixed inset-x-0 top-0 z-30 h-[3px] bg-chip">
+    <div aria-hidden="true" className="fixed inset-x-0 top-0 z-30 h-[3px] bg-chip">
       <div
         className="h-full bg-primary transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
         style={{ width: `${percent}%` }}
@@ -99,7 +103,7 @@ function BirdGlyph() {
 
 function ArrowIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <line x1="5" y1="12" x2="19" y2="12" />
       <polyline points="12 5 19 12 12 19" />
     </svg>
@@ -506,6 +510,7 @@ export function InterviewFlow({
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                aria-hidden="true"
                 className={cn("transition-transform", showResponses ? "rotate-180" : "")}
               >
                 <polyline points="6 9 12 15 18 9" />
@@ -547,6 +552,27 @@ export function InterviewFlow({
 
       <div className="flex flex-1 items-center justify-center px-10 pb-24 pt-8">
         <div className="w-full max-w-[640px]">
+          {/* Hidden live regions, always mounted (a live region only fires
+              if it exists before its content changes). Two separate regions
+              on purpose: the question region's content is derived from
+              `messages`, which updates exactly once per question — after
+              the word-by-word reveal finishes — so each question is
+              announced once, cleanly. Wiring it to the visible streaming
+              h1 instead would re-announce the growing text on every word.
+              The status region handles transient state (typing, send
+              failure); it flips to "" during the reveal, and an empty
+              update announces nothing. Politeness is deliberate — no
+              assertive interruptions anywhere. */}
+          <div aria-live="polite" aria-atomic="true" className="sr-only">
+            {lastAssistantMessage.replace(/\*\*/g, "")}
+          </div>
+          <div role="status" className="sr-only">
+            {isTyping
+              ? "Wren is typing…"
+              : error
+                ? `${error}${failedMessage ? " Your answer was not sent. Use the Retry button to send it again." : ""}`
+                : ""}
+          </div>
           {isTyping ? (
             <TypingDots />
           ) : (
@@ -568,7 +594,8 @@ export function InterviewFlow({
                       type="button"
                       onClick={retrySend}
                       disabled={loading}
-                      className="font-semibold underline underline-offset-2 hover:text-destructive/80 disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label="Retry sending your answer"
+                      className="font-semibold underline underline-offset-2 hover:text-destructive/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {loading ? "Retrying…" : "Retry"}
                     </button>
@@ -584,7 +611,8 @@ export function InterviewFlow({
                         key={i}
                         type="button"
                         onClick={() => handleChipTap(chip)}
-                        className="rounded-full border border-chip bg-transparent px-3.5 py-2 text-sm text-card-foreground transition-colors hover:bg-chip active:bg-chip/70"
+                        aria-label={`Suggested reply: ${chip}`}
+                        className="rounded-full border border-chip bg-transparent px-3.5 py-2 text-sm text-card-foreground transition-colors hover:bg-chip active:bg-chip/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       >
                         {chip}
                       </button>
@@ -593,6 +621,7 @@ export function InterviewFlow({
                 )}
                 <Textarea
                   ref={answerInputRef}
+                  aria-label="Your answer"
                   placeholder="Take your time — plain language is perfect."
                   value={answer}
                   onChange={(e) => {

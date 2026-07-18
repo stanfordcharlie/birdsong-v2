@@ -9,7 +9,7 @@ import {
   slugifyCustomFieldKey,
   type CustomRespondentFieldDef,
 } from "@/lib/surveys/respondent-fields";
-import { slugify } from "@/lib/surveys/slugify";
+import { slugify, randomSlugSuffix } from "@/lib/surveys/slugify";
 import { SurveyOnboardingChat } from "@/components/SurveyOnboardingChat";
 import type { ExtractedSurveyDetails } from "@/lib/survey-onboarding/types";
 import { Input } from "@/components/ui/input";
@@ -89,7 +89,11 @@ function StepFooter({ onNext, nextLabel = "OK" }: { onNext: () => void; nextLabe
 // actually looks like before creating the survey. Placeholders keep it from
 // ever looking broken while the real fields are still blank.
 function SurveyPreviewPanel({ externalTitle, slug }: { externalTitle: string; slug: string }) {
-  const previewSlug = slugify(slug) || "birdsong-research";
+  // "-xxxxxx" stands in for the random anti-enumeration suffix that gets
+  // appended at creation (see createSurvey) — the real value doesn't exist
+  // yet, and previewing without any tail would promise a URL that's never
+  // what actually gets created.
+  const previewSlug = `${slugify(slug) || "birdsong-research"}-xxxxxx`;
   const previewTitle = externalTitle.trim() || "Birdsong Research";
 
   return (
@@ -296,12 +300,17 @@ export function NewSurveyWizard() {
         custom_fields: [...enabledFields, ...customFields] as Json,
       };
 
+      // Every new survey's public slug ends in a random suffix so slugs
+      // can't be enumerated across sponsors; it also makes collisions
+      // effectively impossible, but the DB's surveys_slug_key constraint is
+      // still the backstop — on the off-chance 23505 fires anyway, retry
+      // with a freshly generated suffix (not a predictable increment).
       const baseSlug = slugify(slug);
-      let candidateSlug = baseSlug;
+      let candidateSlug = `${baseSlug}-${randomSlugSuffix()}`;
       let attempt = 1;
       let resultId: string | null = null;
 
-      while (attempt <= 20) {
+      while (attempt <= 5) {
         const { data, error: dbError } = await supabase
           .from("surveys")
           .insert({ ...payload, slug: candidateSlug, user_id: user.id })
@@ -313,12 +322,9 @@ export function NewSurveyWizard() {
           break;
         }
 
-        // 23505 = unique_violation. slug is the only unique column, so a
-        // collision means another survey already has this slug; retry with
-        // an incremented suffix instead of failing the save.
         if (dbError.code === "23505") {
           attempt += 1;
-          candidateSlug = `${baseSlug}-${attempt}`;
+          candidateSlug = `${baseSlug}-${randomSlugSuffix()}`;
           continue;
         }
 
@@ -434,7 +440,7 @@ export function NewSurveyWizard() {
                 onKeyDown={(e) => handleEnterKey(e, handleSlugNext)}
                 className={`font-mono text-sm ${slugInvalid ? invalidBorder : ""}`}
               />
-              <span className="text-xs text-muted-foreground">{`/survey/${slugify(slug) || "..."}`}</span>
+              <span className="text-xs text-muted-foreground">{`/survey/${slugify(slug) || "..."}-xxxxxx`}</span>
             </StepShell>
           )}
 

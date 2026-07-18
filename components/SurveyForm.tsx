@@ -11,7 +11,7 @@ import {
 } from "@/lib/surveys/respondent-fields";
 import { SurveyOnboardingChat } from "@/components/SurveyOnboardingChat";
 import { SURVEY_TONE_OPTIONS, type ExtractedSurveyDetails } from "@/lib/survey-onboarding/types";
-import { slugify } from "@/lib/surveys/slugify";
+import { slugify, randomSlugSuffix } from "@/lib/surveys/slugify";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -296,7 +296,12 @@ export function SurveyForm(props: SurveyFormProps) {
         custom_fields: [...enabledFields, ...customFields] as Json,
       };
 
-      let candidateSlug = baseSlug;
+      // Create appends the random anti-enumeration suffix (matching
+      // NewSurveyWizard, which owns the real create flow today); edit keeps
+      // the admin's typed slug authoritative — the suffix is part of the
+      // visible slug string, so it survives base edits unless the admin
+      // deliberately removes it.
+      let candidateSlug = isEdit ? baseSlug : `${baseSlug}-${randomSlugSuffix()}`;
       let attempt = 1;
       let resultId: string | null = null;
 
@@ -321,10 +326,12 @@ export function SurveyForm(props: SurveyFormProps) {
 
         // 23505 = unique_violation. slug is the only unique column, so a
         // collision means another survey already has this slug; retry with
-        // an incremented suffix instead of failing the save.
+        // a new suffix instead of surfacing the raw error — a fresh random
+        // one on create, an increment on edit (the saved result is shown
+        // back to the admin via setSlug below either way).
         if (dbError.code === "23505") {
           attempt += 1;
-          candidateSlug = `${baseSlug}-${attempt}`;
+          candidateSlug = isEdit ? `${baseSlug}-${attempt}` : `${baseSlug}-${randomSlugSuffix()}`;
           continue;
         }
 
