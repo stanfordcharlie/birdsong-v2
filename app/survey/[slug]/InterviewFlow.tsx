@@ -143,6 +143,12 @@ export function InterviewFlow({
   const [isTyping, setIsTyping] = useState(false);
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [chips, setChips] = useState<string[]>([]);
+  // Content of the most recent user message that failed to send, or null if
+  // nothing's failed / it's since been resolved. The message itself stays in
+  // `messages` (it was already appended optimistically) — this only tracks
+  // whether that last entry needs a retry, so retry can resend the same
+  // content without appending a duplicate.
+  const [failedMessage, setFailedMessage] = useState<string | null>(null);
   const [showResponses, setShowResponses] = useState(false);
   const answerInputRef = useRef<HTMLTextAreaElement>(null);
   const isMountedRef = useRef(true);
@@ -258,13 +264,66 @@ export function InterviewFlow({
     }
   }
 
+  // Shared by a fresh send and a retry: both end up posting some already-
+  // decided message content to the same endpoint and need identical
+  // success/failure handling. `historyForCompletion` is whatever `messages`
+  // looks like at the call site (it already includes this content — either
+  // just-appended for a fresh send, or still there from the original,
+  // failed attempt for a retry) so the completion snapshot is correct
+  // either way without re-deriving it here.
+  async function sendMessage(content: string, historyForCompletion: InterviewMessage[]) {
+    try {
+      const res = await fetch("/api/interview/continue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          response_id: responseId,
+          message: content,
+          token: sessionTokenRef.current,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to continue the interview");
+      setFailedMessage(null);
+      if (data.complete) {
+        window.localStorage.setItem(
+          completionStorageKey(survey.id),
+          JSON.stringify({ closingMessage: data.message, messages: historyForCompletion })
+        );
+        setIsTyping(false);
+        setClosingMessage(data.message);
+        setStage("complete");
+        setLoading(false);
+      } else {
+        await revealAssistantMessage(data.message, data.chips ?? []);
+      }
+    } catch (err) {
+      // Deliberately not removed from `messages` and not silently dropped:
+      // the respondent already saw this answer accepted into the
+      // conversation, so it stays there, visually marked, with a way back
+      // in rather than vanishing on a flaky connection.
+      setIsTyping(false);
+      setFailedMessage(content);
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setLoading(false);
+    }
+  }
+
   async function submitAnswer() {
     if (!answer.trim() || !responseId || loading) return;
     setError(null);
+    // Typing a fresh answer instead of retrying replaces the failed one
+    // rather than letting both exist — simpler to reason about than
+    // forcing retry-first, and it mirrors editing/resending in any normal
+    // chat input. Resolved only here (not on every keystroke) so `messages`
+    // — and the `key` the entrance animation below is keyed on — never
+    // changes while the respondent is actively typing.
+    const baseMessages = failedMessage ? messages.slice(0, -1) : messages;
+    setFailedMessage(null);
     setLoading(true);
     setIsTyping(true);
     const userMessage: InterviewMessage = { role: "user", content: answer };
-    const updatedMessages = [...messages, userMessage];
+    const updatedMessages = [...baseMessages, userMessage];
     setMessages(updatedMessages);
     setAnswer("");
     setChips([]);
@@ -281,35 +340,19 @@ export function InterviewFlow({
     // now. Only keystrokes typed *after* this point (a follow-up while
     // waiting) should ever trigger that pause.
     lastKeystrokeAtRef.current = 0;
-    try {
-      const res = await fetch("/api/interview/continue", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          response_id: responseId,
-          message: userMessage.content,
-          token: sessionTokenRef.current,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to continue the interview");
-      if (data.complete) {
-        window.localStorage.setItem(
-          completionStorageKey(survey.id),
-          JSON.stringify({ closingMessage: data.message, messages: updatedMessages })
-        );
-        setIsTyping(false);
-        setClosingMessage(data.message);
-        setStage("complete");
-        setLoading(false);
-      } else {
-        await revealAssistantMessage(data.message, data.chips ?? []);
-      }
-    } catch (err) {
-      setIsTyping(false);
-      setError(err instanceof Error ? err.message : "Something went wrong");
-      setLoading(false);
-    }
+    await sendMessage(userMessage.content, updatedMessages);
+  }
+
+  // Resends the exact content of the last failed message. Doesn't touch
+  // `messages` (that entry is already there from the original attempt) and
+  // deliberately doesn't set isTyping/show the typing-dots screen — the
+  // failed bubble and Retry button stay visible, just disabled via
+  // `loading`, so retrying doesn't look like the message vanished again.
+  async function retrySend() {
+    if (!failedMessage || !responseId || loading) return;
+    setError(null);
+    setLoading(true);
+    await sendMessage(failedMessage, messages);
   }
 
   function handleSend(e: FormEvent) {
@@ -515,6 +558,23 @@ export function InterviewFlow({
               <h1 className="text-pretty mb-8 font-serif text-[34px] font-normal leading-[1.3] text-card-foreground">
                 {questionText}
               </h1>
+
+              {failedMessage && (
+                <div className="mb-5 flex flex-col items-end gap-1.5">
+                  <div className={cn(RESPONDENT_BUBBLE, "opacity-60")}>{failedMessage}</div>
+                  <div className="flex items-center gap-2 text-xs text-destructive">
+                    <span>Failed to send</span>
+                    <button
+                      type="button"
+                      onClick={retrySend}
+                      disabled={loading}
+                      className="font-semibold underline underline-offset-2 hover:text-destructive/80 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {loading ? "Retrying…" : "Retry"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <form onSubmit={handleSend} className="flex flex-col gap-5">
                 {chips.length > 0 && (

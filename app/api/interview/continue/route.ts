@@ -115,6 +115,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Survey not found" }, { status: 404 });
   }
 
+  // Deliberately no survey.status check here: unlike start, an interview
+  // already in flight must finish even if the owner flips the survey to
+  // draft mid-conversation — only new starts and the public page are gated.
+
   const history = (response.messages as unknown as InterviewMessage[] | null) ?? [];
   const updatedHistory: InterviewMessage[] = [...history, { role: "user", content: message }];
 

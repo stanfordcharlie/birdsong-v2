@@ -228,36 +228,6 @@ export type Database = {
           },
         ];
       };
-      roadmap_items: {
-        Row: {
-          id: string;
-          title: string;
-          description: string | null;
-          status: "done" | "in_progress" | "planned";
-          category: string | null;
-          created_at: string;
-          completed_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          title: string;
-          description?: string | null;
-          status?: "done" | "in_progress" | "planned";
-          category?: string | null;
-          created_at?: string;
-          completed_at?: string | null;
-        };
-        Update: {
-          id?: string;
-          title?: string;
-          description?: string | null;
-          status?: "done" | "in_progress" | "planned";
-          category?: string | null;
-          created_at?: string;
-          completed_at?: string | null;
-        };
-        Relationships: [];
-      };
       auth_events: {
         Row: {
           id: string;

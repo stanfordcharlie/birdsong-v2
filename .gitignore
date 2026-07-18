@@ -53,3 +53,6 @@ ds-bundle/
 Screenshot*.png
 PB 1.2.vistaprint_album/
 .design-sync/fix-css-cache.mjs
+
+# One-time static design exports, kept locally as reference but not tracked
+design_handoff_*/

@@ -82,6 +82,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Survey not found" }, { status: 404 });
   }
 
+  // Defense in depth: the public survey page already gates on this, but
+  // this endpoint is directly callable and must not trust that a caller
+  // came through the gated page. Checked before any Anthropic call or
+  // responses row is created, so a draft survey never burns tokens or
+  // pollutes the lead queue.
+  if (survey.status !== "live") {
+    console.error(`[interview/start] survey_id=${survey_id} is not live (status=${survey.status})`);
+    return NextResponse.json({ error: "This survey isn't available" }, { status: 403 });
+  }
+
   // Survey owner's company profile (what they sell, target ICP, value
   // prop), used to keep the interview anchored to the company's actual
   // product surface area instead of drifting wherever the respondent's

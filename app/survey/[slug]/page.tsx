@@ -21,6 +21,13 @@ export default async function PublicSurveyPage({
     notFound();
   }
 
+  // A draft survey isn't publicly answerable yet. A 404 (not a distinct
+  // "this survey is closed" page) is deliberate: it's the least-informative
+  // response and doesn't confirm a draft slug exists.
+  if (survey.status !== "live") {
+    notFound();
+  }
+
   // The respondent has no session, and profiles RLS only allows a row's own
   // owner to read it, so the survey owner's logo needs the admin client to
   // fetch across that boundary. Only the logo URL is exposed to the page.
