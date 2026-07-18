@@ -11,53 +11,64 @@
      DESIGN.md). */
   --background: #ffffff;
   --foreground: #171717;
+}
 
-  /* --- Birdsong design system tokens (DESIGN.md) ---
-     Not yet referenced by any existing page. Stored as space-separated
-     HSL triplets (shadcn convention) so Tailwind's alpha-modifier syntax
-     (e.g. bg-primary/80) works. */
+/* --- Birdsong design system tokens (DESIGN.md) ---
+   Single light theme, no dark mode — see design_handoff_birdsong_platform.
+   Every ui/ component reads these vars rather than hardcoding color, so a
+   token change here re-skins every surface at once. Stored as
+   space-separated HSL triplets (shadcn convention) so Tailwind's
+   alpha-modifier syntax (e.g. bg-primary/80) works. */
+:root {
   --ds-page-background: 60 7% 97%;     /* #f8f8f7 */
   --ds-card: 0 0% 100%;                /* #ffffff */
-  --ds-card-foreground: 0 0% 7%;       /* #111111 */
+  --ds-card-foreground: 24 10% 10%;    /* #1c1917 ink */
   --ds-popover: 0 0% 100%;
-  --ds-popover-foreground: 0 0% 7%;
+  --ds-popover-foreground: 24 10% 10%;
 
-  --ds-foreground: 0 0% 7%;            /* primary text #111111 */
-  --ds-muted-foreground: 220 9% 46%;   /* secondary text #6b7280 */
+  --ds-foreground: 24 10% 10%;         /* #1c1917 ink */
+  --ds-muted-foreground: 25 5% 45%;    /* #78716c, = Tailwind stone-500 */
+  --ds-faint: 24 5% 64%;               /* #a8a29e, = Tailwind stone-400 */
 
-  --ds-border: 220 13% 91%;            /* #e5e7eb */
-  --ds-input: 220 13% 91%;
+  --ds-border: 20 6% 90%;              /* #e7e5e4, = Tailwind stone-200 */
+  --ds-input: 20 6% 90%;
+  --ds-chip: 48 12% 92%;               /* #edece8 — lighter divider / neutral chip fill */
 
-  --ds-primary: 243 75% 59%;           /* accent #4f46e5 (indigo-600) */
-  --ds-primary-hover: 244 68% 52%;     /* #4338ca (indigo-700) */
-  --ds-primary-foreground: 0 0% 100%;
+  --ds-primary: 24 10% 10%;            /* #1c1917 ink */
+  --ds-primary-hover: 30 6% 25%;       /* #44403c, = Tailwind stone-700 */
+  --ds-primary-foreground: 50 23% 95%; /* #f5f4ef cream text on ink */
 
-  --ds-secondary: 220 15% 96%;         /* neutral-100 */
-  --ds-secondary-foreground: 0 0% 7%;
+  --ds-secondary: 48 12% 92%;          /* #edece8, same as --ds-chip */
+  --ds-secondary-foreground: 24 10% 10%;
 
-  --ds-muted: 220 15% 96%;
-  --ds-accent: 220 15% 96%;
-  --ds-accent-foreground: 0 0% 7%;
+  --ds-muted: 48 12% 92%;
+  --ds-accent: 48 12% 92%;
+  --ds-accent-foreground: 24 10% 10%;
 
-  --ds-destructive: 0 72% 51%;         /* red-600 */
+  --ds-destructive: 0 72% 51%;         /* red-600, unchanged */
   --ds-destructive-foreground: 0 0% 100%;
 
-  --ds-success: 142 76% 36%;           /* green-600 */
+  --ds-success: 139 25% 30%;           /* #3a6046 muted green, status only, unchanged */
   --ds-success-foreground: 0 0% 100%;
-  --ds-warning: 38 92% 50%;            /* amber-500 */
+  --ds-success-bg: 92 28% 90%;         /* #e4ecdd solid badge fill, unchanged */
+  --ds-warning: 38 92% 50%;            /* amber-500, unchanged */
   --ds-warning-foreground: 0 0% 7%;
 
-  --ds-ring: 243 75% 59%;              /* matches primary */
+  --ds-indigo: 244 58% 51%;            /* #4338ca — links/chips on light surfaces */
+  --ds-indigo-light: 230 93% 82%;      /* #a5b4fc — highlights on ink surfaces */
+  --ds-indigo-chip: 243 75% 59%;       /* #4f46e5, used at low alpha for chip fill (rgba(79,70,229,.08)) */
 
-  --ds-sidebar: 0 0% 7%;               /* #111111 */
-  --ds-sidebar-foreground: 218 11% 65%; /* #9ca3af */
-  --ds-sidebar-active-foreground: 0 0% 100%; /* #ffffff */
-  --ds-sidebar-accent: 0 0% 15%;       /* hover/active row fill */
-  --ds-sidebar-border: 0 0% 20%;
-  --ds-sidebar-ring: 243 75% 59%;
+  --ds-ring: 24 10% 10%;               /* matches primary */
 
-  --ds-radius-card: 0.75rem;   /* 12px */
-  --ds-radius-control: 0.5rem; /* 8px, inputs/buttons */
+  --ds-sidebar: 24 10% 10%;            /* #1c1917 ink — the one always-dark surface */
+  --ds-sidebar-foreground: 50 23% 95%; /* #f5f4ef cream, alpha-modified per state (inactive: /60, hover text: full) */
+  --ds-sidebar-active-foreground: 24 10% 10%; /* #1c1917 ink text on the active cream pill */
+  --ds-sidebar-accent: 50 23% 95%;     /* #f5f4ef cream, alpha-modified per state (hover fill: /6, active pill: full) */
+  --ds-sidebar-border: 50 23% 95%;     /* #f5f4ef cream, used at /[0.12] for dividers on ink */
+  --ds-sidebar-ring: 50 23% 95%;
+
+  --ds-radius-card: 0.75rem;    /* 12px */
+  --ds-radius-control: 0.5rem;  /* 8px */
 }
 
 body {
@@ -80,5 +91,148 @@ select {
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+}
+
+/* Marketing landing page (app/home) — see design_handoff_birdsong_landing.
+   Keyframes for the hero product demo and "How it works" animations. */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes noteFloat {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(-4deg);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(14px, -34px) rotate(10deg);
+  }
+}
+@keyframes ripple {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+@keyframes chipCycle {
+  0%,
+  8% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  16%,
+  78% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  88%,
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@keyframes floatCard {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+@keyframes blinkDot {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes headBob {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  30% {
+    transform: rotate(-7deg);
+  }
+  60% {
+    transform: rotate(4deg);
+  }
+}
+
+/* Admin home (app/admin) load-in animation — see design_handoff_admin_home.
+   Elements default to their settled, fully-visible state (set via Tailwind
+   classes in the component) and only pick up the animation under
+   prefers-reduced-motion: no-preference, so reduced-motion users just see
+   the final layout with no animation at all rather than a stripped-down
+   version of it. */
+@keyframes bs-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes bs-dot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 0.6;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bs-rise-1 {
+    animation: bs-rise 0.7s ease-out 0.35s both;
+  }
+  .bs-rise-2 {
+    animation: bs-rise 0.7s ease-out 0.55s both;
+  }
+  .bs-rise-3 {
+    animation: bs-rise 0.6s ease-out 0.5s both;
+  }
+  .bs-rise-4 {
+    animation: bs-rise 0.6s ease-out 0.6s both;
+  }
+  .bs-rise-5 {
+    animation: bs-rise 0.6s ease-out 0.7s both;
+  }
+  .bs-rise-6 {
+    animation: bs-rise 0.6s ease-out 0.8s both;
+  }
+  .bs-dot {
+    animation: bs-dot 2s ease-in-out infinite;
+  }
+  /* No fixed delay, unlike bs-rise-1..6's one-shot page-load stagger —
+     reapplied every time its key changes (respondent survey: each new
+     question), so React remounting the node re-triggers the animation. */
+  .bs-rise-repeat {
+    animation: bs-rise 0.5s ease-out both;
   }
 }

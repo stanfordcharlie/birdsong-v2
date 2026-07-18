@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { inter, sourceSerif } from "@/lib/fonts";
+import { inter, youngSerif, archivo } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -14,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn(inter.variable, sourceSerif.variable)}>
+    <html lang="en" className={cn(inter.variable, youngSerif.variable, archivo.variable)}>
       <body className="font-sans antialiased">{children}</body>
     </html>
   );

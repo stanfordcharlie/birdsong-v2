@@ -8,8 +8,9 @@ import {
   CLOSING_MESSAGE,
   COMPLETE_TOKEN,
   MAX_EXCHANGES,
-} from "@/lib/interview/prompt";
+} from "@/lib/interview-prompt";
 import { extractInterviewInsights } from "@/lib/interview/extract";
+import { parseChips } from "@/lib/interview/chips";
 import { sendLeadNotification } from "@/lib/email/lead-notification";
 import type { InterviewMessage } from "@/lib/interview/types";
 import type { Database, Json } from "@/types/database";
@@ -89,9 +90,10 @@ export async function POST(request: Request) {
     return completeInterview(supabase, response_id, updatedHistory, survey, response);
   }
 
-  // Survey owner's company profile (what they sell, value prop), used to
-  // keep the interview anchored to the company's actual product surface
-  // area instead of drifting wherever the respondent's last answer leads.
+  // Survey owner's company profile (what they sell, target ICP, value
+  // prop), used to keep the interview anchored to the company's actual
+  // product surface area instead of drifting wherever the respondent's
+  // last answer leads.
   const { data: profile } = await supabase
     .from("profiles")
     .select("what_we_sell, target_icp, value_prop")
@@ -99,13 +101,21 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   const anthropic = getAnthropicClient();
-  const systemPrompt = buildInterviewSystemPrompt(
+  const systemPrompt = buildInterviewSystemPrompt({
     survey,
-    exchangeCount,
-    profile
+    companyProfile: profile
       ? { whatWeSell: profile.what_we_sell, targetIcp: profile.target_icp, valueProp: profile.value_prop }
-      : null
-  );
+      : null,
+    respondent: {
+      name: response.respondent_name,
+      customFieldValues: (response.custom_field_values as Record<string, unknown> | null) ?? {},
+    },
+    exchangeCount,
+    // Total messages.length so far (both roles), for the exchange-budget
+    // line — distinct from exchangeCount above, which counts only user
+    // turns and drives the existing MAX_EXCHANGES hard-cap rule.
+    totalMessageCount: updatedHistory.length,
+  });
 
   const claudeMessages: Anthropic.MessageParam[] = [
     { role: "user", content: KICKOFF_MESSAGE },
@@ -119,23 +129,27 @@ export async function POST(request: Request) {
     messages: claudeMessages,
   });
 
-  const reply = completion.content
+  const rawReply = completion.content
     .filter((block): block is Anthropic.TextBlock => block.type === "text")
     .map((block) => block.text)
     .join("")
     .trim();
 
-  if (!reply) {
+  if (!rawReply) {
     return NextResponse.json({ error: "Failed to generate the next question" }, { status: 502 });
   }
 
   // The model is instructed to reply with exactly this token, but it
   // sometimes wraps it in a closing sentence anyway; matching on inclusion
   // (rather than equality) keeps a stray sentinel from leaking into the
-  // respondent-facing transcript.
-  if (reply.includes(COMPLETE_TOKEN)) {
+  // respondent-facing transcript. Checked against the raw reply, before
+  // chip parsing, since the prompt also tells the model never to attach a
+  // chip block to this message.
+  if (rawReply.includes(COMPLETE_TOKEN)) {
     return completeInterview(supabase, response_id, updatedHistory, survey, response);
   }
+
+  const { text: reply, chips } = parseChips(rawReply);
 
   const finalHistory: InterviewMessage[] = [
     ...updatedHistory,
@@ -158,6 +172,7 @@ export async function POST(request: Request) {
     response_id,
     message: reply,
     complete: false,
+    chips,
   });
 }
 
@@ -168,8 +183,21 @@ async function completeInterview(
   survey: Survey,
   response: ResponseRow
 ) {
-  const { painPoints, leadScore, summary, callScript, signals } =
-    await extractInterviewInsights(history);
+  // Survey owner's company profile (what they sell, target ICP, value
+  // prop), used here to keep the lead score and call script anchored to
+  // fit against this sponsor's actual product, not generic friction.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("what_we_sell, target_icp, value_prop")
+    .eq("user_id", survey.user_id)
+    .maybeSingle();
+
+  const { painPoints, leadScore, fitReason, summary, callScript, signals } = await extractInterviewInsights(
+    history,
+    profile
+      ? { whatWeSell: profile.what_we_sell, targetIcp: profile.target_icp, valueProp: profile.value_prop }
+      : null
+  );
 
   const { error: updateError } = await supabase
     .from("responses")
@@ -178,6 +206,7 @@ async function completeInterview(
       completed: true,
       pain_points: painPoints as unknown as Json,
       lead_score: leadScore,
+      fit_reason: fitReason,
       summary,
       call_script: { opener: callScript.opener, talking_points: callScript.talkingPoints } as unknown as Json,
       signals: {
@@ -208,6 +237,7 @@ async function completeInterview(
         respondentName: response.respondent_name,
         respondentEmail: response.respondent_email,
         leadScore,
+        fitReason,
         painPoints,
         ownerEmail,
       });

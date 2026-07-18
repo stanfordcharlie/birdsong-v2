@@ -230,7 +230,7 @@ export default async function ResponseDetailPage({
 
       {/* CRM sync placeholder, no real integration yet */}
       <div className="flex items-center gap-3">
-        <Button type="button" disabled className="bg-[#111111] text-white hover:bg-[#111111]/90">
+        <Button type="button" disabled>
           Push to HubSpot
         </Button>
         <span className="text-xs text-muted-foreground">Not synced yet.</span>

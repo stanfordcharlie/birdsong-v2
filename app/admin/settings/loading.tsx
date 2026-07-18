@@ -1,14 +1,12 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const CARD_SHADOW = "shadow-[0_1px_3px_rgba(0,0,0,0.08)]";
-
 export default function SettingsLoading() {
   return (
     <div className="flex flex-col gap-6">
       <Skeleton className="h-7 w-28" />
 
-      <Card className={CARD_SHADOW}>
+      <Card>
         <CardHeader>
           <CardTitle>Account</CardTitle>
         </CardHeader>
@@ -21,7 +19,7 @@ export default function SettingsLoading() {
         </CardContent>
       </Card>
 
-      <Card className={CARD_SHADOW}>
+      <Card>
         <CardHeader>
           <CardTitle>Change email</CardTitle>
         </CardHeader>
@@ -30,7 +28,7 @@ export default function SettingsLoading() {
         </CardContent>
       </Card>
 
-      <Card className={CARD_SHADOW}>
+      <Card>
         <CardHeader>
           <CardTitle>Change password</CardTitle>
         </CardHeader>

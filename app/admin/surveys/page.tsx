@@ -45,10 +45,10 @@ export default async function AdminDashboardPage() {
   return (
     <div className="flex flex-col gap-7">
       <div className="flex items-end justify-between">
-        <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-muted-foreground">Surveys</span>
-          <h1 className="text-[28px] font-semibold tracking-[-0.01em] text-card-foreground">
-            Your Surveys
+        <div className="flex flex-col gap-2">
+          <span className="text-[13px] font-medium uppercase tracking-[0.04em] text-muted-foreground">Surveys</span>
+          <h1 className="font-serif text-[40px] font-normal leading-none tracking-[-0.01em] text-card-foreground">
+            Your surveys
           </h1>
         </div>
         <Button asChild>

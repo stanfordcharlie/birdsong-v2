@@ -28,22 +28,50 @@ by hand before each sync**:
    isolated production build doesn't collide with a running `next dev`
    server's `.next/`).
 2. `npm run build`.
-3. Copy the single file under `.next-designsync/static/css/*.css` to
-   `.design-sync/.cache/tailwind-build.css`.
+3. Run `node .design-sync/fix-css-cache.mjs .next-designsync/static/css/*.css .design-sync/.cache/tailwind-build.css`
+   — **do not just copy the file.** See below for why.
 4. Delete `.next-designsync/` and revert `next.config.mjs`.
 
-The app's font (Inter, via `next/font/google`) is similarly not a normal
-`@font-face` — Next generates it with an absolute `/_next/static/media/...`
-url() that can't resolve on disk, so the build's own `@font-face` rules for
-it are always dropped as dangling. The actual fix already lives in
-`.design-sync/fonts/inter.css` + `.design-sync/fonts/inter/*.woff2`
-(committed, real font files extracted from a build), wired via
-`cfg.extraFonts`. This renames Next's internal hashed family name to plain
-"Inter" and sets `--font-inter` on `:root` (not the page-scoped class Next
-normally generates), so it resolves in any preview card. **This shouldn't
-need to change** unless the font itself changes (a different `next/font`
-family/weight) — if so, redo the same extraction from a fresh isolated build
-and regenerate `inter.css`.
+### Why step 3 isn't a plain copy
+
+The raw build CSS carries Next's own font machinery for *every* `next/font`
+family the app uses (currently Inter and Source Serif 4, see `lib/fonts.ts`)
+— `@font-face` rules with an absolute `/_next/static/media/...` url() that
+only a live Next server resolves, plus a matching `--font-inter` /
+`--font-source-serif` custom property scoped to a Next-generated
+`.__variable_*` class rather than `:root`. Both are permanently dangling in
+a static cache file with no server behind it.
+
+For Inter this is already solved on the *other* side: `cfg.extraFonts`
+points at `.design-sync/fonts/inter.css` + `.design-sync/fonts/inter/*.woff2`
+(committed, real font files extracted from a build), which renames Next's
+internal hashed family name to plain "Inter" and sets `--font-inter` on
+`:root` directly. **This shouldn't need to change** unless Inter itself
+changes (a different `next/font` family/weight) — if so, redo the same
+extraction from a fresh isolated build and regenerate `inter.css`. Source
+Serif 4 has no such replacement and doesn't need one: it's only used by an
+app-level page (`CompanyProfileSetupFlow.tsx`), not by anything under
+`components/ui` (this bundle's `srcDir`), so the design-sync bundle never
+needs it to resolve at all.
+
+Given that, `fix-css-cache.mjs` strips both fonts' dangling `@font-face`
+rules and non-root `--font-*` declarations from the raw build CSS entirely
+— Inter's correct copy already exists via `extraFonts`, and Source Serif's
+doesn't need one. It leaves each font's `local()`-sourced fallback
+`@font-face` alone (e.g. `src: local("Arial")`) since those aren't broken,
+just currently unreferenced.
+
+The same script also annotates every remaining non-root `--tw-*` custom
+property (Tailwind's own utility-composition internals — transform, filter,
+ring, shadow, backdrop, etc.) with a trailing `/* @kind color|spacing|shadow|other */`
+comment, so an external audit doesn't flag them as unclassified. These are
+intentionally scoped per-utility-class rather than `:root` — that's how
+Tailwind's compositional model works (e.g. `--tw-translate-x` has to differ
+per element), so they're annotated in place, not relocated. If a *new* real
+design token (something referenced in `tailwind.config.ts`'s theme, like
+`--font-inter` was) ever ends up emitted outside `:root` the same way, add
+it to the strip list in `fix-css-cache.mjs` alongside `--font-inter` /
+`--font-source-serif` rather than hand-patching the generated file.
 
 ## Re-sync risks
 

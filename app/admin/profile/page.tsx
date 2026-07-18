@@ -37,10 +37,14 @@ export default async function ProfilePage() {
       hasExistingData={hasExistingData}
       initialValues={{
         companyName: profile?.company_name ?? "",
+        industry: profile?.industry ?? "",
+        website: profile?.website ?? "",
+        teamSize: profile?.team_size ?? "",
+        logoUrl: profile?.logo_url ?? null,
         whatWeSell: profile?.what_we_sell ?? "",
         targetIcp: profile?.target_icp ?? "",
         valueProp: profile?.value_prop ?? "",
-        logoUrl: profile?.logo_url ?? null,
+        brandVoice: profile?.tone ?? "",
       }}
       setupInitialData={{
         companyName: profile?.company_name ?? "",

@@ -8,6 +8,7 @@ export type LeadNotification = {
   respondentName: string | null;
   respondentEmail: string | null;
   leadScore: number;
+  fitReason: string;
   painPoints: string[];
   ownerEmail: string;
 };
@@ -28,7 +29,7 @@ export async function sendLeadNotification(notification: LeadNotification): Prom
     return;
   }
 
-  const { survey, respondentName, respondentEmail, leadScore, painPoints, ownerEmail } =
+  const { survey, respondentName, respondentEmail, leadScore, fitReason, painPoints, ownerEmail } =
     notification;
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -50,6 +51,7 @@ export async function sendLeadNotification(notification: LeadNotification): Prom
         <li><strong>Email:</strong> ${escapeHtml(respondentEmail || "Not provided")}</li>
         <li><strong>Lead score:</strong> ${leadScore}/10</li>
       </ul>
+      ${fitReason ? `<p><strong>Fit:</strong> ${escapeHtml(fitReason)}</p>` : ""}
       <p><strong>Pain points:</strong></p>
       ${painPointsHtml}
       <p><a href="${adminLink}">View the full response in admin</a></p>

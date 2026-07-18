@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 export function SurveyUrl({ slug }: { slug: string }) {
@@ -21,15 +20,9 @@ export function SurveyUrl({ slug }: { slug: string }) {
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <Input
-        type="text"
-        readOnly
-        value={url}
-        onFocus={(e) => e.target.select()}
-        className="flex-1 font-mono text-sm"
-      />
-      <Button type="button" variant="secondary" onClick={handleCopy}>
+    <div className="flex items-center gap-2 rounded-control border border-border bg-card py-2 pl-4 pr-2">
+      <span className="flex-1 truncate text-sm text-muted-foreground">{url}</span>
+      <Button type="button" variant="secondary" size="sm" onClick={handleCopy}>
         {copied ? "Copied!" : "Copy"}
       </Button>
     </div>

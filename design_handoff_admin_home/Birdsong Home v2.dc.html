@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/birdsong-8ad57c95-ea98-4ba5-968a-39df4900c5c4/fonts/fonts.css">
+  <link rel="stylesheet" href="_ds/birdsong-8ad57c95-ea98-4ba5-968a-39df4900c5c4/_ds_bundle.css">
+  <link rel="stylesheet" href="_ds/birdsong-8ad57c95-ea98-4ba5-968a-39df4900c5c4/styles.css">
+  <script src="_ds/birdsong-8ad57c95-ea98-4ba5-968a-39df4900c5c4/_ds_bundle.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Archivo:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; background: #f8f8f7; }
+    a { color: #4f46e5; text-decoration: none; }
+    a:hover { color: #4338ca; }
+    @keyframes bs-draw { from { stroke-dashoffset: 60; } to { stroke-dashoffset: 0; } }
+    @keyframes bs-fly { 0% { opacity: 0; transform: translate(-14px, 10px) rotate(-6deg); } 60% { opacity: 1; transform: translate(3px, -3px) rotate(2deg); } 100% { opacity: 1; transform: translate(0, 0) rotate(0deg); } }
+    @keyframes bs-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes bs-dot { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.4); opacity: 0.6; } }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; width: 100%; display: flex; font-family: 'Archivo', sans-serif; box-sizing: border-box;">
+
+  <div style="width: 42%; min-width: 380px; background: #1c1917; color: #f5f4ef; display: flex; flex-direction: column; justify-content: space-between; padding: 48px 56px; box-sizing: border-box;">
+    <div style="animation: bs-rise 0.7s ease-out 0.35s both;">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(245,244,239,0.5); margin-bottom: 20px;">Friday, July 17</div>
+      <h1 style="font-family: 'Young Serif', serif; font-size: clamp(44px, 4.6vw, 66px); font-weight: 400; line-height: 1.06; margin: 0; letter-spacing: -0.005em;">Good<br>afternoon,<br>Casey.</h1>
+    </div>
+
+    <div style="animation: bs-rise 0.7s ease-out 0.55s both;">
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(245,244,239,0.5); margin-bottom: 18px;">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #a5b4fc; display: inline-block; animation: bs-dot 2s ease-in-out infinite;"></span>
+        What's been happening
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; justify-content: space-between; gap: 16px; align-items: baseline; border-bottom: 1px solid rgba(245,244,239,0.12); padding-bottom: 13px;">
+          <span style="font-size: 14px; font-weight: 500;">6 new responses on <span style="color: #a5b4fc;">CivicRec renewal interview</span></span>
+          <span style="font-size: 12px; color: rgba(245,244,239,0.45); white-space: nowrap;">12m ago</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; gap: 16px; align-items: baseline; border-bottom: 1px solid rgba(245,244,239,0.12); padding-bottom: 13px;">
+          <span style="font-size: 14px; font-weight: 500;">2 leads qualified from <span style="color: #a5b4fc;">Parks &amp; Rec onboarding</span></span>
+          <span style="font-size: 12px; color: rgba(245,244,239,0.45); white-space: nowrap;">1h ago</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; gap: 16px; align-items: baseline;">
+          <span style="font-size: 14px; font-weight: 500;"><span style="color: #a5b4fc;">Facility booking survey</span> hit its response goal</span>
+          <span style="font-size: 12px; color: rgba(245,244,239,0.45); white-space: nowrap;">Yesterday</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex: 1; background: #f8f8f7; display: flex; flex-direction: column; justify-content: center; padding: 64px 72px; box-sizing: border-box;">
+    <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: #a8a29e; margin-bottom: 8px; animation: bs-rise 0.6s ease-out 0.5s both;">Where to next</div>
+
+    <div style="display: flex; flex-direction: column;">
+
+      <div style="display: flex; align-items: center; gap: 28px; padding: 34px 20px; border-bottom: 1px solid #e7e5e4; cursor: pointer; border-radius: 12px; transition: background 0.15s ease; animation: bs-rise 0.6s ease-out 0.6s both;" style-hover="background: rgba(28,25,23,0.04);">
+        <span style="font-size: 13px; font-weight: 600; color: #a8a29e; min-width: 26px;">01</span>
+        <div style="flex: 1;">
+          <div style="font-size: 23px; font-weight: 600; color: #1c1917; margin-bottom: 6px; letter-spacing: -0.01em;">Create a new survey</div>
+          <div style="font-size: 15px; color: #78716c;">Build and launch an AI-moderated interview</div>
+        </div>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1c1917" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 28px; padding: 34px 20px; border-bottom: 1px solid #e7e5e4; cursor: pointer; border-radius: 12px; transition: background 0.15s ease; animation: bs-rise 0.6s ease-out 0.7s both;" style-hover="background: rgba(28,25,23,0.04);">
+        <span style="font-size: 13px; font-weight: 600; color: #a8a29e; min-width: 26px;">02</span>
+        <div style="flex: 1;">
+          <div style="font-size: 23px; font-weight: 600; color: #1c1917; margin-bottom: 6px; letter-spacing: -0.01em;">View dashboard</div>
+          <div style="font-size: 15px; color: #78716c;">See your surveys, responses, and leads</div>
+        </div>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1c1917" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 28px; padding: 34px 20px; cursor: pointer; border-radius: 12px; transition: background 0.15s ease; animation: bs-rise 0.6s ease-out 0.8s both;" style-hover="background: rgba(28,25,23,0.04);">
+        <span style="font-size: 13px; font-weight: 600; color: #a8a29e; min-width: 26px;">03</span>
+        <div style="flex: 1;">
+          <div style="font-size: 23px; font-weight: 600; color: #1c1917; margin-bottom: 6px; letter-spacing: -0.01em;">Company profile</div>
+          <div style="font-size: 15px; color: #78716c;">Set your ICP, brand voice, and survey defaults</div>
+        </div>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1c1917" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</x-dc>
+</body>
+</html>

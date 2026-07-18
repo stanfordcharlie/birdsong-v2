@@ -1,213 +1,285 @@
 # Birdsong Design System
 
-Status: **documented and tooled, not yet applied to any page.** This is the reference
-for every future UI prompt. Existing pages keep their current plain-Tailwind styling
-until they're deliberately migrated — see [Rollout status](#rollout-status) at the
-bottom for exactly what that migration involves.
+Status: **implemented and applied across the whole platform** — admin home, company
+profile, survey settings/detail, and the respondent-facing survey interview. This
+document describes the system as it actually exists in code today, not an aspirational
+spec — every value below is read directly from `app/globals.css`, `tailwind.config.ts`,
+`lib/fonts.ts`, and `components/ui/*`.
 
-Reference points: Linear, Granola, Attio — quiet, confident, high-density B2B SaaS.
-Neutral surfaces, a single decisive accent color, minimal chrome, no gradients or
-decorative shadows.
+**Out of scope:** the marketing pages (`app/landing-page*`), which use their own
+`inter`/`newsreader` fonts and are a separate concern. Everything else in the product —
+including the respondent interview — is on this system.
+
+**Single theme, no dark mode.** There used to be a light/dark toggle
+(`ThemeProvider`/`ThemeToggle`, a `data-theme` attribute); it's been removed entirely.
+One `:root` block in `globals.css`, no theme branching anywhere.
+
+Reference: `design_handoff_birdsong_platform/README.md` is the handoff this
+implements — "ink-black panels, warm neutrals, Young Serif display type, Archivo UI
+type, indigo-200 accents," across all four screens in one shared language.
 
 ## Color palette
 
-| Token | Hex | HSL | Usage |
+All values stored as space-separated HSL triplets (shadcn convention) in CSS custom
+properties prefixed `--ds-*` in `app/globals.css`, mapped to semantic Tailwind classes
+in `tailwind.config.ts` (e.g. `--ds-primary` → `bg-primary`, `text-primary`).
+
+| Token | Class | Hex | Usage |
 |---|---|---|---|
-| Page background | `#f8f8f7` | `60 7% 97%` | App shell background, behind cards |
-| Card background | `#ffffff` | `0 0% 100%` | Cards, popovers, modals, inputs |
-| Primary text | `#111111` | `0 0% 7%` | Headings, body copy, primary labels |
-| Secondary text | `#6b7280` | `220 9% 46%` | Meta text, captions, muted labels, placeholders |
-| Border | `#e5e7eb` | `220 13% 91%` | Card borders, dividers, input borders |
-| Sidebar background | `#111111` | `0 0% 7%` | App sidebar / dark chrome |
-| Sidebar text | `#9ca3af` | `218 11% 65%` | Sidebar inactive labels |
-| Sidebar active text | `#ffffff` | `0 0% 100%` | Sidebar active/selected item |
+| Page background | `bg-page` | `#f8f8f7` | App shell background |
+| Card | `bg-card` | `#ffffff` | Cards, popovers, inputs |
+| Card foreground | `text-card-foreground` | `#1c1917` (ink) | Headings, primary body text |
+| Muted foreground | `text-muted-foreground` | `#78716c` (= Tailwind stone-500) | Secondary text, captions |
+| Faint | `text-faint` | `#a8a29e` (= Tailwind stone-400) | Tertiary text, index numbers, placeholders |
+| Border | `border-border` | `#e7e5e4` (= Tailwind stone-200) | Card borders, section dividers |
+| Chip | `bg-chip` / `border-chip` | `#edece8` | Lighter divider (e.g. between questions), neutral chip fill |
+| Primary | `bg-primary` | `#1c1917` (ink) | Primary buttons, active states, progress fill |
+| Primary hover | `hover:bg-primary-hover` | `#44403c` (= Tailwind stone-700) | Primary button hover |
+| Primary foreground | `text-primary-foreground` | `#f5f4ef` (cream) | Text/icons on ink-filled surfaces |
+| Secondary | `bg-secondary` | `#edece8` | Secondary buttons, hover fills |
+| Success | `text-success` | `#3a6046` | Muted green — status only (e.g. "Live" badge), unrelated to this handoff, unchanged |
+| Success bg | `bg-success-bg` | `#e4ecdd` | Success badge fill |
+| Destructive | `text-destructive` / `bg-destructive` | `#dc2626` (red-600) | Delete actions, error text, unchanged |
+| Warning | `text-warning` / `bg-warning` | amber-500 | "Draft" badge, unchanged |
+| Indigo | `text-indigo` | `#4338ca` | Links/chip text on light surfaces (e.g. "Open respondent view") |
+| Indigo light | `text-indigo-light` / `bg-indigo-light` | `#a5b4fc` | Highlights/accents on ink surfaces (survey names in the activity feed, pulsing dot, user-chip avatar) |
+| Indigo chip | `bg-indigo-chip` (used at low alpha, e.g. `/[0.08]`) | `#4f46e5` | Indigo chip fill, `rgba(79,70,229,.08)` |
+| Sidebar | `bg-sidebar` | `#1c1917` (ink) | The one permanently-dark surface: the icon rail, and the admin home screen's left panel |
+| Sidebar foreground | `text-sidebar-foreground` (alpha-modified per state: `/60` inactive, `/50` faint, full for active text) | `#f5f4ef` (cream) | Text on ink surfaces |
+| Sidebar active foreground | `text-sidebar-active-foreground` | `#1c1917` (ink) | Text on the *active* nav pill (inverted — ink-on-cream, not cream-on-ink) |
+| Sidebar accent | `bg-sidebar-accent` (alpha-modified: `/[0.06]` hover, full for the active pill) | `#f5f4ef` (cream) | Nav hover wash / active pill background |
+| Sidebar border | `border-sidebar-border` (used at `/[0.12]`) | `#f5f4ef` (cream) | Dividers on ink surfaces |
 
-### Accent — proposed: Indigo `#4f46e5`
-
-| Token | Hex | HSL |
-|---|---|---|
-| Accent / Primary | `#4f46e5` | `243 75% 59%` |
-| Accent hover | `#4338ca` | `244 68% 52%` |
-| Accent foreground | `#ffffff` | `0 0% 100%` |
-
-**Why indigo:** the base palette (near-black text, warm-neutral background, true-black
-sidebar) is desaturated by design, so the accent is the only place the product gets to
-say anything. Indigo reads as confident and technical without tipping into "generic
-corporate blue" (Attio) or feeling too playful — it's close to Linear's signature
-accent family, which is exactly the register this product wants (AI-moderated,
-research-grade, not a marketing toy). It also has excellent contrast against both the
-white card surface and the dark sidebar, so it works as a single accent across both
-contexts instead of needing a separate "dark mode" accent.
-
-Alternatives considered and rejected: blue (`#2563eb`, reads as generic SaaS/Attio-clone),
-teal/green (feels more consumer/wellness than B2B research), black-on-black
-monochrome-only (Linear can pull this off because of extreme typographic polish; too
-risky for a younger product).
-
-### Semantic colors
-
-| Token | Hex | HSL | Usage |
-|---|---|---|---|
-| Success | `#16a34a` | `142 76% 36%` | "Done" status, positive confirmations |
-| Warning | `#f59e0b` | `38 92% 50%` | "In progress" status, caution states |
-| Destructive | `#dc2626` | `0 72% 51%` | Delete/destroy actions, error text |
-
-Status badges (done / in progress / planned, as used on the roadmap) map to
-success / warning / neutral respectively — see [Badges](#badges).
+Note the sidebar's active-item colors are **inverted** from a typical dark-rail
+convention: inactive/hover text stays cream-on-ink, but the *active* item is a solid
+cream pill with ink text — straight from the handoff, not a mistake.
 
 ## Typography
 
-**Typeface: [Inter](https://fonts.google.com/specimen/Inter)**, variable weight, loaded
-via `next/font/google`. Already configured at `lib/fonts.ts`, not yet wired into
-`app/layout.tsx` (see [Rollout status](#rollout-status)).
+**Body/UI: [Archivo](https://fonts.google.com/specimen/Archivo)** (`font-archivo`),
+weights 400/500/600/700. **Display: [Young Serif](https://fonts.google.com/specimen/Young+Serif)**
+(`font-serif`), weight 400 only (the font ships no other weight — always pair with
+`font-normal`, never `font-medium`/`font-semibold`, which would be a silent no-op).
+Young Serif is for display headings, big numbers (stat blocks), and the wordmark ONLY;
+Archivo is everything else. Both from `lib/fonts.ts`.
 
-| Style | Size | Weight | Line height | Usage |
-|---|---|---|---|---|
-| H1 | 30px / `text-3xl` | 600 (semibold) | 1.2 | Page titles |
-| H2 | 24px / `text-2xl` | 600 (semibold) | 1.25 | Section headings |
-| H3 | 18px / `text-lg` | 600 (semibold) | 1.3 | Card titles, subsection headings |
-| H4 | 16px / `text-base` | 600 (semibold) | 1.4 | Small headings, list group labels |
-| Body | 14px / `text-sm` | 400 (regular) | 1.5 | Default body copy, form labels |
-| Body emphasis | 14px / `text-sm` | 500 (medium) | 1.5 | Emphasized inline text, active nav items |
-| Small / meta | 12px / `text-xs` | 400 (regular) | 1.4 | Timestamps, helper text, table meta |
-| Small emphasis | 12px / `text-xs` | 500 (medium), uppercase, tracked | 1.4 | Table headers, section eyebrows, badges |
+`font-archivo` is **not** the global `<body>` default — that stays `font-sans` (Inter),
+since marketing pages need it. Instead, `font-archivo` is applied once at each section's
+layout root and inherits down: `components/AdminShell.tsx` for the whole admin, and
+`app/survey/[slug]/page.tsx` for the respondent interview. Don't sprinkle
+`font-archivo` on individual components — if body text isn't rendering in Archivo,
+the fix is almost always a missing wrapper at the root, not a missing class on the
+leaf.
 
-Default body text color is `--foreground` (primary text); meta/secondary text uses
-`text-muted-foreground`.
+Representative sizes actually in use (not a rigid scale — pulled from real pages):
+
+| Usage | Class | Example |
+|---|---|---|
+| Display greeting | `font-serif text-[clamp(44px,4.6vw,66px)] font-normal` | Admin home greeting |
+| Page H1 | `font-serif text-[40px] font-normal` | "Company profile", "Settings" |
+| Survey/response title | `font-serif text-[34px]`–`text-[40px] font-normal` | Survey detail title, interview question |
+| Stat value | `font-serif text-[28px] font-normal` | Survey stats row |
+| Row title | `text-[23px] font-semibold` (Archivo, not serif) | Admin home action rows |
+| Body | `text-sm`/`text-[15px]`/`text-[16px]`, Archivo regular | Default copy |
+| Section eyebrow | `text-[13px] font-semibold uppercase tracking-[0.14em]` | Section titles ("BASICS", "QUESTIONS") |
+| Label | `text-xs font-semibold uppercase tracking-[0.16em]` | Date label, "WHERE TO NEXT", nav-adjacent labels |
+| Wordmark | `font-serif text-[19px]` | Sidebar "Birdsong" |
 
 ## Spacing & radius
 
-**Spacing scale:** 4 / 8 / 12 / 16 / 24 / 32px (`gap-1`, `gap-2`, `gap-3`, `gap-4`,
-`gap-6`, `gap-8` in Tailwind's default scale — no custom spacing tokens needed, the
-default scale already lines up).
-
-- `4px` — tight inline spacing (icon-to-label gaps)
-- `8px` — related-element spacing (label to input, button icon to text)
-- `12px` — internal card/component padding on compact elements
-- `16px` — default component padding, gaps between form fields
-- `24px` — spacing between distinct sections within a page
-- `32px` — spacing between major page regions
+Spacing uses Tailwind's default scale directly, plus arbitrary values (`px-[72px]`
+etc.) where the handoff's spec doesn't land on a default Tailwind step — no custom
+spacing tokens.
 
 **Radius:**
-- Cards, modals, popovers: `12px` (`rounded-card`)
-- Buttons, inputs, selects: `8px` (`rounded-control`)
-- Badges/pills: fully rounded (`rounded-full`)
 
-Both radius values are CSS variables (`--ds-radius-card`, `--ds-radius-control`) so
-they can be tuned globally in one place.
+| Token | Class | Value | Usage |
+|---|---|---|---|
+| `--ds-radius-card` | `rounded-card` | `0.75rem` (12px) | Cards, hoverable rows |
+| `--ds-radius-control` | `rounded-control` | `0.5rem` (8px) | Buttons, inputs, nav items |
+| — | `rounded-full` | 999px | Chips, badges, avatar circles |
 
-**Elevation:** flat by default. Cards use a 1px border (`border-border`), not a shadow.
-Reserve shadows for genuinely floating elements (dropdowns, modals, popovers) and keep
-them subtle — `shadow-sm`/`shadow-md` from Tailwind's defaults, never anything heavier.
+**Elevation:** flat everywhere. Cards use a 1px border (`border-border`), never a
+shadow.
 
 ## Component patterns
 
-All components live in `components/ui/` (shadcn convention) and are built on Radix UI
-primitives + `class-variance-authority` for variants, Tailwind v3 compatible (see
-[Tooling](#tooling) for why this matters).
+All in `components/ui/` (shadcn convention), Radix primitives + `class-variance-authority`,
+Tailwind v3.
 
-### Buttons
+### Buttons (`components/ui/button.tsx`)
 
-Component: `components/ui/button.tsx`. Variants:
+- **`primary`** (default) — `bg-primary text-primary-foreground hover:bg-primary-hover`
+  (ink → stone-700 on hover, cream text). The one emphasized action per view.
+- **`secondary`** — `border border-border bg-card text-card-foreground hover:bg-secondary`.
+- **`destructive`** — solid `bg-destructive`, white text.
+- **`ghost`** — no background/border until hover (`hover:bg-secondary`).
+- **`link`** — text-only, `text-primary`, underline on hover.
 
-- **`primary`** (default) — solid accent fill (`bg-primary`), white text. The one
-  emphasized action per view (submit, create, save).
-- **`secondary`** — white/card background, border, dark text. Default choice for
-  non-primary actions sitting next to a primary button.
-- **`destructive`** — soft red fill (`bg-destructive/10`, red text) rather than a solid
-  red button — solid red is reserved for the confirming action inside a delete
-  confirmation, not the trigger.
-- **`ghost`** — no background/border until hover. Toolbar icon buttons, low-emphasis
-  inline actions.
-- **`link`** — text-only, accent-colored, underline on hover.
+Sizes: `sm` (32px), `default` (36px), `lg` (40px), `icon` (36×36px). All use
+`rounded-control`.
 
-Sizes: `sm` (32px), `default` (36px), `lg` (40px), `icon` (36×36px square).
+### Cards (`components/ui/card.tsx`)
 
-### Cards
+`bg-card`, `rounded-card`, 1px `border-border`, no shadow.
 
-Component: `components/ui/card.tsx` (`Card`, `CardHeader`, `CardTitle`,
-`CardDescription`, `CardContent`, `CardFooter`). White background, `12px` radius, 1px
-border, no shadow at rest. This is the default container for grouped content —
-survey detail sections, roadmap items, form panels.
+### Form inputs (`components/ui/input.tsx`, `textarea.tsx`)
 
-### Form inputs
+`rounded-control`, 1px `border-input`, `bg-card`. Focus state is a 2px `ring-ring`.
 
-Component: `components/ui/input.tsx`. `8px` radius, 1px border (`border-input`), white
-background, `36px` height to match button height for aligned rows. Focus state is a
-2px accent ring (`ring-ring`), not a border-color change alone — meets the same
-"decisive accent, minimal chrome" principle as buttons. Placeholder text uses
-`text-muted-foreground`.
+### Badges (`components/ui/badge.tsx`)
 
-### Badges / status indicators
+Pill (`rounded-full`), tinted background + full-strength text — `success` (green,
+"Live"), `warning` (amber, "Draft"), `destructive`, `default`/`outline`. Unrelated to
+and unchanged by this handoff.
 
-Component: `components/ui/badge.tsx`. Small pill (`rounded-full`), tinted background
-at 10% opacity + full-strength text color — never a solid fill, which reads as too
-loud for a status chip repeated many times in a list (e.g. the roadmap board).
+### Tables (`components/ui/table.tsx`)
 
-Recommended mapping for the roadmap's done/in-progress/planned states:
+Header: uppercase, `text-muted-foreground`, bottom border only. Rows: bottom border,
+`hover:bg-secondary`.
 
-| Status | Variant | Look |
-|---|---|---|
-| Done | `success` | Green tint, green text |
-| In Progress | `warning` | Amber tint, dark text |
-| Planned | `default` | Neutral gray tint |
+### Admin shell (`components/AdminShell.tsx`, `components/AdminSidebar.tsx`)
 
-### Tables
+Collapsible ink sidebar (`bg-sidebar`), **196px expanded / 64px (`w-16`) collapsed**,
+`transition-[width,padding]` 0.2s ease. Top: a toggle button (panel icon, fixed
+position regardless of state) + Young Serif "Birdsong" wordmark (hidden collapsed),
+then three nav links (Home / Surveys / Company profile), each icon (house / clipboard
+/ building — apply the same set to any new admin nav items) + label (label hidden
+collapsed, `title` attribute picks up the slack), 8px radius, active item is a solid
+cream pill with ink text. Bottom: a 30px indigo-light circle with the user's initial
+(always visible) + name/"Admin" role label (hidden collapsed). Hovering the chip
+reveals Settings/Sign out (not shown in the static design reference, but has to live
+somewhere since the handoff's 3-item nav doesn't include Settings).
 
-Component: `components/ui/table.tsx`. Header row: uppercase, `12px`, medium weight,
-`text-muted-foreground`, bottom border only (no header background fill). Body rows:
-bottom border between rows, no vertical borders, subtle background on hover
-(`hover:bg-secondary`). This matches the existing `ResponsesTable` layout already in
-the app — the goal for that component's eventual migration is visual polish, not a
-structural rewrite.
+Collapsed state is local `useState` in `AdminSidebar`, persisted to `localStorage`
+(`bs-sidebar-collapsed`) and re-applied client-side after mount (server/first-client
+render always starts expanded, to avoid a hydration mismatch — same tradeoff as the
+admin home greeting, see below).
+
+**Important:** the sidebar is `sticky`, not `fixed`, and is a normal flex sibling of
+`<main>` in `AdminShell` — `<main>` is just `flex-1`, no `pl-[...]` padding tracking the
+sidebar's width. An earlier version used `position: fixed` + a hardcoded `pl-[232px]`
+on `<main>` to compensate; once the sidebar's width became dynamic (collapse/expand),
+that padding value had no way to stay in sync and the layout could visibly
+break/overlap. Don't reintroduce fixed positioning here without also removing this
+comment and re-solving that sync problem.
+
+A page can still break out of `<main>`'s `p-8` with `-m-8` for a full-bleed layout
+(admin home does this for its split-screen panels; the company profile onboarding
+wizard does the same for its own step-navigator sidebar) — that part is unaffected by
+the sidebar becoming collapsible.
+
+### Load-in animation (`globals.css`)
+
+`bs-rise`: opacity 0→1 + `translateY(16px)`→0, ease-out. Two flavors:
+- `.bs-rise-1` … `.bs-rise-6` — one-shot, staggered, fixed delays (~0.1s apart) for a
+  page's initial load (admin home, survey/profile sections).
+- `.bs-rise-repeat` — no delay, meant to be reapplied by keying the element (React
+  remounts it, restarting the CSS animation) — used for the respondent interview's
+  per-question transition.
+
+`bs-dot`: 7px circle, `bg-indigo-light`, scale 1→1.4 + opacity 1→0.6, 2s infinite —
+marks "live" labels ("What's been happening", "Wren is asking").
+
+Both are gated behind `@media (prefers-reduced-motion: no-preference)`. Elements
+default to their fully-visible resting state via plain Tailwind classes — reduced-motion
+users see the final layout immediately, with no animation attempted at all, rather than
+a stripped-down version of it.
+
+### Respondent interview (`app/survey/[slug]/InterviewFlow.tsx`)
+
+Single-question view (Typeform-style) over the **unchanged** `/api/interview/start` /
+`/api/interview/continue` conversational backend — the interview logic, streaming,
+follow-up generation, and the `INTERVIEW_COMPLETE` sentinel were not touched. Only the
+latest assistant message renders (as "the question"), not the full transcript; the
+completion screen still offers a "See your responses" toggle for the full exchange.
+Progress: a 3px fixed top bar (`bg-chip` track, `bg-primary` fill) using the existing
+`computeProgressPercent` — deliberately does **not** claim a fixed "Question N of X"
+denominator, since the model can genuinely run past `num_questions` (it's a soft
+target, not a hard cap). Submits on Cmd/Ctrl+Enter, not plain Enter — plain Enter
+inserts a newline, since answers can run long.
 
 ## Tooling
 
-- **Library:** [shadcn/ui](https://ui.shadcn.com), Radix UI primitives, Tailwind v3
-  (matching this project's existing Tailwind version — **not** v4).
-- **Config:** `components.json` (style: `new-york`, base color: `neutral`, CSS
-  variables enabled).
-- **Adding new components:** `npx shadcn@latest add <component>` will offer to
-  generate Tailwind v4-style output by default since the CLI's newer versions assume
-  v4 (Base UI primitives, `@theme`/OKLCH tokens, `tw-animate-css`). **Do not accept
-  that output as-is on this project** — either hand-adapt it to the v3 pattern used in
+- **Library:** [shadcn/ui](https://ui.shadcn.com), Radix UI primitives, Tailwind v3.
+- **Config:** `components.json` (style: `new-york`, base color: `neutral`).
+- **Adding new components:** `npx shadcn@latest add <component>` defaults to
+  Tailwind v4-style output on newer CLI versions — hand-adapt to the v3 pattern in
   `components/ui/button.tsx` (Radix `Slot` + CVA + `hsl(var(--x) / <alpha-value>)`
-  tokens), or ask for help translating it. This bit us once already setting this up.
-- **Utility:** `lib/utils.ts` exports `cn()` (clsx + tailwind-merge), the standard
-  shadcn className helper.
-- **Icons:** `lucide-react`.
-- **Animation:** `tailwindcss-animate` plugin (the v3-compatible equivalent of the
-  newer `tw-animate-css`).
+  tokens) rather than accepting v4 output as-is.
+- **Utility:** `lib/utils.ts` exports `cn()` (clsx + tailwind-merge).
+- **Icons:** inline SVG (Feather-style strokes), not an icon library.
+- **Animation:** `tailwindcss-animate` (unrelated to the `bs-rise`/`bs-dot` keyframes
+  above, which are hand-written).
+- **Fonts:** `lib/fonts.ts` — `archivo` / `youngSerif` (the platform, wired into
+  `tailwind.config.ts` as `font-archivo`/`font-serif`), `inter` / `newsreader`
+  (marketing pages only).
 
 ### CSS variable naming
 
-Every design-system CSS variable is prefixed `--ds-*` (e.g. `--ds-primary`,
-`--ds-border`) rather than the shadcn-conventional unprefixed names (`--primary`,
-`--border`). This is deliberate: `--background` and `--foreground` are **already**
-live, unprefixed CSS variables that the `<body>` tag depends on directly (several
-pages rely on the plain body background/text showing through unclassed full-height
-wrappers). Prefixing every new token sidesteps that collision entirely, at the cost of
-one indirection: `tailwind.config.ts` maps the clean, standard Tailwind class names
-(`bg-primary`, `border-border`, `bg-card`, etc.) to the prefixed CSS variables, so
-component code and usage never needs to know about the `--ds-` prefix — it's purely an
-implementation detail in `globals.css` and `tailwind.config.ts`.
+Every design-system variable is prefixed `--ds-*` (e.g. `--ds-primary`, `--ds-border`)
+rather than the shadcn-conventional unprefixed names, because `--background` and
+`--foreground` remain live as separate, unprefixed legacy variables that the plain
+`<body>` tag still depends on (see below) — prefixing sidesteps the collision.
+`tailwind.config.ts` maps the clean, standard Tailwind class names to the prefixed
+vars, so component code never needs to know about the `--ds-` prefix.
 
-## Rollout status
+## Overscroll / canvas background
 
-Nothing in `app/` currently uses any of these tokens or components. This phase was
-scoped to tooling only. To actually apply the system to a page:
+Browsers paint the rubber-band overscroll area using `<body>`'s actual
+`background-color`, not any inner div's. Since `<body>` itself still carries the
+legacy `--background: #ffffff`, `components/AdminShell.tsx` sets
+`document.body.style.backgroundColor` to `hsl(var(--ds-page-background))` on mount and
+clears it on unmount, scoping the fix to admin routes only.
 
-1. Swap literal Tailwind utility classes (`bg-black`, `text-neutral-900`, `border`,
-   etc.) for the semantic tokens (`bg-primary`, `text-foreground`, `border-border`).
-2. Swap raw `<button>`/`<input>` elements for `components/ui/button.tsx` /
-   `components/ui/input.tsx`.
-3. Once **every** page has migrated off the legacy `--background`/`--foreground`
-   values, retire them and rename `--ds-page-background`/`--ds-foreground` to the
-   unprefixed `--background`/`--foreground` shadcn convention, and simplify
-   `tailwind.config.ts` accordingly.
-4. To activate Inter: import `inter` from `lib/fonts.ts` into `app/layout.tsx` and add
-   `inter.variable` to the root `<html>` or `<body>` className, alongside
-   `font-sans` (already configured in `tailwind.config.ts` to resolve to
-   `var(--font-inter)`).
+## Known gaps
 
-None of this has been done yet — by design, per this task's scope.
+Content the design handoff specifies but the data model doesn't back yet — shown where
+real, otherwise omitted rather than fabricated:
+
+- **Survey Settings "Survey defaults"-equivalent stats**: the handoff's Company Profile
+  screen shows company-wide "Response goal," "Max questions," "Follow-up depth," and
+  "Qualification threshold" stat blocks. None have a backing field — there's no
+  response-goal, follow-up-depth, or qualification-threshold column anywhere (survey
+  `num_questions` is per-survey, not a company default; follow-up depth is currently a
+  hardcoded instruction inside the interview system prompt, not configurable;
+  qualification is a manual admin action via response status, not a numeric rule).
+  This whole section is omitted from Company Profile rather than showing fabricated
+  numbers.
+- **Survey Settings stats row**: shown with 3 of the mockup's 4 stats (Responses,
+  Qualified leads, Completion rate — all real, computed from `responses`). "Avg.
+  duration" is omitted — there's no per-response timing data. The "Responses" stat also
+  drops the mockup's "/25" goal fraction for the same reason as above.
+- **Company Profile "Ideal customer profile" segment chips** and the **"How your
+  interviewer sounds" sample quote**: omitted. `target_icp` is one free-text field, not
+  discrete segments, and there's no generator for a sample interviewer line.
+- **Brand voice**: the handoff shows several simultaneous filled chips (e.g. "Warm,"
+  "Plainspoken," "Curious"), which doesn't fit a fixed-enum single-select. Implemented
+  as free text (the `tone` column, unchanged shape) split on commas for chip display —
+  admins type comma-separated descriptors in their own words.
+- **"Wren"** (the interviewer name shown on the respondent screen, "Wren is asking") is
+  hardcoded brand copy, not a per-survey or per-company field — same category as
+  "Powered by Birdsong."
+- **Sidebar collapsed width mismatch in the design files themselves**: `Birdsong Home
+  v2.dc.html` specifies 196px/64px; `Company Profile.dc.html` and `Survey
+  Settings.dc.html` specify 232px/76px for the same mechanism. Implemented as 196/64
+  everywhere, per the explicit written spec that introduced this feature — treat the
+  232/76 pair in the other two files as stale if a future handoff touches them again.
+
+## Deviations from the static mockups (kept for real functionality)
+
+The four handoff files show idealized read-only screens; a few real, load-bearing
+features aren't depicted there and were kept, styled to match:
+
+- **Company Profile**: "Basics" (name/industry/website/team size/logo) and "What you
+  sell"/"Value proposition" sections aren't in the mockup at all — but nothing else in
+  the app can edit those fields once onboarding is done, so they stay, in the same
+  read-first + per-section "Edit" pattern as the sections that are shown.
+- **Survey Settings**: a single "Edit" button (opens the existing full `SurveyForm`,
+  unchanged) sits in the header next to Preview/Share link. The mockup's per-section
+  "Edit" buttons on "Audience & goal" and "Questions" all open this same form rather
+  than editing just that section — splitting `SurveyForm` into independent per-section
+  forms would be a real refactor of working, complex form logic, not a styling change.
+- **Company Profile / Survey Settings**: the "Edit with AI" bar (Company Profile) and
+  the response table (Survey Settings) are real, previously-built features not shown in
+  these particular mockups; both were kept and restyled rather than dropped.

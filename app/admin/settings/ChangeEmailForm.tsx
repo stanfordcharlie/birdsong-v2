@@ -49,11 +49,7 @@ export function ChangeEmailForm() {
         <p className="text-sm text-muted-foreground">Check your inbox to confirm the change.</p>
       )}
       <div>
-        <Button
-          type="submit"
-          disabled={loading || !newEmail.trim()}
-          className="bg-[#111111] text-white hover:bg-[#111111]/90"
-        >
+        <Button type="submit" disabled={loading || !newEmail.trim()}>
           {loading ? "Sending..." : "Update email"}
         </Button>
       </div>

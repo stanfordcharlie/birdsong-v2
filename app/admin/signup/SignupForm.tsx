@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function SignupForm() {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +27,14 @@ export function SignupForm() {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/admin`,
+        // Stored on the auth.users row itself (not the profiles table),
+        // so it's available immediately after signup even before a
+        // profiles row exists — read back via user.user_metadata
+        // wherever the admin's own name is displayed (see lib/user-name.ts).
+        data: {
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+        },
       },
     });
     if (error) {
@@ -67,6 +77,24 @@ export function SignupForm() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex gap-3">
+              <Input
+                type="text"
+                placeholder="First name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="flex-1"
+                required
+              />
+              <Input
+                type="text"
+                placeholder="Last name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="flex-1"
+                required
+              />
+            </div>
             <Input
               type="email"
               placeholder="Email"

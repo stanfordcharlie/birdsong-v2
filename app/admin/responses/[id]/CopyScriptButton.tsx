@@ -18,12 +18,7 @@ export function CopyScriptButton({ text }: { text: string }) {
   }
 
   return (
-    <Button
-      type="button"
-      size="sm"
-      onClick={handleCopy}
-      className="bg-[#111111] text-white hover:bg-[#111111]/90"
-    >
+    <Button type="button" size="sm" onClick={handleCopy}>
       {copied ? "Copied" : "Copy"}
     </Button>
   );

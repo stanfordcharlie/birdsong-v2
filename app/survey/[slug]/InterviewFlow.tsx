@@ -13,18 +13,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
 import { renderWithBold } from "@/lib/chat/render-with-bold";
 import { cn } from "@/lib/utils";
 
 type Survey = Database["public"]["Tables"]["surveys"]["Row"];
 type Stage = "intro" | "chat" | "complete";
 
-// Light "received message" treatment (matches the profile-onboarding chat)
-// instead of a solid dark bubble, so bolded phrases read clearly and the
-// two sides of the conversation are easy to tell apart at a glance.
 const ASSISTANT_BUBBLE =
-  "max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground";
+  "max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-chip px-4 py-2.5 text-sm leading-relaxed text-card-foreground";
 const RESPONDENT_BUBBLE =
   "self-end max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground";
 
@@ -44,10 +40,10 @@ const TYPING_PAUSE_MS = 10000;
 
 function TypingDots() {
   return (
-    <div className={cn(ASSISTANT_BUBBLE, "flex w-fit items-center gap-1 py-3")}>
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
+    <div className="flex items-center gap-1.5 py-2">
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-faint [animation-delay:-0.3s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-faint [animation-delay:-0.15s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-faint" />
     </div>
   );
 }
@@ -66,15 +62,12 @@ function computeProgressPercent(answered: number, target: number): number {
   return Math.min(90 + Math.round(9 * (overage / (overage + target))), 99);
 }
 
-// Rendered as a hairline at the very top of the viewport rather than a
-// labeled form-wizard bar, since a respondent mid-conversation doesn't need
-// (or want) a percentage readout.
 function TopProgressLine({ answered, target }: { answered: number; target: number }) {
   const percent = computeProgressPercent(answered, target);
   return (
-    <div className="fixed inset-x-0 top-0 z-30 h-0.5">
+    <div className="fixed inset-x-0 top-0 z-30 h-[3px] bg-chip">
       <div
-        className="h-full bg-primary transition-all duration-500"
+        className="h-full bg-primary transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
         style={{ width: `${percent}%` }}
       />
     </div>
@@ -89,20 +82,26 @@ function completionStorageKey(surveyId: string) {
   return `birdsong-survey-complete:${surveyId}`;
 }
 
-function SendIcon() {
+function BirdGlyph() {
   return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <line x1="12" y1="19" x2="12" y2="5" />
-      <polyline points="5 12 12 5 19 12" />
+    <svg width="22" height="22" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+      <path
+        d="M4 17 C4 9, 10 5, 17 5 C17 5, 16 8, 14 9.5 C18 9.5, 21 8, 21 8 C20 15, 14 19, 8 19 L5 22"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="15.5" cy="7.5" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
     </svg>
   );
 }
@@ -139,6 +138,7 @@ export function InterviewFlow({
   const [error, setError] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [streamingText, setStreamingText] = useState<string | null>(null);
+  const [chips, setChips] = useState<string[]>([]);
   const [showResponses, setShowResponses] = useState(false);
   const answerInputRef = useRef<HTMLTextAreaElement>(null);
   const isMountedRef = useRef(true);
@@ -179,27 +179,6 @@ export function InterviewFlow({
     }
   }, [stage, loading]);
 
-  // Instant, not smooth: streamingText updates every ~40-60ms as words
-  // reveal, and each update grows the bubble a little more. Smooth
-  // scrolling can't finish one ~300-500ms animation before the next call
-  // interrupts it with an already-stale target, so across a whole reply
-  // the view visibly stalls or never catches up. Firing instantly on every
-  // update reads as continuous tracking anyway given how frequent the
-  // updates are, without the interrupted-animation class of bugs.
-  //
-  // window.scrollTo to the full document height, not bottomRef.scrollIntoView:
-  // scrollIntoView computes its target from the element's bounding rect at
-  // call time, and with the sticky header/composer plus a growing bubble
-  // in the same tick, that rect can be stale by the time the browser acts
-  // on it, leaving the view a bubble or two behind. Scrolling the window
-  // straight to document.documentElement.scrollHeight has no such
-  // intermediate geometry to go stale. `stage` is included so switching
-  // into the chat view scrolls immediately too, not just on the next
-  // message/typing change.
-  useEffect(() => {
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
-  }, [stage, messages, isTyping, streamingText]);
-
   async function waitForRespondentToPauseTyping() {
     while (isMountedRef.current) {
       const idleMs = Date.now() - lastKeystrokeAtRef.current;
@@ -214,7 +193,7 @@ export function InterviewFlow({
   // mid-keystroke on a follow-up, then reveals the reply word by word so
   // Claude's side of the conversation paces like a real texting app instead
   // of appearing all at once.
-  async function revealAssistantMessage(content: string) {
+  async function revealAssistantMessage(content: string, nextChips: string[] = []) {
     await waitForRespondentToPauseTyping();
     if (!isMountedRef.current) return;
 
@@ -230,6 +209,10 @@ export function InterviewFlow({
     setMessages((prev) => [...prev, { role: "assistant", content }]);
     setStreamingText(null);
     setLoading(false);
+    // Chips land once the question has fully "arrived", not mid-reveal —
+    // popping in alongside the finished question reads as part of the
+    // conversation instead of a UI element racing the typing animation.
+    setChips(nextChips);
   }
 
   async function handleStart(e: FormEvent) {
@@ -262,7 +245,7 @@ export function InterviewFlow({
       if (!res.ok) throw new Error(data.error || "Failed to start the interview");
       setResponseId(data.response_id);
       setStage("chat");
-      await revealAssistantMessage(data.message);
+      await revealAssistantMessage(data.message, data.chips ?? []);
     } catch (err) {
       setIsTyping(false);
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -279,6 +262,7 @@ export function InterviewFlow({
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setAnswer("");
+    setChips([]);
     // The textarea's height is grown via direct DOM mutation as the
     // respondent types (see onChange below), so clearing the React state
     // alone doesn't shrink it back down; reset it explicitly.
@@ -310,7 +294,7 @@ export function InterviewFlow({
         setStage("complete");
         setLoading(false);
       } else {
-        await revealAssistantMessage(data.message);
+        await revealAssistantMessage(data.message, data.chips ?? []);
       }
     } catch (err) {
       setIsTyping(false);
@@ -324,212 +308,261 @@ export function InterviewFlow({
     submitAnswer();
   }
 
-  // Enter sends the answer; Shift+Enter falls through to the textarea's
-  // default behavior and inserts a newline instead.
+  // Tapping a chip drops its text into the composer for editing, it never
+  // auto-sends. Chips stay visible after a tap (the respondent might want
+  // to try another one, or edit what just got inserted) — they only clear
+  // once the respondent actually types (below) or sends.
+  function handleChipTap(chipText: string) {
+    setAnswer(chipText);
+    const el = answerInputRef.current;
+    if (el) {
+      el.focus();
+      requestAnimationFrame(() => el.setSelectionRange(el.value.length, el.value.length));
+    }
+  }
+
+  // Cmd/Ctrl+Enter submits; plain Enter (and Shift+Enter) just insert a
+  // newline, since answers here can reasonably run to a few sentences.
   function handleAnswerKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       e.preventDefault();
       submitAnswer();
     }
   }
 
+  const surveyName = survey.external_title || survey.title;
+
   if (stage === "intro") {
     return (
-      <div className="mx-auto max-w-xl px-4 py-12">
-        <Card>
-          <CardContent className="flex flex-col gap-4 p-6">
-            {survey.sponsor && logoUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={survey.sponsor} className="h-8 w-auto object-contain" />
+      <div className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-4 py-12">
+        <div className="flex flex-col gap-4">
+          {survey.sponsor && logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={survey.sponsor} className="h-8 w-auto object-contain" />
+          )}
+          <h1 className="font-serif text-[28px] font-normal text-card-foreground">{surveyName}</h1>
+          {survey.topic && <p className="text-[15px] text-muted-foreground">{survey.topic}</p>}
+          {survey.gift_card_amount ? (
+            <p className="text-sm text-muted-foreground">
+              Complete this interview for a ${survey.gift_card_amount} gift card.
+            </p>
+          ) : null}
+          <form onSubmit={handleStart} className="flex flex-col gap-3">
+            <Input
+              type="text"
+              placeholder="Your name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+            <Input
+              type="email"
+              placeholder="Your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            {enabledFields.includes("phone") && (
+              <Input
+                type="tel"
+                placeholder={fieldPlaceholder("phone")}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required={parsePresetFieldRequired(survey.custom_fields, "phone")}
+              />
             )}
-            <h1 className="text-xl font-semibold text-card-foreground">
-              {survey.external_title || survey.title}
-            </h1>
-            {survey.topic && <p className="text-sm text-muted-foreground">{survey.topic}</p>}
-            {survey.gift_card_amount ? (
-              <p className="text-sm text-muted-foreground">
-                Complete this interview for a ${survey.gift_card_amount} gift card.
-              </p>
-            ) : null}
-            <form onSubmit={handleStart} className="flex flex-col gap-3">
+            {enabledFields.includes("job_title") && (
               <Input
                 type="text"
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
+                placeholder={fieldPlaceholder("job_title")}
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                required={parsePresetFieldRequired(survey.custom_fields, "job_title")}
               />
+            )}
+            {enabledFields.includes("company") && (
               <Input
-                type="email"
-                placeholder="Your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+                type="text"
+                placeholder={fieldPlaceholder("company")}
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                required={parsePresetFieldRequired(survey.custom_fields, "company")}
               />
-              {enabledFields.includes("phone") && (
-                <Input
-                  type="tel"
-                  placeholder={fieldPlaceholder("phone")}
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required={parsePresetFieldRequired(survey.custom_fields, "phone")}
-                />
-              )}
-              {enabledFields.includes("job_title") && (
-                <Input
-                  type="text"
-                  placeholder={fieldPlaceholder("job_title")}
-                  value={jobTitle}
-                  onChange={(e) => setJobTitle(e.target.value)}
-                  required={parsePresetFieldRequired(survey.custom_fields, "job_title")}
-                />
-              )}
-              {enabledFields.includes("company") && (
-                <Input
-                  type="text"
-                  placeholder={fieldPlaceholder("company")}
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
-                  required={parsePresetFieldRequired(survey.custom_fields, "company")}
-                />
-              )}
-              {enabledFields.includes("linkedin") && (
-                <Input
-                  type="url"
-                  placeholder={fieldPlaceholder("linkedin")}
-                  value={linkedin}
-                  onChange={(e) => setLinkedin(e.target.value)}
-                  required={parsePresetFieldRequired(survey.custom_fields, "linkedin")}
-                />
-              )}
-              {customFieldDefs.map((field) => (
-                <Input
-                  key={field.key}
-                  type="text"
-                  placeholder={field.required ? `${field.label} *` : field.label}
-                  value={customFieldValues[field.key] ?? ""}
-                  onChange={(e) =>
-                    setCustomFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))
-                  }
-                  required={field.required === true}
-                />
-              ))}
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" disabled={loading}>
-                {loading ? "Starting..." : "Start"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+            )}
+            {enabledFields.includes("linkedin") && (
+              <Input
+                type="url"
+                placeholder={fieldPlaceholder("linkedin")}
+                value={linkedin}
+                onChange={(e) => setLinkedin(e.target.value)}
+                required={parsePresetFieldRequired(survey.custom_fields, "linkedin")}
+              />
+            )}
+            {customFieldDefs.map((field) => (
+              <Input
+                key={field.key}
+                type="text"
+                placeholder={field.required ? `${field.label} *` : field.label}
+                value={customFieldValues[field.key] ?? ""}
+                onChange={(e) =>
+                  setCustomFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                }
+                required={field.required === true}
+              />
+            ))}
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button type="submit" disabled={loading}>
+              {loading ? "Starting..." : "Start"}
+            </Button>
+          </form>
+        </div>
       </div>
     );
   }
 
   if (stage === "complete") {
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-12">
-        <div className="flex flex-col gap-2 text-center">
-          <h1 className="text-xl font-semibold text-card-foreground">Thanks!</h1>
-          <p className="text-sm text-muted-foreground">{closingMessage}</p>
+      <div className="flex min-h-screen flex-col">
+        <div className="flex items-center justify-between px-10 py-7">
+          <div className="flex items-center gap-2.5 text-card-foreground">
+            <BirdGlyph />
+            <span className="text-sm font-semibold">{surveyName}</span>
+          </div>
+          <span className="text-[13px] font-medium text-faint">Complete</span>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowResponses((prev) => !prev)}
-          className="mx-auto flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-card-foreground"
-          aria-expanded={showResponses}
-        >
-          {showResponses ? "Hide your responses" : "See your responses"}
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={cn("transition-transform", showResponses ? "rotate-180" : "")}
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </button>
+        <div className="flex flex-1 items-center justify-center px-10 pb-24">
+          <div className="bs-rise-repeat w-full max-w-[640px] text-center">
+            <h1 className="mb-3.5 font-serif text-[38px] font-normal leading-[1.2] text-card-foreground">
+              That&apos;s everything. Thank you.
+            </h1>
+            <p className="text-base leading-relaxed text-muted-foreground">{closingMessage}</p>
 
-        {showResponses && (
-          <div className="flex flex-col gap-3">
-            {messages.map((m, i) => (
-              <div key={i} className={m.role === "assistant" ? ASSISTANT_BUBBLE : RESPONDENT_BUBBLE}>
-                {m.role === "assistant" ? renderWithBold(m.content) : m.content}
+            <button
+              type="button"
+              onClick={() => setShowResponses((prev) => !prev)}
+              className="mx-auto mt-8 flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-card-foreground"
+              aria-expanded={showResponses}
+            >
+              {showResponses ? "Hide your responses" : "See your responses"}
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={cn("transition-transform", showResponses ? "rotate-180" : "")}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {showResponses && (
+              <div className="mx-auto mt-4 flex max-w-md flex-col gap-3 text-left">
+                {messages.map((m, i) => (
+                  <div key={i} className={m.role === "assistant" ? ASSISTANT_BUBBLE : RESPONDENT_BUBBLE}>
+                    {m.role === "assistant" ? renderWithBold(m.content) : m.content}
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        )}
+        </div>
+
+        <Footer />
       </div>
     );
   }
 
   const answeredCount = messages.filter((m) => m.role === "user").length;
+  const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant")?.content ?? "";
+  const questionText = streamingText ?? lastAssistantMessage;
 
   return (
     <div className="flex min-h-screen flex-col">
       <TopProgressLine answered={answeredCount} target={survey.num_questions ?? 8} />
 
-      <header className="sticky top-0 z-20 bg-page/95 backdrop-blur-sm">
-        <div className="mx-auto w-full max-w-2xl px-6 pb-3 pt-8">
-          <h1 className="text-sm font-medium text-muted-foreground">
-            {survey.external_title || survey.title}
-          </h1>
+      <div className="flex items-center justify-between px-10 py-7">
+        <div className="flex items-center gap-2.5 text-card-foreground">
+          <BirdGlyph />
+          <span className="text-sm font-semibold">{surveyName}</span>
         </div>
-      </header>
-
-      {/* pb-28 clears the sticky composer below: without it the last message
-          lands right at the document edge and ends up hidden behind the
-          composer instead of visible once scrolled fully to the bottom. */}
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-6 py-2 pb-28">
-        {messages.map((m, i) => (
-          <div key={i} className={m.role === "assistant" ? ASSISTANT_BUBBLE : RESPONDENT_BUBBLE}>
-            {m.role === "assistant" ? renderWithBold(m.content) : m.content}
-          </div>
-        ))}
-        {isTyping && <TypingDots />}
-        {streamingText !== null && (
-          <div className={ASSISTANT_BUBBLE}>{renderWithBold(streamingText)}</div>
-        )}
+        <span className="text-[13px] font-medium text-faint">Question {answeredCount + 1}</span>
       </div>
 
-      <div className="sticky bottom-0 z-20 bg-page">
-        <div className="mx-auto w-full max-w-2xl px-6 pb-6 pt-3">
-          <form
-            onSubmit={handleSend}
-            className="flex items-end gap-2 rounded-3xl bg-card px-2 py-2 shadow-sm ring-1 ring-border focus-within:ring-2 focus-within:ring-ring"
-          >
-            <Textarea
-              ref={answerInputRef}
-              placeholder="Type your answer..."
-              value={answer}
-              onChange={(e) => {
-                setAnswer(e.target.value);
-                lastKeystrokeAtRef.current = Date.now();
-                const el = e.target;
-                el.style.height = "auto";
-                el.style.height = `${el.scrollHeight}px`;
-              }}
-              onKeyDown={handleAnswerKeyDown}
-              rows={1}
-              className="max-h-36 flex-1 resize-none overflow-y-auto rounded-none border-0 bg-transparent px-3 py-2 text-sm text-card-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
-            />
-            <button
-              type="submit"
-              disabled={loading || !answer.trim()}
-              aria-label="Send"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-card-foreground text-card transition-opacity disabled:opacity-40"
-            >
-              <SendIcon />
-            </button>
-          </form>
-          {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+      <div className="flex flex-1 items-center justify-center px-10 pb-24 pt-8">
+        <div className="w-full max-w-[640px]">
+          {isTyping ? (
+            <TypingDots />
+          ) : (
+            <div key={messages.length} className="bs-rise-repeat">
+              <div className="mb-[22px] flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-faint">
+                <span className="bs-dot inline-block h-[7px] w-[7px] rounded-full bg-indigo-light" />
+                Wren is asking
+              </div>
+              <h1 className="text-pretty mb-8 font-serif text-[34px] font-normal leading-[1.3] text-card-foreground">
+                {questionText}
+              </h1>
+
+              <form onSubmit={handleSend} className="flex flex-col gap-5">
+                {chips.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {chips.map((chip, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => handleChipTap(chip)}
+                        className="rounded-full border border-chip bg-transparent px-3.5 py-2 text-sm text-card-foreground transition-colors hover:bg-chip active:bg-chip/70"
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <Textarea
+                  ref={answerInputRef}
+                  placeholder="Take your time — plain language is perfect."
+                  value={answer}
+                  onChange={(e) => {
+                    setAnswer(e.target.value);
+                    lastKeystrokeAtRef.current = Date.now();
+                    setChips((prev) => (prev.length > 0 ? [] : prev));
+                  }}
+                  onKeyDown={handleAnswerKeyDown}
+                  rows={4}
+                  disabled={loading}
+                  className="text-base"
+                />
+                <div className="flex items-center gap-4">
+                  <Button type="submit" disabled={loading || !answer.trim()} className="gap-2">
+                    Continue
+                    <ArrowIcon />
+                  </Button>
+                  <span className="text-[13px] text-faint">
+                    or press <strong className="font-semibold text-muted-foreground">⌘ Enter</strong>
+                  </span>
+                </div>
+              </form>
+              {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+            </div>
+          )}
         </div>
       </div>
+
+      <Footer />
+    </div>
+  );
+}
+
+function Footer() {
+  return (
+    <div className="pb-6 text-center">
+      <span className="text-xs text-faint">
+        Powered by <span className="font-serif text-muted-foreground">Birdsong</span>
+      </span>
     </div>
   );
 }

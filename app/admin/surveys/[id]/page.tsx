@@ -1,16 +1,14 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ResponsesTable } from "./ResponsesTable";
-import { SurveyUrl } from "./SurveyUrl";
-import { SurveyStatusToggle } from "./SurveyStatusToggle";
-import { SurveyForm, type SurveyFormValues } from "@/components/SurveyForm";
+import { SurveyDetailView, type RespondentChip } from "./SurveyDetailView";
+import { type SurveyFormValues } from "@/components/SurveyForm";
 import {
   parseCustomRespondentFieldDefs,
   parseEnabledRespondentFields,
   parsePresetFieldLabel,
   parsePresetFieldRequired,
 } from "@/lib/surveys/respondent-fields";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function SurveyDetailPage({
   params,
@@ -62,29 +60,49 @@ export default async function SurveyDetailPage({
     customFields: customFieldDefs,
   };
 
+  // Presets in enabledFields order, then any fully custom fields — mirrors
+  // the order SurveyForm lists them in, so the read view's chip order
+  // matches what "Edit" reveals right below it.
+  const respondentChips: RespondentChip[] = [
+    ...enabledFields.map((key) => ({
+      label: parsePresetFieldLabel(survey.custom_fields, key),
+      required: parsePresetFieldRequired(survey.custom_fields, key),
+    })),
+    ...customFieldDefs.map((field) => ({ label: field.label, required: field.required === true })),
+  ];
+
+  const responseList = responses ?? [];
+  const qualifiedCount = responseList.filter((r) => r.status === "qualified").length;
+  const completionRate =
+    responseList.length > 0
+      ? Math.round((responseList.filter((r) => r.completed).length / responseList.length) * 100)
+      : null;
+
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-card-foreground">{survey.title}</h1>
-          <SurveyStatusToggle surveyId={survey.id} status={survey.status} />
-        </div>
-        <p className="text-sm text-muted-foreground">{responses?.length ?? 0} responses</p>
-        <SurveyUrl slug={survey.slug} />
-      </div>
+    <div className="flex flex-col gap-10">
+      <SurveyDetailView
+        survey={{
+          id: survey.id,
+          status: survey.status,
+          title: survey.title,
+          externalTitle: survey.external_title ?? "",
+          slug: survey.slug,
+          topic: survey.topic ?? "",
+          targetAudience: [survey.target_industry, survey.target_job_title, survey.target_company_size]
+            .filter((segment) => segment && segment.trim())
+            .join(" · "),
+          tone: survey.tone ?? "",
+          numQuestions: survey.num_questions != null ? String(survey.num_questions) : "",
+          questionGuide: survey.question_guide ?? "",
+          respondentChips,
+        }}
+        responseCount={responseList.length}
+        qualifiedCount={qualifiedCount}
+        completionRate={completionRate}
+        initialValues={initialValues}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Survey details
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <SurveyForm mode="edit" surveyId={survey.id} initialValues={initialValues} />
-        </CardContent>
-      </Card>
-
-      <ResponsesTable responses={responses ?? []} />
+      <ResponsesTable responses={responseList} />
     </div>
   );
 }

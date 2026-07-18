@@ -15,9 +15,16 @@ export type Signals = {
   champion: string | null;
 };
 
+export type CompanyProfile = {
+  whatWeSell: string | null;
+  targetIcp: string | null;
+  valueProp: string | null;
+};
+
 export type InterviewInsights = {
   painPoints: string[];
   leadScore: number;
+  fitReason: string;
   summary: string;
   callScript: CallScript;
   signals: Signals;
@@ -34,20 +41,34 @@ const EMPTY_SIGNALS: Signals = {
 const FALLBACK_INSIGHTS: InterviewInsights = {
   painPoints: [],
   leadScore: 5,
+  fitReason: "",
   summary: "",
   callScript: { opener: "", talkingPoints: [] },
   signals: EMPTY_SIGNALS,
 };
 
-const EXTRACTION_SYSTEM_PROMPT = `You analyze a completed market research interview transcript and extract structured insights for the sales rep who will follow up with this respondent. You are an analyst, not the interviewer, and you never address the respondent directly.
+function buildExtractionSystemPrompt(companyProfile: CompanyProfile | null): string {
+  const profileParts: string[] = [];
+  if (companyProfile?.whatWeSell) profileParts.push(`sells: ${companyProfile.whatWeSell}`);
+  if (companyProfile?.targetIcp) profileParts.push(`targets customers like: ${companyProfile.targetIcp}`);
+  if (companyProfile?.valueProp) profileParts.push(`value proposition: ${companyProfile.valueProp}`);
 
-Score the lead from 1 to 10 using this rubric:
-- 9-10: the respondent mentioned budget, timeline, or being actively in the market for a solution.
-- 7-8: the respondent described clear, implicit friction or unmet needs without being asked directly.
-- 5-6: mild friction can be inferred, but was not stated directly.
-- 3-4: the respondent was mostly positive with little to no friction.
-- 1-2: nothing relevant to friction or need came up.
-If you are uncertain where the interview falls, default conservatively to 5.
+  const productSection =
+    profileParts.length > 0
+      ? `\nThis interview was commissioned by a sponsor company that ${profileParts.join("; ")}. Use this to judge fit and to write a call script specific to what this sponsor actually sells, not a generic one.\n`
+      : "\nNo sponsor product information is available for this interview. Score and write the call script based on friction alone, without inferring a specific product to sell against.\n";
+
+  return `You analyze a completed market research interview transcript and extract structured insights for the sales rep who will follow up with this respondent. You are an analyst, not the interviewer, and you never address the respondent directly.
+${productSection}
+Score the lead from 1 to 10. This score means fit AND friction for the sponsor's specific product above, not generic friction:
+- 9-10: the respondent described friction or unmet needs that the sponsor's product specifically addresses, and they plausibly fit the sponsor's target ICP.
+- 7-8: clear, implicit friction connected to what the sponsor sells, even if fit with the ICP is only partial or unstated.
+- 5-6: mild friction can be inferred but it's not clearly connected to the sponsor's product, or fit with the ICP is unclear either way.
+- 3-4: the respondent was mostly positive, or any friction they described falls outside what the sponsor's product addresses.
+- 1-2: nothing relevant to the sponsor's product came up, or the respondent clearly doesn't fit the ICP.
+If you are uncertain where the interview falls, default conservatively to 5. If no sponsor product information was provided above, fall back to scoring generic friction only, using the same rubric shape.
+
+Also write fit_reason: one sentence explaining why this respondent is or isn't a fit for the sponsor's product specifically (not just whether they have friction in general). If no sponsor product information was provided, say so plainly rather than guessing at a product.
 
 Also list the distinct pain points, challenges, or frustrations the respondent actually expressed, phrased in or close to their own words. If none were expressed, return an empty list.
 
@@ -61,15 +82,16 @@ Also pull out whatever deal signals the transcript actually surfaced, as a signa
 - champion: who internally would advocate for or drive this forward, if someone was named.
 
 Write a call script for the rep:
-- opener: one to two sentences the rep can literally say to open the call. Reference something specific and true from this transcript (a tool they mentioned, a workflow they described, something they said), never a generic opener that could apply to any respondent. When any of the signals surfaced something relevant, let it naturally inform the opener or a talking point instead of listing it separately.
-- talking_points: the 2 to 3 most glaring pain points from this specific interview, phrased as short things for the rep to bring up in conversation, not a restatement of the pain_points list.
+- opener: one to two sentences the rep can literally say to open the call. Connect something specific and true the respondent said (a tool they mentioned, a workflow they described, a frustration in their own words) to the sponsor's actual value proposition above. Never a generic opener that could apply to any respondent, and never a generic pitch that ignores what this respondent specifically said. When any of the signals surfaced something relevant, let it naturally inform the opener or a talking point instead of listing it separately.
+- talking_points: the 2 to 3 most glaring pain points from this specific interview, each phrased as a bridge from something the respondent actually said (quote or closely paraphrase their own words) to how the sponsor's product addresses it. Not a restatement of the pain_points list.
 
 Call the record_interview_insights tool exactly once with your findings.`;
+}
 
 const INSIGHTS_TOOL: Anthropic.Tool = {
   name: "record_interview_insights",
   description:
-    "Record the pain points, lead score, summary, and call script extracted from a completed interview transcript.",
+    "Record the pain points, lead score, fit reason, summary, and call script extracted from a completed interview transcript.",
   input_schema: {
     type: "object",
     properties: {
@@ -83,7 +105,12 @@ const INSIGHTS_TOOL: Anthropic.Tool = {
         type: "integer",
         minimum: 1,
         maximum: 10,
-        description: "Lead score from 1 to 10 per the rubric.",
+        description: "Lead score from 1 to 10 per the rubric: fit and friction for the sponsor's specific product.",
+      },
+      fit_reason: {
+        type: "string",
+        description:
+          "One sentence explaining why this respondent is or isn't a fit for the sponsor's product specifically.",
       },
       summary: {
         type: "string",
@@ -122,20 +149,21 @@ const INSIGHTS_TOOL: Anthropic.Tool = {
           opener: {
             type: "string",
             description:
-              "One to two sentences the rep can say to open the call, referencing something specific from this transcript.",
+              "One to two sentences the rep can say to open the call, connecting something specific from this transcript to the sponsor's value proposition.",
           },
           talking_points: {
             type: "array",
             items: { type: "string" },
             minItems: 2,
             maxItems: 3,
-            description: "The 2 to 3 most glaring pain points from this interview, phrased as talking points.",
+            description:
+              "The 2 to 3 most glaring pain points from this interview, each bridging what the respondent said to the sponsor's product.",
           },
         },
         required: ["opener", "talking_points"],
       },
     },
-    required: ["pain_points", "lead_score", "summary", "call_script"],
+    required: ["pain_points", "lead_score", "fit_reason", "summary", "call_script"],
   },
 };
 
@@ -145,44 +173,80 @@ function transcriptToText(messages: InterviewMessage[]): string {
     .join("\n\n");
 }
 
-export async function extractInterviewInsights(
-  messages: InterviewMessage[]
-): Promise<InterviewInsights> {
-  const anthropic = getAnthropicClient();
+type ParsedToolInput = {
+  pain_points?: unknown;
+  lead_score?: unknown;
+  fit_reason?: unknown;
+  summary?: unknown;
+  signals?: unknown;
+  call_script?: unknown;
+};
 
-  const result = await anthropic.messages.create({
-    model: INTERVIEW_MODEL,
-    max_tokens: 1024,
-    system: EXTRACTION_SYSTEM_PROMPT,
-    messages: [{ role: "user", content: transcriptToText(messages) }],
-    tools: [INSIGHTS_TOOL],
-    tool_choice: { type: "tool", name: "record_interview_insights" },
-  });
-
+// Anthropic's tool-use path hands back an already-parsed object (no raw-text
+// JSON.parse step exists in this call), so the failure modes worth guarding
+// against are: the model not invoking the tool at all, or invoking it with a
+// shape that fails validation. Either one used to fall through to
+// FALLBACK_INSIGHTS silently (leadScore 5) with no log line, which is the
+// worst outcome on an otherwise-hot lead. We now retry the call once and log
+// loudly on every failure so a bad extraction is visible, not silent.
+function extractToolInput(result: Anthropic.Message): ParsedToolInput | null {
   const toolUse = result.content.find(
     (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
   );
-  if (!toolUse) return FALLBACK_INSIGHTS;
+  if (!toolUse) return null;
 
-  const input = toolUse.input as {
-    pain_points?: unknown;
-    lead_score?: unknown;
-    summary?: unknown;
-    signals?: unknown;
-    call_script?: unknown;
+  const input = toolUse.input as ParsedToolInput;
+  const hasValidScore =
+    typeof input.lead_score === "number" &&
+    Number.isInteger(input.lead_score) &&
+    input.lead_score >= 1 &&
+    input.lead_score <= 10;
+  const hasValidCallScript =
+    typeof (input.call_script as { opener?: unknown } | undefined)?.opener === "string" &&
+    Array.isArray((input.call_script as { talking_points?: unknown } | undefined)?.talking_points);
+
+  if (!hasValidScore || !hasValidCallScript) return null;
+
+  return input;
+}
+
+export async function extractInterviewInsights(
+  messages: InterviewMessage[],
+  companyProfile: CompanyProfile | null = null
+): Promise<InterviewInsights> {
+  const anthropic = getAnthropicClient();
+  const system = buildExtractionSystemPrompt(companyProfile);
+  const requestParams: Anthropic.MessageCreateParamsNonStreaming = {
+    model: INTERVIEW_MODEL,
+    max_tokens: 1024,
+    system,
+    messages: [{ role: "user", content: transcriptToText(messages) }],
+    tools: [INSIGHTS_TOOL],
+    tool_choice: { type: "tool", name: "record_interview_insights" },
   };
+
+  let input: ParsedToolInput | null = null;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const result = await anthropic.messages.create(requestParams);
+    input = extractToolInput(result);
+    if (input) break;
+    console.error(
+      `[extractInterviewInsights] attempt ${attempt} failed to produce a valid record_interview_insights call; ` +
+        `${attempt < 2 ? "retrying once" : "falling back to defaults (lead_score=5) after retry"}`
+    );
+  }
+
+  if (!input) return FALLBACK_INSIGHTS;
 
   const painPoints = Array.isArray(input.pain_points)
     ? input.pain_points.filter((p): p is string => typeof p === "string")
     : FALLBACK_INSIGHTS.painPoints;
 
-  const leadScore =
-    typeof input.lead_score === "number" &&
-    Number.isInteger(input.lead_score) &&
-    input.lead_score >= 1 &&
-    input.lead_score <= 10
-      ? input.lead_score
-      : FALLBACK_INSIGHTS.leadScore;
+  // Validated in extractToolInput.
+  const leadScore = input.lead_score as number;
+
+  const fitReason = typeof input.fit_reason === "string" ? input.fit_reason : FALLBACK_INSIGHTS.fitReason;
 
   const summary = typeof input.summary === "string" ? input.summary : FALLBACK_INSIGHTS.summary;
 
@@ -207,13 +271,12 @@ export async function extractInterviewInsights(
     champion: normalizeSignal(rawSignals?.champion),
   };
 
-  const rawCallScript = input.call_script as { opener?: unknown; talking_points?: unknown } | undefined;
+  // Validated in extractToolInput.
+  const rawCallScript = input.call_script as { opener: string; talking_points: unknown[] };
   const callScript: CallScript = {
-    opener: typeof rawCallScript?.opener === "string" ? rawCallScript.opener : "",
-    talkingPoints: Array.isArray(rawCallScript?.talking_points)
-      ? rawCallScript.talking_points.filter((p): p is string => typeof p === "string").slice(0, 3)
-      : [],
+    opener: rawCallScript.opener,
+    talkingPoints: rawCallScript.talking_points.filter((p): p is string => typeof p === "string").slice(0, 3),
   };
 
-  return { painPoints, leadScore, summary, callScript, signals };
+  return { painPoints, leadScore, fitReason, summary, callScript, signals };
 }

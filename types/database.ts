@@ -87,6 +87,7 @@ export type Database = {
           messages: Json;
           pain_points: Json;
           lead_score: number | null;
+          fit_reason: string | null;
           completed: boolean;
           custom_field_values: Json;
           status: string;
@@ -105,6 +106,7 @@ export type Database = {
           messages?: Json;
           pain_points?: Json;
           lead_score?: number | null;
+          fit_reason?: string | null;
           completed?: boolean;
           custom_field_values?: Json;
           status?: string;
@@ -125,6 +127,7 @@ export type Database = {
           messages?: Json;
           pain_points?: Json;
           lead_score?: number | null;
+          fit_reason?: string | null;
           completed?: boolean;
           custom_field_values?: Json;
           status?: string;

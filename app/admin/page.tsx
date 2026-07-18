@@ -1,44 +1,153 @@
 import Link from "next/link";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { getRecentActivity, type ActivityEvent } from "@/lib/activity";
+import { formatRelativeTime } from "@/lib/format-relative-time";
+import { userFirstName } from "@/lib/user-name";
+import { cn } from "@/lib/utils";
+import { GreetingBlock } from "./GreetingBlock";
 
-export default function AdminHomePage() {
+function ActivityText({ event }: { event: ActivityEvent }) {
+  if (event.type === "new_responses") {
+    return (
+      <>
+        {event.count} new response{event.count === 1 ? "" : "s"} on{" "}
+        <span className="text-indigo-light">{event.surveyTitle}</span>
+      </>
+    );
+  }
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-10">
+    <>
+      {event.count} lead{event.count === 1 ? "" : "s"} qualified from{" "}
+      <span className="text-indigo-light">{event.surveyTitle}</span>
+    </>
+  );
+}
 
-      {/* Welcome card */}
-      <div className="flex w-full max-w-lg flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-[#0a0a0a]">Welcome to Birdsong</h1>
-        <p className="text-sm text-muted-foreground">
-          What would you like to do?
-        </p>
+const ACTIONS = [
+  {
+    href: "/admin/surveys/new",
+    title: "Create a new survey",
+    description: "Build and launch an AI-moderated interview",
+  },
+  {
+    href: "/admin/surveys",
+    title: "View dashboard",
+    description: "See your surveys, responses, and leads",
+  },
+  {
+    href: "/admin/profile",
+    title: "Company profile",
+    description: "Set your ICP, brand voice, and survey defaults",
+  },
+] as const;
+
+const ROW_ANIMATIONS = ["bs-rise-4", "bs-rise-5", "bs-rise-6"];
+
+export default async function AdminHomePage() {
+  const supabase = await createClient();
+  const user = await getCurrentUser();
+
+  if (!user) return null;
+
+  const [{ data: profile }, events] = await Promise.all([
+    supabase.from("profiles").select("contact_name").eq("user_id", user.id).maybeSingle(),
+    getRecentActivity(supabase, user.id),
+  ]);
+
+  const firstName = userFirstName(user, profile?.contact_name);
+
+  return (
+    // -m-8 cancels AdminShell's own p-8 content padding so both panels run
+    // flush against the icon sidebar and the viewport edges, matching the
+    // design's full-bleed split screen. The sidebar itself stays visible —
+    // this is a second, content-level dark panel, not a replacement nav
+    // rail (same pattern as CompanyProfileSetupFlow). Its own explicit
+    // width (34%, clamped 320-420px) keeps it a distinct flex sibling from
+    // the nav rail rather than the two ever competing for the same space —
+    // at 42% it could get wide enough to visually merge with the rail on
+    // narrower viewports.
+    <div className="-m-8 flex min-h-screen">
+      {/* Left panel */}
+      <div className="flex w-[34%] min-w-[320px] max-w-[420px] flex-col justify-between bg-sidebar px-12 py-12">
+        <GreetingBlock firstName={firstName} />
+
+        <div className="bs-rise-2">
+          <div className="mb-[18px] flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/50">
+            <span className="bs-dot inline-block h-[7px] w-[7px] rounded-full bg-indigo-light" />
+            What&apos;s been happening
+          </div>
+
+          {events.length === 0 ? (
+            <p className="text-sm text-sidebar-foreground/60">
+              No activity yet — it&apos;ll show up here once responses start coming in.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3.5">
+              {events.map((event, i) => (
+                <div
+                  key={`${event.type}-${event.surveyTitle}`}
+                  className={cn(
+                    "flex items-baseline justify-between gap-4",
+                    i < events.length - 1 && "border-b border-sidebar-border/[0.12] pb-[13px]"
+                  )}
+                >
+                  <span className="text-sm font-medium text-sidebar-foreground">
+                    <ActivityText event={event} />
+                  </span>
+                  <span className="whitespace-nowrap text-xs text-sidebar-foreground/45">
+                    {formatRelativeTime(event.at)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Action cards */}
-      <div className="grid w-full max-w-lg grid-cols-1 gap-3">
-        <Link href="/admin/surveys/new" className="group flex items-center justify-between rounded-2xl border border-[#e5e7eb] bg-white p-5 shadow-sm transition-all hover:border-[#0a0a0a] hover:shadow-md">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-semibold text-[#0a0a0a]">Create a new survey</span>
-            <span className="text-xs text-muted-foreground">Build and launch an AI-moderated interview</span>
-          </div>
-          <svg className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-        </Link>
+      {/* Right panel */}
+      <div className="flex flex-1 flex-col justify-center bg-page px-[72px] py-16">
+        <div className="bs-rise-3 mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-faint">
+          Where to next
+        </div>
 
-        <Link href="/admin/surveys" className="group flex items-center justify-between rounded-2xl border border-[#e5e7eb] bg-white p-5 shadow-sm transition-all hover:border-[#0a0a0a] hover:shadow-md">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-semibold text-[#0a0a0a]">View dashboard</span>
-            <span className="text-xs text-muted-foreground">See your surveys, responses, and leads</span>
-          </div>
-          <svg className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-        </Link>
-
-        <Link href="/admin/profile" className="group flex items-center justify-between rounded-2xl border border-[#e5e7eb] bg-white p-5 shadow-sm transition-all hover:border-[#0a0a0a] hover:shadow-md">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-semibold text-[#0a0a0a]">Company profile</span>
-            <span className="text-xs text-muted-foreground">Set your ICP, brand voice, and survey defaults</span>
-          </div>
-          <svg className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-        </Link>
+        <div className="flex flex-col">
+          {ACTIONS.map((action, i) => (
+            <Link
+              key={action.href}
+              href={action.href}
+              className={cn(
+                ROW_ANIMATIONS[i],
+                "group flex items-center gap-7 rounded-card px-5 py-[34px] transition-colors hover:bg-card-foreground/[0.04]",
+                i < ACTIONS.length - 1 && "border-b border-border"
+              )}
+            >
+              <span className="min-w-[26px] text-[13px] font-semibold text-faint">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <div className="flex-1">
+                <div className="mb-1.5 text-[23px] font-semibold tracking-[-0.01em] text-card-foreground">
+                  {action.title}
+                </div>
+                <div className="text-[15px] text-muted-foreground">{action.description}</div>
+              </div>
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="shrink-0 text-card-foreground"
+              >
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </Link>
+          ))}
+        </div>
       </div>
-
     </div>
   );
 }

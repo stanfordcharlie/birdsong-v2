@@ -10,12 +10,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
-// Design handoff: design_handoff_company_profile/README.md. Colors here
-// (#6366f1 etc.) are the handoff's own palette, deliberately not the
-// app's shared --ds-primary (#4f46e5), matching this design's exact spec
-// without silently re-skinning every other button in the admin. Scoped to
-// this flow only.
-
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 
@@ -326,15 +320,15 @@ export function CompanyProfileSetupFlow({
   const nextLabel = step === TOTAL_STEPS - 2 ? "Review" : "Continue";
 
   return (
-    <div className="-m-8 flex min-h-screen bg-[#f8f8f7]">
+    <div className="-m-8 flex min-h-screen bg-page">
       {/* Left rail. The -m-8/min-h-screen above cancel AdminShell's own
           p-8 content padding so this rail runs flush against the app's
           existing dark sidebar and to the edges of the content area,
           rather than sitting indented inside another layer of padding.
           The app's own admin nav stays visible; only this flow's own
           step-navigator sidebar is new. */}
-      <div className="sticky top-0 flex h-screen w-[220px] shrink-0 flex-col border-r border-[#e6e6e4] bg-white px-5 py-8">
-        <div className="mb-7 font-[family-name:var(--font-source-serif)] text-[17px] font-medium tracking-[-0.01em] text-[#1a1a18]">
+      <div className="sticky top-0 flex h-screen w-[220px] shrink-0 flex-col border-r border-border bg-card px-5 py-8">
+        <div className="mb-7 font-serif text-[17px] font-normal tracking-[-0.01em] text-card-foreground">
           Company Profile
         </div>
 
@@ -347,24 +341,24 @@ export function CompanyProfileSetupFlow({
                   <div
                     className={cn(
                       "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                      status === "current" && "bg-[#6366f1] text-white",
-                      status === "done" && "border border-[#86e0a6] bg-[#e9f9ef] text-[#15803d]",
-                      status === "upcoming" && "border border-[#e6e6e4] bg-white text-[#9a9a94]"
+                      status === "current" && "bg-primary text-primary-foreground",
+                      status === "done" && "bg-success-bg text-success",
+                      status === "upcoming" && "border border-border bg-card text-faint"
                     )}
                   >
                     {status === "done" ? "✓" : i + 1}
                   </div>
                   {i < STEPS.length - 1 && (
-                    <div className="min-h-[20px] w-px flex-1 bg-[#e6e6e4]" />
+                    <div className="min-h-[20px] w-px flex-1 bg-border" />
                   )}
                 </div>
                 <div className="pb-6 pt-0.5">
                   <div
                     className={cn(
                       "text-sm",
-                      status === "current" && "font-semibold text-[#1a1a18]",
-                      status === "done" && "font-medium text-[#79796f]",
-                      status === "upcoming" && "font-medium text-[#9a9a94]"
+                      status === "current" && "font-semibold text-card-foreground",
+                      status === "done" && "font-medium text-muted-foreground",
+                      status === "upcoming" && "font-medium text-faint"
                     )}
                   >
                     {s.section}
@@ -381,7 +375,7 @@ export function CompanyProfileSetupFlow({
               {saveError}
             </div>
           )}
-          <div className="text-xs text-[#b3b3ac]">{saveNote || "Autosaved as you go"}</div>
+          <div className="text-xs text-faint">{saveNote || "Autosaved as you go"}</div>
         </div>
       </div>
 
@@ -389,21 +383,15 @@ export function CompanyProfileSetupFlow({
       <div className="flex flex-1 justify-center px-10 py-14">
         <div className="w-full max-w-[680px]">
           <div className="mb-3.5 flex items-center justify-between">
-            <div className="text-sm text-[#9a9a94]">{stepLabel}</div>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={handleSaveExit}
-              className="border-[#e6e6e4] text-[#4a4a44] hover:bg-[#f8f8f7]"
-            >
+            <div className="text-sm text-faint">{stepLabel}</div>
+            <Button type="button" variant="secondary" size="sm" onClick={handleSaveExit}>
               Save &amp; exit
             </Button>
           </div>
 
-          <div className="mb-9 h-1 w-full overflow-hidden rounded-full bg-[#ececea]">
+          <div className="mb-9 h-1 w-full overflow-hidden rounded-full bg-secondary">
             <div
-              className="h-full rounded-full bg-[#6366f1] transition-[width] duration-300 ease-out"
+              className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -415,33 +403,33 @@ export function CompanyProfileSetupFlow({
               transform: entering ? "translateY(8px)" : "translateY(0)",
             }}
           >
-            <Card className="flex min-h-[540px] flex-col rounded-[16px] border-[#e6e6e4] p-11">
+            <Card className="flex min-h-[540px] flex-col p-11">
               {isReview ? (
                 <div className="flex flex-1 flex-col">
-                  <h2 className="mb-2 font-[family-name:var(--font-source-serif)] text-[28px] font-medium tracking-[-0.01em] text-[#1a1a18]">
+                  <h2 className="mb-2 font-serif text-[28px] font-normal tracking-[-0.01em] text-card-foreground">
                     {current.title}
                   </h2>
-                  <p className="mb-8 text-[15.5px] leading-[1.6] text-[#79796f]">{current.subtitle}</p>
+                  <p className="mb-8 text-[15.5px] leading-[1.6] text-muted-foreground">{current.subtitle}</p>
 
                   <div className="flex flex-col gap-5">
                     {STEPS.filter((s) => !s.review).map((s, i) => (
-                      <div key={s.id} className="rounded-xl border border-[#e6e6e4] p-[18px_20px]">
+                      <div key={s.id} className="rounded-card border border-border p-[18px_20px]">
                         <div className="mb-2.5 flex items-center justify-between">
-                          <div className="text-[13px] font-semibold text-[#1a1a18]">{s.section}</div>
+                          <div className="text-[13px] font-semibold text-card-foreground">{s.section}</div>
                           <Button
                             type="button"
                             variant="secondary"
                             size="sm"
                             onClick={() => goTo(i)}
-                            className="h-[30px] border-[#e6e6e4] px-3 text-xs text-[#4a4a44] hover:bg-[#f8f8f7]"
+                            className="h-[30px] px-3"
                           >
                             Edit
                           </Button>
                         </div>
                         <div className="flex flex-col gap-1.5">
                           {(s.fields ?? []).map((f) => (
-                            <div key={f.key} className="text-sm text-[#4a4a44]">
-                              <span className="text-[#9a9a94]">{f.label || s.section}:</span>{" "}
+                            <div key={f.key} className="text-sm text-muted-foreground">
+                              <span className="text-faint">{f.label || s.section}:</span>{" "}
                               {data[f.key] ? data[f.key] : "—"}
                             </div>
                           ))}
@@ -451,21 +439,11 @@ export function CompanyProfileSetupFlow({
                   </div>
 
                   <div className="mt-auto flex items-center justify-between pt-9">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={goBack}
-                      className="border-[#e6e6e4] text-[#4a4a44] hover:bg-[#f8f8f7]"
-                    >
+                    <Button type="button" variant="secondary" onClick={goBack}>
                       Back
                     </Button>
                     <div className="flex flex-col items-end gap-1.5">
-                      <Button
-                        type="button"
-                        onClick={handleFinish}
-                        disabled={finishing}
-                        className="bg-[#6366f1] hover:bg-[#4f46e5]"
-                      >
+                      <Button type="button" onClick={handleFinish} disabled={finishing}>
                         {finishing ? "Finishing..." : "Finish setup"}
                       </Button>
                       {finishError && <span className="text-xs text-destructive">{finishError}</span>}
@@ -474,13 +452,13 @@ export function CompanyProfileSetupFlow({
                 </div>
               ) : (
                 <div className="flex flex-1 flex-col">
-                  <div className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.03em] text-[#8b7cf6]">
+                  <div className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.03em] text-muted-foreground">
                     {current.section}
                   </div>
-                  <h2 className="mb-2 font-[family-name:var(--font-source-serif)] text-[28px] font-medium tracking-[-0.01em] text-[#1a1a18]">
+                  <h2 className="mb-2 font-serif text-[28px] font-normal tracking-[-0.01em] text-card-foreground">
                     {current.title}
                   </h2>
-                  <p className="mb-8 text-[15.5px] leading-[1.6] text-[#79796f]">{current.subtitle}</p>
+                  <p className="mb-8 text-[15.5px] leading-[1.6] text-muted-foreground">{current.subtitle}</p>
 
                   <div
                     className={
@@ -492,7 +470,7 @@ export function CompanyProfileSetupFlow({
                     {(current.fields ?? []).map((field) => (
                       <div key={field.key} className="flex flex-col gap-2">
                         {field.label && (
-                          <label className="text-sm font-semibold text-[#1a1a18]">{field.label}</label>
+                          <label className="text-sm font-semibold text-card-foreground">{field.label}</label>
                         )}
                         {field.type === "textarea" ? (
                           <Textarea
@@ -500,7 +478,7 @@ export function CompanyProfileSetupFlow({
                             onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setField(field, e.target.value)}
                             placeholder={field.placeholder}
                             rows={field.rows ?? 4}
-                            className="resize-none border-[#e6e6e4]"
+                            className="resize-none"
                           />
                         ) : (
                           <Input
@@ -508,22 +486,17 @@ export function CompanyProfileSetupFlow({
                             value={data[field.key] || ""}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setField(field, e.target.value)}
                             placeholder={field.placeholder}
-                            className="h-11 border-[#e6e6e4]"
+                            className="h-11"
                           />
                         )}
-                        {field.helper && <div className="text-[13px] text-[#9a9a94]">{field.helper}</div>}
+                        {field.helper && <div className="text-[13px] text-faint">{field.helper}</div>}
                       </div>
                     ))}
                   </div>
 
                   <div className="mt-auto flex items-center justify-between pt-9">
                     {step > 0 ? (
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={goBack}
-                        className="border-[#e6e6e4] text-[#4a4a44] hover:bg-[#f8f8f7]"
-                      >
+                      <Button type="button" variant="secondary" onClick={goBack}>
                         Back
                       </Button>
                     ) : (
@@ -533,7 +506,6 @@ export function CompanyProfileSetupFlow({
                       type="button"
                       onClick={goNext}
                       disabled={!isStepComplete(current, data)}
-                      className="bg-[#6366f1] hover:bg-[#4f46e5]"
                     >
                       {nextLabel}
                     </Button>

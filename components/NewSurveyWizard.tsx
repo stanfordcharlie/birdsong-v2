@@ -95,7 +95,7 @@ function SurveyPreviewPanel({ externalTitle, slug }: { externalTitle: string; sl
   return (
     <div className="flex flex-col gap-2">
       <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Preview</span>
-      <div className="overflow-hidden rounded-card border border-border shadow-sm">
+      <div className="overflow-hidden rounded-card border border-border">
         <div className="flex flex-col gap-2 border-b border-border bg-secondary/50 px-3 py-2">
           <div className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
@@ -355,7 +355,7 @@ export function NewSurveyWizard() {
       </div>
 
       <div className={showPreview ? "grid grid-cols-1 gap-8 md:grid-cols-2 md:items-start" : undefined}>
-        <div className="rounded-card border border-border bg-card p-8 shadow-sm">
+        <div className="rounded-card border border-border bg-card p-8">
           {step === 0 && (
             <StepShell
               label="Internal name"

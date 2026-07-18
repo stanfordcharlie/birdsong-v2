@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { editProfile } from "@/lib/profile-onboarding/edit";
-import type { ExtractedProfile } from "@/lib/profile-onboarding/extract";
+import type { CompanyProfileEditFields } from "@/lib/profile-onboarding/edit";
 
 // POST /api/profile/edit
 // Body: { instruction, current }
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  let body: { instruction?: string; current?: ExtractedProfile };
+  let body: { instruction?: string; current?: CompanyProfileEditFields };
   try {
     body = await request.json();
   } catch {

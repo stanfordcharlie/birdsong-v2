@@ -74,7 +74,16 @@ const EMPTY_VALUES: SurveyFormValues = {
 
 type SurveyFormProps =
   | { mode: "create" }
-  | { mode: "edit"; surveyId: string; initialValues: SurveyFormValues };
+  | {
+      mode: "edit";
+      surveyId: string;
+      initialValues: SurveyFormValues;
+      // Lets a read-first parent view (SurveyDetailView) return to its
+      // summary display right after a successful save, instead of leaving
+      // the full edit form up. Optional since mode:"create" has nowhere to
+      // "return" to — it navigates to the new survey's own page instead.
+      onSaved?: () => void;
+    };
 
 const invalidBorder = "border-destructive focus-visible:ring-destructive";
 const selectClasses =
@@ -330,6 +339,7 @@ export function SurveyForm(props: SurveyFormProps) {
         setSlug(candidateSlug);
         setSaved(true);
         router.refresh();
+        props.onSaved?.();
       } else {
         router.push(`/admin/surveys/${resultId}`);
       }

@@ -55,11 +55,7 @@ export function ChangePasswordForm() {
       {error && <p className="text-sm text-destructive">{error}</p>}
       {success && <p className="text-sm text-muted-foreground">Password updated.</p>}
       <div>
-        <Button
-          type="submit"
-          disabled={loading || !newPassword || !confirmPassword}
-          className="bg-[#111111] text-white hover:bg-[#111111]/90"
-        >
+        <Button type="submit" disabled={loading || !newPassword || !confirmPassword}>
           {loading ? "Updating..." : "Update password"}
         </Button>
       </div>

@@ -1,8 +1,9 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 
-export function SignOutButton() {
+export function SignOutButton({ className }: { className?: string }) {
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -15,7 +16,10 @@ export function SignOutButton() {
     <button
       type="button"
       onClick={handleSignOut}
-      className="text-sm text-sidebar-foreground transition-colors hover:text-sidebar-active-foreground"
+      className={cn(
+        "text-sm text-sidebar-foreground transition-colors hover:text-sidebar-active-foreground",
+        className
+      )}
     >
       Sign out
     </button>

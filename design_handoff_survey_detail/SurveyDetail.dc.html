@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Survey Detail" description="Read-first survey config page — condensed from a text-heavy form" -->
+<helmet>
+<script src="./ds-base.js"></script>
+<style>
+@font-face{font-family:"Inter";font-style:normal;font-weight:100 900;font-display:swap;src:url(../../fonts/ba9851c3c22cd980-s.woff2) format("woff2")}
+.field-row:hover .edit-hint{opacity:1}
+.chip{transition:background .12s ease,border-color .12s ease}
+.chip-required{background:#eef2ff;color:#4f46e5;border:1px solid #e0e4fb}
+.chip-optional{background:#f7f7f5;color:#71716b;border:1px solid #eaeae7}
+</style>
+</helmet>
+<div style="display:flex;height:100vh;background:#f8f8f7;font-family:'Inter',ui-sans-serif,system-ui;color:#18181b">
+<aside style="width:72px;flex:0 0 72px;background:oklch(0.19 0.004 285);display:flex;flex-direction:column;align-items:center;padding:20px 0;gap:28px">
+<div style="width:32px;height:32px;border-radius:9px;background:oklch(0.58 0.19 265);display:flex;align-items:center;justify-content:center">
+<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="white" stroke-width="1.6"></circle></svg>
+</div>
+<nav style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+<div title="Home" style="width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 8l6-5 6 5v7a1 1 0 01-1 1H4a1 1 0 01-1-1V8z" stroke="rgba(255,255,255,.72)" stroke-width="1.5" stroke-linejoin="round"></path></svg>
+</div>
+<div title="Surveys" style="width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:rgba(255,255,255,.12)">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="3.5" y="2.5" width="11" height="13" rx="1.5" stroke="#fff" stroke-width="1.5"></rect><line x1="6" y1="6.5" x2="12" y2="6.5" stroke="#fff" stroke-width="1.3"></line><line x1="6" y1="9.5" x2="12" y2="9.5" stroke="#fff" stroke-width="1.3"></line></svg>
+</div>
+<div title="Respondents" style="width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="6.5" r="2.5" stroke="rgba(255,255,255,.72)" stroke-width="1.5"></circle><path d="M3.5 15c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5" stroke="rgba(255,255,255,.72)" stroke-width="1.5"></path></svg>
+</div>
+<div title="Settings" style="width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="2.6" stroke="rgba(255,255,255,.72)" stroke-width="1.5"></circle><circle cx="9" cy="9" r="6" stroke="rgba(255,255,255,.72)" stroke-width="1.1" stroke-dasharray="1.5 2.2"></circle></svg>
+</div>
+</nav>
+<div style="flex:1"></div>
+<div style="width:30px;height:30px;border-radius:8px;background:oklch(0.6 0.14 145);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:white">S</div>
+</aside>
+<main style="flex:1;overflow:auto;padding:48px 56px 80px">
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+<div style="display:flex;align-items:center;gap:12px">
+<h1 style="font-size:26px;font-weight:600;letter-spacing:-0.01em;margin:0">7/14/26 P&amp;R</h1>
+<x-import component-from-global-scope="Birdsong.Badge" variant="success" hint-size="50px,22px">Live</x-import>
+</div>
+<x-import component-from-global-scope="Birdsong.Button" variant="primary" hint-size="90px,38px">Save</x-import>
+</div>
+<div style="font-size:13px;color:#9c9c98;margin-bottom:20px">1 response</div>
+
+<div style="display:flex;align-items:center;gap:8px;background:white;border:1px solid #eaeae7;border-radius:10px;padding:8px 8px 8px 16px;margin-bottom:32px">
+<span style="flex:1;font-size:13px;color:#71716b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">https://birdsong-v2.vercel.app/survey/parks-and-rec-2</span>
+<x-import component-from-global-scope="Birdsong.Button" variant="secondary" size="sm" hint-size="70px,32px">Copy</x-import>
+</div>
+
+<div style="display:grid;grid-template-columns:340px 1fr;gap:24px;align-items:start">
+
+<div style="display:flex;flex-direction:column;gap:16px">
+<div style="background:white;border:1px solid #eaeae7;border-radius:12px;padding:20px">
+<div style="font-size:12px;color:#9c9c98;font-weight:600;letter-spacing:.02em;text-transform:uppercase;margin-bottom:16px">Survey identity</div>
+<div style="display:flex;flex-direction:column;gap:16px">
+<div class="field-row">
+<div style="font-size:13px;color:#9c9c98;font-weight:500;margin-bottom:5px">Internal name</div>
+<div style="font-size:15px;font-weight:500">7/14/26 P&amp;R</div>
+</div>
+<div class="field-row">
+<div style="font-size:13px;color:#9c9c98;font-weight:500;margin-bottom:5px">External name</div>
+<div style="font-size:15px;font-weight:500">Parks and Rec</div>
+</div>
+<div class="field-row">
+<div style="font-size:13px;color:#9c9c98;font-weight:500;margin-bottom:5px">Slug</div>
+<div style="font-size:15px;color:#3f3f3a">parks-and-rec-2</div>
+</div>
+</div>
+</div>
+<div style="background:white;border:1px solid #eaeae7;border-radius:12px;padding:20px">
+<div style="font-size:12px;color:#9c9c98;font-weight:600;letter-spacing:.02em;text-transform:uppercase;margin-bottom:14px">Respondent info collected</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+<sc-for list="{{ respondentFields }}" as="f" hint-placeholder-count="5">
+<div class="chip {{ f.chipClass }}" style="display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:20px;font-size:13px">
+{{ f.label }}
+<sc-if value="{{ f.required }}" hint-placeholder-val="{{ true }}"><span style="font-size:11px;opacity:.7">required</span></sc-if>
+</div>
+</sc-for>
+</div>
+<div style="font-size:12px;color:#b3b3ad;margin-top:10px">Name and email always collected.</div>
+</div>
+</div>
+
+<div style="background:white;border:1px solid #eaeae7;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:22px">
+<div style="font-size:12px;color:#9c9c98;font-weight:600;letter-spacing:.02em;text-transform:uppercase">Survey details</div>
+<div>
+<div style="font-size:13px;color:#9c9c98;font-weight:500;margin-bottom:6px">Topic</div>
+<div style="font-size:15px;line-height:1.5;color:#2a2a27">Understand whether Parks and Rec departments are happy with their current software, to identify pain points and sell them on Rec.</div>
+</div>
+<div>
+<div style="font-size:13px;color:#9c9c98;font-weight:500;margin-bottom:6px">Target audience</div>
+<div style="font-size:14px;color:#2a2a27">Parks and Recreation &middot; Directors and Managers &middot; $1M+ revenue</div>
+</div>
+<div style="display:flex;gap:40px">
+<div>
+<div style="font-size:13px;color:#9c9c98;font-weight:500;margin-bottom:6px">Tone</div>
+<div style="font-size:14px;color:#2a2a27">Conversational</div>
+</div>
+<div>
+<div style="font-size:13px;color:#9c9c98;font-weight:500;margin-bottom:6px">Questions</div>
+<div style="font-size:14px;color:#2a2a27">6</div>
+</div>
+</div>
+</div>
+</div>
+
+<div style="margin-top:24px;background:white;border:1px solid #eaeae7;border-radius:12px;padding:24px 28px 28px">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+<h2 style="font-size:18px;font-weight:600;margin:0">Question guide</h2>
+<x-import component-from-global-scope="Birdsong.Button" variant="secondary" size="sm" hint-size="130px,32px">Spruce up with AI</x-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:24px;max-width:760px">
+<sc-for list="{{ questions }}" as="q" hint-placeholder-count="6">
+<div style="display:flex;gap:16px">
+<div style="flex:0 0 28px;height:28px;border-radius:8px;background:#f1f1ef;color:#71716b;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ q.num }}</div>
+<div style="font-size:15px;line-height:1.6;color:#2a2a27;padding-top:2px">{{ q.text }}</div>
+</div>
+</sc-for>
+</div>
+</div>
+
+</main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1400,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  renderVals() {
+    const respondentFields = [
+      { label: "Phone number", required: true },
+      { label: "Job title", required: true },
+      { label: "Company name", required: true },
+      { label: "LinkedIn URL", required: false }
+    ].map(f => ({ ...f, chipClass: f.required ? "chip-required" : "chip-optional" }));
+    const questions = [
+      "Map their current software stack (registration, facility booking, memberships, instructor scheduling) and how long they've been on it — legacy tenure is a strong fit signal, so probe when it was implemented and whether it's been upgraded since.",
+      "Ask what prompted them to look at (or avoid looking at) new software in the past two years.",
+      "Surface the top 2-3 daily frustrations with the current system, in their own words.",
+      "Understand who else is involved in a purchasing decision and what budget cycle it would fall under.",
+      "Gauge appetite for online registration and payment collection if not already in place.",
+      "Close by asking what a 'better' system would need to do on day one to be worth switching."
+    ].map((text, i) => ({ text, num: i + 1 }));
+    return { respondentFields, questions };
+  }
+}
+
+</script>
+</body>
+</html>

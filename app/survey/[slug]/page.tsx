@@ -32,7 +32,7 @@ export default async function PublicSurveyPage({
     .maybeSingle();
 
   return (
-    <div className="min-h-screen bg-page">
+    <div className="font-archivo min-h-screen bg-page">
       <InterviewFlow survey={survey} logoUrl={profile?.logo_url ?? null} />
     </div>
   );

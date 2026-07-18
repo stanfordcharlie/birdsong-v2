@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
-import { buildInterviewSystemPrompt, KICKOFF_MESSAGE } from "@/lib/interview/prompt";
+import { buildInterviewSystemPrompt, buildKickoffMessage } from "@/lib/interview-prompt";
+import { parseChips } from "@/lib/interview/chips";
 import type { InterviewMessage } from "@/lib/interview/types";
 import type { Json } from "@/types/database";
 
@@ -50,40 +51,50 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Survey not found" }, { status: 404 });
   }
 
-  // Survey owner's company profile (what they sell, value prop), used to
-  // keep the interview anchored to the company's actual product surface
-  // area instead of drifting wherever the respondent's last answer leads.
+  // Survey owner's company profile (what they sell, target ICP, value
+  // prop), used to keep the interview anchored to the company's actual
+  // product surface area instead of drifting wherever the respondent's
+  // last answer leads.
   const { data: profile } = await supabase
     .from("profiles")
     .select("what_we_sell, target_icp, value_prop")
     .eq("user_id", survey.user_id)
     .maybeSingle();
 
+  const respondent = {
+    name: respondent_name ?? null,
+    customFieldValues: custom_field_values ?? {},
+  };
+
   const anthropic = getAnthropicClient();
-  const systemPrompt = buildInterviewSystemPrompt(
+  const systemPrompt = buildInterviewSystemPrompt({
     survey,
-    1,
-    profile
+    companyProfile: profile
       ? { whatWeSell: profile.what_we_sell, targetIcp: profile.target_icp, valueProp: profile.value_prop }
-      : null
-  );
+      : null,
+    respondent,
+    exchangeCount: 1,
+    totalMessageCount: 1,
+  });
 
   const completion = await anthropic.messages.create({
     model: INTERVIEW_MODEL,
     max_tokens: 512,
     system: systemPrompt,
-    messages: [{ role: "user", content: KICKOFF_MESSAGE }],
+    messages: [{ role: "user", content: buildKickoffMessage(respondent) }],
   });
 
-  const openingQuestion = completion.content
+  const rawOpeningQuestion = completion.content
     .filter((block): block is Anthropic.TextBlock => block.type === "text")
     .map((block) => block.text)
     .join("")
     .trim();
 
-  if (!openingQuestion) {
+  if (!rawOpeningQuestion) {
     return NextResponse.json({ error: "Failed to generate opening question" }, { status: 502 });
   }
+
+  const { text: openingQuestion, chips } = parseChips(rawOpeningQuestion);
 
   const messages: InterviewMessage[] = [{ role: "assistant", content: openingQuestion }];
 
@@ -110,5 +121,6 @@ export async function POST(request: Request) {
   return NextResponse.json({
     response_id: response.id,
     message: openingQuestion,
+    chips,
   });
 }

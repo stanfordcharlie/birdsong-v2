@@ -1,21 +1,27 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-// The home page itself has no data fetching (only the shared layout above
-// it does, for the signed-in user), so this mostly guards a future data
-// dependency here rather than the layout's own fetch, which this segment's
-// boundary sits below and can't cover.
 export default function AdminHomeLoading() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-10">
-      <div className="flex w-full max-w-lg flex-col items-center gap-2">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-4 w-40" />
+    <div className="-m-8 flex min-h-screen">
+      <div className="flex w-[42%] min-w-[380px] flex-col justify-between bg-sidebar px-14 py-12">
+        <div className="flex flex-col gap-5">
+          <Skeleton className="h-3 w-40 bg-white/10" />
+          <Skeleton className="h-16 w-full bg-white/10" />
+        </div>
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-3 w-48 bg-white/10" />
+          <Skeleton className="h-10 w-full bg-white/10" />
+          <Skeleton className="h-10 w-full bg-white/10" />
+        </div>
       </div>
 
-      <div className="grid w-full max-w-lg grid-cols-1 gap-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-[72px] w-full rounded-2xl" />
-        ))}
+      <div className="flex flex-1 flex-col justify-center bg-page px-[72px] py-16">
+        <Skeleton className="mb-6 h-3 w-32" />
+        <div className="flex flex-col gap-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-[102px] w-full rounded-card" />
+          ))}
+        </div>
       </div>
     </div>
   );

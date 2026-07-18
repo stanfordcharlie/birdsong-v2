@@ -1,7 +1,6 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  darkMode: "class",
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -38,6 +37,7 @@ const config: Config = {
           DEFAULT: "hsl(var(--ds-muted) / <alpha-value>)",
           foreground: "hsl(var(--ds-muted-foreground) / <alpha-value>)",
         },
+        faint: "hsl(var(--ds-faint) / <alpha-value>)",
         accent: {
           DEFAULT: "hsl(var(--ds-accent) / <alpha-value>)",
           foreground: "hsl(var(--ds-accent-foreground) / <alpha-value>)",
@@ -49,6 +49,7 @@ const config: Config = {
         success: {
           DEFAULT: "hsl(var(--ds-success) / <alpha-value>)",
           foreground: "hsl(var(--ds-success-foreground) / <alpha-value>)",
+          bg: "hsl(var(--ds-success-bg) / <alpha-value>)",
         },
         warning: {
           DEFAULT: "hsl(var(--ds-warning) / <alpha-value>)",
@@ -57,6 +58,12 @@ const config: Config = {
         border: "hsl(var(--ds-border) / <alpha-value>)",
         input: "hsl(var(--ds-input) / <alpha-value>)",
         ring: "hsl(var(--ds-ring) / <alpha-value>)",
+        chip: "hsl(var(--ds-chip) / <alpha-value>)",
+        indigo: {
+          DEFAULT: "hsl(var(--ds-indigo) / <alpha-value>)",
+          light: "hsl(var(--ds-indigo-light) / <alpha-value>)",
+          chip: "hsl(var(--ds-indigo-chip) / <alpha-value>)",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--ds-sidebar) / <alpha-value>)",
           foreground: "hsl(var(--ds-sidebar-foreground) / <alpha-value>)",
@@ -71,7 +78,17 @@ const config: Config = {
         control: "var(--ds-radius-control)",
       },
       fontFamily: {
+        // Global body default. Marketing pages (out of scope for the
+        // platform redesign) still render in Inter via this — the admin +
+        // respondent surfaces override it explicitly with font-archivo at
+        // their layout root instead of redefining the shared default.
         sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],
+        newsreader: ["var(--font-newsreader)", "Georgia", "serif"],
+        // Platform design system (see design_handoff_birdsong_platform):
+        // Archivo for UI text, Young Serif for display headings/big
+        // numbers/wordmark only.
+        archivo: ["var(--font-archivo)", "ui-sans-serif", "system-ui", "sans-serif"],
+        serif: ["var(--font-young-serif)", "Georgia", "serif"],
       },
     },
   },
