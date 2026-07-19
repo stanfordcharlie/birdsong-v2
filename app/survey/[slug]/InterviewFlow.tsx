@@ -200,6 +200,32 @@ function CheckIcon({ className }: { className?: string }) {
   );
 }
 
+// Invalid-state counterpart to CheckIcon (email only): shown once the
+// respondent has left the field (or tried to submit) with a value that
+// doesn't parse as an email, and swaps to the check the moment it does.
+// Not shown while they're still mid-typing a fresh address — flashing red
+// at "cha…" would just be noise.
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={cn("motion-reduce:animate-none", className)}
+      style={{ animation: "pop 0.25s ease both" }}
+    >
+      <path
+        d="M6.5 6.5l11 11M17.5 6.5l-11 11"
+        stroke="#b3432b"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function InterviewFlow({
   survey,
   logoUrl,
@@ -222,6 +248,9 @@ export function InterviewFlow({
   const [stage, setStage] = useState<Stage>("intro");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  // Whether the email field has been blurred (or a submit attempted) —
+  // gates the invalid-email X so it never flashes mid-typing.
+  const [emailTouched, setEmailTouched] = useState(false);
   const [phone, setPhone] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [company, setCompany] = useState("");
@@ -376,6 +405,13 @@ export function InterviewFlow({
     const missing = firstMissingRequiredField();
     if (missing) {
       setError(`Please fill in ${missing}.`);
+      return;
+    }
+    // Same shape check the live tick uses — catches it client-side instead
+    // of waiting for the start route to reject the address.
+    if (!EMAIL_LIVE_CHECK_PATTERN.test(email.trim())) {
+      setEmailTouched(true);
+      setError("That doesn't look like a valid email address.");
       return;
     }
     setError(null);
@@ -586,6 +622,7 @@ export function InterviewFlow({
   if (stage === "intro") {
     const nameOk = name.trim().length > 1;
     const emailOk = EMAIL_LIVE_CHECK_PATTERN.test(email.trim());
+    const emailShowsX = !emailOk && emailTouched && email.trim().length > 0;
 
     let fieldCount = 0;
     const nameIdx = fieldCount++;
@@ -684,12 +721,19 @@ export function InterviewFlow({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  onBlur={() => setEmailTouched(true)}
                   onKeyDown={(e) => onFieldKeyDown(e, emailIdx)}
                   placeholder="you@example.com"
                   disabled={loading}
-                  className={cn(FIELD_INPUT_BASE, "pl-4 pr-11")}
+                  aria-invalid={emailShowsX}
+                  className={cn(
+                    FIELD_INPUT_BASE,
+                    "pl-4 pr-11",
+                    emailShowsX && "border-[#b3432b] focus:border-[#b3432b]"
+                  )}
                 />
                 {emailOk && <CheckIcon className="absolute bottom-4 right-[15px]" />}
+                {emailShowsX && <XIcon className="absolute bottom-4 right-[15px]" />}
               </div>
 
               {hasPhone && (
