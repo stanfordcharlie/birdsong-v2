@@ -116,14 +116,16 @@ export function AdminSidebar({
       )}
     >
       {/* overflow-hidden lives here, not on <aside> itself — narrow enough
-          to clip the wordmark/labels cleanly during the width transition,
-          but not so broad that it also clips the account menu below, which
-          needs to overflow past the rail's edge to be readable. Horizontal
-          padding is a constant 12px (px-3) on every row here and in the
-          account chip below, rather than on the outer <aside> — the
-          previous version put 28px on <aside> *and* 12px on each nav item,
-          and at 196px wide that compounded enough to clip "Company
-          profile"'s label. */}
+          to clip the wordmark cleanly during the width transition, but not
+          so broad that it also clips the account menu below (or, now, the
+          collapsed nav tooltips), both of which need to overflow past the
+          rail's edge to be readable. Horizontal padding is a constant 12px
+          (px-3) on every row here and in the account chip below, rather
+          than on the outer <aside> — the previous version put 28px on
+          <aside> *and* 12px on each nav item, and at 196px wide that
+          compounded enough to clip "Company profile"'s label. Nav itself
+          moved below, out of this wrapper, for the same overflow-escaping
+          reason as the account menu. */}
       <div className="overflow-hidden">
         <div className={cn("mb-12 flex items-center px-3", collapsed ? "justify-center" : "gap-2.5")}>
           <button
@@ -140,37 +142,49 @@ export function AdminSidebar({
             </Link>
           )}
         </div>
-
-        <nav className={cn("flex flex-col gap-1", !collapsed && "px-2")}>
-          {NAV_ITEMS.map((item) => {
-            // "/admin" is a prefix of every other admin route, so it needs an
-            // exact-match carve-out to avoid lighting up alongside whichever
-            // other item actually matches the current page.
-            const isActive =
-              item.href === "/admin"
-                ? pathname === "/admin"
-                : pathname === item.href || pathname.startsWith(`${item.href}/`);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={item.label}
-                className={cn(
-                  "flex items-center whitespace-nowrap rounded-control text-[13px] transition-colors",
-                  collapsed ? "mx-auto h-10 w-10 justify-center" : "gap-2 px-2.5 py-[9px]",
-                  isActive
-                    ? "bg-sidebar-accent font-semibold text-sidebar-active-foreground"
-                    : "font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent/[0.06] hover:text-sidebar-foreground"
-                )}
-              >
-                <Icon />
-                {!collapsed && <span>{item.label}</span>}
-              </Link>
-            );
-          })}
-        </nav>
       </div>
+
+      <nav className={cn("flex flex-col gap-1", !collapsed && "px-2")}>
+        {NAV_ITEMS.map((item) => {
+          // "/admin" is a prefix of every other admin route, so it needs an
+          // exact-match carve-out to avoid lighting up alongside whichever
+          // other item actually matches the current page.
+          const isActive =
+            item.href === "/admin"
+              ? pathname === "/admin"
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              title={item.label}
+              className={cn(
+                "group/tooltip relative flex items-center whitespace-nowrap rounded-control text-[13px] transition-colors",
+                collapsed ? "mx-auto h-10 w-10 justify-center" : "gap-2 px-2.5 py-[9px]",
+                isActive
+                  ? "bg-sidebar-accent font-semibold text-sidebar-active-foreground"
+                  : "font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent/[0.06] hover:text-sidebar-foreground"
+              )}
+            >
+              <Icon />
+              {!collapsed && <span>{item.label}</span>}
+              {/* Collapsed-only hover/focus preview of what the icon is —
+                  expanded already shows the label inline, so this would be
+                  redundant (and mispositioned) there. Same visual language
+                  as the account menu below: sidebar surface, subtle border,
+                  shadow. z-50 + the nav-outside-overflow-hidden move above
+                  are both required for this to actually render past the
+                  rail's edge instead of getting clipped. */}
+              {collapsed && (
+                <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-control border border-sidebar-border/[0.12] bg-sidebar px-2.5 py-1.5 text-xs font-medium text-sidebar-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover/tooltip:opacity-100 group-focus-visible/tooltip:opacity-100">
+                  {item.label}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </nav>
 
       {/* Bottom: account chip. Hovering it reveals a small menu with
           Settings and Sign out, flush against the chip (no margin gap) so

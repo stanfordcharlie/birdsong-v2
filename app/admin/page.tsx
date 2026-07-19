@@ -5,6 +5,7 @@ import { formatRelativeTime } from "@/lib/format-relative-time";
 import { userFirstName } from "@/lib/user-name";
 import { cn } from "@/lib/utils";
 import { GreetingBlock } from "./GreetingBlock";
+import { AddSampleDataButton } from "@/components/SampleDataControls";
 
 function ActivityText({ event }: { event: ActivityEvent }) {
   if (event.type === "new_responses") {
@@ -49,9 +50,10 @@ export default async function AdminHomePage() {
 
   if (!user) return null;
 
-  const [{ data: profile }, events] = await Promise.all([
+  const [{ data: profile }, events, { count: surveyCount }] = await Promise.all([
     supabase.from("profiles").select("contact_name").eq("user_id", user.id).maybeSingle(),
     getRecentActivity(supabase, user.id),
+    supabase.from("surveys").select("id", { count: "exact", head: true }).eq("user_id", user.id),
   ]);
 
   const firstName = userFirstName(user, profile?.contact_name);
@@ -77,7 +79,21 @@ export default async function AdminHomePage() {
             What&apos;s been happening
           </div>
 
-          {events.length === 0 ? (
+          {(surveyCount ?? 0) === 0 ? (
+            <div className="flex flex-col gap-3.5">
+              <p className="text-sm text-sidebar-foreground/60">
+                No surveys yet. Once you create one and share its link, completed interviews and
+                qualified leads show up here.
+              </p>
+              <Link
+                href="/admin/surveys/new"
+                className="text-sm font-semibold text-indigo-light transition-colors hover:text-indigo-light/80"
+              >
+                Create your first survey
+              </Link>
+              <AddSampleDataButton className="self-start text-sm font-medium text-sidebar-foreground/60 underline underline-offset-2 transition-colors hover:text-sidebar-foreground disabled:opacity-50" />
+            </div>
+          ) : events.length === 0 ? (
             <p className="text-sm text-sidebar-foreground/60">
               No activity yet — it&apos;ll show up here once responses start coming in.
             </p>

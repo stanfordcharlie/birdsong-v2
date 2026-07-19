@@ -16,9 +16,32 @@ type ResponseRow = Database["public"]["Tables"]["responses"]["Row"];
 // Each row links to the full response detail page (call script, status,
 // summary, transcript) rather than expanding inline, since that page now
 // shows far more than a table row reasonably could.
-export function ResponsesTable({ responses }: { responses: ResponseRow[] }) {
+export function ResponsesTable({
+  responses,
+  previewHref,
+}: {
+  responses: ResponseRow[];
+  previewHref?: string;
+}) {
   if (responses.length === 0) {
-    return <p className="text-sm text-muted-foreground">No responses yet.</p>;
+    return (
+      <Card className="flex flex-col items-start gap-3 p-6">
+        <p className="text-sm text-muted-foreground">
+          No responses yet. Interviews land here as respondents finish, each one scored with a call
+          script ready — use Share link above to send your survey out.
+        </p>
+        {previewHref && (
+          <a
+            href={previewHref}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm font-semibold text-indigo transition-colors hover:text-indigo/80"
+          >
+            Preview the interview yourself
+          </a>
+        )}
+      </Card>
+    );
   }
 
   return (

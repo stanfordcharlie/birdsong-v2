@@ -89,6 +89,8 @@ const config: Config = {
         // numbers/wordmark only.
         archivo: ["var(--font-archivo)", "ui-sans-serif", "system-ui", "sans-serif"],
         serif: ["var(--font-young-serif)", "Georgia", "serif"],
+        // Survey respondent flow only (design_handoff_survey_respondent).
+        spectral: ["var(--font-spectral)", "Georgia", "serif"],
       },
     },
   },

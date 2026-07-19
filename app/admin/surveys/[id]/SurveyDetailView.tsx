@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { SurveyForm, type SurveyFormValues } from "@/components/SurveyForm";
+import { ReportSection, type SurveyReportRow } from "./ReportSection";
 import { cn } from "@/lib/utils";
 
 export type RespondentChip = {
@@ -74,12 +75,16 @@ export function SurveyDetailView({
   qualifiedCount,
   completionRate,
   initialValues,
+  latestReport,
+  completedInterviewCount,
 }: {
   survey: SurveyDetailData;
   responseCount: number;
   qualifiedCount: number;
   completionRate: number | null;
   initialValues: SurveyFormValues;
+  latestReport: SurveyReportRow | null;
+  completedInterviewCount: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -160,10 +165,17 @@ export function SurveyDetailView({
         )}
       </div>
 
-      <div className="bs-rise-2 grid grid-cols-3 gap-4 border-t border-border py-7">
-        <StatBlock value={responseCount} label="Responses" />
-        <StatBlock value={qualifiedCount} label="Qualified leads" />
-        <StatBlock value={completionRate !== null ? `${completionRate}%` : "—"} label="Completion rate" />
+      <div className="bs-rise-2 border-t border-border py-7">
+        <div className="grid grid-cols-3 gap-4">
+          <StatBlock value={responseCount} label="Responses" />
+          <StatBlock value={qualifiedCount} label="Qualified leads" />
+          <StatBlock value={completionRate !== null ? `${completionRate}%` : "—"} label="Completion rate" />
+        </div>
+        {responseCount === 0 && (
+          <p className="mt-4 text-[13px] text-faint">
+            Stats fill in as interviews complete — share your link to get the first ones in.
+          </p>
+        )}
       </div>
 
       <div className="bs-rise-3 border-t border-border py-8">
@@ -228,6 +240,12 @@ export function SurveyDetailView({
           </a>
         </div>
       </div>
+
+      <ReportSection
+        surveyId={survey.id}
+        initialReport={latestReport}
+        completedInterviewCount={completedInterviewCount}
+      />
 
       {survey.respondentChips.length > 0 && (
         <div className="bs-rise-6 border-t border-border py-8">

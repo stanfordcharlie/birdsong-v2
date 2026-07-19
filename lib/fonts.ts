@@ -1,4 +1,4 @@
-import { Archivo, Inter, Newsreader, Young_Serif } from "next/font/google";
+import { Archivo, Inter, Newsreader, Spectral, Young_Serif } from "next/font/google";
 
 // Marketing pages only (app/landing-page*) — the platform redesign
 // (design_handoff_birdsong_platform) covers admin + the respondent survey,
@@ -36,5 +36,15 @@ export const archivo = Archivo({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-archivo",
+  display: "swap",
+});
+
+// Display serif for the respondent survey flow's editorial redesign only
+// (design_handoff_survey_respondent) — not part of the admin/respondent
+// Young Serif system above, and not applied anywhere else.
+export const spectral = Spectral({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-spectral",
   display: "swap",
 });

@@ -235,4 +235,55 @@ select {
   .bs-rise-repeat {
     animation: bs-rise 0.5s ease-out both;
   }
+
+  /* Survey respondent intro (design_handoff_survey_respondent) — its own
+     shorter rise distance (10px vs bs-rise's 16px) and tighter stagger
+     timing per the handoff, so kept as its own keyframe/classes rather
+     than reusing bs-rise-1..6 (whose delays belong to the admin home
+     page's different layout). */
+  .survey-intro-rise-1 {
+    animation: bs-rise-10 0.5s ease both 0.05s;
+  }
+  .survey-intro-rise-2 {
+    animation: bs-rise-10 0.5s ease both 0.12s;
+  }
+  .survey-intro-rise-3 {
+    animation: bs-rise-10 0.5s ease both 0.18s;
+  }
+  .survey-intro-rise-4 {
+    animation: bs-rise-10 0.5s ease both 0.26s;
+  }
+  .survey-intro-rise-5 {
+    animation: bs-rise-10 0.5s ease both 0.34s;
+  }
+  .survey-intro-rise-6 {
+    animation: bs-rise-10 0.5s ease both 0.42s;
+  }
+}
+
+@keyframes bs-rise-10 {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Survey respondent intro's live validation checkmarks (name/email) —
+   pop in via scale, cancelled outright under reduced motion by the
+   motion-reduce:animate-none utility at each call site rather than a
+   settled-by-default class, since the icon's mere presence (not its
+   entrance) carries the actual validity signal. */
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

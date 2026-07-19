@@ -3,6 +3,7 @@ import { SignOutButton } from "@/components/SignOutButton";
 import { ChangeEmailForm } from "./ChangeEmailForm";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { AddSampleDataButton, RemoveSampleDataButton } from "@/components/SampleDataControls";
 
 export default async function SettingsPage() {
   const user = await getCurrentUser();
@@ -43,6 +44,22 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent className="p-0">
             <ChangePasswordForm />
+          </CardContent>
+        </Card>
+
+        <Card className="p-6">
+          <CardHeader className="p-0 pb-4">
+            <h2 className="font-serif text-xl font-normal text-card-foreground">Sample data</h2>
+          </CardHeader>
+          <CardContent className="flex flex-col items-start gap-3 p-0">
+            <p className="text-sm text-muted-foreground">
+              Explore Birdsong with a demo survey and eight realistic test responses. Sample data
+              never counts as real leads, never emails you, and removes cleanly.
+            </p>
+            <div className="flex items-center gap-3">
+              <AddSampleDataButton className="rounded-control border border-border bg-card px-4 py-2 text-sm font-medium text-card-foreground transition-colors hover:bg-secondary disabled:opacity-50" />
+              <RemoveSampleDataButton className="rounded-control border border-border bg-card px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-secondary disabled:opacity-50" />
+            </div>
           </CardContent>
         </Card>
       </div>

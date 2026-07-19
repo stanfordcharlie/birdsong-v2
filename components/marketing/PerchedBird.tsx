@@ -1,9 +1,43 @@
-export function PerchedBird() {
+import { cn } from "@/lib/utils";
+
+type PerchedBirdNote = {
+  glyph: string;
+  top: string;
+  left: string;
+  fontSize: string;
+  delaySeconds: number;
+};
+
+// Existing marketing placement (ProductDemo's hero mockup): unchanged from
+// before this component grew props, so that call site stays pixel-identical.
+const DEFAULT_WRAPPER_CLASSNAME = "absolute -top-[34px] left-[72px] z-[2]";
+const DEFAULT_NOTES: PerchedBirdNote[] = [
+  { glyph: "♪", top: "-6px", left: "34px", fontSize: "15px", delaySeconds: 0 },
+  { glyph: "♫", top: "2px", left: "42px", fontSize: "12px", delaySeconds: 1.1 },
+  { glyph: "♪", top: "-10px", left: "48px", fontSize: "13px", delaySeconds: 2.2 },
+];
+
+// Reused (not redrawn) for the survey respondent intro's perched-on-the-form
+// placement (design_handoff_survey_respondent) — same bird SVG and
+// headBob/noteFloat keyframes, different size/position/notes for that
+// context. Every prop defaults to the original marketing configuration, so
+// existing zero-prop callers are unaffected.
+export function PerchedBird({
+  className = DEFAULT_WRAPPER_CLASSNAME,
+  width = 40,
+  height = 38,
+  notes = DEFAULT_NOTES,
+}: {
+  className?: string;
+  width?: number;
+  height?: number;
+  notes?: PerchedBirdNote[];
+} = {}) {
   return (
-    <div className="absolute -top-[34px] left-[72px] z-[2]">
+    <div className={cn(className)}>
       <svg
-        width="40"
-        height="38"
+        width={width}
+        height={height}
         viewBox="0 0 40 38"
         fill="none"
         aria-hidden="true"
@@ -17,27 +51,21 @@ export function PerchedBird() {
         <circle cx="24.7" cy="15.9" r="1.2" fill="#F5EFE3" />
         <path d="M27 14.5l4.5-1.2" stroke="#33684B" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
-      <span
-        aria-hidden="true"
-        className="absolute -top-1.5 left-[34px] font-newsreader text-[15px] text-[#33684B] motion-reduce:![animation:none]"
-        style={{ animation: "noteFloat 3.2s ease-out infinite" }}
-      >
-        ♪
-      </span>
-      <span
-        aria-hidden="true"
-        className="absolute top-0.5 left-[42px] font-newsreader text-xs text-[#33684B] motion-reduce:![animation:none]"
-        style={{ animation: "noteFloat 3.2s ease-out 1.1s infinite" }}
-      >
-        ♫
-      </span>
-      <span
-        aria-hidden="true"
-        className="absolute -top-2.5 left-12 font-newsreader text-[13px] text-[#33684B] motion-reduce:![animation:none]"
-        style={{ animation: "noteFloat 3.2s ease-out 2.2s infinite" }}
-      >
-        ♪
-      </span>
+      {notes.map((note, i) => (
+        <span
+          key={i}
+          aria-hidden="true"
+          className="absolute font-newsreader text-[#33684B] motion-reduce:![animation:none]"
+          style={{
+            top: note.top,
+            left: note.left,
+            fontSize: note.fontSize,
+            animation: `noteFloat 3.2s ease-out ${note.delaySeconds}s infinite`,
+          }}
+        >
+          {note.glyph}
+        </span>
+      ))}
     </div>
   );
 }

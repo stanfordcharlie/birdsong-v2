@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ResponsesTable } from "./ResponsesTable";
 import { SurveyDetailView, type RespondentChip } from "./SurveyDetailView";
+import { type SurveyReportRow } from "./ReportSection";
 import { type SurveyFormValues } from "@/components/SurveyForm";
 import {
   parseCustomRespondentFieldDefs,
@@ -21,9 +22,16 @@ export default async function SurveyDetailPage({
   // Neither query depends on the other's result (responses is filtered by
   // the route param, not by anything read off the survey row), so they run
   // concurrently instead of the survey fetch blocking the responses fetch.
-  const [{ data: survey }, { data: responses }] = await Promise.all([
+  const [{ data: survey }, { data: responses }, { data: latestReport }] = await Promise.all([
     supabase.from("surveys").select("*").eq("id", id).maybeSingle(),
     supabase.from("responses").select("*").eq("survey_id", id).order("created_at", { ascending: false }),
+    supabase
+      .from("survey_reports")
+      .select("*")
+      .eq("survey_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   if (!survey) {
@@ -72,8 +80,10 @@ export default async function SurveyDetailPage({
   ];
 
   // Owner test runs are excluded from the stats and the table both — they
-  // remain reachable via their direct /admin/responses/[id] links.
-  const responseList = (responses ?? []).filter((r) => !r.is_test);
+  // remain reachable via their direct /admin/responses/[id] links. The
+  // seeded sample survey is the exception: its rows are all is_test by
+  // design, and hiding them would make the demo look dead.
+  const responseList = (responses ?? []).filter((r) => survey.is_sample || !r.is_test);
   const qualifiedCount = responseList.filter((r) => r.status === "qualified").length;
   const completionRate =
     responseList.length > 0
@@ -102,9 +112,20 @@ export default async function SurveyDetailPage({
         qualifiedCount={qualifiedCount}
         completionRate={completionRate}
         initialValues={initialValues}
+        latestReport={
+          latestReport
+            ? {
+                id: latestReport.id,
+                content: latestReport.content as unknown as SurveyReportRow["content"],
+                respondent_count: latestReport.respondent_count,
+                created_at: latestReport.created_at,
+              }
+            : null
+        }
+        completedInterviewCount={responseList.filter((r) => r.completed).length}
       />
 
-      <ResponsesTable responses={responseList} />
+      <ResponsesTable responses={responseList} previewHref={`/survey/${survey.slug}?test=1`} />
     </div>
   );
 }

@@ -8,22 +8,59 @@ import {
   parseEnabledRespondentFields,
   parsePresetFieldLabel,
   parsePresetFieldRequired,
-  type OptionalRespondentField,
 } from "@/lib/surveys/respondent-fields";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { PerchedBird } from "@/components/marketing/PerchedBird";
 import { renderWithBold } from "@/lib/chat/render-with-bold";
+import { spectral, newsreader } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
+
+// Design reference: design_handoff_survey_respondent/. Editorial palette
+// (matches the marketing pages), deliberately not the admin/shadcn stone
+// tokens (bg-primary, border-input, etc. resolve to different hex values
+// than this design calls for) — so this file uses raw elements with the
+// handoff's exact hex values throughout, the same approach the marketing
+// components already take for their own distinct palette.
 
 type Survey = Database["public"]["Tables"]["surveys"]["Row"];
 type Stage = "intro" | "chat" | "complete";
 
+const PAGE_BACKGROUND_STYLE: React.CSSProperties = {
+  background: "radial-gradient(130% 90% at 50% -8%, rgba(233,166,116,.22), transparent 58%), #f3ecdf",
+};
+
 const ASSISTANT_BUBBLE =
-  "max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-chip px-4 py-2.5 text-sm leading-relaxed text-card-foreground";
+  "max-w-[80%] whitespace-pre-wrap break-words rounded-2xl border border-[#e7ddc9] bg-[#fffdf7] px-4 py-2.5 text-sm leading-relaxed text-[#262019]";
 const RESPONDENT_BUBBLE =
-  "self-end max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground";
+  "self-end max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-[#241f18] px-4 py-2.5 text-sm leading-relaxed text-[#f3ecdf]";
+
+const FIELD_LABEL_CLASSES = "text-[13px] font-semibold text-[#6f6757]";
+const FIELD_INPUT_BASE =
+  "w-full min-w-0 rounded-xl border border-[#e7ddc9] bg-[#fffdf7] py-[14px] text-base text-[#262019] placeholder:text-[#a89d88] focus:border-[#6f6757] focus:outline-none focus:ring-[3px] focus:ring-[rgba(38,32,25,.07)] disabled:cursor-not-allowed disabled:opacity-60";
+
+// Same bird, different perch: 48x46 (vs the marketing default 40x38) and
+// its own two-note arrangement, per the handoff.
+const INTRO_BIRD_NOTES = [
+  { glyph: "♪", top: "-7px", left: "41px", fontSize: "18px", delaySeconds: 0 },
+  { glyph: "♫", top: "2px", left: "50px", fontSize: "14px", delaySeconds: 1.1 },
+];
+
+// Ship chip auto-submit behind a flag per the handoff ("fallback is today's
+// prefill-the-composer behavior") — flip to false to fall back.
+const INSTANT_CHIP_SUBMIT = true;
+const CHIP_AUTO_SUBMIT_DELAY_MS = 260;
+
+// No skip sentinel exists in the interview prompt/model (out of scope to
+// add one here), so Skip sends a plain, natural-reading reply the
+// interviewer's existing evasive-answer handling can react to normally.
+const SKIP_MESSAGE_CONTENT = "I'd rather not answer that one.";
+
+// Estimated-minutes heuristic for the intro's meta line, since there's no
+// explicit time-estimate column on surveys. Named constant so it's a
+// one-line tune, not a buried magic number.
+const MINUTES_PER_QUESTION = 1.5;
+
+const EMAIL_LIVE_CHECK_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function wait(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -41,12 +78,12 @@ const TYPING_PAUSE_MS = 10000;
 
 function TypingDots() {
   // Purely decorative — the hidden status live region in the chat stage is
-  // what tells screen reader users Wren is typing.
+  // what tells screen reader users the interviewer is typing.
   return (
     <div aria-hidden="true" className="flex items-center gap-1.5 py-2">
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-faint [animation-delay:-0.3s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-faint [animation-delay:-0.15s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-faint" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#a89d88] [animation-delay:-0.3s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#a89d88] [animation-delay:-0.15s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#a89d88]" />
     </div>
   );
 }
@@ -67,12 +104,10 @@ function computeProgressPercent(answered: number, target: number): number {
 
 function TopProgressLine({ answered, target }: { answered: number; target: number }) {
   const percent = computeProgressPercent(answered, target);
-  // aria-hidden: decorative reinforcement of the "Question N" header text,
-  // which is what actually conveys position to screen reader users.
   return (
-    <div aria-hidden="true" className="fixed inset-x-0 top-0 z-30 h-[3px] bg-chip">
+    <div aria-hidden="true" className="fixed inset-x-0 top-0 z-30 h-1 bg-[rgba(38,32,25,.08)]">
       <div
-        className="h-full bg-primary transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+        className="h-full rounded-r-sm bg-[#3a6046] transition-[width] duration-[450ms] ease-[cubic-bezier(.4,0,.2,1)]"
         style={{ width: `${percent}%` }}
       />
     </div>
@@ -87,26 +122,55 @@ function completionStorageKey(surveyId: string) {
   return `birdsong-survey-complete:${surveyId}`;
 }
 
-function BirdGlyph() {
+function TestModeBadge({ isTest }: { isTest: boolean }) {
+  if (!isTest) return null;
   return (
-    <svg width="22" height="22" viewBox="0 0 26 26" fill="none" aria-hidden="true">
-      <path
-        d="M4 17 C4 9, 10 5, 17 5 C17 5, 16 8, 14 9.5 C18 9.5, 21 8, 21 8 C20 15, 14 19, 8 19 L5 22"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="15.5" cy="7.5" r="0.9" fill="currentColor" />
+    <div className="fixed right-4 top-4 z-20">
+      <Badge variant="warning">Test mode</Badge>
+    </div>
+  );
+}
+
+function ArrowIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2.5 8h11M9 3.5L13.5 8 9 12.5" />
     </svg>
   );
 }
 
-function ArrowIcon() {
+// Live name/email validation tick (intro only): pops in via the `pop`
+// keyframe (globals.css). motion-reduce:animate-none, not a settled-state
+// class, since the icon's presence (not its entrance) carries the actual
+// validity signal — reduced-motion users still see it, just without the pop.
+function CheckIcon({ className }: { className?: string }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="5" y1="12" x2="19" y2="12" />
-      <polyline points="12 5 19 12 12 19" />
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={cn("motion-reduce:animate-none", className)}
+      style={{ animation: "pop 0.25s ease both" }}
+    >
+      <path
+        d="M5 12.5l4.5 4.5L19 7.5"
+        stroke="#3a6046"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -125,13 +189,11 @@ export function InterviewFlow({
 }) {
   const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
   const customFieldDefs = parseCustomRespondentFieldDefs(survey.custom_fields);
-  // Placeholder text is the only visible label these fields have, so a
-  // required one gets a trailing " *" appended to it as the sole visual
-  // cue, matching the asterisk convention used elsewhere in the admin UI.
-  function fieldPlaceholder(key: OptionalRespondentField): string {
-    const label = parsePresetFieldLabel(survey.custom_fields, key);
-    return parsePresetFieldRequired(survey.custom_fields, key) ? `${label} *` : label;
-  }
+  const hasPhone = enabledFields.includes("phone");
+  const hasJobTitle = enabledFields.includes("job_title");
+  const hasCompany = enabledFields.includes("company");
+  const hasLinkedin = enabledFields.includes("linkedin");
+
   const [stage, setStage] = useState<Stage>("intro");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -153,6 +215,8 @@ export function InterviewFlow({
   const [isTyping, setIsTyping] = useState(false);
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [chips, setChips] = useState<string[]>([]);
+  // Which chip (if any) is currently highlighted/pending auto-submit.
+  const [pickedChipIndex, setPickedChipIndex] = useState<number | null>(null);
   // Content of the most recent user message that failed to send, or null if
   // nothing's failed / it's since been resolved. The message itself stays in
   // `messages` (it was already appended optimistically) — this only tracks
@@ -164,11 +228,20 @@ export function InterviewFlow({
   const isMountedRef = useRef(true);
   // Epoch 0 so a fresh page load with no typing yet never waits.
   const lastKeystrokeAtRef = useRef(0);
+  // Intro fields in render order, populated via setFieldRef(idx) below, so
+  // Enter-to-advance can focus "whichever field is next" without hardcoding
+  // which optional fields this particular survey has enabled.
+  const fieldRefs = useRef<Array<HTMLInputElement | null>>([]);
+  // Pending chip auto-submit timer, so a second chip tap, manual typing, or
+  // an explicit send/skip can all cancel a still-pending one and avoid a
+  // double-send.
+  const chipSubmitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      if (chipSubmitTimeoutRef.current) clearTimeout(chipSubmitTimeoutRef.current);
     };
   }, []);
 
@@ -210,6 +283,13 @@ export function InterviewFlow({
     }
   }
 
+  function clearPendingChipSubmit() {
+    if (chipSubmitTimeoutRef.current) {
+      clearTimeout(chipSubmitTimeoutRef.current);
+      chipSubmitTimeoutRef.current = null;
+    }
+  }
+
   // The typing indicator is already showing by the time this runs (callers
   // turn it on immediately when they send, before the fetch that produces
   // `content` even resolves) — this just holds it up if the respondent is
@@ -238,8 +318,35 @@ export function InterviewFlow({
     setChips(nextChips);
   }
 
-  async function handleStart(e: FormEvent) {
-    e.preventDefault();
+  function firstMissingRequiredField(): string | null {
+    if (!name.trim()) return "your name";
+    if (!email.trim()) return "your email";
+    if (hasPhone && parsePresetFieldRequired(survey.custom_fields, "phone") && !phone.trim()) {
+      return parsePresetFieldLabel(survey.custom_fields, "phone");
+    }
+    if (hasJobTitle && parsePresetFieldRequired(survey.custom_fields, "job_title") && !jobTitle.trim()) {
+      return parsePresetFieldLabel(survey.custom_fields, "job_title");
+    }
+    if (hasCompany && parsePresetFieldRequired(survey.custom_fields, "company") && !company.trim()) {
+      return parsePresetFieldLabel(survey.custom_fields, "company");
+    }
+    if (hasLinkedin && parsePresetFieldRequired(survey.custom_fields, "linkedin") && !linkedin.trim()) {
+      return parsePresetFieldLabel(survey.custom_fields, "linkedin");
+    }
+    for (const field of customFieldDefs) {
+      if (field.required && !customFieldValues[field.key]?.trim()) return field.label;
+    }
+    return null;
+  }
+
+  // Split from the form's onSubmit so Enter-on-the-last-field can trigger it
+  // directly without needing to fabricate a submit event.
+  async function startInterview() {
+    const missing = firstMissingRequiredField();
+    if (missing) {
+      setError(`Please fill in ${missing}.`);
+      return;
+    }
     setError(null);
     setLoading(true);
     setIsTyping(true);
@@ -252,11 +359,11 @@ export function InterviewFlow({
           ...(isTest ? { is_test: true } : {}),
           respondent_name: name,
           respondent_email: email,
-          respondent_phone: enabledFields.includes("phone") ? phone : undefined,
+          respondent_phone: hasPhone ? phone : undefined,
           custom_field_values: {
-            ...(enabledFields.includes("job_title") && jobTitle ? { job_title: jobTitle } : {}),
-            ...(enabledFields.includes("company") && company ? { company } : {}),
-            ...(enabledFields.includes("linkedin") && linkedin ? { linkedin } : {}),
+            ...(hasJobTitle && jobTitle ? { job_title: jobTitle } : {}),
+            ...(hasCompany && company ? { company } : {}),
+            ...(hasLinkedin && linkedin ? { linkedin } : {}),
             ...Object.fromEntries(
               customFieldDefs
                 .filter((field) => customFieldValues[field.key]?.trim())
@@ -278,13 +385,36 @@ export function InterviewFlow({
     }
   }
 
-  // Shared by a fresh send and a retry: both end up posting some already-
-  // decided message content to the same endpoint and need identical
-  // success/failure handling. `historyForCompletion` is whatever `messages`
-  // looks like at the call site (it already includes this content — either
-  // just-appended for a fresh send, or still there from the original,
-  // failed attempt for a retry) so the completion snapshot is correct
-  // either way without re-deriving it here.
+  function handleIntroSubmit(e: FormEvent) {
+    e.preventDefault();
+    startInterview();
+  }
+
+  function setFieldRef(idx: number) {
+    return (el: HTMLInputElement | null) => {
+      fieldRefs.current[idx] = el;
+    };
+  }
+
+  // Enter in any intro field moves to the next one; on the last field it
+  // starts the survey. totalFields is computed fresh per render (see the
+  // intro branch below) and closed over here, always consistent with
+  // whichever optional fields this survey actually has enabled.
+  function handleFieldKeyDown(e: KeyboardEvent<HTMLInputElement>, idx: number, totalFields: number) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (idx < totalFields - 1) {
+      fieldRefs.current[idx + 1]?.focus();
+    } else {
+      startInterview();
+    }
+  }
+
+  // Shared by a fresh send, a chip auto-submit, and Skip: all end up
+  // posting some already-decided message content to the same endpoint and
+  // need identical success/failure handling. `content` is a plain argument
+  // rather than reading `answer` state, specifically so a chip's auto-submit
+  // (fired from a setTimeout) never risks sending a stale value.
   async function sendMessage(content: string, historyForCompletion: InterviewMessage[]) {
     try {
       const res = await fetch("/api/interview/continue", {
@@ -325,8 +455,9 @@ export function InterviewFlow({
     }
   }
 
-  async function submitAnswer() {
-    if (!answer.trim() || !responseId || loading) return;
+  async function submitAnswerContent(content: string) {
+    if (!content.trim() || !responseId || loading) return;
+    clearPendingChipSubmit();
     setError(null);
     // Typing a fresh answer instead of retrying replaces the failed one
     // rather than letting both exist — simpler to reason about than
@@ -338,7 +469,8 @@ export function InterviewFlow({
     setFailedMessage(null);
     setLoading(true);
     setIsTyping(true);
-    const userMessage: InterviewMessage = { role: "user", content: answer };
+    setPickedChipIndex(null);
+    const userMessage: InterviewMessage = { role: "user", content };
     const updatedMessages = [...baseMessages, userMessage];
     setMessages(updatedMessages);
     setAnswer("");
@@ -356,7 +488,11 @@ export function InterviewFlow({
     // now. Only keystrokes typed *after* this point (a follow-up while
     // waiting) should ever trigger that pause.
     lastKeystrokeAtRef.current = 0;
-    await sendMessage(userMessage.content, updatedMessages);
+    await sendMessage(content, updatedMessages);
+  }
+
+  async function submitAnswer() {
+    await submitAnswerContent(answer);
   }
 
   // Resends the exact content of the last failed message. Doesn't touch
@@ -376,23 +512,39 @@ export function InterviewFlow({
     submitAnswer();
   }
 
-  // Tapping a chip drops its text into the composer for editing, it never
-  // auto-sends. Chips stay visible after a tap (the respondent might want
-  // to try another one, or edit what just got inserted) — they only clear
-  // once the respondent actually types (below) or sends.
-  function handleChipTap(chipText: string) {
-    setAnswer(chipText);
-    const el = answerInputRef.current;
-    if (el) {
-      el.focus();
-      requestAnimationFrame(() => el.setSelectionRange(el.value.length, el.value.length));
-    }
+  function handleSkip() {
+    if (!responseId || loading) return;
+    clearPendingChipSubmit();
+    submitAnswerContent(SKIP_MESSAGE_CONTENT);
   }
 
-  // Cmd/Ctrl+Enter submits; plain Enter (and Shift+Enter) just insert a
-  // newline, since answers here can reasonably run to a few sentences.
+  // Selecting a chip fills the composer and, unless the fallback flag is
+  // off, auto-submits it after a brief flash so the tap itself reads as the
+  // answer. Any later chip tap, manual typing, explicit send, or skip
+  // cancels a still-pending timer (see clearPendingChipSubmit call sites)
+  // so at most one submission for this turn ever goes out.
+  function handleChipTap(index: number, chipText: string) {
+    clearPendingChipSubmit();
+    setAnswer(chipText);
+    setPickedChipIndex(index);
+    if (!INSTANT_CHIP_SUBMIT) {
+      const el = answerInputRef.current;
+      if (el) {
+        el.focus();
+        requestAnimationFrame(() => el.setSelectionRange(el.value.length, el.value.length));
+      }
+      return;
+    }
+    chipSubmitTimeoutRef.current = setTimeout(() => {
+      chipSubmitTimeoutRef.current = null;
+      submitAnswerContent(chipText);
+    }, CHIP_AUTO_SUBMIT_DELAY_MS);
+  }
+
+  // Plain Enter sends (Cmd/Ctrl+Enter falls under the same check, since
+  // both are just "Enter" without Shift); Shift+Enter inserts a newline.
   function handleAnswerKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       submitAnswer();
     }
@@ -401,123 +553,278 @@ export function InterviewFlow({
   const surveyName = survey.external_title || survey.title;
 
   if (stage === "intro") {
+    const nameOk = name.trim().length > 1;
+    const emailOk = EMAIL_LIVE_CHECK_PATTERN.test(email.trim());
+
+    let fieldCount = 0;
+    const nameIdx = fieldCount++;
+    const emailIdx = fieldCount++;
+    const phoneIdx = hasPhone ? fieldCount++ : -1;
+    const jobTitleIdx = hasJobTitle ? fieldCount++ : -1;
+    const companyIdx = hasCompany ? fieldCount++ : -1;
+    const linkedinIdx = hasLinkedin ? fieldCount++ : -1;
+    const customFieldIdxs = customFieldDefs.map(() => fieldCount++);
+    const totalFieldCount = fieldCount;
+    const onFieldKeyDown = (e: KeyboardEvent<HTMLInputElement>, idx: number) =>
+      handleFieldKeyDown(e, idx, totalFieldCount);
+
+    const metaLine = survey.num_questions
+      ? `${survey.num_questions} questions · about ${Math.max(3, Math.round(survey.num_questions * MINUTES_PER_QUESTION))} minutes`
+      : null;
+    const microcopy = survey.gift_card_amount
+      ? "Press Enter to move between fields · Your info is only used to send the gift card"
+      : "Press Enter to move between fields";
+
     return (
-      <div className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-4 py-12">
-        <div className="flex flex-col gap-4">
+      <div
+        className={cn(
+          spectral.variable,
+          newsreader.variable,
+          "flex min-h-screen flex-col font-sans text-[16px] text-[#262019]"
+        )}
+        style={PAGE_BACKGROUND_STYLE}
+      >
+        <TestModeBadge isTest={isTest} />
+        <div className="mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-6 py-16">
           {survey.sponsor && logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt={survey.sponsor} className="h-8 w-auto object-contain" />
+            <img src={logoUrl} alt={survey.sponsor} className="mb-6 h-8 w-auto object-contain" />
           )}
-          {isTest && (
-            <div>
-              <Badge variant="warning">Test mode</Badge>
+
+          {(survey.gift_card_amount || metaLine) && (
+            <div className="survey-intro-rise-1 mb-[22px] flex flex-wrap items-center gap-2.5">
+              {survey.gift_card_amount ? (
+                <span className="rounded-full bg-[#e4ecdd] px-3 py-1.5 text-[13px] font-semibold tracking-[0.04em] text-[#3a6046]">
+                  ${survey.gift_card_amount} gift card
+                </span>
+              ) : null}
+              {metaLine && <span className="text-sm text-[#6f6757]">{metaLine}</span>}
             </div>
           )}
-          <h1 className="font-serif text-[28px] font-normal text-card-foreground">{surveyName}</h1>
-          {survey.topic && <p className="text-[15px] text-muted-foreground">{survey.topic}</p>}
-          {survey.gift_card_amount ? (
-            <p className="text-sm text-muted-foreground">
-              Complete this interview for a ${survey.gift_card_amount} gift card.
+
+          <h1 className="survey-intro-rise-2 font-spectral mb-3.5 text-[44px] font-medium leading-[1.08] tracking-[-0.01em]">
+            {surveyName}
+          </h1>
+
+          {survey.topic && (
+            <p className="survey-intro-rise-3 text-pretty mb-9 text-[17px] leading-[1.55] text-[#6f6757]">
+              {survey.topic}
             </p>
-          ) : null}
-          <form onSubmit={handleStart} className="flex flex-col gap-3">
-            <Input
-              type="text"
-              placeholder="Your name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-            <Input
-              type="email"
-              placeholder="Your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            {enabledFields.includes("phone") && (
-              <Input
-                type="tel"
-                placeholder={fieldPlaceholder("phone")}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required={parsePresetFieldRequired(survey.custom_fields, "phone")}
-              />
-            )}
-            {enabledFields.includes("job_title") && (
-              <Input
-                type="text"
-                placeholder={fieldPlaceholder("job_title")}
-                value={jobTitle}
-                onChange={(e) => setJobTitle(e.target.value)}
-                required={parsePresetFieldRequired(survey.custom_fields, "job_title")}
-              />
-            )}
-            {enabledFields.includes("company") && (
-              <Input
-                type="text"
-                placeholder={fieldPlaceholder("company")}
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                required={parsePresetFieldRequired(survey.custom_fields, "company")}
-              />
-            )}
-            {enabledFields.includes("linkedin") && (
-              <Input
-                type="url"
-                placeholder={fieldPlaceholder("linkedin")}
-                value={linkedin}
-                onChange={(e) => setLinkedin(e.target.value)}
-                required={parsePresetFieldRequired(survey.custom_fields, "linkedin")}
-              />
-            )}
-            {customFieldDefs.map((field) => (
-              <Input
-                key={field.key}
-                type="text"
-                placeholder={field.required ? `${field.label} *` : field.label}
-                value={customFieldValues[field.key] ?? ""}
-                onChange={(e) =>
-                  setCustomFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))
-                }
-                required={field.required === true}
-              />
-            ))}
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" disabled={loading}>
-              {loading ? "Starting..." : "Start"}
-            </Button>
+          )}
+
+          <form onSubmit={handleIntroSubmit}>
+            <div className="survey-intro-rise-4 flex flex-col gap-3">
+              <div className="relative flex flex-col gap-1.5">
+                <PerchedBird
+                  className="pointer-events-none absolute -top-[14px] right-[14px] z-[2]"
+                  width={48}
+                  height={46}
+                  notes={INTRO_BIRD_NOTES}
+                />
+                <label htmlFor="respondent-name" className={FIELD_LABEL_CLASSES}>
+                  Your name
+                </label>
+                <input
+                  id="respondent-name"
+                  ref={setFieldRef(nameIdx)}
+                  type="text"
+                  autoComplete="name"
+                  autoFocus
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyDown={(e) => onFieldKeyDown(e, nameIdx)}
+                  placeholder="First and last"
+                  disabled={loading}
+                  className={cn(FIELD_INPUT_BASE, "pl-4 pr-11")}
+                />
+                {nameOk && <CheckIcon className="absolute bottom-4 right-[15px]" />}
+              </div>
+
+              <div className="relative flex flex-col gap-1.5">
+                <label htmlFor="respondent-email" className={FIELD_LABEL_CLASSES}>
+                  Email <span className="font-normal text-[#a89d88]">for the gift card</span>
+                </label>
+                <input
+                  id="respondent-email"
+                  ref={setFieldRef(emailIdx)}
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => onFieldKeyDown(e, emailIdx)}
+                  placeholder="you@example.com"
+                  disabled={loading}
+                  className={cn(FIELD_INPUT_BASE, "pl-4 pr-11")}
+                />
+                {emailOk && <CheckIcon className="absolute bottom-4 right-[15px]" />}
+              </div>
+
+              {hasPhone && (
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="respondent-phone" className={FIELD_LABEL_CLASSES}>
+                    {parsePresetFieldLabel(survey.custom_fields, "phone")}
+                  </label>
+                  <input
+                    id="respondent-phone"
+                    ref={setFieldRef(phoneIdx)}
+                    type="tel"
+                    required={parsePresetFieldRequired(survey.custom_fields, "phone")}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    onKeyDown={(e) => onFieldKeyDown(e, phoneIdx)}
+                    disabled={loading}
+                    className={cn(FIELD_INPUT_BASE, "px-4")}
+                  />
+                </div>
+              )}
+
+              {(hasJobTitle || hasCompany) && (
+                <div className={hasJobTitle && hasCompany ? "grid grid-cols-2 gap-3" : "flex flex-col gap-3"}>
+                  {hasJobTitle && (
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                      <label htmlFor="respondent-job-title" className={FIELD_LABEL_CLASSES}>
+                        {parsePresetFieldLabel(survey.custom_fields, "job_title")}
+                      </label>
+                      <input
+                        id="respondent-job-title"
+                        ref={setFieldRef(jobTitleIdx)}
+                        type="text"
+                        autoComplete="organization-title"
+                        required={parsePresetFieldRequired(survey.custom_fields, "job_title")}
+                        value={jobTitle}
+                        onChange={(e) => setJobTitle(e.target.value)}
+                        onKeyDown={(e) => onFieldKeyDown(e, jobTitleIdx)}
+                        disabled={loading}
+                        className={cn(FIELD_INPUT_BASE, "px-4")}
+                      />
+                    </div>
+                  )}
+                  {hasCompany && (
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                      <label htmlFor="respondent-company" className={FIELD_LABEL_CLASSES}>
+                        {parsePresetFieldLabel(survey.custom_fields, "company")}
+                      </label>
+                      <input
+                        id="respondent-company"
+                        ref={setFieldRef(companyIdx)}
+                        type="text"
+                        autoComplete="organization"
+                        required={parsePresetFieldRequired(survey.custom_fields, "company")}
+                        value={company}
+                        onChange={(e) => setCompany(e.target.value)}
+                        onKeyDown={(e) => onFieldKeyDown(e, companyIdx)}
+                        disabled={loading}
+                        className={cn(FIELD_INPUT_BASE, "px-4")}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {hasLinkedin && (
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="respondent-linkedin" className={FIELD_LABEL_CLASSES}>
+                    {parsePresetFieldLabel(survey.custom_fields, "linkedin")}
+                  </label>
+                  <input
+                    id="respondent-linkedin"
+                    ref={setFieldRef(linkedinIdx)}
+                    type="url"
+                    autoComplete="url"
+                    required={parsePresetFieldRequired(survey.custom_fields, "linkedin")}
+                    value={linkedin}
+                    onChange={(e) => setLinkedin(e.target.value)}
+                    onKeyDown={(e) => onFieldKeyDown(e, linkedinIdx)}
+                    disabled={loading}
+                    className={cn(FIELD_INPUT_BASE, "px-4")}
+                  />
+                </div>
+              )}
+
+              {customFieldDefs.map((field, i) => (
+                <div key={field.key} className="flex flex-col gap-1.5">
+                  <label htmlFor={`respondent-custom-${field.key}`} className={FIELD_LABEL_CLASSES}>
+                    {field.required ? `${field.label} *` : field.label}
+                  </label>
+                  <input
+                    id={`respondent-custom-${field.key}`}
+                    ref={setFieldRef(customFieldIdxs[i])}
+                    type="text"
+                    required={field.required === true}
+                    value={customFieldValues[field.key] ?? ""}
+                    onChange={(e) =>
+                      setCustomFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                    }
+                    onKeyDown={(e) => onFieldKeyDown(e, customFieldIdxs[i])}
+                    disabled={loading}
+                    className={cn(FIELD_INPUT_BASE, "px-4")}
+                  />
+                </div>
+              ))}
+
+              {error && <p className="text-sm text-[#b3432b]">{error}</p>}
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="survey-intro-rise-5 mt-6 flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-[#241f18] px-6 text-[17px] font-semibold text-[#f3ecdf] transition-opacity hover:opacity-90 active:scale-[.985] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "Starting…" : "Start"}
+              <ArrowIcon size={17} />
+            </button>
           </form>
+
+          <div className="survey-intro-rise-6 mt-3.5 text-center text-[13px] text-[#a89d88]">{microcopy}</div>
         </div>
+        <Footer />
       </div>
     );
   }
 
   if (stage === "complete") {
     return (
-      <div className="flex min-h-screen flex-col">
-        <div className="flex items-center justify-between px-10 py-7">
-          <div className="flex items-center gap-2.5 text-card-foreground">
-            <BirdGlyph />
-            <span className="text-sm font-semibold">{surveyName}</span>
-          </div>
-          <div className="flex items-center gap-2.5">
-            {isTest && <Badge variant="warning">Test mode</Badge>}
-            <span className="text-[13px] font-medium text-faint">Complete</span>
-          </div>
-        </div>
-
-        <div className="flex flex-1 items-center justify-center px-10 pb-24">
-          <div className="bs-rise-repeat w-full max-w-[640px] text-center">
-            <h1 className="mb-3.5 font-serif text-[38px] font-normal leading-[1.2] text-card-foreground">
+      <div
+        className={cn(spectral.variable, "flex min-h-screen flex-col font-sans text-[16px] text-[#262019]")}
+        style={PAGE_BACKGROUND_STYLE}
+      >
+        <TestModeBadge isTest={isTest} />
+        <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+          <div className="bs-rise-repeat mx-auto w-full max-w-[560px]">
+            <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-[#e4ecdd]">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M5 12.5l4.5 4.5L19 7.5"
+                  stroke="#3a6046"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <h1 className="font-spectral mb-3.5 text-[38px] font-medium leading-[1.15]">
               That&apos;s everything. Thank you.
             </h1>
-            <p className="text-base leading-relaxed text-muted-foreground">{closingMessage}</p>
+            <p className="text-pretty text-base leading-[1.6] text-[#6f6757]">
+              {closingMessage}
+              {survey.gift_card_amount ? (
+                <>
+                  {" "}
+                  The{" "}
+                  <strong className="font-semibold text-[#262019]">
+                    ${survey.gift_card_amount} gift card
+                  </strong>{" "}
+                  will land in your inbox within a day or two.
+                </>
+              ) : null}
+            </p>
 
             <button
               type="button"
               onClick={() => setShowResponses((prev) => !prev)}
-              className="mx-auto mt-8 flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-card-foreground"
+              className="mx-auto mt-8 flex items-center gap-1.5 text-sm text-[#6f6757] transition-colors hover:text-[#262019]"
               aria-expanded={showResponses}
             >
               {showResponses ? "Hide your responses" : "See your responses"}
@@ -548,7 +855,6 @@ export function InterviewFlow({
             )}
           </div>
         </div>
-
         <Footer />
       </div>
     );
@@ -557,23 +863,21 @@ export function InterviewFlow({
   const answeredCount = messages.filter((m) => m.role === "user").length;
   const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant")?.content ?? "";
   const questionText = streamingText ?? lastAssistantMessage;
+  const targetQuestionCount = survey.num_questions ?? 8;
+  const hasAnswer = answer.trim().length > 0;
+  // Same auto-grow heuristic as the design reference: line count plus a
+  // rough characters-per-line estimate, not actual DOM measurement.
+  const draftRows = Math.min(6, Math.max(2, answer.split("\n").length + Math.floor(answer.length / 70)));
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <TopProgressLine answered={answeredCount} target={survey.num_questions ?? 8} />
+    <div
+      className={cn(spectral.variable, "flex min-h-screen flex-col font-sans text-[16px] text-[#262019]")}
+      style={PAGE_BACKGROUND_STYLE}
+    >
+      <TopProgressLine answered={answeredCount} target={targetQuestionCount} />
+      <TestModeBadge isTest={isTest} />
 
-      <div className="flex items-center justify-between px-10 py-7">
-        <div className="flex items-center gap-2.5 text-card-foreground">
-          <BirdGlyph />
-          <span className="text-sm font-semibold">{surveyName}</span>
-        </div>
-        <div className="flex items-center gap-2.5">
-          {isTest && <Badge variant="warning">Test mode</Badge>}
-          <span className="text-[13px] font-medium text-faint">Question {answeredCount + 1}</span>
-        </div>
-      </div>
-
-      <div className="flex flex-1 items-center justify-center px-10 pb-24 pt-8">
+      <div className="flex flex-1 items-center justify-center px-6 py-16">
         <div className="w-full max-w-[640px]">
           {/* Hidden live regions, always mounted (a live region only fires
               if it exists before its content changes). Two separate regions
@@ -581,7 +885,7 @@ export function InterviewFlow({
               `messages`, which updates exactly once per question — after
               the word-by-word reveal finishes — so each question is
               announced once, cleanly. Wiring it to the visible streaming
-              h1 instead would re-announce the growing text on every word.
+              h2 instead would re-announce the growing text on every word.
               The status region handles transient state (typing, send
               failure); it flips to "" during the reveal, and an empty
               update announces nothing. Politeness is deliberate — no
@@ -591,34 +895,37 @@ export function InterviewFlow({
           </div>
           <div role="status" className="sr-only">
             {isTyping
-              ? "Wren is typing…"
+              ? "The interviewer is typing…"
               : error
                 ? `${error}${failedMessage ? " Your answer was not sent. Use the Retry button to send it again." : ""}`
                 : ""}
           </div>
+
           {isTyping ? (
             <TypingDots />
           ) : (
             <div key={messages.length} className="bs-rise-repeat">
-              <div className="mb-[22px] flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-faint">
-                <span className="bs-dot inline-block h-[7px] w-[7px] rounded-full bg-indigo-light" />
-                Wren is asking
+              <div className="mb-1 flex items-center justify-end">
+                <span className="text-[13px] tabular-nums text-[#a89d88]">
+                  {answeredCount + 1} of {targetQuestionCount}
+                </span>
               </div>
-              <h1 className="text-pretty mb-8 font-serif text-[34px] font-normal leading-[1.3] text-card-foreground">
-                {questionText}
+
+              <h1 className="font-spectral text-pretty mb-[26px] text-[32px] font-medium leading-[1.28] tracking-[-0.005em] [&_strong]:font-semibold [&_strong]:not-italic [&_strong]:underline [&_strong]:decoration-[#3a6046] [&_strong]:decoration-2 [&_strong]:underline-offset-[5px]">
+                {renderWithBold(questionText)}
               </h1>
 
               {failedMessage && (
                 <div className="mb-5 flex flex-col items-end gap-1.5">
                   <div className={cn(RESPONDENT_BUBBLE, "opacity-60")}>{failedMessage}</div>
-                  <div className="flex items-center gap-2 text-xs text-destructive">
+                  <div className="flex items-center gap-2 text-xs text-[#b3432b]">
                     <span>Failed to send</span>
                     <button
                       type="button"
                       onClick={retrySend}
                       disabled={loading}
                       aria-label="Retry sending your answer"
-                      className="font-semibold underline underline-offset-2 hover:text-destructive/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="font-semibold underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a6046] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {loading ? "Retrying…" : "Retry"}
                     </button>
@@ -626,48 +933,71 @@ export function InterviewFlow({
                 </div>
               )}
 
-              <form onSubmit={handleSend} className="flex flex-col gap-5">
+              <form onSubmit={handleSend} className="flex flex-col gap-[18px]">
                 {chips.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {chips.map((chip, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => handleChipTap(chip)}
-                        aria-label={`Suggested reply: ${chip}`}
-                        className="rounded-full border border-chip bg-transparent px-3.5 py-2 text-sm text-card-foreground transition-colors hover:bg-chip active:bg-chip/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        {chip}
-                      </button>
-                    ))}
+                  <div className="flex flex-wrap gap-2.5">
+                    {chips.map((chip, i) => {
+                      const picked = pickedChipIndex === i;
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => handleChipTap(i, chip)}
+                          aria-label={`Suggested reply: ${chip}`}
+                          aria-pressed={picked}
+                          className={cn(
+                            "min-h-[44px] rounded-full border px-[18px] py-[11px] text-[15px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a6046] focus-visible:ring-offset-2",
+                            picked
+                              ? "border-[#241f18] bg-[#241f18] text-[#f3ecdf]"
+                              : "border-[#e7ddc9] bg-[#fffdf7] text-[#262019] hover:border-[#a89d88] hover:bg-[#f6efe1] active:scale-[.97]"
+                          )}
+                        >
+                          {chip}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
-                <Textarea
+
+                <textarea
                   ref={answerInputRef}
                   aria-label="Your answer"
-                  placeholder="Take your time — plain language is perfect."
+                  placeholder="…or type it your own way"
                   value={answer}
                   onChange={(e) => {
                     setAnswer(e.target.value);
                     lastKeystrokeAtRef.current = Date.now();
                     setChips((prev) => (prev.length > 0 ? [] : prev));
+                    setPickedChipIndex(null);
+                    clearPendingChipSubmit();
                   }}
                   onKeyDown={handleAnswerKeyDown}
-                  rows={4}
+                  rows={draftRows}
                   disabled={loading}
-                  className="text-base"
+                  className="w-full resize-none rounded-[14px] border border-[#e7ddc9] bg-[#fffdf7] px-[18px] py-4 text-base leading-[1.5] text-[#262019] placeholder:text-[#a89d88] focus:border-[#6f6757] focus:outline-none focus:ring-[3px] focus:ring-[rgba(38,32,25,.07)] disabled:cursor-not-allowed disabled:opacity-60"
                 />
-                <div className="flex items-center gap-4">
-                  <Button type="submit" disabled={loading || !answer.trim()} className="gap-2">
-                    Continue
-                    <ArrowIcon />
-                  </Button>
-                  <span className="text-[13px] text-faint">
-                    or press <strong className="font-semibold text-muted-foreground">⌘ Enter</strong>
-                  </span>
+
+                <div className="flex flex-wrap items-center gap-4">
+                  <button
+                    type="submit"
+                    disabled={!hasAnswer || loading}
+                    className="flex min-h-[48px] items-center gap-2.5 rounded-xl bg-[#241f18] px-[26px] py-[14px] text-base font-semibold text-[#f3ecdf] transition-opacity hover:opacity-90 active:scale-[.985] disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Continue <ArrowIcon size={15} />
+                  </button>
+                  <span className="text-[13px] text-[#a89d88]">Enter ↵ to send · Shift+Enter for a new line</span>
+                  <span className="flex-1" />
+                  <button
+                    type="button"
+                    onClick={handleSkip}
+                    disabled={loading}
+                    className="rounded-control px-2 py-2 text-sm text-[#a89d88] transition-colors hover:text-[#262019] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Skip
+                  </button>
                 </div>
               </form>
-              {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+              {error && <p className="mt-3 text-sm text-[#b3432b]">{error}</p>}
             </div>
           )}
         </div>
@@ -681,8 +1011,8 @@ export function InterviewFlow({
 function Footer() {
   return (
     <div className="pb-6 text-center">
-      <span className="text-xs text-faint">
-        Powered by <span className="font-serif text-muted-foreground">Birdsong</span>
+      <span className="text-xs text-[#a89d88]">
+        Powered by <span className="font-serif text-[#6f6757]">Birdsong</span>
       </span>
     </div>
   );

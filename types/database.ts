@@ -26,6 +26,7 @@ export type Database = {
           gift_card_amount: number | null;
           custom_fields: Json;
           status: string;
+          is_sample: boolean;
           user_id: string;
           created_at: string;
         };
@@ -45,6 +46,7 @@ export type Database = {
           gift_card_amount?: number | null;
           custom_fields?: Json;
           status?: string;
+          is_sample?: boolean;
           user_id: string;
           created_at?: string;
         };
@@ -64,6 +66,7 @@ export type Database = {
           gift_card_amount?: number | null;
           custom_fields?: Json;
           status?: string;
+          is_sample?: boolean;
           user_id?: string;
           created_at?: string;
         };
@@ -226,6 +229,48 @@ export type Database = {
             foreignKeyName: "profiles_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: true;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      survey_reports: {
+        Row: {
+          id: string;
+          survey_id: string;
+          user_id: string;
+          content: Json;
+          respondent_count: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          survey_id: string;
+          user_id: string;
+          content: Json;
+          respondent_count: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          survey_id?: string;
+          user_id?: string;
+          content?: Json;
+          respondent_count?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "survey_reports_survey_id_fkey";
+            columns: ["survey_id"];
+            isOneToOne: false;
+            referencedRelation: "surveys";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "survey_reports_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];
           },

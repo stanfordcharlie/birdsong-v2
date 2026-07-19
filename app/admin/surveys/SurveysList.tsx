@@ -52,7 +52,20 @@ export function SurveysList({ surveys }: { surveys: SurveyListItem[] }) {
   }, [surveys, query, statusFilter]);
 
   if (surveys.length === 0) {
-    return <p className="text-sm text-muted-foreground">No surveys yet.</p>;
+    return (
+      <Card className="flex flex-col items-start gap-3 p-8">
+        <p className="text-sm text-card-foreground">
+          No surveys yet. Create one and Wren starts interviewing the moment you share the link —
+          every completed conversation comes back scored, with a call script ready.
+        </p>
+        <Link
+          href="/admin/surveys/new"
+          className="rounded-control bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          Create your first survey
+        </Link>
+      </Card>
+    );
   }
 
   return (
