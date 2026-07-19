@@ -38,7 +38,15 @@ export function SignupForm() {
       },
     });
     if (error) {
-      setError(error.message);
+      // Some auth failures surface with a useless stringified message
+      // (e.g. "{}" when Supabase's confirmation-email send 500s) — show a
+      // human sentence instead of raw JSON in those cases.
+      const raw = error.message?.trim();
+      setError(
+        raw && raw !== "{}" && !raw.startsWith("{")
+          ? raw
+          : "We couldn't create your account just now — sending the confirmation email failed on our end. Please try again in a bit."
+      );
       setLoading(false);
       return;
     }
