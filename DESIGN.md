@@ -289,6 +289,13 @@ legacy `--background: #ffffff`, `components/AdminShell.tsx` sets
 `document.body.style.backgroundColor` to `hsl(var(--ds-page-background))` on mount and
 clears it on unmount, scoping the fix to admin routes only.
 
+That only solves the light content column, though — no single body color can also
+match the dark sidebar rail, so bouncing past the page edge still showed the rail
+"ending" in dead white space above/below it. The same `AdminShell` effect therefore
+also sets `overscroll-behavior-y: none` on `<html>` (the document scroller) while an
+admin page is mounted: admin routes don't rubber-band at all; the page stops at its
+edges. Respondent and marketing pages keep the native bounce.
+
 ## Known gaps
 
 Content the design handoff specifies but the data model doesn't back yet — shown where

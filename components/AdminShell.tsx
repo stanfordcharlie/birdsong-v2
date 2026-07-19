@@ -20,8 +20,16 @@ export function AdminShell({
   // rely on that legacy body background) are untouched.
   useEffect(() => {
     document.body.style.backgroundColor = "hsl(var(--ds-page-background))";
+    // The rubber-band bounce paints the body background beyond the layout's
+    // edges — above/below the dark sidebar that reads as the rail ending in
+    // dead white space. One body background can't match both the ink rail
+    // and the light content column, so disable the bounce entirely on admin
+    // routes instead: the page simply stops at its edges. Set on <html>,
+    // the actual document scroller.
+    document.documentElement.style.overscrollBehaviorY = "none";
     return () => {
       document.body.style.backgroundColor = "";
+      document.documentElement.style.overscrollBehaviorY = "";
     };
   }, []);
 
