@@ -7,8 +7,9 @@ import { useScrollReveal } from "./useScrollReveal";
 // "Everything your team needs" per design_handoff_landing_sections: three
 // cells (the old "Booking built in" cell is gone — that feature doesn't
 // exist) in a hairline grid, each with a small reveal-driven micro-visual.
-// Used by /landing-page only; landing-page-2 keeps FeaturesSection. The
-// lp-* animation classes live in globals.css behind prefers-reduced-motion.
+// Used by /landing-page only; landing-page-2's equivalent is
+// AskedNotInferredGrid. The lp-* animation classes live in globals.css
+// behind prefers-reduced-motion.
 
 const ROUTE_MID_PATH = "M24 40 C 90 40 130 40 190 40";
 
@@ -78,7 +79,7 @@ export function TeamNeedsGrid() {
     <section
       id="features"
       ref={ref}
-      className={cn(spectral.variable, "mx-auto max-w-[1180px] px-12 pb-[110px] pt-9 max-md:px-8")}
+      className={cn(spectral.variable, "mx-auto max-w-[1360px] px-12 pb-[110px] pt-9 max-md:px-8")}
     >
       <h2
         data-reveal

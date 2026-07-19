@@ -24,7 +24,7 @@ export function FooterCta({
           Get started
         </Link>
       </div>
-      <div className="mx-auto flex max-w-[1120px] justify-between px-8 pb-[34px] text-[13px] text-[rgba(245,239,227,0.45)]">
+      <div className="mx-auto flex max-w-[1360px] justify-between px-12 pb-[34px] text-[13px] text-[rgba(245,239,227,0.45)] max-md:px-8">
         <span>© 2026 Birdsong</span>
         <span className="flex gap-[22px]">
           {extraLink && (

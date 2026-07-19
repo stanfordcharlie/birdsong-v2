@@ -4,11 +4,31 @@ import { spectral } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 import { useScrollReveal } from "./useScrollReveal";
 
-// "How it works" per design_handoff_landing_sections: eggshell ground,
-// Spectral headlines, three columns with looping vignettes (radar ping /
-// chat exchange / lead card). Used by /landing-page only — landing-page-2
-// still renders the older HowItWorksSection. All animation classes (lp-*)
-// live in globals.css behind prefers-reduced-motion.
+// "How it works" per design_handoff_landing_sections (and its CS variant,
+// design_handoff_landing_sections_cs): eggshell ground, Spectral headline
+// with right-aligned kicker, three columns with looping vignettes (radar
+// ping / chat exchange / lead card) over reveal-filled hairlines. Copy is
+// passed in per page — /landing-page and /landing-page-2 share the whole
+// skeleton. All animation classes (lp-*) live in globals.css behind
+// prefers-reduced-motion.
+
+export type HowItWorksContent = {
+  headline: string;
+  /** Max width of the headline block, px. */
+  headlineMaxWidth: number;
+  /** Tailwind classes controlling headline size/leading (differs per page). */
+  headlineSizeClass: string;
+  kicker: string;
+  invite: { chipA: string; chipB: string; body: string };
+  converse: { question: string; answer: string; chips: [string, string]; body: string };
+  deliver: {
+    account: string;
+    badge: string;
+    routedLine: string;
+    footerLine: string;
+    body: string;
+  };
+};
 
 const HAIRLINE_DELAYS = ["0.3s", "0.45s", "0.6s"];
 const COLUMN_DELAYS = ["0.05s", "0.15s", "0.25s"];
@@ -42,27 +62,33 @@ function StepBody({ children }: { children: React.ReactNode }) {
 const FLOAT_CHIP =
   "absolute rounded-full border border-[#e9e3d3] bg-[#fffefa] px-[13px] py-1.5 text-[12.5px] font-medium text-[#262019] shadow-[0_2px_8px_rgba(38,32,25,0.06)]";
 
-export function HowItWorksShowcase() {
+export function HowItWorksShowcase({ content }: { content: HowItWorksContent }) {
   const ref = useScrollReveal<HTMLElement>();
+  const { headline, headlineMaxWidth, headlineSizeClass, kicker, invite, converse, deliver } =
+    content;
 
   return (
     <section
       id="how"
       ref={ref}
-      className={cn(spectral.variable, "mx-auto max-w-[1180px] px-12 pb-[84px] pt-24 max-md:px-8")}
+      className={cn(spectral.variable, "mx-auto max-w-[1360px] px-12 pb-[84px] pt-24 max-md:px-8")}
     >
       <div data-reveal className="lp-reveal flex flex-wrap items-end justify-between gap-8">
         <div>
           <div className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.14em] text-[#3a6046]">
             How it works
           </div>
-          <h2 className="text-balance max-w-[640px] font-spectral text-[clamp(38px,4.5vw,54px)] font-medium leading-[1.08] tracking-[-0.01em] text-[#262019]">
-            From first note to booked demo.
+          <h2
+            className={cn(
+              "text-balance font-spectral font-medium tracking-[-0.01em] text-[#262019]",
+              headlineSizeClass
+            )}
+            style={{ maxWidth: `${headlineMaxWidth}px` }}
+          >
+            {headline}
           </h2>
         </div>
-        <div className="max-w-[300px] pb-2 text-[15px] leading-[1.55] text-[#6f6757]">
-          Three steps, one owner: Birdsong. Your team only shows up for the demo.
-        </div>
+        <div className="max-w-[300px] pb-2 text-[15px] leading-[1.55] text-[#6f6757]">{kicker}</div>
       </div>
 
       <div className="mt-14 grid grid-cols-3 gap-12 max-lg:grid-cols-1">
@@ -82,17 +108,14 @@ export function HowItWorksShowcase() {
             />
             <span className="h-3.5 w-3.5 rounded-full bg-[#3a6046]" />
             <span className={cn(FLOAT_CHIP, "lp-loop-chip-a left-[8%] top-[26px]")}>
-              VP Sales · invited
+              {invite.chipA}
             </span>
             <span className={cn(FLOAT_CHIP, "lp-loop-chip-b bottom-6 right-[6%]")}>
-              Head of Growth · accepted
+              {invite.chipB}
             </span>
           </div>
           <StepTitle>Invite</StepTitle>
-          <StepBody>
-            You pick the audience. Birdsong reaches them directly and invites them into a paid,
-            peer-level conversation about their work.
-          </StepBody>
+          <StepBody>{invite.body}</StepBody>
         </div>
 
         {/* 02 — Converse: chat exchange + extracted chips */}
@@ -101,37 +124,34 @@ export function HowItWorksShowcase() {
           <StepNumber>02</StepNumber>
           <div className="flex h-[190px] flex-col justify-center gap-[9px] px-1">
             <div className="lp-loop-bub-a max-w-[82%] self-start rounded-[14px] rounded-bl-[4px] border border-[#e9e3d3] bg-[#fffefa] px-3.5 py-[9px] text-[13px] text-[#262019] shadow-[0_2px_8px_rgba(38,32,25,0.05)]">
-              Where does inbound break down for you today?
+              {converse.question}
             </div>
             <div className="lp-loop-bub-b max-w-[82%] self-end rounded-[14px] rounded-br-[4px] bg-[#3a6046] px-3.5 py-[9px] text-[13px] text-[#f2f6ef]">
-              Manual triage. Everything sits for days.
+              {converse.answer}
             </div>
             <div className="mt-1 flex flex-wrap gap-2">
               <span className="lp-loop-exchip-1 rounded-full bg-[#e4ecdd] px-3 py-[5px] text-xs font-semibold text-[#3a6046]">
-                Pain: manual inbound triage
+                {converse.chips[0]}
               </span>
               <span className="lp-loop-exchip-2 rounded-full bg-[#e4ecdd] px-3 py-[5px] text-xs font-semibold text-[#3a6046]">
-                Timeline: this quarter
+                {converse.chips[1]}
               </span>
             </div>
           </div>
           <StepTitle>Converse</StepTitle>
-          <StepBody>
-            A real conversation about their work, not a survey. What actually hurts surfaces in
-            their own words, weighed against your ICP and scored.
-          </StepBody>
+          <StepBody>{converse.body}</StepBody>
         </div>
 
-        {/* 03 — Deliver: lead card with fit badge, drawn check, demo line */}
+        {/* 03 — Deliver: lead card with fit badge, drawn check, footer line */}
         <div data-reveal className="lp-reveal" style={{ transitionDelay: COLUMN_DELAYS[2] }}>
           <StepHairline delay={HAIRLINE_DELAYS[2]} />
           <StepNumber>03</StepNumber>
           <div className="flex h-[190px] items-center justify-center">
             <div className="lp-loop-card w-full max-w-[310px] rounded-2xl border border-[#e9e3d3] bg-[#fffefa] px-[22px] py-5 shadow-[0_10px_28px_rgba(38,32,25,0.08)]">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-[15.5px] font-semibold text-[#262019]">Coretide</div>
+                <div className="text-[15.5px] font-semibold text-[#262019]">{deliver.account}</div>
                 <span className="lp-loop-badge rounded-full bg-[#e4ecdd] px-3 py-1 text-[12.5px] font-semibold text-[#3a6046]">
-                  92 fit
+                  {deliver.badge}
                 </span>
               </div>
               <div className="mt-2 flex items-center gap-[7px] text-[13.5px] text-[#6f6757]">
@@ -150,19 +170,16 @@ export function HowItWorksShowcase() {
                     strokeDashoffset="0"
                   />
                 </svg>
-                Qualified · routed to Maya
+                {deliver.routedLine}
               </div>
               <div className="mt-3 flex items-center gap-1.5 border-t border-[#e9e3d3] pt-3 text-[12.5px] text-[#a89d88]">
                 <span className="lp-loop-blink h-1.5 w-1.5 rounded-full bg-[#3a6046]" />
-                Demo · Thu 2:30 PM · conversation attached
+                {deliver.footerLine}
               </div>
             </div>
           </div>
           <StepTitle>Deliver</StepTitle>
-          <StepBody>
-            The lead lands qualified and routed to the right rep, with the conversation attached
-            and a demo ready to book.
-          </StepBody>
+          <StepBody>{deliver.body}</StepBody>
         </div>
       </div>
     </section>

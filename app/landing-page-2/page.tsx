@@ -5,8 +5,8 @@ import { MarketingPageShell } from "@/components/marketing/MarketingPageShell";
 import { LandingNav } from "@/components/marketing/LandingNav";
 import { HeroSection } from "@/components/marketing/HeroSection";
 import { ProductDemo, type ProductDemoContent } from "@/components/marketing/ProductDemo";
-import { HowItWorksSection } from "@/components/marketing/HowItWorksSection";
-import { FeaturesSection } from "@/components/marketing/FeaturesSection";
+import { HowItWorksShowcase } from "@/components/marketing/HowItWorksShowcase";
+import { AskedNotInferredGrid } from "@/components/marketing/AskedNotInferredGrid";
 import { FooterCta } from "@/components/marketing/FooterCta";
 
 export const metadata: Metadata = {
@@ -37,25 +37,6 @@ const DEMO_CONTENT: ProductDemoContent = {
   successLine: "Routed to Dana (CSM, Fernwood) with the full conversation",
 };
 
-const FEATURES = [
-  {
-    title: "Beyond the health score",
-    body: "Usage data guesses. A conversation hears the two departments asking for seats.",
-  },
-  {
-    title: "Trust, kept intact",
-    body: "Your CSMs never have to pitch mid-relationship. The research stands apart, so the relationship stays warm.",
-  },
-  {
-    title: "The whole base, heard",
-    body: "Real conversations for the hundreds of accounts tech touch never reaches, not just the ones with a CSM.",
-  },
-  {
-    title: "Paced for people",
-    body: "Occasional and meaningful by design. One good conversation a year beats a survey every quarter.",
-  },
-];
-
 export default async function ExpansionMarketingPage() {
   const supabase = await createClient();
   const {
@@ -69,7 +50,7 @@ export default async function ExpansionMarketingPage() {
   }
 
   return (
-    <MarketingPageShell>
+    <MarketingPageShell tone="eggshell">
       <LandingNav crossLink={{ label: "For Inbound leads", href: "/" }} />
       <HeroSection
         eyebrow="Birdsong for customer success"
@@ -78,29 +59,34 @@ export default async function ExpansionMarketingPage() {
         subheadMaxWidth={580}
       />
       <ProductDemo content={DEMO_CONTENT} />
-      <HowItWorksSection
-        heading="A real conversation for every account, not just the top fifteen."
-        headingMaxWidth={560}
-        invite={{
-          text: "Your long tail gets usage dashboards, not conversations. Birdsong invites those customers into one: occasional, paid, and worth their time.",
-        }}
-        converse={{
-          text: "The research stands apart from the relationship, so nobody has to probe. Growth, friction, and appetite surface in the customer's own words.",
-          chips: [
-            "Growth: team doubled this year",
-            "Appetite: two departments want in",
-            "Friction: working around plan limits",
-          ],
-        }}
-        converseChipsMaxWidth={240}
-        deliver={{
-          text: "The opportunity lands with whoever owns the account, scored and sourced, with the conversation attached. QBRs and check-ins stay exactly as they are.",
-          cardTitle: "Fernwood Labs",
-          cardSubtitle: "Expansion ready · routed to Dana",
-          cardPill: "88 fit",
+      <HowItWorksShowcase
+        content={{
+          headline: "A real conversation for every account, not just the top fifteen.",
+          headlineMaxWidth: 720,
+          headlineSizeClass: "text-[clamp(36px,4.2vw,50px)] leading-[1.1]",
+          kicker:
+            "Three steps, one owner: Birdsong. Your CSMs only show up for accounts ready to grow.",
+          invite: {
+            chipA: "Fernwood Labs · invited",
+            chipB: "Priya · accepted",
+            body: "Your long tail gets usage dashboards, not conversations. Birdsong invites those customers into one: occasional, paid, and worth their time.",
+          },
+          converse: {
+            question: "How has the team's use changed this year?",
+            answer: "We doubled — two more departments want in.",
+            chips: ["Growth: team doubled", "Appetite: two departments"],
+            body: "The research stands apart from the relationship, so nobody has to probe. Growth, friction, and appetite surface in the customer's own words.",
+          },
+          deliver: {
+            account: "Fernwood Labs",
+            badge: "88 fit",
+            routedLine: "Expansion ready · routed to Dana",
+            footerLine: "Conversation attached · QBRs untouched",
+            body: "The opportunity lands with whoever owns the account, scored and sourced, with the conversation attached. QBRs and check-ins stay exactly as they are.",
+          },
         }}
       />
-      <FeaturesSection heading="Asked, not inferred." features={FEATURES} />
+      <AskedNotInferredGrid />
       <FooterCta
         heading="Hear your whole base."
         subhead="Runs alongside your NPS tool. Your first expansion signals within the month."

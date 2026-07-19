@@ -7,7 +7,7 @@ export function LandingNav({
   crossLink?: { label: string; href: string };
 }) {
   return (
-    <nav className="mx-auto flex max-w-[1120px] items-center justify-between px-8 py-[26px]">
+    <nav className="mx-auto flex max-w-[1360px] items-center justify-between px-12 py-[26px] max-md:px-8">
       <Link href="#top" className="flex items-center gap-2.5">
         <BirdLogo size={26} />
         <span className="font-newsreader text-[21px] font-medium tracking-[-0.01em] text-[#211D16]">

@@ -57,7 +57,32 @@ export default async function MarketingHomePage() {
         subhead="Birdsong invites the people you want to sell to into genuine conversations about their work, then hands your team qualified leads with the whole story already there."
       />
       <ProductDemo content={DEMO_CONTENT} />
-      <HowItWorksShowcase />
+      <HowItWorksShowcase
+        content={{
+          headline: "From first note to booked demo.",
+          headlineMaxWidth: 640,
+          headlineSizeClass: "text-[clamp(38px,4.5vw,54px)] leading-[1.08]",
+          kicker: "Three steps, one owner: Birdsong. Your team only shows up for the demo.",
+          invite: {
+            chipA: "VP Sales · invited",
+            chipB: "Head of Growth · accepted",
+            body: "You pick the audience. Birdsong reaches them directly and invites them into a paid, peer-level conversation about their work.",
+          },
+          converse: {
+            question: "Where does inbound break down for you today?",
+            answer: "Manual triage. Everything sits for days.",
+            chips: ["Pain: manual inbound triage", "Timeline: this quarter"],
+            body: "A real conversation about their work, not a survey. What actually hurts surfaces in their own words, weighed against your ICP and scored.",
+          },
+          deliver: {
+            account: "Coretide",
+            badge: "92 fit",
+            routedLine: "Qualified · routed to Maya",
+            footerLine: "Demo · Thu 2:30 PM · conversation attached",
+            body: "The lead lands qualified and routed to the right rep, with the conversation attached and a demo ready to book.",
+          },
+        }}
+      />
       <TeamNeedsGrid />
       <FooterCta
         heading="Hear your best leads first."

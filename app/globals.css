@@ -155,42 +155,6 @@ select {
     transform: translate(14px, -34px) rotate(10deg);
   }
 }
-@keyframes ripple {
-  0% {
-    transform: scale(0.4);
-    opacity: 0.7;
-  }
-  100% {
-    transform: scale(1.6);
-    opacity: 0;
-  }
-}
-@keyframes chipCycle {
-  0%,
-  8% {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  16%,
-  78% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  88%,
-  100% {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-}
-@keyframes floatCard {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-7px);
-  }
-}
 @keyframes blinkDot {
   0%,
   100% {
@@ -508,6 +472,36 @@ select {
     opacity: 1;
   }
 }
+/* CS page (landing-page-2) additions — design_handoff_landing_sections_cs */
+@keyframes lp-dash-flow {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+@keyframes lp-base-dot {
+  0%,
+  100% {
+    background: #e9e3d3;
+    transform: scale(1);
+  }
+  45%,
+  55% {
+    background: #3a6046;
+    transform: scale(1.25);
+  }
+}
+@keyframes lp-year-pulse {
+  0%,
+  30% {
+    box-shadow: 0 0 0 0 rgba(58, 96, 70, 0.35);
+  }
+  55% {
+    box-shadow: 0 0 0 10px rgba(58, 96, 70, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(58, 96, 70, 0);
+  }
+}
 
 /* Purely decorative movers: invisible at rest, so reduced-motion users
    never see them frozen mid-flight. */
@@ -596,6 +590,19 @@ select {
   }
   .lp-loop-blink {
     animation: lp-dot-blink 2.4s ease infinite;
+  }
+  /* CS page loops: marching dashed line, base-wide dot pulse (per-dot
+     delays inline), yearly-cadence pulse ring. All settle to static
+     resting states (plain dashed line, grey dots, solid green dot) under
+     reduced motion. */
+  .lp-dash-flow {
+    animation: lp-dash-flow 1.6s linear infinite;
+  }
+  .lp-base-dot {
+    animation: lp-base-dot 7s ease infinite;
+  }
+  .lp-year-pulse {
+    animation: lp-year-pulse 5s ease infinite;
   }
 }
 

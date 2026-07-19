@@ -18,7 +18,11 @@ export function HeroSection({
     : { h1: "0s", subhead: "0.12s", buttons: "0.22s" };
 
   return (
-    <header id="top" className="mx-auto max-w-[880px] px-8 pb-6 pt-[72px] text-center">
+    // Outer container matches the 1360px section width (with 48px side
+    // padding) so the hero belongs to the same grid as nav/sections; the
+    // 880px inner block is the text measure, centered as before.
+    <header id="top" className="mx-auto max-w-[1360px] px-12 pb-6 pt-[72px] max-md:px-8">
+      <div className="mx-auto max-w-[880px] text-center">
       {eyebrow && (
         <p
           className="mb-[18px] text-[13px] uppercase tracking-[0.14em] text-[#33684B]"
@@ -55,6 +59,7 @@ export function HeroSection({
         >
           See how it works
         </Link>
+      </div>
       </div>
     </header>
   );
