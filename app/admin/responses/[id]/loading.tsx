@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export default function ResponseDetailLoading() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="admin-container flex flex-col gap-6">
       <Skeleton className="h-4 w-32" />
 
       <div className="flex flex-wrap items-center justify-between gap-4">

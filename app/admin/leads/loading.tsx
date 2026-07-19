@@ -4,10 +4,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 export default function LeadsLoading() {
   return (
-    <div className="flex flex-col gap-7">
-      <div className="flex flex-col gap-1.5">
+    <div className="admin-container-wide flex flex-col gap-7">
+      <div className="flex flex-col gap-2">
         <Skeleton className="h-4 w-12" />
-        <Skeleton className="h-7 w-52" />
+        <Skeleton className="h-10 w-72" />
       </div>
 
       <div className="flex items-center gap-3">

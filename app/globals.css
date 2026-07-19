@@ -97,6 +97,39 @@ select {
   }
 }
 
+/* --- Admin typography roles (DESIGN.md "Typography roles") ---
+   Pages reference these roles, not raw sizes. Serif (Young Serif) is
+   page-title only — every other piece of admin text is Archivo on this
+   fixed scale. Component layer, so a plain utility at the call site can
+   still override a single property (e.g. a differently-colored label). */
+@layer components {
+  .type-page-title {
+    @apply font-serif text-[40px] font-normal leading-[1.1] tracking-[-0.01em] text-card-foreground;
+  }
+  .type-label {
+    @apply font-archivo text-[13px] font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+  }
+  .type-heading {
+    @apply font-archivo text-[17px] font-semibold tracking-[-0.01em] text-card-foreground;
+  }
+  .type-body {
+    @apply font-archivo text-[15px] font-normal leading-[1.6] text-card-foreground;
+  }
+  .type-meta {
+    @apply font-archivo text-[13px] font-normal text-muted-foreground;
+  }
+
+  /* Shared admin content containers (DESIGN.md "Layout containers").
+     AdminShell wraps pages in p-8 (32px); the container's own pt-6 brings
+     the top offset to 56px from viewport top to the eyebrow label. */
+  .admin-container {
+    @apply mx-auto w-full max-w-[920px] pt-6;
+  }
+  .admin-container-wide {
+    @apply mx-auto w-full max-w-[1140px] pt-6;
+  }
+}
+
 /* Marketing landing page (app/home) — see design_handoff_birdsong_landing.
    Keyframes for the hero product demo and "How it works" animations. */
 @keyframes fadeUp {
@@ -230,10 +263,23 @@ select {
     animation: bs-dot 2s ease-in-out infinite;
   }
   /* No fixed delay, unlike bs-rise-1..6's one-shot page-load stagger —
-     reapplied every time its key changes (respondent survey: each new
-     question), so React remounting the node re-triggers the animation. */
+     reapplied every time its key changes, so React remounting the node
+     re-triggers the animation (respondent survey: the completion screen). */
   .bs-rise-repeat {
     animation: bs-rise 0.5s ease-out both;
+  }
+
+  /* Respondent interview question reveal (InterviewFlow's QUESTION_REVEAL
+     config: "pop" | "fade" | "none"). Played once per question on the
+     block's single mount; `both` fill means the animation ends exactly at
+     the resting state — no terminal jump. Outside this media query the
+     resting state is fully visible, so reduced-motion users (and the
+     "none" mode, which applies no class) get an instant render. */
+  .q-reveal-pop {
+    animation: q-reveal-pop 0.3s ease-out both;
+  }
+  .q-reveal-fade {
+    animation: q-reveal-fade 0.2s ease-out both;
   }
 
   /* Survey respondent intro (design_handoff_survey_respondent) — its own
@@ -269,6 +315,26 @@ select {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Question reveal keyframes (see .q-reveal-* above). */
+@keyframes q-reveal-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes q-reveal-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 

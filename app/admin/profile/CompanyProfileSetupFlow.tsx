@@ -328,7 +328,7 @@ export function CompanyProfileSetupFlow({
           The app's own admin nav stays visible; only this flow's own
           step-navigator sidebar is new. */}
       <div className="sticky top-0 flex h-screen w-[220px] shrink-0 flex-col border-r border-border bg-card px-5 py-8">
-        <div className="mb-7 font-serif text-[17px] font-normal tracking-[-0.01em] text-card-foreground">
+        <div className="mb-7 text-[15px] font-semibold tracking-[-0.01em] text-card-foreground">
           Company Profile
         </div>
 

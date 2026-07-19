@@ -40,7 +40,7 @@ export async function POST() {
       // Draft forever: the sample survey must never be publicly answerable.
       status: "draft",
       is_sample: true,
-      slug: `sample-parks-rec-${randomSlugSuffix()}`,
+      slug: `sample-field-ops-${randomSlugSuffix()}`,
       user_id: user.id,
     })
     .select("id")

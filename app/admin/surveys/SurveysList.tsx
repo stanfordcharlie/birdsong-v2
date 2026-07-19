@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
@@ -34,13 +35,6 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
 export function SurveysList({ surveys }: { surveys: SurveyListItem[] }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  async function handleCopySlug(surveyId: string, slug: string) {
-    await navigator.clipboard.writeText(slug);
-    setCopiedId(surveyId);
-    setTimeout(() => setCopiedId((current) => (current === surveyId ? null : current)), 1500);
-  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -58,12 +52,9 @@ export function SurveysList({ surveys }: { surveys: SurveyListItem[] }) {
           No surveys yet. Create one and Wren starts interviewing the moment you share the link —
           every completed conversation comes back scored, with a call script ready.
         </p>
-        <Link
-          href="/admin/surveys/new"
-          className="rounded-control bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-        >
-          Create your first survey
-        </Link>
+        <Button asChild>
+          <Link href="/admin/surveys/new">Create your first survey</Link>
+        </Button>
       </Card>
     );
   }
@@ -89,7 +80,9 @@ export function SurveysList({ surveys }: { surveys: SurveyListItem[] }) {
                 onClick={() => setStatusFilter(filter.value)}
                 aria-pressed={active}
                 className={cn(
-                  "rounded-control border px-3.5 py-2 text-[13px] font-medium transition-colors",
+                  // h-9 matches the Input and Button defaults so the whole
+                  // controls row sits on one consistent height.
+                  "flex h-9 items-center rounded-control border px-3.5 text-[13px] font-medium transition-colors",
                   active
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-border bg-transparent text-muted-foreground hover:bg-secondary"
@@ -100,6 +93,9 @@ export function SurveysList({ surveys }: { surveys: SurveyListItem[] }) {
             );
           })}
         </div>
+        <Button asChild className="ml-auto">
+          <Link href="/admin/surveys/new">New survey</Link>
+        </Button>
       </div>
 
       <Card className="overflow-hidden">
@@ -108,7 +104,6 @@ export function SurveysList({ surveys }: { surveys: SurveyListItem[] }) {
             <TableRow>
               <TableHead>Internal name</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Slug</TableHead>
               <TableHead>Responses</TableHead>
               <TableHead>Created</TableHead>
             </TableRow>
@@ -116,7 +111,7 @@ export function SurveysList({ surveys }: { surveys: SurveyListItem[] }) {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
                   No surveys match your search.
                 </TableCell>
               </TableRow>
@@ -124,7 +119,7 @@ export function SurveysList({ surveys }: { surveys: SurveyListItem[] }) {
               filtered.map((survey) => (
                 <TableRow key={survey.id} className="relative">
                   <TableCell>
-                    <Link href={`/admin/surveys/${survey.id}`} className="font-serif text-[17px] font-normal text-card-foreground">
+                    <Link href={`/admin/surveys/${survey.id}`} className="text-[15px] font-medium text-card-foreground">
                       {/* Stretches to fill the whole row (position:relative
                           on TableRow above), so anywhere in the row is
                           clickable, not just this text. */}
@@ -137,22 +132,8 @@ export function SurveysList({ surveys }: { surveys: SurveyListItem[] }) {
                       {survey.status === "live" ? "Live" : "Draft"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-[13px] text-muted-foreground">
-                    <button
-                      type="button"
-                      onClick={() => handleCopySlug(survey.id, survey.slug)}
-                      // Sits above the name column's row-covering overlay
-                      // link (position:relative on TableRow + inset:0 span
-                      // above), which would otherwise intercept this click
-                      // and navigate instead of copying.
-                      className="relative z-10 rounded px-1 -mx-1 transition-colors hover:bg-secondary hover:text-card-foreground"
-                      title={`Copy slug: ${survey.slug}`}
-                    >
-                      {copiedId === survey.id ? "Copied!" : survey.slug}
-                    </button>
-                  </TableCell>
                   <TableCell className="text-card-foreground">{survey.responseCount}</TableCell>
-                  <TableCell className="text-[13px] text-faint">
+                  <TableCell className="text-sm text-card-foreground">
                     {new Date(survey.createdAt).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",

@@ -4,19 +4,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 export default function SurveysLoading() {
   return (
-    <div className="flex flex-col gap-7">
-      <div className="flex items-end justify-between">
-        <div className="flex flex-col gap-1.5">
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-7 w-44" />
-        </div>
-        <Skeleton className="h-9 w-28 rounded-control" />
+    <div className="admin-container-wide flex flex-col gap-7">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-10 w-64" />
       </div>
 
       <div className="flex items-center gap-3">
         <Skeleton className="h-9 max-w-[320px] flex-1 rounded-control" />
-        <Skeleton className="h-8 w-14 rounded-control" />
-        <Skeleton className="h-8 w-14 rounded-control" />
+        <Skeleton className="h-9 w-14 rounded-control" />
+        <Skeleton className="h-9 w-14 rounded-control" />
+        <Skeleton className="ml-auto h-9 w-28 rounded-control" />
       </div>
 
       <Card className="overflow-hidden">
@@ -25,7 +23,6 @@ export default function SurveysLoading() {
             <TableRow>
               <TableHead>Internal name</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Slug</TableHead>
               <TableHead>Responses</TableHead>
               <TableHead>Created</TableHead>
             </TableRow>
@@ -38,9 +35,6 @@ export default function SurveysLoading() {
                 </TableCell>
                 <TableCell>
                   <Skeleton className="h-5 w-14 rounded-full" />
-                </TableCell>
-                <TableCell>
-                  <Skeleton className="h-4 w-32" />
                 </TableCell>
                 <TableCell>
                   <Skeleton className="h-4 w-10" />

@@ -76,9 +76,9 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn("border-border py-8", !first && "border-t")}>
-      <div className="mb-3.5 flex items-baseline justify-between gap-6">
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-card-foreground">{title}</h2>
+    <div className={cn("border-border py-6", !first && "border-t")}>
+      <div className="mb-4 flex items-baseline justify-between gap-6">
+        <h2 className="type-label">{title}</h2>
         {editing ? (
           <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
             Cancel
@@ -326,10 +326,10 @@ export function CompanyProfileView({
     .filter(Boolean);
 
   return (
-    <div className="mx-auto flex max-w-[760px] flex-col">
-      <div className="bs-rise-1 mb-12">
-        <div className="mb-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-faint">Settings</div>
-        <h1 className="mb-2.5 font-serif text-[40px] font-normal text-card-foreground">Company profile</h1>
+    <div className="admin-container flex flex-col">
+      <div className="bs-rise-1 mb-6">
+        <div className="mb-2.5 type-label">Settings</div>
+        <h1 className="mb-2.5 type-page-title">Company profile</h1>
         <p className="max-w-[520px] text-[15px] text-muted-foreground">
           What Birdsong knows about your company. Every survey uses this to ask sharper questions and qualify the
           right people.
@@ -339,7 +339,7 @@ export function CompanyProfileView({
         )}
       </div>
 
-      <div className="bs-rise-2 mb-10 flex items-center gap-2.5 rounded-card border border-border bg-chip px-3.5 py-3">
+      <div className="bs-rise-2 mb-4 flex items-center gap-2.5 rounded-card border border-border bg-chip px-3.5 py-3">
         <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="shrink-0" aria-hidden="true">
           <path d="M8 1.5l1.6 3.9L13.5 7l-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z" fill="hsl(var(--ds-indigo))" />
         </svg>
@@ -362,7 +362,7 @@ export function CompanyProfileView({
           {aiButtonLabel}
         </Button>
       </div>
-      {aiError && <p className="-mt-8 mb-8 text-sm text-destructive">{aiError}</p>}
+      {aiError && <p className="-mt-2 mb-4 text-sm text-destructive">{aiError}</p>}
 
       {saveError && <p className="mb-4 text-sm text-destructive">{saveError}</p>}
 
@@ -428,7 +428,7 @@ export function CompanyProfileView({
                 className="h-12 w-12 rounded-card border border-border bg-card object-cover"
               />
             ) : (
-              <div className="flex h-12 w-12 items-center justify-center rounded-card border border-border bg-card font-serif text-base text-card-foreground">
+              <div className="flex h-12 w-12 items-center justify-center rounded-card border border-border bg-card text-sm font-semibold text-card-foreground">
                 {initials}
               </div>
             )}
@@ -474,7 +474,7 @@ export function CompanyProfileView({
               </div>
             </div>
           ) : (
-            <p className="max-w-[620px] text-[16px] leading-[1.65] text-card-foreground">
+            <p className="max-w-[620px] text-[15px] leading-[1.6] text-card-foreground">
               {profile.whatWeSell || "—"}
             </p>
           )}
@@ -496,7 +496,7 @@ export function CompanyProfileView({
               </div>
             </div>
           ) : (
-            <p className="max-w-[620px] text-[16px] leading-[1.65] text-card-foreground">
+            <p className="max-w-[620px] text-[15px] leading-[1.6] text-card-foreground">
               {profile.targetIcp || "—"}
             </p>
           )}
@@ -518,7 +518,7 @@ export function CompanyProfileView({
               </div>
             </div>
           ) : (
-            <p className="max-w-[620px] text-[16px] leading-[1.65] text-card-foreground">
+            <p className="max-w-[620px] text-[15px] leading-[1.6] text-card-foreground">
               {profile.valueProp || "—"}
             </p>
           )}

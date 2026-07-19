@@ -40,12 +40,10 @@ export default async function LeadsPage() {
   });
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="admin-container-wide flex flex-col gap-7">
       <div className="flex flex-col gap-2">
-        <span className="text-[13px] font-medium uppercase tracking-[0.04em] text-muted-foreground">Leads</span>
-        <h1 className="font-serif text-[40px] font-normal leading-none tracking-[-0.01em] text-card-foreground">
-          Your lead queue
-        </h1>
+        <span className="type-label">Leads</span>
+        <h1 className="type-page-title">Your lead queue</h1>
       </div>
 
       {error && <p className="text-sm text-destructive">{error.message}</p>}

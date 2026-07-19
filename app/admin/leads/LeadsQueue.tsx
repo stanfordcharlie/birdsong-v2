@@ -102,10 +102,11 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="max-w-[320px] flex-1 basis-[200px]">
+        <div className="max-w-[320px] flex-1 basis-[240px]">
           <Input
             type="text"
-            placeholder="Search name, email, company"
+            placeholder="Search leads"
+            aria-label="Search leads by name, email, or company"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -120,7 +121,7 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
                 onClick={() => setStatusFilter(filter.value)}
                 aria-pressed={active}
                 className={cn(
-                  "rounded-control border px-3.5 py-2 text-[13px] font-medium transition-colors",
+                  "flex h-9 items-center rounded-control border px-3.5 text-[13px] font-medium transition-colors",
                   active
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-border bg-transparent text-muted-foreground hover:bg-secondary"
@@ -136,7 +137,7 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
           onClick={() => setHotOnly((prev) => !prev)}
           aria-pressed={hotOnly}
           className={cn(
-            "rounded-control border px-3.5 py-2 text-[13px] font-medium transition-colors",
+            "flex h-9 items-center rounded-control border px-3.5 text-[13px] font-medium transition-colors",
             hotOnly
               ? "border-primary bg-primary text-primary-foreground"
               : "border-border bg-transparent text-muted-foreground hover:bg-secondary"
@@ -162,7 +163,7 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
           onClick={() => setShowTest((prev) => !prev)}
           aria-pressed={showTest}
           className={cn(
-            "rounded-control border px-3.5 py-2 text-[13px] font-medium transition-colors",
+            "flex h-9 items-center rounded-control border px-3.5 text-[13px] font-medium transition-colors",
             showTest
               ? "border-primary bg-primary text-primary-foreground"
               : "border-border bg-transparent text-muted-foreground hover:bg-secondary"
@@ -241,7 +242,7 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
                   {/* suppressHydrationWarning: relative time is computed
                       from Date.now(), which can differ between the server
                       render and hydration across a minute boundary. */}
-                  <TableCell className="text-[13px] text-faint" suppressHydrationWarning>
+                  <TableCell className="text-[13px] text-muted-foreground" suppressHydrationWarning>
                     {formatRelativeTime(lead.createdAt)}
                   </TableCell>
                 </TableRow>

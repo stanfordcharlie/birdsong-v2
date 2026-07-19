@@ -111,7 +111,10 @@ export function AdminSidebar({
         // AdminShell), so its rendered width is always what main's layout
         // actually reserves — no separate padding value to keep in sync as
         // the width transitions between collapsed/expanded.
-        "sticky top-0 flex h-screen shrink-0 flex-col justify-between bg-sidebar pb-8 pt-10 transition-[width] duration-200 ease-out",
+        // Top-anchored stack: wordmark row, then nav directly beneath it
+        // (28px gap), with mt-auto pinning the account chip to the bottom —
+        // no justify-between, which used to strand the nav mid-rail.
+        "sticky top-0 flex h-screen shrink-0 flex-col bg-sidebar pb-8 pt-10 transition-[width] duration-200 ease-out",
         collapsed ? "w-16" : "w-[196px]"
       )}
     >
@@ -127,7 +130,7 @@ export function AdminSidebar({
           moved below, out of this wrapper, for the same overflow-escaping
           reason as the account menu. */}
       <div className="overflow-hidden">
-        <div className={cn("mb-12 flex items-center px-3", collapsed ? "justify-center" : "gap-2.5")}>
+        <div className={cn("mb-7 flex items-center px-3", collapsed ? "justify-center" : "gap-2.5")}>
           <button
             type="button"
             onClick={toggleCollapsed}
@@ -192,7 +195,7 @@ export function AdminSidebar({
           prematurely end the hover. Not shown in the static design
           reference, but Settings/Sign out have to live somewhere — the
           main nav only ever listed Home/Surveys/Company profile. */}
-      <div className={cn("group/account relative flex items-center px-3", collapsed ? "justify-center" : "gap-2.5")}>
+      <div className={cn("group/account relative mt-auto flex items-center px-3", collapsed ? "justify-center" : "gap-2.5")}>
         <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-indigo-light text-[13px] font-semibold text-sidebar-active-foreground">
           {userInitial}
         </span>
@@ -205,16 +208,25 @@ export function AdminSidebar({
           </div>
         )}
 
-        <div className="pointer-events-none absolute bottom-full left-0 z-50 w-48 rounded-control border border-sidebar-border/[0.12] bg-sidebar p-1 opacity-0 shadow-lg transition-opacity duration-150 group-hover/account:pointer-events-auto group-hover/account:opacity-100">
+        {/* Standard light popover (card surface, border, shadow — the
+            design system's menu treatment), flush against the chip (no
+            margin gap) so the cursor never crosses a dead zone on its way
+            up. Expanded: inset to the rail's 12px padding so it never
+            overhangs the sidebar edge; collapsed: flies out to the right
+            of the avatar, same as the nav tooltips. */}
+        <div
+          className={cn(
+            "pointer-events-none absolute z-50 rounded-card border border-border bg-card p-1.5 opacity-0 shadow-lg transition-opacity duration-150 group-hover/account:pointer-events-auto group-hover/account:opacity-100",
+            collapsed ? "bottom-0 left-full ml-2 w-44" : "bottom-full left-3 right-3"
+          )}
+        >
           <Link
             href="/admin/settings"
-            className="block rounded-control px-3 py-2 text-sm text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/[0.06] hover:text-sidebar-foreground"
+            className="block rounded-control px-3 py-3 text-sm text-card-foreground transition-colors hover:bg-secondary"
           >
             Settings
           </Link>
-          <div className="rounded-control px-3 py-2 transition-colors hover:bg-sidebar-accent/[0.06]">
-            <SignOutButton className="text-sidebar-foreground/60 hover:text-sidebar-foreground" />
-          </div>
+          <SignOutButton className="block w-full rounded-control px-3 py-3 text-left text-card-foreground transition-colors hover:bg-secondary hover:text-card-foreground" />
         </div>
       </div>
     </aside>

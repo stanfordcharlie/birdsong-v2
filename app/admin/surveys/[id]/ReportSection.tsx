@@ -91,7 +91,7 @@ export function ReportSection({
   return (
     <div className="border-t border-border py-8">
       <div className="mb-3.5 flex items-baseline justify-between gap-6">
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-card-foreground">Report</h2>
+        <h2 className="type-label">Report</h2>
         <div className="flex items-center gap-2.5">
           {report && (
             <Button type="button" variant="secondary" size="sm" onClick={handleCopy}>
@@ -121,10 +121,10 @@ export function ReportSection({
       ) : (
         <div className="flex max-w-[680px] flex-col gap-7">
           <div>
-            <h3 className="font-serif text-[26px] font-normal leading-[1.25] text-card-foreground">
+            <h3 className="text-[17px] font-semibold leading-[1.35] tracking-[-0.01em] text-card-foreground">
               {content.title}
             </h3>
-            <p className="mt-1.5 text-[13px] text-faint">
+            <p className="mt-1.5 text-[13px] text-muted-foreground">
               Based on {report!.respondent_count} interviews · Generated{" "}
               {formatGeneratedDate(report!.created_at)}
               {content.meta && content.meta.interviews_included < content.meta.interviews_total && (
@@ -133,7 +133,7 @@ export function ReportSection({
             </p>
           </div>
 
-          <p className="text-[16px] leading-[1.65] text-card-foreground">{content.executive_summary}</p>
+          <p className="text-[15px] leading-[1.6] text-card-foreground">{content.executive_summary}</p>
 
           {content.key_themes.map((theme, i) => (
             <div key={i}>
@@ -178,7 +178,7 @@ export function ReportSection({
               <h4 className="text-[16px] font-semibold text-card-foreground">Notable quotes</h4>
               {content.notable_quotes.map((q, i) => (
                 <blockquote key={i} className="border-l-2 border-primary pl-4">
-                  <p className="font-serif text-[17px] leading-[1.5] text-card-foreground">
+                  <p className="text-[15px] leading-[1.6] text-card-foreground">
                     &ldquo;{q.quote}&rdquo;
                   </p>
                   <footer className="mt-1 text-[13px] text-muted-foreground">{q.attribution}</footer>

@@ -3,8 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function SettingsLoading() {
   return (
-    <div className="flex flex-col gap-6">
-      <Skeleton className="h-7 w-28" />
+    <div className="admin-container flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-10 w-48" />
+      </div>
 
       <Card>
         <CardHeader>

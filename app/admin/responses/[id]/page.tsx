@@ -100,7 +100,7 @@ export default async function ResponseDetailPage({
   const secondaryLine = [response.respondent_email, jobTitle, company].filter(Boolean).join(" · ");
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="admin-container flex flex-col gap-6">
       {survey && (
         <Link
           href={`/admin/surveys/${survey.id}`}

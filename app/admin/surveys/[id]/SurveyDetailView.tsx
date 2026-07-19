@@ -44,7 +44,7 @@ function parseQuestionGuide(text: string): string[] {
 function StatBlock({ value, label }: { value: React.ReactNode; label: string }) {
   return (
     <div>
-      <div className="font-serif text-[28px] leading-none text-card-foreground">{value}</div>
+      <div className="text-[26px] font-semibold leading-none tracking-[-0.01em] text-card-foreground">{value}</div>
       <div className="mt-2 text-[13px] text-muted-foreground">{label}</div>
     </div>
   );
@@ -59,7 +59,7 @@ function SectionHeader({
 }) {
   return (
     <div className="mb-3.5 flex items-baseline justify-between gap-6">
-      <h2 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-card-foreground">{title}</h2>
+      <h2 className="type-label">{title}</h2>
       {onEdit && (
         <Button type="button" variant="secondary" size="sm" onClick={onEdit}>
           Edit
@@ -106,9 +106,9 @@ export function SurveyDetailView({
 
   if (editing) {
     return (
-      <Card>
+      <Card className="admin-container-wide">
         <div className="flex items-center justify-between border-b border-border p-6 pb-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Edit survey</h2>
+          <h2 className="type-label">Edit survey</h2>
           <Button type="button" variant="secondary" size="sm" onClick={() => setEditing(false)}>
             Cancel
           </Button>
@@ -126,12 +126,12 @@ export function SurveyDetailView({
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="admin-container-wide flex flex-col">
       <div className="bs-rise-1 mb-11">
         <div className="mb-2.5 flex items-center gap-3">
           <Link
             href="/admin/surveys"
-            className="text-xs font-semibold uppercase tracking-[0.16em] text-faint transition-colors hover:text-muted-foreground"
+            className="type-label transition-colors hover:text-card-foreground"
           >
             Surveys
           </Link>
@@ -139,7 +139,7 @@ export function SurveyDetailView({
           <Badge variant={isLive ? "success" : "warning"}>{isLive ? "Live" : "Draft"}</Badge>
         </div>
         <div className="flex items-end justify-between gap-6">
-          <h1 className="font-serif text-[40px] font-normal text-card-foreground">{survey.title}</h1>
+          <h1 className="type-page-title">{survey.title}</h1>
           <div className="flex shrink-0 gap-2.5">
             {/* ?test=1: owner-verified server-side; lets the admin run the
                 interview (even on a draft) without creating a real lead,

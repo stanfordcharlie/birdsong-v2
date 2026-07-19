@@ -1,6 +1,6 @@
 const MAX_SLUG_LENGTH = 60;
 
-// Public survey URLs get a random tail (e.g. parks-and-rec-2-x7k2m9) so one
+// Public survey URLs get a random tail (e.g. field-ops-research-x7k2m9) so one
 // sponsor's surveys can't be found by guessing another's human-readable
 // slug. 6 chars over a 36-char alphabet ≈ 2.2B combinations — not a
 // credential (the session token is), just enough to kill enumeration.

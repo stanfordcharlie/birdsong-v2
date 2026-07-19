@@ -66,9 +66,25 @@ function wait(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
-function wordRevealDelayMs() {
-  return 40 + Math.random() * 20;
-}
+// How incoming interviewer questions arrive. Flip in one line:
+//   "pop"  — the full question rises and settles: fade + 10px rise + slight
+//            scale, 300ms ease-out (default)
+//   "fade" — plain 200ms opacity fade, no movement
+//   "none" — instant render, no animation
+// All three collapse to an instant render under prefers-reduced-motion (the
+// classes are gated in globals.css; resting state is fully visible).
+type QuestionReveal = "pop" | "fade" | "none";
+const QUESTION_REVEAL: QuestionReveal = "pop";
+
+const QUESTION_REVEAL_CLASS: Record<QuestionReveal, string> = {
+  pop: "q-reveal-pop",
+  fade: "q-reveal-fade",
+  none: "",
+};
+
+// How long the typing dots take to fade out before the question lands —
+// keep in sync with TypingDots' motion-safe:duration-150.
+const DOTS_FADE_MS = 150;
 
 // If a respondent starts typing a follow-up thought right after sending
 // (e.g. they forgot to mention something) before the next question has
@@ -76,11 +92,20 @@ function wordRevealDelayMs() {
 // until they've paused typing for this long.
 const TYPING_PAUSE_MS = 10000;
 
-function TypingDots() {
+function TypingDots({ leaving = false }: { leaving?: boolean }) {
   // Purely decorative — the hidden status live region in the chat stage is
-  // what tells screen reader users the interviewer is typing.
+  // what tells screen reader users the interviewer is typing. `leaving`
+  // fades the dots to transparent just before the question replaces them,
+  // so the indicator→question handoff reads as a crossfade instead of a
+  // hard cut (instant under reduced motion via motion-safe).
   return (
-    <div aria-hidden="true" className="flex items-center gap-1.5 py-2">
+    <div
+      aria-hidden="true"
+      className={cn(
+        "flex items-center gap-1.5 py-2 motion-safe:transition-opacity motion-safe:duration-150",
+        leaving && "opacity-0"
+      )}
+    >
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#a89d88] [animation-delay:-0.3s]" />
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#a89d88] [animation-delay:-0.15s]" />
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#a89d88]" />
@@ -213,7 +238,9 @@ export function InterviewFlow({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
-  const [streamingText, setStreamingText] = useState<string | null>(null);
+  // True for the brief window where the typing dots are fading out before
+  // the finished question replaces them (see revealAssistantMessage).
+  const [dotsLeaving, setDotsLeaving] = useState(false);
   const [chips, setChips] = useState<string[]>([]);
   // Which chip (if any) is currently highlighted/pending auto-submit.
   const [pickedChipIndex, setPickedChipIndex] = useState<number | null>(null);
@@ -293,28 +320,32 @@ export function InterviewFlow({
   // The typing indicator is already showing by the time this runs (callers
   // turn it on immediately when they send, before the fetch that produces
   // `content` even resolves) — this just holds it up if the respondent is
-  // mid-keystroke on a follow-up, then reveals the reply word by word so
-  // Claude's side of the conversation paces like a real texting app instead
-  // of appearing all at once.
+  // mid-keystroke on a follow-up, then hands off from indicator to question:
+  // the dots fade out, and the full question arrives in one motion (per
+  // QUESTION_REVEAL).
   async function revealAssistantMessage(content: string, nextChips: string[] = []) {
     await waitForRespondentToPauseTyping();
     if (!isMountedRef.current) return;
 
-    setIsTyping(false);
-    setStreamingText(null);
-    const words = content.split(" ");
-    for (let i = 1; i <= words.length; i++) {
-      setStreamingText(words.slice(0, i).join(" "));
-      if (i < words.length) await wait(wordRevealDelayMs());
+    if (QUESTION_REVEAL !== "none") {
+      // Let the dots reach transparent before the swap, so the height
+      // change from short indicator to full question block happens while
+      // nothing is visible (the question itself starts at opacity 0).
+      setDotsLeaving(true);
+      await wait(DOTS_FADE_MS);
       if (!isMountedRef.current) return;
     }
 
+    // One batched commit: the dots unmount and the finished question mounts
+    // (keyed on messages.length) playing its entrance exactly once. The old
+    // word-by-word reveal appended the message *after* streaming into an
+    // already-mounted block, which changed the key and remounted it —
+    // replaying the entrance over fully-visible text (the end-of-reveal
+    // flash). Chips land in the same commit, part of the same arrival.
+    setIsTyping(false);
+    setDotsLeaving(false);
     setMessages((prev) => [...prev, { role: "assistant", content }]);
-    setStreamingText(null);
     setLoading(false);
-    // Chips land once the question has fully "arrived", not mid-reveal —
-    // popping in alongside the finished question reads as part of the
-    // conversation instead of a UI element racing the typing animation.
     setChips(nextChips);
   }
 
@@ -862,7 +893,7 @@ export function InterviewFlow({
 
   const answeredCount = messages.filter((m) => m.role === "user").length;
   const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant")?.content ?? "";
-  const questionText = streamingText ?? lastAssistantMessage;
+  const questionText = lastAssistantMessage;
   const targetQuestionCount = survey.num_questions ?? 8;
   const hasAnswer = answer.trim().length > 0;
   // Same auto-grow heuristic as the design reference: line count plus a
@@ -882,14 +913,13 @@ export function InterviewFlow({
           {/* Hidden live regions, always mounted (a live region only fires
               if it exists before its content changes). Two separate regions
               on purpose: the question region's content is derived from
-              `messages`, which updates exactly once per question — after
-              the word-by-word reveal finishes — so each question is
-              announced once, cleanly. Wiring it to the visible streaming
-              h2 instead would re-announce the growing text on every word.
-              The status region handles transient state (typing, send
-              failure); it flips to "" during the reveal, and an empty
-              update announces nothing. Politeness is deliberate — no
-              assertive interruptions anywhere. */}
+              `messages`, which updates exactly once per question — when the
+              finished question is appended in revealAssistantMessage — so
+              each question is announced once, in full, regardless of the
+              visual entrance animation. The status region handles transient
+              state (typing, send failure); it flips to "" when the question
+              lands, and an empty update announces nothing. Politeness is
+              deliberate — no assertive interruptions anywhere. */}
           <div aria-live="polite" aria-atomic="true" className="sr-only">
             {lastAssistantMessage.replace(/\*\*/g, "")}
           </div>
@@ -902,9 +932,12 @@ export function InterviewFlow({
           </div>
 
           {isTyping ? (
-            <TypingDots />
+            <TypingDots leaving={dotsLeaving} />
           ) : (
-            <div key={messages.length} className="bs-rise-repeat">
+            // Keyed on messages.length so the entrance replays once per new
+            // question — the key changes only when a message is appended,
+            // never mid-animation, so the reveal can't double-fire.
+            <div key={messages.length} className={QUESTION_REVEAL_CLASS[QUESTION_REVEAL]}>
               <div className="mb-1 flex items-center justify-end">
                 <span className="text-[13px] tabular-nums text-[#a89d88]">
                   {answeredCount + 1} of {targetQuestionCount}

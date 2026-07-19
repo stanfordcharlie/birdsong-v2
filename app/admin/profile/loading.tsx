@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 
 export default function ProfileLoading() {
   return (
-    <div className="mx-auto flex max-w-[800px] flex-col">
+    <div className="admin-container flex flex-col">
       <div className="mb-2 flex items-end justify-between gap-5 pb-5 pt-2">
         <div className="flex flex-col gap-3">
           <Skeleton className="h-3 w-32" />

@@ -133,7 +133,7 @@ const REPORT_TOOL: Anthropic.Tool = {
             quote: { type: "string", description: "Verbatim quote, stripped of any names or company names." },
             attribution: {
               type: "string",
-              description: 'Generic attribution, e.g. "one recreation director".',
+              description: 'Generic attribution, e.g. "one operations director".',
             },
           },
           required: ["quote", "attribution"],

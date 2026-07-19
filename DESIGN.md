@@ -44,7 +44,7 @@ in `tailwind.config.ts` (e.g. `--ds-primary` → `bg-primary`, `text-primary`).
 | Indigo | `text-indigo` | `#4338ca` | Links/chip text on light surfaces (e.g. "Open respondent view") |
 | Indigo light | `text-indigo-light` / `bg-indigo-light` | `#a5b4fc` | Highlights/accents on ink surfaces (survey names in the activity feed, pulsing dot, user-chip avatar) |
 | Indigo chip | `bg-indigo-chip` (used at low alpha, e.g. `/[0.08]`) | `#4f46e5` | Indigo chip fill, `rgba(79,70,229,.08)` |
-| Sidebar | `bg-sidebar` | `#1c1917` (ink) | The one permanently-dark surface: the icon rail, and the admin home screen's left panel |
+| Sidebar | `bg-sidebar` | `#1c1917` (ink) | The one permanently-dark surface: the nav rail (the admin home's old dark left panel is gone) |
 | Sidebar foreground | `text-sidebar-foreground` (alpha-modified per state: `/60` inactive, `/50` faint, full for active text) | `#f5f4ef` (cream) | Text on ink surfaces |
 | Sidebar active foreground | `text-sidebar-active-foreground` | `#1c1917` (ink) | Text on the *active* nav pill (inverted — ink-on-cream, not cream-on-ink) |
 | Sidebar accent | `bg-sidebar-accent` (alpha-modified: `/[0.06]` hover, full for the active pill) | `#f5f4ef` (cream) | Nav hover wash / active pill background |
@@ -54,14 +54,40 @@ Note the sidebar's active-item colors are **inverted** from a typical dark-rail
 convention: inactive/hover text stays cream-on-ink, but the *active* item is a solid
 cream pill with ink text — straight from the handoff, not a mistake.
 
-## Typography
+## Typography roles
 
 **Body/UI: [Archivo](https://fonts.google.com/specimen/Archivo)** (`font-archivo`),
 weights 400/500/600/700. **Display: [Young Serif](https://fonts.google.com/specimen/Young+Serif)**
 (`font-serif`), weight 400 only (the font ships no other weight — always pair with
 `font-normal`, never `font-medium`/`font-semibold`, which would be a silent no-op).
-Young Serif is for display headings, big numbers (stat blocks), and the wordmark ONLY;
-Archivo is everything else. Both from `lib/fonts.ts`.
+Both from `lib/fonts.ts`.
+
+**Hard rule: serif is page-title only.** Young Serif appears in exactly two places in
+the admin: the single large page title at the top of each page (the `.type-page-title`
+role) and the sidebar "Birdsong" wordmark (`font-serif text-[19px]`). Nothing else —
+not table cell content, not card headings, not section titles, not survey names, not
+form headings, not stat values. Everything else is Archivo on the fixed scale below.
+
+Every role is a reusable utility class defined in `app/globals.css` (`@layer
+components`) — pages reference roles, not raw sizes. Because the roles live in the
+components layer, a single plain utility at a call site can still override one
+property (e.g. the survey-detail breadcrumb uses `.type-label` plus its own hover
+color).
+
+| Role | Class | Font | Size / weight | Color | Used for |
+|---|---|---|---|---|---|
+| Page title | `.type-page-title` | Young Serif | 40px / 400, line-height 1.1, tracking −0.01em | ink | The one large title per page: "Your surveys", "Your lead queue", "Settings", "Company profile", "New survey", the dashboard greeting, the survey-detail title |
+| Section label (eyebrow) | `.type-label` | Archivo | 13px / 600, uppercase, tracking 0.14em | muted | Page eyebrows ("SURVEYS", "SETTINGS", the dashboard date), section titles ("BASICS", "REPORT", "WHERE TO NEXT"), breadcrumbs |
+| Card / section heading | `.type-heading` | Archivo | 17px / 600, tracking −0.01em | ink | Card headings ("Change email", "Account"), dashboard action-row titles, report titles. 16–18px / 600 is the sanctioned band when a sub-heading needs one step down (report theme `h4`s sit at 16px). |
+| Body | `.type-body` | Archivo | 15px / 400, line-height 1.6 | ink | Default copy and long-form read views; `text-sm` (14px) remains fine for denser UI copy |
+| Meta / secondary | `.type-meta` | Archivo | 13px / 400 | muted | Timestamps, slugs, created dates, attributions |
+| Table header | (baked into `components/ui/table.tsx`) | Archivo | 12px (`text-xs`) / 600, uppercase, tracking wide | muted | Every table `<th>` |
+| Table cell | (baked into `components/ui/table.tsx`) | Archivo | 14px (`text-sm`) / 400 | ink | Every table `<td>`; row-title cells (survey internal names) step up to `text-[15px] font-medium` |
+
+Two sanctioned exceptions to the serif rule, both deliberate: the sidebar wordmark
+(serif 19px — branding, not a heading), and the company-profile setup wizard's step
+titles (serif 28px — each wizard step's single page title, sized down to fit its
+card; the wizard's left-rail "Company Profile" label is sans).
 
 `font-archivo` is **not** the global `<body>` default — that stays `font-sans` (Inter),
 since marketing pages need it. Instead, `font-archivo` is applied once at each section's
@@ -69,21 +95,34 @@ layout root and inherits down: `components/AdminShell.tsx` for the whole admin, 
 `app/survey/[slug]/page.tsx` for the respondent interview. Don't sprinkle
 `font-archivo` on individual components — if body text isn't rendering in Archivo,
 the fix is almost always a missing wrapper at the root, not a missing class on the
-leaf.
+leaf. (The `.type-*` role classes each carry `font-archivo`/`font-serif` themselves,
+so they're safe anywhere.)
 
-Representative sizes actually in use (not a rigid scale — pulled from real pages):
+## Layout containers & spacing rhythm
 
-| Usage | Class | Example |
+Every admin page's content sits in one of two shared containers (utility classes in
+`globals.css`), horizontally centered in the space to the right of the sidebar:
+
+| Class | Max width | Used by |
 |---|---|---|
-| Display greeting | `font-serif text-[clamp(44px,4.6vw,66px)] font-normal` | Admin home greeting |
-| Page H1 | `font-serif text-[40px] font-normal` | "Company profile", "Settings" |
-| Survey/response title | `font-serif text-[34px]`–`text-[40px] font-normal` | Survey detail title, interview question |
-| Stat value | `font-serif text-[28px] font-normal` | Survey stats row |
-| Row title | `text-[23px] font-semibold` (Archivo, not serif) | Admin home action rows |
-| Body | `text-sm`/`text-[15px]`/`text-[16px]`, Archivo regular | Default copy |
-| Section eyebrow | `text-[13px] font-semibold uppercase tracking-[0.14em]` | Section titles ("BASICS", "QUESTIONS") |
-| Label | `text-xs font-semibold uppercase tracking-[0.16em]` | Date label, "WHERE TO NEXT", nav-adjacent labels |
-| Wordmark | `font-serif text-[19px]` | Sidebar "Birdsong" |
+| `.admin-container` | 920px | Form/detail pages: dashboard, Company profile, Settings, New survey, response detail |
+| `.admin-container-wide` | 1140px | Table pages: Surveys, Leads, survey detail |
+
+Both are `mx-auto w-full pt-6`; combined with `AdminShell`'s `p-8` this puts the
+eyebrow label 56px from the viewport top on every page, with 32px of horizontal
+padding once the viewport is narrower than the container. Each route's `loading.tsx`
+skeleton uses the same container as its page so nothing jumps when content arrives.
+
+**Page header pattern:** every page opens with an eyebrow (`.type-label`) 8–10px
+above its serif page title, then `gap-7` (28px) / `mb-10` before the first section.
+
+**Vertical rhythm:** 40–48px between major sections (`mt-12` between dashboard
+sections; Company profile sections are `py-6` each side of a divider = 48px
+title-to-title), 16–24px within a section (section label → content is `mb-4`).
+
+The only full-bleed layout left is the company-profile setup wizard, which cancels
+`AdminShell`'s `p-8` with `-m-8` for its own step-navigator rail. The admin home no
+longer does this — it sits on `.admin-container` like every other page.
 
 ## Spacing & radius
 
@@ -99,8 +138,10 @@ spacing tokens.
 | `--ds-radius-control` | `rounded-control` | `0.5rem` (8px) | Buttons, inputs, nav items |
 | — | `rounded-full` | 999px | Chips, badges, avatar circles |
 
-**Elevation:** flat everywhere. Cards use a 1px border (`border-border`), never a
-shadow.
+**Elevation:** flat for surfaces in the page flow — cards use a 1px border
+(`border-border`), never a shadow. Floating layers only (the sidebar account
+popover, collapsed-nav tooltips) add `shadow-lg` on top of their border so they
+read as intentional menus above the page.
 
 ## Component patterns
 
@@ -141,15 +182,26 @@ Header: uppercase, `text-muted-foreground`, bottom border only. Rows: bottom bor
 ### Admin shell (`components/AdminShell.tsx`, `components/AdminSidebar.tsx`)
 
 Collapsible ink sidebar (`bg-sidebar`), **196px expanded / 64px (`w-16`) collapsed**,
-`transition-[width,padding]` 0.2s ease. Top: a toggle button (panel icon, fixed
-position regardless of state) + Young Serif "Birdsong" wordmark (hidden collapsed),
-then three nav links (Home / Surveys / Company profile), each icon (house / clipboard
-/ building — apply the same set to any new admin nav items) + label (label hidden
-collapsed, `title` attribute picks up the slack), 8px radius, active item is a solid
-cream pill with ink text. Bottom: a 30px indigo-light circle with the user's initial
-(always visible) + name/"Admin" role label (hidden collapsed). Hovering the chip
-reveals Settings/Sign out (not shown in the static design reference, but has to live
-somewhere since the handoff's 3-item nav doesn't include Settings).
+`transition-[width,padding]` 0.2s ease. **Top-anchored stack** (no `justify-between`
+— the nav must never float mid-rail): the toggle button (panel icon, fixed position
+regardless of state) + Young Serif "Birdsong" wordmark (hidden collapsed) sit at the
+very top, with the nav links directly beneath after a 28px gap (`mb-7`). Four nav
+links (Home / Leads / Surveys / Company profile), each icon (house / people /
+clipboard / building — apply the same hand-drawn stroke set to any new admin nav
+items) + label (label hidden collapsed, `title` attribute picks up the slack), 8px
+radius, active item is a solid cream pill with ink text. Bottom, pinned with
+`mt-auto`: a 30px indigo-light circle with the user's initial (always visible) +
+name/"Admin" role label (hidden collapsed).
+
+Hovering the account chip reveals a Settings/Sign out popover (not shown in the
+static design reference, but has to live somewhere since the handoff's nav doesn't
+include Settings). It's the design system's standard light menu: `bg-card`, 1px
+`border-border`, `rounded-card`, `shadow-lg`, `p-1.5`, items `text-sm` with 12px
+vertical padding (`py-3`) and `hover:bg-secondary`. It sits flush against the chip
+(no margin gap, so the cursor never crosses a hover dead zone), inset to the rail's
+12px padding when expanded (`left-3 right-3` — it must never overhang the sidebar
+edge), and flies out to the right of the avatar when collapsed, like the nav
+tooltips.
 
 Collapsed state is local `useState` in `AdminSidebar`, persisted to `localStorage`
 (`bs-sidebar-collapsed`) and re-applied client-side after mount (server/first-client
@@ -164,10 +216,11 @@ that padding value had no way to stay in sync and the layout could visibly
 break/overlap. Don't reintroduce fixed positioning here without also removing this
 comment and re-solving that sync problem.
 
-A page can still break out of `<main>`'s `p-8` with `-m-8` for a full-bleed layout
-(admin home does this for its split-screen panels; the company profile onboarding
-wizard does the same for its own step-navigator sidebar) — that part is unaffected by
-the sidebar becoming collapsible.
+A page can still break out of `<main>`'s `p-8` with `-m-8` for a full-bleed layout —
+today only the company profile onboarding wizard does this, for its own
+step-navigator sidebar. (The admin home used to as well, for a split-screen dark
+panel; it now sits on `.admin-container` — see "Layout containers & spacing
+rhythm".)
 
 ### Load-in animation (`globals.css`)
 
@@ -176,7 +229,11 @@ the sidebar becoming collapsible.
   page's initial load (admin home, survey/profile sections).
 - `.bs-rise-repeat` — no delay, meant to be reapplied by keying the element (React
   remounts it, restarting the CSS animation) — used for the respondent interview's
-  per-question transition.
+  completion screen.
+- `.q-reveal-pop` / `.q-reveal-fade` — the respondent interview's per-question
+  entrance (rise-and-settle with slight scale, or plain fade). Which one (or
+  neither) applies is a one-line config in `InterviewFlow.tsx` (`QUESTION_REVEAL`:
+  `"pop" | "fade" | "none"`). The old word-by-word typing reveal is gone.
 
 `bs-dot`: 7px circle, `bg-indigo-light`, scale 1→1.4 + opacity 1→0.6, 2s infinite —
 marks "live" labels ("What's been happening", "Wren is asking").

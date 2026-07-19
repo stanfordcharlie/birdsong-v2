@@ -5,7 +5,7 @@ export function QuestionGuide() {
     <Textarea
       className="max-w-sm"
       rows={4}
-      defaultValue={"How long has your team used CivicRec?\nHas it had any major upgrades since?"}
+      defaultValue={"How long has your team used your dispatch software?\nHas it had any major upgrades since?"}
     />
   );
 }

@@ -31,20 +31,17 @@ export function GreetingBlock({ firstName }: { firstName: string | null }) {
 
   return (
     <div className="bs-rise-1">
-      <div className="mb-5 text-xs font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/50">
-        {dateLabel}
-      </div>
-      <h1 className="font-serif text-[clamp(44px,4.6vw,66px)] font-normal leading-[1.06] tracking-[-0.005em] text-sidebar-foreground">
-        Good
-        <br />
-        {time}
-        {firstName ? (
+      {/* Non-breaking spaces hold both lines' height on the first frame,
+          before the client clock fills in — no layout shift on mount. */}
+      <div className="mb-2.5 type-label">{dateLabel || " "}</div>
+      <h1 className="type-page-title">
+        {time ? (
           <>
-            ,<br />
-            {firstName}.
+            Good {time}
+            {firstName ? `, ${firstName}.` : "."}
           </>
         ) : (
-          "."
+          " "
         )}
       </h1>
     </div>

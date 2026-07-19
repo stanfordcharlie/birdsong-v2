@@ -13,14 +13,14 @@ export function ResponsesList() {
       <TableBody>
         <TableRow>
           <TableCell>Alex Rivera</TableCell>
-          <TableCell>alex@cityparks.gov</TableCell>
+          <TableCell>alex@copperpoint.example</TableCell>
           <TableCell>
             <Badge variant="primary">8</Badge>
           </TableCell>
         </TableRow>
         <TableRow>
           <TableCell>Jordan Lee</TableCell>
-          <TableCell>jordan@parksrec.org</TableCell>
+          <TableCell>jordan@gablefrost.example</TableCell>
           <TableCell>
             <Badge variant="default">5</Badge>
           </TableCell>

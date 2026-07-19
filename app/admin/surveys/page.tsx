@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
 import { SurveysList, type SurveyListItem } from "./SurveysList";
 
 export default async function AdminDashboardPage() {
@@ -47,17 +45,10 @@ export default async function AdminDashboardPage() {
   }));
 
   return (
-    <div className="flex flex-col gap-7">
-      <div className="flex items-end justify-between">
-        <div className="flex flex-col gap-2">
-          <span className="text-[13px] font-medium uppercase tracking-[0.04em] text-muted-foreground">Surveys</span>
-          <h1 className="font-serif text-[40px] font-normal leading-none tracking-[-0.01em] text-card-foreground">
-            Your surveys
-          </h1>
-        </div>
-        <Button asChild>
-          <Link href="/admin/surveys/new">New survey</Link>
-        </Button>
+    <div className="admin-container-wide flex flex-col gap-7">
+      <div className="flex flex-col gap-2">
+        <span className="type-label">Surveys</span>
+        <h1 className="type-page-title">Your surveys</h1>
       </div>
 
       {error && <p className="text-sm text-destructive">{error.message}</p>}
