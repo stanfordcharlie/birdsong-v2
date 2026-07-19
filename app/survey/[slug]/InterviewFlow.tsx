@@ -25,8 +25,10 @@ import { cn } from "@/lib/utils";
 type Survey = Database["public"]["Tables"]["surveys"]["Row"];
 type Stage = "intro" | "chat" | "complete";
 
+// Ground is the same eggshell as /landing-page (#faf8f1, was beige
+// #f3ecdf); the warm radial glow stays — it's an alpha wash on top.
 const PAGE_BACKGROUND_STYLE: React.CSSProperties = {
-  background: "radial-gradient(130% 90% at 50% -8%, rgba(233,166,116,.22), transparent 58%), #f3ecdf",
+  background: "radial-gradient(130% 90% at 50% -8%, rgba(233,166,116,.22), transparent 58%), #faf8f1",
 };
 
 const ASSISTANT_BUBBLE =
