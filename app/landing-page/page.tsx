@@ -5,8 +5,8 @@ import { MarketingPageShell } from "@/components/marketing/MarketingPageShell";
 import { LandingNav } from "@/components/marketing/LandingNav";
 import { HeroSection } from "@/components/marketing/HeroSection";
 import { ProductDemo, type ProductDemoContent } from "@/components/marketing/ProductDemo";
-import { HowItWorksSection } from "@/components/marketing/HowItWorksSection";
-import { FeaturesSection } from "@/components/marketing/FeaturesSection";
+import { HowItWorksShowcase } from "@/components/marketing/HowItWorksShowcase";
+import { TeamNeedsGrid } from "@/components/marketing/TeamNeedsGrid";
 import { FooterCta } from "@/components/marketing/FooterCta";
 
 export const metadata: Metadata = {
@@ -34,27 +34,8 @@ const DEMO_CONTENT: ProductDemoContent = {
   qualifiedScoreLabel: "91, strong",
   qualifiedBadgeLabel: "Qualified",
   ctaButtonLabel: "Book demo",
-  successLine: "Demo booked: Thursday 10:30 AM with Sam (AE, West)",
+  successLine: "Demo booked: Thursday 10:30 AM with Maya (AE, West)",
 };
-
-const FEATURES = [
-  {
-    title: "Context, attached",
-    body: "Every lead arrives with the conversation: what hurts, who is involved, when they want to move.",
-  },
-  {
-    title: "Scoring you define",
-    body: "Fit is measured against your ICP, in criteria you can read. Not a black-box number.",
-  },
-  {
-    title: "Routing that holds",
-    body: "Territory, segment, round-robin. The right rep gets the lead the first time.",
-  },
-  {
-    title: "Booking built in",
-    body: '"Get started" becomes "demo booked" while the intent is still warm.',
-  },
-];
 
 export default async function MarketingHomePage() {
   const supabase = await createClient();
@@ -69,34 +50,15 @@ export default async function MarketingHomePage() {
   }
 
   return (
-    <MarketingPageShell>
+    <MarketingPageShell tone="eggshell">
       <LandingNav crossLink={{ label: "For customer success", href: "/landing-page-2" }} />
       <HeroSection
         h1="Your best leads are already singing."
         subhead="Birdsong invites the people you want to sell to into genuine conversations about their work, then hands your team qualified leads with the whole story already there."
       />
       <ProductDemo content={DEMO_CONTENT} />
-      <HowItWorksSection
-        heading="From first note to booked demo."
-        invite={{
-          text: "You pick the audience. Birdsong reaches them directly and invites them into a paid, peer-level conversation about their work.",
-        }}
-        converse={{
-          text: "A real conversation about their work, not a survey. What actually hurts surfaces in their own words, weighed against your ICP and scored.",
-          chips: [
-            "Pain: manual inbound triage",
-            "Timeline: this quarter",
-            "Champion: Head of Growth",
-          ],
-        }}
-        deliver={{
-          text: "The lead lands qualified and routed to the right rep, with the conversation attached and a demo ready to book.",
-          cardTitle: "Coretide",
-          cardSubtitle: "Qualified · routed to Sam",
-          cardPill: "92 fit",
-        }}
-      />
-      <FeaturesSection heading="Everything your team needs. Nothing it doesn't." features={FEATURES} />
+      <HowItWorksShowcase />
+      <TeamNeedsGrid />
       <FooterCta
         heading="Hear your best leads first."
         subhead="Set up in an afternoon. Better inbound leads within the week."
