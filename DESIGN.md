@@ -193,15 +193,16 @@ radius, active item is a solid cream pill with ink text. Bottom, pinned with
 `mt-auto`: a 30px indigo-light circle with the user's initial (always visible) +
 name/"Admin" role label (hidden collapsed).
 
-Hovering the account chip reveals a Settings/Sign out popover (not shown in the
+Clicking the account chip toggles a Settings/Sign out popover (not shown in the
 static design reference, but has to live somewhere since the handoff's nav doesn't
-include Settings). It's the design system's standard light menu: `bg-card`, 1px
-`border-border`, `rounded-card`, `shadow-lg`, `p-1.5`, items `text-sm` with 12px
-vertical padding (`py-3`) and `hover:bg-secondary`. It sits flush against the chip
-(no margin gap, so the cursor never crosses a hover dead zone), inset to the rail's
-12px padding when expanded (`left-3 right-3` — it must never overhang the sidebar
-edge), and flies out to the right of the avatar when collapsed, like the nav
-tooltips.
+include Settings). Click-toggled, not hover-revealed — hover made the collapsed
+flyout unreachable (the cursor lost hover crossing the gap to it) and doesn't work
+for touch or keyboard; outside click, Escape, and any navigation dismiss it. It's
+the design system's standard light menu: `bg-card`, 1px `border-border`,
+`rounded-card`, `shadow-lg`, `p-1.5`, items `text-sm` with 12px vertical padding
+(`py-3`) and `hover:bg-secondary`. Expanded, it sits above the chip inset to the
+rail's 12px padding (`left-3 right-3` — it must never overhang the sidebar edge);
+collapsed, it flies out to the right of the avatar, like the nav tooltips.
 
 Collapsed state is local `useState` in `AdminSidebar`, persisted to `localStorage`
 (`bs-sidebar-collapsed`) and re-applied client-side after mount (server/first-client

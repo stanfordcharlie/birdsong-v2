@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignOutButton } from "./SignOutButton";
@@ -86,11 +86,40 @@ export function AdminSidebar({
   // flash from expanded to collapsed on reload, traded deliberately for
   // zero hydration-mismatch risk (same tradeoff as the admin home greeting).
   const [collapsed, setCollapsed] = useState(false);
+  // Click-toggled, not hover-revealed: the collapsed flyout sits past a gap
+  // the cursor has to cross, and losing hover mid-crossing made the menu
+  // unclickable. A real toggle also works for touch and keyboard.
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(COLLAPSE_STORAGE_KEY);
     if (stored === "true") setCollapsed(true);
   }, []);
+
+  // Dismiss the account menu on outside click or Escape.
+  useEffect(() => {
+    if (!accountOpen) return;
+    function onPointerDown(e: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setAccountOpen(false);
+      }
+    }
+    function onKeyDown(e: globalThis.KeyboardEvent) {
+      if (e.key === "Escape") setAccountOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [accountOpen]);
+
+  // Navigating anywhere closes the menu (e.g. after choosing Settings).
+  useEffect(() => {
+    setAccountOpen(false);
+  }, [pathname]);
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -189,39 +218,53 @@ export function AdminSidebar({
         })}
       </nav>
 
-      {/* Bottom: account chip. Hovering it reveals a small menu with
-          Settings and Sign out, flush against the chip (no margin gap) so
-          moving the cursor up into the menu doesn't cross a dead zone and
-          prematurely end the hover. Not shown in the static design
-          reference, but Settings/Sign out have to live somewhere — the
-          main nav only ever listed Home/Surveys/Company profile. */}
-      <div className={cn("group/account relative mt-auto flex items-center px-3", collapsed ? "justify-center" : "gap-2.5")}>
-        <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-indigo-light text-[13px] font-semibold text-sidebar-active-foreground">
-          {userInitial}
-        </span>
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-semibold text-sidebar-foreground">
-              {userName ?? "Account"}
-            </div>
-            <div className="text-[11px] text-sidebar-foreground/50">Admin</div>
-          </div>
-        )}
+      {/* Bottom: account chip. Clicking it toggles a small menu with
+          Settings and Sign out (outside click and Escape dismiss it). Not
+          shown in the static design reference, but Settings/Sign out have
+          to live somewhere — the main nav doesn't include them. */}
+      <div ref={accountRef} className="relative mt-auto px-3">
+        <button
+          type="button"
+          onClick={() => setAccountOpen((prev) => !prev)}
+          aria-haspopup="menu"
+          aria-expanded={accountOpen}
+          aria-label="Account menu"
+          className={cn(
+            "flex w-full items-center rounded-control py-1.5 text-left transition-colors hover:bg-sidebar-accent/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/40",
+            collapsed ? "justify-center" : "gap-2.5 px-1.5",
+            accountOpen && "bg-sidebar-accent/[0.06]"
+          )}
+        >
+          <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-indigo-light text-[13px] font-semibold text-sidebar-active-foreground">
+            {userInitial}
+          </span>
+          {!collapsed && (
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-semibold text-sidebar-foreground">
+                {userName ?? "Account"}
+              </span>
+              <span className="block text-[11px] text-sidebar-foreground/50">Admin</span>
+            </span>
+          )}
+        </button>
 
         {/* Standard light popover (card surface, border, shadow — the
-            design system's menu treatment), flush against the chip (no
-            margin gap) so the cursor never crosses a dead zone on its way
-            up. Expanded: inset to the rail's 12px padding so it never
-            overhangs the sidebar edge; collapsed: flies out to the right
-            of the avatar, same as the nav tooltips. */}
+            design system's menu treatment), toggled by the button above.
+            Expanded: sits above the chip, inset to the rail's 12px padding
+            so it never overhangs the sidebar edge; collapsed: flies out to
+            the right of the avatar, same side as the nav tooltips. */}
         <div
+          role="menu"
           className={cn(
-            "pointer-events-none absolute z-50 rounded-card border border-border bg-card p-1.5 opacity-0 shadow-lg transition-opacity duration-150 group-hover/account:pointer-events-auto group-hover/account:opacity-100",
-            collapsed ? "bottom-0 left-full ml-2 w-44" : "bottom-full left-3 right-3"
+            "absolute z-50 rounded-card border border-border bg-card p-1.5 shadow-lg transition-opacity duration-150",
+            collapsed ? "bottom-0 left-full ml-2 w-44" : "bottom-full left-3 right-3 mb-1.5",
+            accountOpen ? "opacity-100" : "pointer-events-none opacity-0"
           )}
         >
           <Link
             href="/admin/settings"
+            role="menuitem"
+            onClick={() => setAccountOpen(false)}
             className="block rounded-control px-3 py-3 text-sm text-card-foreground transition-colors hover:bg-secondary"
           >
             Settings
