@@ -14,13 +14,16 @@ import {
   sanitizeCustomFieldValues,
   truncate,
 } from "@/lib/interview/validation";
+import { deriveCompanyNameFromDomain, extractEmailDomain, isFreeEmailDomain } from "@/lib/interview/work-email";
 import type { InterviewMessage } from "@/lib/interview/types";
 import type { Json } from "@/types/database";
 
 // POST /api/interview/start
-// Body: { survey_id, respondent_name?, respondent_email?, respondent_phone?, custom_field_values? }
-// Creates a `responses` row (unauthenticated, public) and returns the first
-// interview message from Claude.
+// Body: { survey_id, respondent_name?, respondent_email, respondent_phone?, custom_field_values? }
+// respondent_email must be a work address (see isFreeEmailDomain below) — it's
+// how a company name gets derived now that there's no separate company field
+// by default. Creates a `responses` row (unauthenticated, public) and returns
+// the first interview message from Claude.
 //
 // CAPTCHA (e.g. Turnstile/hCaptcha) would slot in right here, verified
 // before the rate-limit check below even runs — not added in this pass.
@@ -59,11 +62,31 @@ export async function POST(request: Request) {
   const respondent_email =
     typeof body.respondent_email === "string" ? truncate(body.respondent_email.trim(), EMAIL_MAX_LENGTH) : undefined;
 
-  if (respondent_email && !isValidEmail(respondent_email)) {
+  if (!respondent_email) {
+    return NextResponse.json({ error: "A work email is required." }, { status: 400 });
+  }
+  if (!isValidEmail(respondent_email)) {
     return NextResponse.json({ error: "That doesn't look like a valid email address." }, { status: 400 });
   }
 
-  const sanitizedCustomFieldValues = sanitizeCustomFieldValues(custom_field_values);
+  // Never trust the client's own blocklist check (InterviewFlow.tsx runs
+  // the same one for inline UX, but a direct caller could skip it) — this
+  // is the actual gate, and it's also where the company name gets derived
+  // since the domain only exists once the address has passed validation.
+  const emailDomain = extractEmailDomain(respondent_email);
+  if (!emailDomain || isFreeEmailDomain(emailDomain)) {
+    return NextResponse.json(
+      { error: "Please use your work email so we can send your gift card" },
+      { status: 400 }
+    );
+  }
+  const derivedCompanyName = deriveCompanyNameFromDomain(emailDomain);
+
+  const sanitizedCustomFieldValues = {
+    ...sanitizeCustomFieldValues(custom_field_values),
+    email_domain: emailDomain,
+    derived_company_name: derivedCompanyName,
+  };
 
   console.log(`[interview/start] survey_id=${survey_id} respondent_email=${respondent_email ?? "none"}`);
 

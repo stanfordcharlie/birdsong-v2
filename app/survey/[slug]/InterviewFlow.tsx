@@ -9,6 +9,7 @@ import {
   parsePresetFieldLabel,
   parsePresetFieldRequired,
 } from "@/lib/surveys/respondent-fields";
+import { extractEmailDomain, isFreeEmailDomain } from "@/lib/interview/work-email";
 import { Badge } from "@/components/ui/badge";
 import { PerchedBird } from "@/components/marketing/PerchedBird";
 import { renderWithBold } from "@/lib/chat/render-with-bold";
@@ -25,7 +26,7 @@ import { cn } from "@/lib/utils";
 type Survey = Database["public"]["Tables"]["surveys"]["Row"];
 type Stage = "intro" | "chat" | "complete";
 
-// Ground is the same eggshell as /landing-page (#faf8f1, was beige
+// Ground is the same eggshell as / (the landing page, #faf8f1, was beige
 // #f3ecdf); the warm radial glow stays — it's an alpha wash on top.
 const PAGE_BACKGROUND_STYLE: React.CSSProperties = {
   background: "radial-gradient(130% 90% at 50% -8%, rgba(233,166,116,.22), transparent 58%), #faf8f1",
@@ -382,7 +383,7 @@ export function InterviewFlow({
 
   function firstMissingRequiredField(): string | null {
     if (!name.trim()) return "your name";
-    if (!email.trim()) return "your email";
+    if (!email.trim()) return "your work email";
     if (hasPhone && parsePresetFieldRequired(survey.custom_fields, "phone") && !phone.trim()) {
       return parsePresetFieldLabel(survey.custom_fields, "phone");
     }
@@ -414,6 +415,15 @@ export function InterviewFlow({
     if (!EMAIL_LIVE_CHECK_PATTERN.test(email.trim())) {
       setEmailTouched(true);
       setError("That doesn't look like a valid email address.");
+      return;
+    }
+    // Same blocklist the start route enforces server-side — this is just
+    // the inline, catch-it-before-the-round-trip copy; the route never
+    // trusts this check on its own.
+    const domain = extractEmailDomain(email.trim());
+    if (domain && isFreeEmailDomain(domain)) {
+      setEmailTouched(true);
+      setError("Please use your work email so we can send your gift card");
       return;
     }
     setError(null);
@@ -713,8 +723,11 @@ export function InterviewFlow({
 
               <div className="relative flex flex-col gap-1.5">
                 <label htmlFor="respondent-email" className={FIELD_LABEL_CLASSES}>
-                  Email <span className="font-normal text-[#a89d88]">for the gift card</span>
+                  Work email
                 </label>
+                <p className="text-[13px] text-[#a89d88]">
+                  This is where we&apos;ll send your gift card and a copy of the report.
+                </p>
                 <input
                   id="respondent-email"
                   ref={setFieldRef(emailIdx)}
@@ -725,7 +738,7 @@ export function InterviewFlow({
                   onChange={(e) => setEmail(e.target.value)}
                   onBlur={() => setEmailTouched(true)}
                   onKeyDown={(e) => onFieldKeyDown(e, emailIdx)}
-                  placeholder="you@example.com"
+                  placeholder="you@yourcompany.com"
                   disabled={loading}
                   aria-invalid={emailShowsX}
                   className={cn(

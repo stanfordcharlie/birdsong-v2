@@ -51,7 +51,12 @@ export default async function ResponseDetailPage({
 
   const customValues = (response.custom_field_values as Record<string, unknown> | null) ?? {};
   const jobTitle = typeof customValues.job_title === "string" ? customValues.job_title : null;
-  const company = typeof customValues.company === "string" ? customValues.company : null;
+  const company =
+    typeof customValues.company === "string"
+      ? customValues.company
+      : typeof customValues.derived_company_name === "string"
+        ? customValues.derived_company_name
+        : null;
 
   const messages = (response.messages as unknown as InterviewMessage[] | null) ?? [];
   const painPoints = (response.pain_points as unknown as string[] | null) ?? [];

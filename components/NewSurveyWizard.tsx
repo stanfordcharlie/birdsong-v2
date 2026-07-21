@@ -150,7 +150,11 @@ export function NewSurveyWizard() {
 
   const [collectPhone, setCollectPhone] = useState(true);
   const [collectJobTitle, setCollectJobTitle] = useState(true);
-  const [collectCompany, setCollectCompany] = useState(true);
+  // Off by default: company is now derived from the required work email
+  // domain instead of asked for directly. Admins can still turn this back
+  // on for an explicit field, which then takes priority over the derived
+  // name everywhere it's displayed or fed to the interview.
+  const [collectCompany, setCollectCompany] = useState(false);
   const [phoneLabel, setPhoneLabel] = useState(OPTIONAL_RESPONDENT_FIELD_LABELS.phone);
   const [jobTitleLabel, setJobTitleLabel] = useState(OPTIONAL_RESPONDENT_FIELD_LABELS.job_title);
   const [companyLabel, setCompanyLabel] = useState(OPTIONAL_RESPONDENT_FIELD_LABELS.company);

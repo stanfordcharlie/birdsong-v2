@@ -42,7 +42,7 @@ export function buildKickoffMessage(respondent?: InterviewRespondent | null): st
   const firstName = firstNameOf(respondent?.name);
   const values = respondent?.customFieldValues ?? {};
   const role = typeof values.job_title === "string" ? values.job_title.trim() : "";
-  const company = typeof values.company === "string" ? values.company.trim() : "";
+  const company = companyOf(values);
 
   if (!firstName && !role && !company) return KICKOFF_MESSAGE;
 
@@ -63,6 +63,17 @@ function firstNameOf(name: string | null | undefined): string | null {
   return trimmed.split(/\s+/)[0];
 }
 
+// An explicit "company" field (surveys that kept it after the preset was
+// removed going forward) always wins over the derived-from-email-domain
+// name, matching the same explicit-else-derived preference the admin leads
+// queue and response detail view use.
+function companyOf(values: Record<string, unknown>): string {
+  const explicit = typeof values.company === "string" ? values.company.trim() : "";
+  if (explicit) return explicit;
+  const derived = typeof values.derived_company_name === "string" ? values.derived_company_name.trim() : "";
+  return derived;
+}
+
 // Resolves the respondent's raw custom_field_values against the survey's
 // own field definitions (surveys.custom_fields) so preset keys like
 // "job_title" and admin-defined custom keys like "custom_team_size" both
@@ -78,6 +89,9 @@ function describeRespondentContext(survey: Survey, respondent?: InterviewRespond
 
   const details: string[] = [];
   for (const key of enabledPresets) {
+    // Company is handled separately below so it can fall back to the
+    // email-derived name on surveys that don't collect it explicitly.
+    if (key === "company") continue;
     const raw = values[key];
     if (typeof raw === "string" && raw.trim()) {
       details.push(`${parsePresetFieldLabel(survey.custom_fields, key)}: ${raw.trim()}`);
@@ -88,6 +102,13 @@ function describeRespondentContext(survey: Survey, respondent?: InterviewRespond
     if (typeof raw === "string" && raw.trim()) {
       details.push(`${def.label}: ${raw.trim()}`);
     }
+  }
+  const company = companyOf(values);
+  if (company) {
+    const companyLabel = enabledPresets.includes("company")
+      ? parsePresetFieldLabel(survey.custom_fields, "company")
+      : "Company";
+    details.push(`${companyLabel}: ${company}`);
   }
 
   if (!firstName && details.length === 0) return "";

@@ -28,7 +28,12 @@ export default async function LeadsPage() {
       id: r.id,
       name: r.respondent_name,
       email: r.respondent_email,
-      company: typeof customValues.company === "string" ? customValues.company : null,
+      company:
+        typeof customValues.company === "string"
+          ? customValues.company
+          : typeof customValues.derived_company_name === "string"
+            ? customValues.derived_company_name
+            : null,
       surveyId: r.survey_id,
       surveyTitle: r.surveys?.title ?? "—",
       leadScore: r.lead_score,
