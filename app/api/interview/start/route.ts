@@ -15,11 +15,12 @@ import {
   truncate,
 } from "@/lib/interview/validation";
 import { deriveCompanyNameFromDomain, extractEmailDomain, isFreeEmailDomain } from "@/lib/interview/work-email";
+import { sanitizeSource } from "@/lib/interview/source";
 import type { InterviewMessage } from "@/lib/interview/types";
 import type { Json } from "@/types/database";
 
 // POST /api/interview/start
-// Body: { survey_id, respondent_name?, respondent_email, respondent_phone?, custom_field_values? }
+// Body: { survey_id, respondent_name?, respondent_email, respondent_phone?, custom_field_values?, source? }
 // respondent_email must be a work address (see isFreeEmailDomain below) — it's
 // how a company name gets derived now that there's no separate company field
 // by default. Creates a `responses` row (unauthenticated, public) and returns
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
   let body: {
     survey_id?: string;
     is_test?: unknown;
+    source?: unknown;
     respondent_name?: string;
     respondent_email?: string;
     respondent_phone?: string;
@@ -43,6 +45,12 @@ export async function POST(request: Request) {
   }
 
   const { survey_id, respondent_phone, custom_field_values } = body;
+
+  // Never trust the client's own cleaning (InterviewFlow.tsx sanitizes
+  // ?src= for UX, but a direct caller could send anything) — re-sanitized
+  // independently here. Null when absent or when it sanitizes down to
+  // nothing, same as organic/untagged traffic.
+  const source = sanitizeSource(body.source);
 
   if (!survey_id || typeof survey_id !== "string") {
     return NextResponse.json({ error: "survey_id is required" }, { status: 400 });
@@ -196,6 +204,7 @@ export async function POST(request: Request) {
       custom_field_values: sanitizedCustomFieldValues as Json,
       messages: messages as unknown as Json,
       session_token: sessionToken,
+      source,
       ...(isTest ? { is_test: true } : {}),
     })
     .select("id")

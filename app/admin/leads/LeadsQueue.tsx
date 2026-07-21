@@ -29,6 +29,7 @@ export type LeadItem = {
   topPainPoint: string | null;
   createdAt: string;
   isTest: boolean;
+  source: string | null;
 };
 
 type StatusFilter = "all" | "new" | "contacted" | "qualified" | "not_a_fit";
@@ -65,6 +66,7 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [surveyFilter, setSurveyFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [hotOnly, setHotOnly] = useState(false);
   const [showTest, setShowTest] = useState(false);
 
@@ -78,6 +80,17 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
     return Array.from(seen, ([id, title]) => ({ id, title }));
   }, [items]);
 
+  // Distinct, non-null source values actually present in this user's data.
+  // Most accounts won't have any ?src= traffic yet, so the whole control
+  // (not just an empty option list) is hidden until at least one exists.
+  const sourceOptions = useMemo(() => {
+    const seen = new Set<string>();
+    for (const lead of items) {
+      if (lead.source) seen.add(lead.source);
+    }
+    return Array.from(seen).sort();
+  }, [items]);
+
   function handleStatusChange(leadId: string, status: string) {
     setLeads((prev) => prev.map((lead) => (lead.id === leadId ? { ...lead, status } : lead)));
   }
@@ -88,6 +101,7 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
       if (!showTest && lead.isTest) return false;
       if (statusFilter !== "all" && lead.status !== statusFilter) return false;
       if (surveyFilter !== "all" && lead.surveyId !== surveyFilter) return false;
+      if (sourceFilter !== "all" && lead.source !== sourceFilter) return false;
       if (hotOnly && (lead.leadScore ?? 0) < HOT_SCORE_MIN) return false;
       if (
         q &&
@@ -97,7 +111,7 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
       }
       return true;
     });
-  }, [leads, query, statusFilter, surveyFilter, hotOnly, showTest]);
+  }, [leads, query, statusFilter, surveyFilter, sourceFilter, hotOnly, showTest]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -158,6 +172,21 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
             </option>
           ))}
         </select>
+        {sourceOptions.length > 0 && (
+          <select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            aria-label="Filter by source"
+            className={SELECT_CLASSES}
+          >
+            <option value="all">All sources</option>
+            {sourceOptions.map((source) => (
+              <option key={source} value={source}>
+                {source}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           type="button"
           onClick={() => setShowTest((prev) => !prev)}
@@ -180,6 +209,7 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
               <TableHead>Name</TableHead>
               <TableHead>Company</TableHead>
               <TableHead>Survey</TableHead>
+              {sourceOptions.length > 0 && <TableHead>Source</TableHead>}
               <TableHead>Score</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Top pain point</TableHead>
@@ -189,7 +219,10 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                <TableCell
+                  colSpan={sourceOptions.length > 0 ? 8 : 7}
+                  className="text-center text-sm text-muted-foreground"
+                >
                   No leads match your filters.
                 </TableCell>
               </TableRow>
@@ -217,6 +250,9 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{lead.company || "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{lead.surveyTitle}</TableCell>
+                  {sourceOptions.length > 0 && (
+                    <TableCell className="text-muted-foreground">{lead.source || "—"}</TableCell>
+                  )}
                   <TableCell>
                     <Badge variant={scoreBadgeVariant(lead.leadScore)}>
                       {lead.leadScore ?? "—"}

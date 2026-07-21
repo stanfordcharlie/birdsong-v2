@@ -233,6 +233,7 @@ export function InterviewFlow({
   survey,
   logoUrl,
   isTest = false,
+  source = null,
 }: {
   survey: Survey;
   logoUrl: string | null;
@@ -240,6 +241,10 @@ export function InterviewFlow({
   // the is_test flag on the start call (re-verified by the route), and
   // skipping completion persistence so previews are repeatable.
   isTest?: boolean;
+  // Already sanitized server-side by the page (from ?src=). Never rendered
+  // anywhere — just carried through to the start call unchanged, however
+  // long the respondent takes to fill in the intro form.
+  source?: string | null;
 }) {
   const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
   const customFieldDefs = parseCustomRespondentFieldDefs(survey.custom_fields);
@@ -436,6 +441,7 @@ export function InterviewFlow({
         body: JSON.stringify({
           survey_id: survey.id,
           ...(isTest ? { is_test: true } : {}),
+          ...(source ? { source } : {}),
           respondent_name: name,
           respondent_email: email,
           respondent_phone: hasPhone ? phone : undefined,

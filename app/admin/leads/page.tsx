@@ -14,7 +14,7 @@ export default async function LeadsPage() {
   const { data: responses, error } = await supabase
     .from("responses")
     .select(
-      "id, respondent_name, respondent_email, custom_field_values, lead_score, status, pain_points, created_at, survey_id, is_test, surveys(title)"
+      "id, respondent_name, respondent_email, custom_field_values, lead_score, status, pain_points, created_at, survey_id, is_test, source, surveys(title)"
     )
     .eq("user_id", user?.id ?? "")
     .eq("completed", true)
@@ -41,6 +41,7 @@ export default async function LeadsPage() {
       topPainPoint: typeof painPoints[0] === "string" ? painPoints[0] : null,
       createdAt: r.created_at,
       isTest: r.is_test,
+      source: r.source,
     };
   });
 

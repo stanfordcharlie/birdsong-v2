@@ -126,6 +126,9 @@ export default async function ResponseDetailPage({
               {response.respondent_name || "Unnamed respondent"}
             </span>
             {secondaryLine && <span className="text-sm text-muted-foreground">{secondaryLine}</span>}
+            {response.source && (
+              <span className="text-xs text-muted-foreground">Source: {response.source}</span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sanitizeSource } from "@/lib/interview/source";
 import { InterviewFlow } from "./InterviewFlow";
 
 // cache() so generateMetadata and the page component share one query per
@@ -63,9 +64,9 @@ export default async function PublicSurveyPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ test?: string }>;
+  searchParams: Promise<{ test?: string; src?: string }>;
 }) {
-  const [{ slug }, { test }] = await Promise.all([params, searchParams]);
+  const [{ slug }, { test, src }] = await Promise.all([params, searchParams]);
   const survey = await getSurvey(slug);
 
   if (!survey) {
@@ -77,6 +78,12 @@ export default async function PublicSurveyPage({
   // ignored entirely and normal rules apply, so a curious respondent
   // adding it gets exactly the standard behavior.
   const isTest = test === "1" && (await getCurrentUser())?.id === survey.user_id;
+
+  // ?src= tags which channel this link was shared through (in-app popup,
+  // an email blast, paid ads, ...). Sanitized here so InterviewFlow only
+  // ever sees a clean value; the start route re-sanitizes independently
+  // since it's directly callable and can't trust this pass either.
+  const source = sanitizeSource(src);
 
   // A draft survey isn't publicly answerable yet. A 404 (not a distinct
   // "this survey is closed" page) is deliberate: it's the least-informative
@@ -101,7 +108,7 @@ export default async function PublicSurveyPage({
 
   return (
     <div className="font-archivo min-h-screen bg-page">
-      <InterviewFlow survey={survey} logoUrl={profile?.logo_url ?? null} isTest={isTest} />
+      <InterviewFlow survey={survey} logoUrl={profile?.logo_url ?? null} isTest={isTest} source={source} />
     </div>
   );
 }

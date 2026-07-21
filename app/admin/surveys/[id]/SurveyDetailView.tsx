@@ -5,9 +5,16 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SurveyForm, type SurveyFormValues } from "@/components/SurveyForm";
 import { ReportSection, type SurveyReportRow } from "./ReportSection";
 import { cn } from "@/lib/utils";
+
+export type SourceBreakdownRow = {
+  source: string;
+  starts: number;
+  completions: number;
+};
 
 export type RespondentChip = {
   label: string;
@@ -77,6 +84,7 @@ export function SurveyDetailView({
   initialValues,
   latestReport,
   completedInterviewCount,
+  sourceBreakdown,
 }: {
   survey: SurveyDetailData;
   responseCount: number;
@@ -85,6 +93,9 @@ export function SurveyDetailView({
   initialValues: SurveyFormValues;
   latestReport: SurveyReportRow | null;
   completedInterviewCount: number;
+  // Null when there's nothing to compare yet (every response so far is
+  // "Direct", or they're all from the same tagged source).
+  sourceBreakdown: SourceBreakdownRow[] | null;
 }) {
   const [editing, setEditing] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -177,6 +188,36 @@ export function SurveyDetailView({
           </p>
         )}
       </div>
+
+      {sourceBreakdown && (
+        <div className="border-t border-border py-8">
+          <SectionHeader title="Sources" />
+          <p className="mb-3.5 text-[13px] text-faint">
+            Starts and completions by <code className="font-mono text-faint">?src=</code> on the shared
+            link. Untagged traffic shows as Direct.
+          </p>
+          <Card className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Starts</TableHead>
+                  <TableHead>Completions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sourceBreakdown.map((row) => (
+                  <TableRow key={row.source}>
+                    <TableCell className="font-medium text-card-foreground">{row.source}</TableCell>
+                    <TableCell className="text-muted-foreground">{row.starts}</TableCell>
+                    <TableCell className="text-muted-foreground">{row.completions}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </div>
+      )}
 
       <div className="bs-rise-3 border-t border-border py-8">
         <SectionHeader title="Audience & goal" onEdit={() => setEditing(true)} />

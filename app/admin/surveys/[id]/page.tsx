@@ -90,6 +90,28 @@ export default async function SurveyDetailPage({
       ? Math.round((responseList.filter((r) => r.completed).length / responseList.length) * 100)
       : null;
 
+  // Every response row is a "start" (created the moment the interview
+  // begins), so grouping the same responseList by source gives starts and
+  // completions per channel for free. Untagged rows bucket under "Direct"
+  // rather than being dropped, so a survey with one tagged source plus
+  // organic traffic still shows a real comparison. Only worth showing once
+  // there's actually something to compare — a single bucket (all direct,
+  // or every response from the same source) isn't a breakdown.
+  const sourceBuckets = new Map<string, { starts: number; completions: number }>();
+  for (const r of responseList) {
+    const key = r.source?.trim() || "Direct";
+    const bucket = sourceBuckets.get(key) ?? { starts: 0, completions: 0 };
+    bucket.starts += 1;
+    if (r.completed) bucket.completions += 1;
+    sourceBuckets.set(key, bucket);
+  }
+  const sourceBreakdown =
+    sourceBuckets.size > 1
+      ? Array.from(sourceBuckets, ([source, counts]) => ({ source, ...counts })).sort(
+          (a, b) => b.starts - a.starts
+        )
+      : null;
+
   return (
     <div className="flex flex-col gap-10">
       <SurveyDetailView
@@ -111,6 +133,7 @@ export default async function SurveyDetailPage({
         responseCount={responseList.length}
         qualifiedCount={qualifiedCount}
         completionRate={completionRate}
+        sourceBreakdown={sourceBreakdown}
         initialValues={initialValues}
         latestReport={
           latestReport
