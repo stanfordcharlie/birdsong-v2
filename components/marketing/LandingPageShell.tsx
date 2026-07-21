@@ -1,6 +1,9 @@
+"use client";
+
 import { bricolage, spectral } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 import { MarketingBodyEffects } from "./MarketingBodyEffects";
+import { useScrollReveal } from "./useScrollReveal";
 
 // Matches the literal --lp-bg values in globals.css (can't read a CSS
 // custom property from here to hand to MarketingBodyEffects, which sets
@@ -22,8 +25,17 @@ export function LandingPageShell({
   children: React.ReactNode;
   tone?: "cream" | "eggshell";
 }) {
+  // Owns the scroll-reveal observer for the whole page: it queries every
+  // [data-reveal] descendant once mounted (Hero, HowItWorksSection,
+  // ProofComparison, FeatureCard, LandingCta, ...) and adds .lp-in as each
+  // scrolls into view (see useScrollReveal / globals.css). Without a ref
+  // attached somewhere above them, those elements sit at their pre-reveal
+  // opacity: 0 forever.
+  const ref = useScrollReveal<HTMLDivElement>();
+
   return (
     <div
+      ref={ref}
       data-tone={tone === "eggshell" ? "eggshell" : undefined}
       className={cn(
         bricolage.variable,
