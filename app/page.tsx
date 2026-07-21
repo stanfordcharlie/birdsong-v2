@@ -52,7 +52,7 @@ export default async function RootPage() {
   }
 
   return (
-    <LandingPageShell tone="cream">
+    <LandingPageShell tone="eggshell">
       <LandingNav crossLink={{ label: "For customer success", href: "/customer-success" }} />
       <Hero
         h1Pre="Your best leads are already"
