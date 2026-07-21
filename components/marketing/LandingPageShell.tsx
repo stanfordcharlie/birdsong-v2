@@ -40,7 +40,14 @@ export function LandingPageShell({
       className={cn(
         bricolage.variable,
         spectral.variable,
-        "min-h-screen overflow-x-hidden bg-landing-bg font-sans text-landing-ink"
+        // overflow-x-clip, not overflow-x-hidden: `hidden` on one axis
+        // computes the other from visible to auto, which makes this div a
+        // scroll container — and LandingNav's `sticky` then resolves
+        // against *this* box instead of the viewport. Since the box grows
+        // to full content height it never scrolls itself, so the nav just
+        // rode up out of view. `clip` does the same clipping (the CTA bird
+        // flies 420px right, see lp-takeoff) without the scroll container.
+        "lp-shell min-h-screen overflow-x-clip bg-landing-bg font-sans text-landing-ink"
       )}
     >
       <MarketingBodyEffects color={TONE_BODY_COLOR[tone]} />

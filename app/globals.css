@@ -676,6 +676,18 @@ select {
   }
 }
 
+/* Pre-Safari-16 fallback for LandingPageShell's overflow-x: clip. Without
+   clip support the whole declaration is dropped, so the CTA bird's 420px
+   takeoff would widen the page — restore hidden there. That costs those
+   browsers the sticky nav (hidden makes the shell a scroll container, which
+   is the very reason the shell moved to clip), i.e. exactly today's
+   behavior, rather than a page that scrolls sideways. */
+@supports not (overflow-x: clip) {
+  .lp-shell {
+    overflow-x: hidden;
+  }
+}
+
 /* --- Respondent survey: mobile viewport + keyboard (app/survey/[slug]) ---
    Most respondents arrive from paid ads on a phone, so this flow is the one
    surface tuned for a 360–430px portrait viewport with the on-screen
