@@ -27,8 +27,17 @@ export const metadata: Metadata = {
 // Matches the "B" mark's rounded-square fill (public/icon.svg,
 // favicon.ico, etc.) — colors browser chrome (mobile address bar, PWA
 // splash/install UI) that would otherwise default to white.
+//
+// width/initialScale restate Next's own defaults; viewportFit: "cover" is
+// the part that matters — without it iOS letterboxes the page inside the
+// safe area and every env(safe-area-inset-*) resolves to 0px, so the
+// respondent survey's home-indicator clearance would silently do nothing.
+// userScalable is deliberately left alone: pinch-zoom stays available.
 export const viewport: Viewport = {
   themeColor: "#3a6046",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

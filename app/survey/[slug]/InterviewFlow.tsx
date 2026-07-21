@@ -38,8 +38,12 @@ const RESPONDENT_BUBBLE =
   "self-end max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-[#241f18] px-4 py-2.5 text-sm leading-relaxed text-[#f3ecdf]";
 
 const FIELD_LABEL_CLASSES = "text-[13px] font-semibold text-[#6f6757]";
+// text-base (16px) is load-bearing on iOS, not just a type choice: Safari
+// auto-zooms the whole page on focus for any input under 16px and never
+// zooms back out. min-h-[48px] is the touch-target floor; on desktop the
+// py-[14px] + 16px line box already exceeds it, so it changes nothing there.
 const FIELD_INPUT_BASE =
-  "w-full min-w-0 rounded-xl border border-[#e7ddc9] bg-[#fffdf7] py-[14px] text-base text-[#262019] placeholder:text-[#a89d88] focus:border-[#6f6757] focus:outline-none focus:ring-[3px] focus:ring-[rgba(38,32,25,.07)] disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full min-w-0 min-h-[48px] rounded-xl border border-[#e7ddc9] bg-[#fffdf7] py-[14px] text-base text-[#262019] placeholder:text-[#a89d88] focus:border-[#6f6757] focus:outline-none focus:ring-[3px] focus:ring-[rgba(38,32,25,.07)] disabled:cursor-not-allowed disabled:opacity-60";
 
 // Same bird, different perch: 48x46 (vs the marketing default 40x38) and
 // its own two-note arrangement, per the handoff.
@@ -67,6 +71,44 @@ const EMAIL_LIVE_CHECK_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function wait(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+// Below this, a visual-viewport shrink is the URL bar collapsing or a
+// find-in-page bar, not a keyboard — re-anchoring the stage for those would
+// be a visible jolt for no reason.
+const KEYBOARD_MIN_INSET_PX = 120;
+
+// How much of the layout viewport the on-screen keyboard is covering, or 0
+// when it's closed.
+//
+// No CSS unit reports this. dvh shrinks for browser toolbars but *not* for
+// the keyboard — on iOS the keyboard is painted over the layout viewport
+// without resizing it at all — so the pinned-to-the-bottom composer ends up
+// underneath it. window.visualViewport is the only API that describes the
+// box the respondent can actually see, hence measuring here and handing the
+// number to CSS as a custom property. offsetTop is subtracted because iOS
+// scrolls the visual viewport within the layout viewport when focusing a
+// field near the bottom; without it the inset reads short by that amount.
+function useKeyboardInset() {
+  const [inset, setInset] = useState(0);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const covered = window.innerHeight - vv.height - vv.offsetTop;
+      setInset(covered > KEYBOARD_MIN_INSET_PX ? Math.round(covered) : 0);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+
+  return inset;
 }
 
 // How incoming interviewer questions arrive. Flip in one line:
@@ -289,6 +331,11 @@ export function InterviewFlow({
   const [failedMessage, setFailedMessage] = useState<string | null>(null);
   const [showResponses, setShowResponses] = useState(false);
   const answerInputRef = useRef<HTMLTextAreaElement>(null);
+  // The chat stage's scroll box once the keyboard is up (see the
+  // .survey-stage rules in globals.css) — scrolled back to the top when a
+  // new question lands so the question, not the middle of the composer, is
+  // what the respondent sees.
+  const stageRef = useRef<HTMLDivElement>(null);
   const isMountedRef = useRef(true);
   // Epoch 0 so a fresh page load with no typing yet never waits.
   const lastKeystrokeAtRef = useRef(0);
@@ -331,6 +378,8 @@ export function InterviewFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const keyboardInset = useKeyboardInset();
+
   // Refocus the answer box whenever it becomes usable again (first question,
   // and after each round trip) so respondents never have to click into it.
   useEffect(() => {
@@ -338,6 +387,16 @@ export function InterviewFlow({
       answerInputRef.current?.focus();
     }
   }, [stage, loading]);
+
+  // A new question replaces the old one in place, so there's no thread to
+  // follow — but with the keyboard up the stage is a scroll box that may be
+  // left mid-scroll from the previous answer. Reset it so each question
+  // starts at the top of the visible area. Keyed on message count, which
+  // changes exactly once per question (see revealAssistantMessage).
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    stageRef.current?.scrollTo({ top: 0, behavior: prefersReducedMotion ? "auto" : "smooth" });
+  }, [messages.length]);
 
   async function waitForRespondentToPauseTyping() {
     while (isMountedRef.current) {
@@ -653,25 +712,35 @@ export function InterviewFlow({
     const totalFieldCount = fieldCount;
     const onFieldKeyDown = (e: KeyboardEvent<HTMLInputElement>, idx: number) =>
       handleFieldKeyDown(e, idx, totalFieldCount);
+    // Label the mobile keyboard's action key to match what Enter actually
+    // does here, so the software keyboard agrees with the existing
+    // Enter-advances-field handler instead of offering a generic "return"
+    // that looks like it will insert a newline.
+    const enterHintFor = (idx: number): "next" | "go" =>
+      idx < totalFieldCount - 1 ? "next" : "go";
 
     const metaLine = survey.num_questions
       ? `${survey.num_questions} questions · about ${Math.max(3, Math.round(survey.num_questions * MINUTES_PER_QUESTION))} minutes`
       : null;
-    const microcopy = survey.gift_card_amount
-      ? "Press Enter to move between fields · Your info is only used to send the gift card"
-      : "Press Enter to move between fields";
+    // Split rather than one string so the keyboard hint can be dropped on
+    // phones, where there is no Enter key to press — the software keyboard
+    // shows "next"/"go" (see enterHintFor) and the instruction reads as
+    // stale advice for a keyboard the respondent doesn't have.
+    const giftCardMicrocopy = survey.gift_card_amount
+      ? "Your info is only used to send the gift card"
+      : null;
 
     return (
       <div
         className={cn(
           spectral.variable,
           newsreader.variable,
-          "flex min-h-screen flex-col font-sans text-[16px] text-[#262019]"
+          "survey-viewport flex flex-col overflow-x-hidden font-sans text-[16px] text-[#262019]"
         )}
         style={PAGE_BACKGROUND_STYLE}
       >
         <TestModeBadge isTest={isTest} />
-        <div className="mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-6 py-16">
+        <div className="mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-10 sm:px-6 sm:py-16">
           {survey.sponsor && logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt={survey.sponsor} className="mb-6 h-8 w-auto object-contain" />
@@ -688,12 +757,12 @@ export function InterviewFlow({
             </div>
           )}
 
-          <h1 className="survey-intro-rise-2 font-spectral mb-3.5 text-[44px] font-medium leading-[1.08] tracking-[-0.01em]">
+          <h1 className="survey-intro-rise-2 font-spectral mb-3.5 text-balance break-words text-[31px] font-medium leading-[1.12] tracking-[-0.01em] sm:text-[44px] sm:leading-[1.08]">
             {surveyName}
           </h1>
 
           {survey.topic && (
-            <p className="survey-intro-rise-3 text-pretty mb-9 text-[17px] leading-[1.55] text-[#6f6757]">
+            <p className="survey-intro-rise-3 text-pretty mb-7 text-[16px] leading-[1.55] text-[#6f6757] sm:mb-9 sm:text-[17px]">
               {survey.topic}
             </p>
           )}
@@ -701,8 +770,14 @@ export function InterviewFlow({
           <form onSubmit={handleIntroSubmit}>
             <div className="survey-intro-rise-4 flex flex-col gap-3">
               <div className="relative flex flex-col gap-1.5">
+                {/* The notes are absolutely placed up to ~64px right of the
+                    bird's own left edge, so at 360–430px the default
+                    right-[14px] perch pushes them against (and past) the
+                    form's right edge. Sliding the whole bird inboard on
+                    phones keeps the arrangement intact rather than clipping
+                    it; sm: restores the desktop perch exactly. */}
                 <PerchedBird
-                  className="pointer-events-none absolute -top-[14px] right-[14px] z-[2]"
+                  className="pointer-events-none absolute -top-[14px] right-[58px] z-[2] sm:right-[14px]"
                   width={48}
                   height={46}
                   notes={INTRO_BIRD_NOTES}
@@ -715,6 +790,7 @@ export function InterviewFlow({
                   ref={setFieldRef(nameIdx)}
                   type="text"
                   autoComplete="name"
+                  enterKeyHint={enterHintFor(nameIdx)}
                   autoFocus
                   required
                   value={name}
@@ -739,6 +815,11 @@ export function InterviewFlow({
                   ref={setFieldRef(emailIdx)}
                   type="email"
                   autoComplete="email"
+                  enterKeyHint={enterHintFor(emailIdx)}
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -766,6 +847,9 @@ export function InterviewFlow({
                     id="respondent-phone"
                     ref={setFieldRef(phoneIdx)}
                     type="tel"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    enterKeyHint={enterHintFor(phoneIdx)}
                     required={parsePresetFieldRequired(survey.custom_fields, "phone")}
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
@@ -777,7 +861,13 @@ export function InterviewFlow({
               )}
 
               {(hasJobTitle || hasCompany) && (
-                <div className={hasJobTitle && hasCompany ? "grid grid-cols-2 gap-3" : "flex flex-col gap-3"}>
+                <div
+                  className={
+                    hasJobTitle && hasCompany
+                      ? "grid grid-cols-1 gap-3 sm:grid-cols-2"
+                      : "flex flex-col gap-3"
+                  }
+                >
                   {hasJobTitle && (
                     <div className="flex min-w-0 flex-col gap-1.5">
                       <label htmlFor="respondent-job-title" className={FIELD_LABEL_CLASSES}>
@@ -788,6 +878,7 @@ export function InterviewFlow({
                         ref={setFieldRef(jobTitleIdx)}
                         type="text"
                         autoComplete="organization-title"
+                        enterKeyHint={enterHintFor(jobTitleIdx)}
                         required={parsePresetFieldRequired(survey.custom_fields, "job_title")}
                         value={jobTitle}
                         onChange={(e) => setJobTitle(e.target.value)}
@@ -807,6 +898,7 @@ export function InterviewFlow({
                         ref={setFieldRef(companyIdx)}
                         type="text"
                         autoComplete="organization"
+                        enterKeyHint={enterHintFor(companyIdx)}
                         required={parsePresetFieldRequired(survey.custom_fields, "company")}
                         value={company}
                         onChange={(e) => setCompany(e.target.value)}
@@ -829,6 +921,11 @@ export function InterviewFlow({
                     ref={setFieldRef(linkedinIdx)}
                     type="url"
                     autoComplete="url"
+                    inputMode="url"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    enterKeyHint={enterHintFor(linkedinIdx)}
                     required={parsePresetFieldRequired(survey.custom_fields, "linkedin")}
                     value={linkedin}
                     onChange={(e) => setLinkedin(e.target.value)}
@@ -848,6 +945,7 @@ export function InterviewFlow({
                     id={`respondent-custom-${field.key}`}
                     ref={setFieldRef(customFieldIdxs[i])}
                     type="text"
+                    enterKeyHint={enterHintFor(customFieldIdxs[i])}
                     required={field.required === true}
                     value={customFieldValues[field.key] ?? ""}
                     onChange={(e) =>
@@ -866,14 +964,18 @@ export function InterviewFlow({
             <button
               type="submit"
               disabled={loading}
-              className="survey-intro-rise-5 mt-6 flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-[#241f18] px-6 text-[17px] font-semibold text-[#f3ecdf] transition-opacity hover:opacity-90 active:scale-[.985] disabled:cursor-not-allowed disabled:opacity-60"
+              className="survey-intro-rise-5 mt-6 flex min-h-[52px] w-full touch-manipulation items-center justify-center gap-2.5 rounded-xl bg-[#241f18] px-6 text-[17px] font-semibold text-[#f3ecdf] transition-opacity active:scale-[.985] disabled:cursor-not-allowed disabled:opacity-60 [@media(hover:hover)]:hover:opacity-90"
             >
               {loading ? "Starting…" : "Start"}
               <ArrowIcon size={17} />
             </button>
           </form>
 
-          <div className="survey-intro-rise-6 mt-3.5 text-center text-[13px] text-[#a89d88]">{microcopy}</div>
+          <div className="survey-intro-rise-6 mt-3.5 text-balance text-center text-[13px] text-[#a89d88]">
+            <span className="hidden sm:inline">Press Enter to move between fields</span>
+            {giftCardMicrocopy && <span className="hidden sm:inline"> · </span>}
+            {giftCardMicrocopy}
+          </div>
         </div>
         <Footer />
       </div>
@@ -883,11 +985,14 @@ export function InterviewFlow({
   if (stage === "complete") {
     return (
       <div
-        className={cn(spectral.variable, "flex min-h-screen flex-col font-sans text-[16px] text-[#262019]")}
+        className={cn(
+          spectral.variable,
+          "survey-viewport flex flex-col overflow-x-hidden font-sans text-[16px] text-[#262019]"
+        )}
         style={PAGE_BACKGROUND_STYLE}
       >
         <TestModeBadge isTest={isTest} />
-        <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+        <div className="flex flex-1 flex-col items-center justify-center px-5 py-12 text-center sm:px-6 sm:py-16">
           <div className="bs-rise-repeat mx-auto w-full max-w-[560px]">
             <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-[#e4ecdd]">
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -900,10 +1005,10 @@ export function InterviewFlow({
                 />
               </svg>
             </div>
-            <h1 className="font-spectral mb-3.5 text-[38px] font-medium leading-[1.15]">
+            <h1 className="font-spectral mb-3.5 text-balance text-[29px] font-medium leading-[1.18] sm:text-[38px] sm:leading-[1.15]">
               That&apos;s everything. Thank you.
             </h1>
-            <p className="text-pretty text-base leading-[1.6] text-[#6f6757]">
+            <p className="text-pretty break-words text-base leading-[1.6] text-[#6f6757]">
               {closingMessage}
               {survey.gift_card_amount ? (
                 <>
@@ -920,7 +1025,7 @@ export function InterviewFlow({
             <button
               type="button"
               onClick={() => setShowResponses((prev) => !prev)}
-              className="mx-auto mt-8 flex items-center gap-1.5 text-sm text-[#6f6757] transition-colors hover:text-[#262019]"
+              className="mx-auto mt-8 flex min-h-[44px] touch-manipulation items-center gap-1.5 px-3 text-sm text-[#6f6757] transition-colors [@media(hover:hover)]:hover:text-[#262019]"
               aria-expanded={showResponses}
             >
               {showResponses ? "Hide your responses" : "See your responses"}
@@ -967,13 +1072,25 @@ export function InterviewFlow({
 
   return (
     <div
-      className={cn(spectral.variable, "flex min-h-screen flex-col font-sans text-[16px] text-[#262019]")}
-      style={PAGE_BACKGROUND_STYLE}
+      className={cn(
+        spectral.variable,
+        "survey-viewport flex flex-col overflow-x-hidden font-sans text-[16px] text-[#262019]"
+      )}
+      data-keyboard={keyboardInset > 0 ? "open" : undefined}
+      style={
+        {
+          ...PAGE_BACKGROUND_STYLE,
+          "--kb-inset": `${keyboardInset}px`,
+        } as React.CSSProperties
+      }
     >
       <TopProgressLine answered={answeredCount} target={targetQuestionCount} />
       <TestModeBadge isTest={isTest} />
 
-      <div className="flex flex-1 items-center justify-center px-6 py-16">
+      <div
+        ref={stageRef}
+        className="survey-stage flex flex-1 items-center justify-center px-5 py-8 sm:px-6 sm:py-16"
+      >
         <div className="w-full max-w-[640px]">
           {/* Hidden live regions, always mounted (a live region only fires
               if it exists before its content changes). Two separate regions
@@ -1009,7 +1126,13 @@ export function InterviewFlow({
                 </span>
               </div>
 
-              <h1 className="font-spectral text-pretty mb-[26px] text-[32px] font-medium leading-[1.28] tracking-[-0.005em] [&_strong]:font-semibold [&_strong]:not-italic [&_strong]:underline [&_strong]:decoration-[#3a6046] [&_strong]:decoration-2 [&_strong]:underline-offset-[5px]">
+              {/* 32px is a lot of vertical run for a long question on a
+                  380px-tall visible box — at phone widths it alone can push
+                  the composer off screen. Scaling to 23px buys back roughly
+                  a line and a half without touching the desktop size. The
+                  bolded-phrase underline treatment is unchanged; only
+                  underline-offset tightens with the smaller type. */}
+              <h1 className="font-spectral text-pretty mb-5 break-words text-[23px] font-medium leading-[1.32] tracking-[-0.005em] [&_strong]:font-semibold [&_strong]:not-italic [&_strong]:underline [&_strong]:decoration-[#3a6046] [&_strong]:decoration-2 [&_strong]:underline-offset-[4px] sm:mb-[26px] sm:text-[32px] sm:leading-[1.28] sm:[&_strong]:underline-offset-[5px]">
                 {renderWithBold(questionText)}
               </h1>
 
@@ -1023,7 +1146,7 @@ export function InterviewFlow({
                       onClick={retrySend}
                       disabled={loading}
                       aria-label="Retry sending your answer"
-                      className="font-semibold underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a6046] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex min-h-[44px] touch-manipulation items-center px-2 font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a6046] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:opacity-80"
                     >
                       {loading ? "Retrying…" : "Retry"}
                     </button>
@@ -1033,6 +1156,12 @@ export function InterviewFlow({
 
               <form onSubmit={handleSend} className="flex flex-col gap-[18px]">
                 {chips.length > 0 && (
+                  // Wrap, not horizontal scroll: a scroller hides options
+                  // off the right edge (the respondent has to discover them)
+                  // and its swipe gesture competes with scrolling the stage
+                  // when the keyboard is up. Wrapping keeps every suggestion
+                  // visible and thumb-reachable; the cost is vertical space,
+                  // which the smaller mobile question type just bought back.
                   <div className="flex flex-wrap gap-2.5">
                     {chips.map((chip, i) => {
                       const picked = pickedChipIndex === i;
@@ -1044,10 +1173,10 @@ export function InterviewFlow({
                           aria-label={`Suggested reply: ${chip}`}
                           aria-pressed={picked}
                           className={cn(
-                            "min-h-[44px] rounded-full border px-[18px] py-[11px] text-[15px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a6046] focus-visible:ring-offset-2",
+                            "min-h-[44px] touch-manipulation break-words rounded-full border px-[18px] py-[11px] text-left text-[15px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a6046] focus-visible:ring-offset-2",
                             picked
                               ? "border-[#241f18] bg-[#241f18] text-[#f3ecdf]"
-                              : "border-[#e7ddc9] bg-[#fffdf7] text-[#262019] hover:border-[#a89d88] hover:bg-[#f6efe1] active:scale-[.97]"
+                              : "border-[#e7ddc9] bg-[#fffdf7] text-[#262019] active:scale-[.97] [@media(hover:hover)]:hover:border-[#a89d88] [@media(hover:hover)]:hover:bg-[#f6efe1]"
                           )}
                         >
                           {chip}
@@ -1072,24 +1201,35 @@ export function InterviewFlow({
                   onKeyDown={handleAnswerKeyDown}
                   rows={draftRows}
                   disabled={loading}
-                  className="w-full resize-none rounded-[14px] border border-[#e7ddc9] bg-[#fffdf7] px-[18px] py-4 text-base leading-[1.5] text-[#262019] placeholder:text-[#a89d88] focus:border-[#6f6757] focus:outline-none focus:ring-[3px] focus:ring-[rgba(38,32,25,.07)] disabled:cursor-not-allowed disabled:opacity-60"
+                  enterKeyHint="send"
+                  // max-h caps the auto-grow at ~4 of its 6 rows on phones and
+                  // scrolls past that: a 6-row box plus the keyboard leaves
+                  // no room for the question or Continue on a 380px-tall
+                  // visible area. sm:max-h-none keeps the full 6-row growth
+                  // on desktop.
+                  className="max-h-[136px] w-full touch-manipulation resize-none overflow-y-auto rounded-[14px] border border-[#e7ddc9] bg-[#fffdf7] px-[18px] py-4 text-base leading-[1.5] text-[#262019] placeholder:text-[#a89d88] focus:border-[#6f6757] focus:outline-none focus:ring-[3px] focus:ring-[rgba(38,32,25,.07)] disabled:cursor-not-allowed disabled:opacity-60 sm:max-h-none"
                 />
 
-                <div className="flex flex-wrap items-center gap-4">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   <button
                     type="submit"
                     disabled={!hasAnswer || loading}
-                    className="flex min-h-[48px] items-center gap-2.5 rounded-xl bg-[#241f18] px-[26px] py-[14px] text-base font-semibold text-[#f3ecdf] transition-opacity hover:opacity-90 active:scale-[.985] disabled:cursor-not-allowed disabled:opacity-45"
+                    className="flex min-h-[48px] touch-manipulation items-center gap-2.5 rounded-xl bg-[#241f18] px-[26px] py-[14px] text-base font-semibold text-[#f3ecdf] transition-opacity active:scale-[.985] disabled:cursor-not-allowed disabled:opacity-45 [@media(hover:hover)]:hover:opacity-90"
                   >
                     Continue <ArrowIcon size={15} />
                   </button>
-                  <span className="text-[13px] text-[#a89d88]">Enter ↵ to send · Shift+Enter for a new line</span>
+                  {/* Describes physical keys the phone keyboard doesn't have;
+                      enterKeyHint="send" on the textarea is the mobile
+                      equivalent affordance. */}
+                  <span className="hidden text-[13px] text-[#a89d88] sm:inline">
+                    Enter ↵ to send · Shift+Enter for a new line
+                  </span>
                   <span className="flex-1" />
                   <button
                     type="button"
                     onClick={handleSkip}
                     disabled={loading}
-                    className="rounded-control px-2 py-2 text-sm text-[#a89d88] transition-colors hover:text-[#262019] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-control px-3 text-sm text-[#a89d88] transition-colors disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:text-[#262019]"
                   >
                     Skip
                   </button>
@@ -1108,7 +1248,11 @@ export function InterviewFlow({
 
 function Footer() {
   return (
-    <div className="pb-6 text-center">
+    // Bottom-most element in every stage, so it owns clearing the iPhone
+    // home indicator for the whole flow. When the keyboard is up this is
+    // hidden (globals.css) and the clearance goes with it — correct, since
+    // the keyboard is covering that strip anyway.
+    <div className="survey-footer pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] text-center">
       <span className="text-xs text-[#a89d88]">
         Powered by <span className="font-serif text-[#6f6757]">Birdsong</span>
       </span>

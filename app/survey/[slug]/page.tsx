@@ -107,7 +107,11 @@ export default async function PublicSurveyPage({
     .maybeSingle();
 
   return (
-    <div className="font-archivo min-h-screen bg-page">
+    // survey-viewport, not min-h-screen: 100vh on iOS Safari is the
+    // toolbars-hidden height, so a min-h-screen wrapper would keep the
+    // document taller than the visible area and reintroduce the scroll
+    // InterviewFlow's own dvh sizing exists to remove.
+    <div className="font-archivo survey-viewport bg-page">
       <InterviewFlow survey={survey} logoUrl={profile?.logo_url ?? null} isTest={isTest} source={source} />
     </div>
   );

@@ -675,3 +675,62 @@ select {
     transform: scale(1);
   }
 }
+
+/* --- Respondent survey: mobile viewport + keyboard (app/survey/[slug]) ---
+   Most respondents arrive from paid ads on a phone, so this flow is the one
+   surface tuned for a 360–430px portrait viewport with the on-screen
+   keyboard up. Everything below is either width-agnostic (dvh, safe-area,
+   pointer queries) or only engages once JS sets data-keyboard, so desktop
+   rendering is unchanged. */
+
+/* 100vh on iOS Safari is the *large* viewport — the height the page would
+   have if the toolbars were hidden — so a 100vh column is taller than
+   what's actually on screen and its vertically-centered content sits
+   partly below the fold. dvh tracks the real box. The vh line is the
+   fallback for browsers without dvh; @supports upgrades it in place. */
+.survey-viewport {
+  min-height: 100vh;
+}
+@supports (min-height: 100dvh) {
+  .survey-viewport {
+    min-height: 100dvh;
+  }
+}
+
+/* Keyboard open (data-keyboard + --kb-inset set from visualViewport in
+   InterviewFlow). dvh does *not* shrink for the keyboard — nothing in CSS
+   does — so the column has to be capped to the measured visible box and
+   the stage re-anchored to the top: a centered column inside a full-height
+   page puts the composer behind the keyboard. The stage scrolls internally
+   from here so the question stays reachable above the composer. */
+.survey-viewport[data-keyboard="open"] {
+  min-height: 0;
+  height: calc(100vh - var(--kb-inset, 0px));
+}
+@supports (height: 100dvh) {
+  .survey-viewport[data-keyboard="open"] {
+    height: calc(100dvh - var(--kb-inset, 0px));
+  }
+}
+.survey-viewport[data-keyboard="open"] .survey-stage {
+  align-items: flex-start;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+/* "Powered by Birdsong" is the first thing worth sacrificing for composer
+   room on a 380px-tall visible box. */
+.survey-viewport[data-keyboard="open"] .survey-footer {
+  display: none;
+}
+
+/* Touch: no lingering tap flash, and no hover skin left stuck on a chip
+   after it's been tapped. The hover *styles* themselves are gated per call
+   site with [@media(hover:hover)]; this covers the UA-level highlight. */
+.survey-viewport button,
+.survey-viewport a,
+.survey-viewport textarea,
+.survey-viewport input {
+  -webkit-tap-highlight-color: transparent;
+}
