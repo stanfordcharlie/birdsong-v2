@@ -1,6 +1,6 @@
 import { Archivo, Inter, Newsreader, Spectral, Young_Serif } from "next/font/google";
 
-// Marketing pages only (app/landing-page*) — the platform redesign
+// Marketing pages only (app/page.tsx, app/customer-success) — the platform redesign
 // (design_handoff_birdsong_platform) covers admin + the respondent survey,
 // not marketing. Body default for the whole app (see tailwind.config.ts's
 // fontFamily.sans) so marketing pages don't need to opt in explicitly.

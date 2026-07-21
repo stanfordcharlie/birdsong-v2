@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useScrollReveal } from "./useScrollReveal";
 
 // "Asked, not inferred." per design_handoff_landing_sections_cs: 2×2
-// hairline grid on /landing-page-2, each cell an 86px micro-visual +
+// hairline grid on /customer-success, each cell an 86px micro-visual +
 // Spectral heading + body. The lp-* reveal/loop classes live in
 // globals.css behind prefers-reduced-motion — reduced-motion users see
 // static visuals (grey dot grid, plain dashed line, solid green dot).

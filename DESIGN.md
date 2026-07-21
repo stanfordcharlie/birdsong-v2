@@ -6,9 +6,9 @@ document describes the system as it actually exists in code today, not an aspira
 spec — every value below is read directly from `app/globals.css`, `tailwind.config.ts`,
 `lib/fonts.ts`, and `components/ui/*`.
 
-**Out of scope:** the marketing pages (`app/landing-page*`), which use their own
-`inter`/`newsreader` fonts and are a separate concern. Everything else in the product —
-including the respondent interview — is on this system.
+**Out of scope:** the marketing pages (`app/page.tsx`, `app/customer-success`), which use
+their own `inter`/`newsreader` fonts and are a separate concern. Everything else in the
+product — including the respondent interview — is on this system.
 
 **Single theme, no dark mode.** There used to be a light/dark toggle
 (`ThemeProvider`/`ThemeToggle`, a `data-theme` attribute); it's been removed entirely.

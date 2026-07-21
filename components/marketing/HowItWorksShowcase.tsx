@@ -8,7 +8,7 @@ import { useScrollReveal } from "./useScrollReveal";
 // design_handoff_landing_sections_cs): eggshell ground, Spectral headline
 // with right-aligned kicker, three columns with looping vignettes (radar
 // ping / chat exchange / lead card) over reveal-filled hairlines. Copy is
-// passed in per page — /landing-page and /landing-page-2 share the whole
+// passed in per page — / and /customer-success share the whole
 // skeleton. All animation classes (lp-*) live in globals.css behind
 // prefers-reduced-motion.
 

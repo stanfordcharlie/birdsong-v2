@@ -3,8 +3,8 @@ import { cn } from "@/lib/utils";
 import { MarketingBodyEffects } from "./MarketingBodyEffects";
 
 // tone="eggshell" is the design_handoff_landing_sections ground (#faf8f1,
-// flat) applied across the whole of /landing-page; landing-page-2 stays on
-// the original beige radial gradient until it gets its own pass.
+// flat) applied across the whole of / (the main landing page); /customer-success
+// stays on the original beige radial gradient until it gets its own pass.
 export function MarketingPageShell({
   children,
   tone = "beige",

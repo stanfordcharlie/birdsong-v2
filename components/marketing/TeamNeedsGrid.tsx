@@ -7,7 +7,7 @@ import { useScrollReveal } from "./useScrollReveal";
 // "Everything your team needs" per design_handoff_landing_sections: three
 // cells (the old "Booking built in" cell is gone — that feature doesn't
 // exist) in a hairline grid, each with a small reveal-driven micro-visual.
-// Used by /landing-page only; landing-page-2's equivalent is
+// Used by / only; /customer-success's equivalent is
 // AskedNotInferredGrid. The lp-* animation classes live in globals.css
 // behind prefers-reduced-motion.
 
