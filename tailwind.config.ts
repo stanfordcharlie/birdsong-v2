@@ -72,6 +72,38 @@ const config: Config = {
           border: "hsl(var(--ds-sidebar-border) / <alpha-value>)",
           ring: "hsl(var(--ds-sidebar-ring) / <alpha-value>)",
         },
+
+        // Marketing landing pages (design_handoff_landing_pages_full) — a
+        // separate token system from --ds-* above (marketing is explicitly
+        // out of scope for the platform design system, see DESIGN.md).
+        // Plain hex custom properties, not the HSL-triplet/<alpha-value>
+        // convention: nothing here needs an alpha-modified variant. bg /
+        // surface / border read from --lp-* vars that swap between the
+        // "cream" default and a "eggshell" override (see globals.css) —
+        // the same tone-switch the design handoff itself implements, now
+        // driven by a data-tone attribute on LandingPageShell instead of a
+        // prototype prop.
+        landing: {
+          bg: "var(--lp-bg)",
+          surface: "var(--lp-surface)",
+          ink: "var(--lp-ink)",
+          muted: "var(--lp-muted)",
+          faint: "var(--lp-faint)",
+          border: "var(--lp-border)",
+          green: {
+            DEFAULT: "var(--lp-green)",
+            bg: "var(--lp-green-bg)",
+          },
+          blue: {
+            DEFAULT: "var(--lp-blue)",
+            mid: "var(--lp-blue-mid)",
+            bg: "var(--lp-blue-bg)",
+          },
+          butter: {
+            deep: "var(--lp-butter-deep)",
+            bg: "var(--lp-butter-bg)",
+          },
+        },
       },
       borderRadius: {
         card: "var(--ds-radius-card)",
@@ -89,8 +121,12 @@ const config: Config = {
         // numbers/wordmark only.
         archivo: ["var(--font-archivo)", "ui-sans-serif", "system-ui", "sans-serif"],
         serif: ["var(--font-young-serif)", "Georgia", "serif"],
-        // Survey respondent flow only (design_handoff_survey_respondent).
+        // Survey respondent flow (normal style) and, italic only, the
+        // marketing landing pages' pull quotes.
         spectral: ["var(--font-spectral)", "Georgia", "serif"],
+        // Marketing landing pages only (design_handoff_landing_pages_full)
+        // — headings, weight 700.
+        bricolage: ["var(--font-bricolage)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
     },
   },

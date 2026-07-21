@@ -7,8 +7,10 @@ spec — every value below is read directly from `app/globals.css`, `tailwind.co
 `lib/fonts.ts`, and `components/ui/*`.
 
 **Out of scope:** the marketing pages (`app/page.tsx`, `app/customer-success`), which use
-their own `inter`/`newsreader` fonts and are a separate concern. Everything else in the
-product — including the respondent interview — is on this system.
+their own Bricolage Grotesque / Spectral (italic) / Inter fonts and their own
+`--lp-*`-prefixed color tokens (see `design_handoff_landing_pages_full`) and are a
+separate concern. Everything else in the product — including the respondent
+interview — is on this system.
 
 **Single theme, no dark mode.** There used to be a light/dark toggle
 (`ThemeProvider`/`ThemeToggle`, a `data-theme` attribute); it's been removed entirely.

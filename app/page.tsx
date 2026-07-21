@@ -1,20 +1,27 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { MarketingPageShell } from "@/components/marketing/MarketingPageShell";
+import { LandingPageShell } from "@/components/marketing/LandingPageShell";
 import { LandingNav } from "@/components/marketing/LandingNav";
-import { HeroSection } from "@/components/marketing/HeroSection";
-import { ProductDemo, type ProductDemoContent } from "@/components/marketing/ProductDemo";
-import { HowItWorksShowcase } from "@/components/marketing/HowItWorksShowcase";
-import { TeamNeedsGrid } from "@/components/marketing/TeamNeedsGrid";
-import { FooterCta } from "@/components/marketing/FooterCta";
+import { Hero } from "@/components/marketing/Hero";
+import { NotationDivider } from "@/components/marketing/NotationDivider";
+import { HowItWorksSection } from "@/components/marketing/HowItWorksSection";
+import { HowItWorksStep } from "@/components/marketing/HowItWorksStep";
+import { InviteGraphic } from "@/components/marketing/InviteGraphic";
+import { ListenGraphic } from "@/components/marketing/ListenGraphic";
+import { RouteGraphic } from "@/components/marketing/RouteGraphic";
+import { ProofComparison } from "@/components/marketing/ProofComparison";
+import { FeatureCard } from "@/components/marketing/FeatureCard";
+import { CrossAudienceBanner } from "@/components/marketing/CrossAudienceBanner";
+import { LandingCta } from "@/components/marketing/LandingCta";
+import { LandingFooter } from "@/components/marketing/LandingFooter";
 
 // This is the primary indexed page for the domain, so metadata here (not
 // the generic fallback in app/layout.tsx) is what search/social previews
 // actually show for usebirdsong.com.
-const TITLE = "Birdsong — Your best leads are already singing.";
+const TITLE = "Birdsong · Your best leads are already singing.";
 const DESCRIPTION =
-  "Birdsong invites the people you want to sell to into genuine conversations about their work, then hands your team qualified leads with the whole story already there.";
+  "Birdsong holds real conversations with the people you want to reach, then hands your team qualified leads, whole story attached.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -32,28 +39,6 @@ export const metadata: Metadata = {
   },
 };
 
-const DEMO_CONTENT: ProductDemoContent = {
-  sessionSubtitle: "Go-to-market in mid-market SaaS · 20 min · paid session",
-  questionProgressLabel: "Question 4 of 8",
-  joiningLine: "Maya accepted your invite · joining the session…",
-  question: "What part of your inbound process eats the most time for your team?",
-  answer:
-    "Honestly? Qualifying. Our SDRs spend half the day on leads that go nowhere, and the good ones wait two days for a reply.",
-  doneLabel: "Conversation complete · 19 min",
-  teamLabel: "Delivered to your team",
-  avatarInitials: "MC",
-  personName: "Maya Chen",
-  personMeta: "Head of Growth · Coretide",
-  conversationMeta: "Conversation complete · 8 questions · 19 min",
-  extractedChip: "Pain point: slow inbound follow-up is costing deals",
-  scoreFieldLabel: "Lead score",
-  qualifiedScoreWidth: "91%",
-  qualifiedScoreLabel: "91, strong",
-  qualifiedBadgeLabel: "Qualified",
-  ctaButtonLabel: "Book demo",
-  successLine: "Demo booked: Thursday 10:30 AM with Maya (AE, West)",
-};
-
 export default async function RootPage() {
   const supabase = await createClient();
   const {
@@ -67,44 +52,129 @@ export default async function RootPage() {
   }
 
   return (
-    <MarketingPageShell tone="eggshell">
+    <LandingPageShell tone="cream">
       <LandingNav crossLink={{ label: "For customer success", href: "/customer-success" }} />
-      <HeroSection
-        h1="Your best leads are already singing."
-        subhead="Birdsong invites the people you want to sell to into genuine conversations about their work, then hands your team qualified leads with the whole story already there."
-      />
-      <ProductDemo content={DEMO_CONTENT} />
-      <HowItWorksShowcase
-        content={{
-          headline: "From first note to booked demo.",
-          headlineMaxWidth: 640,
-          headlineSizeClass: "text-[clamp(38px,4.5vw,54px)] leading-[1.08]",
-          kicker: "Three steps, one owner: Birdsong. Your team only shows up for the demo.",
-          invite: {
-            chipA: "VP Sales · invited",
-            chipB: "Head of Growth · accepted",
-            body: "You pick the audience. Birdsong reaches them directly and invites them into a paid, peer-level conversation about their work.",
+      <Hero
+        h1Pre="Your best leads are already"
+        h1Colored="singing."
+        h1FontSizePx={62}
+        subhead="Birdsong holds real conversations with the people you want to reach, then hands your team qualified leads, whole story attached."
+        demoContent={{
+          headerLabel: "live interview",
+          question: {
+            pre: "Before we get to tools:",
+            bold: "where does your pipeline actually come from",
+            post: "right now, and which part of it do you trust least?",
           },
-          converse: {
-            question: "Where does inbound break down for you today?",
-            answer: "Manual triage. Everything sits for days.",
-            chips: ["Pain: manual inbound triage", "Timeline: this quarter"],
-            body: "A real conversation about their work, not a survey. What actually hurts surfaces in their own words, weighed against your ICP and scored.",
-          },
-          deliver: {
-            account: "Coretide",
-            badge: "92 fit",
-            routedLine: "Qualified · routed to Maya",
-            footerLine: "Demo · Thu 2:30 PM · conversation attached",
-            body: "The lead lands qualified and routed to the right rep, with the conversation attached and a demo ready to book.",
-          },
+          answer: "Honestly? Two channels, and one of them is me answering cold emails at 11pm.",
+          chipA: "Tell me about the 11pm part",
+          chipB: "What have you already tried?",
         }}
       />
-      <TeamNeedsGrid />
-      <FooterCta
-        heading="Hear your best leads first."
-        subhead="Set up in an afternoon. Better inbound leads within the week."
+      <NotationDivider />
+      <HowItWorksSection
+        headline="From first note to booked demo."
+        headlineFontSizePx={48}
+        headlineLineHeight={1.06}
+        headlineMaxWidthPx={640}
+        kicker="Three steps, one owner: Birdsong. Your team only shows up for the demo."
+      >
+        <HowItWorksStep
+          number="01"
+          accent="green"
+          transitionDelay="0.05s"
+          title="Invite"
+          body="Paid respondents join a genuine industry conversation. You pick the audience; Birdsong brings them in."
+        >
+          <InviteGraphic
+            personaTopInitials="VS"
+            personaMidInitials="HG"
+            personaBottomInitials="PM"
+            chipALabel="VP Sales · invited"
+            chipBLabel="Head of Growth · accepted"
+          />
+        </HowItWorksStep>
+        <HowItWorksStep
+          number="02"
+          accent="blue"
+          transitionDelay="0.15s"
+          title="Listen"
+          body="AI interviews surface how they actually work, pains included. No pitching, ever."
+        >
+          <ListenGraphic
+            question="What breaks first when inbound spikes?"
+            answer="Triage. Everything sits for days."
+            chip1Label="Pain: manual triage"
+            chip2Label="Timeline: this quarter"
+          />
+        </HowItWorksStep>
+        <HowItWorksStep
+          number="03"
+          accent="butter"
+          transitionDelay="0.25s"
+          title="Route"
+          body="Each respondent is scored 1 to 10. Hot leads land in your queue with a call script and the context already written."
+        >
+          <RouteGraphic
+            cardTitle="Sam Okafor"
+            badgeLabel="9 / 10"
+            subline="Hot lead · routed to your queue"
+            footerLine="Call script · context attached"
+            stickerLabel="booked!"
+          />
+        </HowItWorksStep>
+      </HowItWorksSection>
+      <ProofComparison
+        headlinePre="Every lead arrives with the"
+        headlineGreen="whole story."
+        intro="We are early, so no logo wall. Judge the artifact instead: this is the difference between a lead and a Birdsong lead."
+        leftLabel="A LEAD, USUALLY"
+        leftInitials="JR"
+        leftName="Jordan Reyes"
+        leftSubline="jordan.reyes@coretide.com"
+        leftSourceLine='Source: downloaded "State of Inbound.pdf"'
+        rightLabel="A BIRDSONG LEAD"
+        rightName="Sam Okafor"
+        rightTitleLine="Head of Growth · Coretide"
+        rightScoreLabel="Score 9"
+        pullQuote="We spend our best hours triaging inbound that goes nowhere."
+        signals={[
+          "Metric: 40 hours a month lost to manual triage",
+          "Economic buyer: CRO, named in conversation",
+          "Timeline: evaluating this quarter",
+        ]}
+        calloutLabel="Call opener, generated:"
+        calloutText="You said triage eats your team’s best hours. Walk me through the worst morning, and I’ll show you what we’d take off your plate first."
       />
-    </MarketingPageShell>
+      <section id="features" className="mx-auto max-w-[1360px] px-6 pb-[100px] md:px-12">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <FeatureCard
+            tint="green"
+            title="Conversations, not forms"
+            body="People give twenty honest minutes to a good conversation. They give ninety distracted seconds to a form."
+          />
+          <FeatureCard
+            tint="blue"
+            transitionDelay="0.1s"
+            title="Scored while you sleep"
+            body="Every interview is scored against your ICP overnight, 1 to 10, with the reasoning written out in plain language."
+          />
+          <FeatureCard
+            tint="butter"
+            transitionDelay="0.2s"
+            title="Scripts from what they said"
+            body="Your rep opens the call quoting the prospect’s own words, not a persona guess."
+          />
+        </div>
+      </section>
+      <CrossAudienceBanner
+        heading="Running customer research on your own base?"
+        subtext="Birdsong finds expansion signals in your happiest customers."
+        linkLabel="For customer success"
+        href="/customer-success"
+      />
+      <LandingCta headlinePre="Hear what your market is" headlineBlue="saying." />
+      <LandingFooter />
+    </LandingPageShell>
   );
 }
