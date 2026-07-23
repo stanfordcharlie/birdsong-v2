@@ -39,7 +39,22 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootPage() {
+export default async function RootPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string }>;
+}) {
+  // Supabase should send email-confirmation clicks straight to
+  // /api/auth/callback (via the signup call's emailRedirectTo), but if its
+  // Site URL config forces the redirect back to the site root instead, the
+  // ?code= lands here still unexchanged. Forward it to the callback route so
+  // the session actually gets created rather than stranding the user, logged
+  // out, on the marketing page with a raw code in the URL.
+  const { code } = await searchParams;
+  if (code) {
+    redirect(`/api/auth/callback?code=${encodeURIComponent(code)}&next=/admin`);
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

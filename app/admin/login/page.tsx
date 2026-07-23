@@ -2,7 +2,18 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LoginForm } from "./LoginForm";
 
-export default async function AdminLoginPage() {
+// Maps the ?error= code the auth callback sets on a failed confirmation into a
+// clear, respondent-safe sentence shown above the form.
+const ERROR_MESSAGES: Record<string, string> = {
+  confirmation:
+    "That confirmation link is invalid or has expired. Log in below, or sign up again to get a fresh link.",
+};
+
+export default async function AdminLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -15,5 +26,8 @@ export default async function AdminLoginPage() {
     redirect("/");
   }
 
-  return <LoginForm />;
+  const { error } = await searchParams;
+  const notice = error ? ERROR_MESSAGES[error] ?? null : null;
+
+  return <LoginForm notice={notice} />;
 }

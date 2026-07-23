@@ -6,10 +6,12 @@ import { createClient } from "@/lib/supabase/client";
 import { logLoginEvent } from "@/lib/auth-events";
 import { AuthScreen, AuthField, AuthPasswordField, AuthError, AuthSubmit } from "@/components/auth/AuthScreen";
 
-export function LoginForm() {
+export function LoginForm({ notice = null }: { notice?: string | null }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  // Seeded from a server-provided notice (e.g. an expired confirmation link
+  // routed here by the auth callback); cleared once the user starts a submit.
+  const [error, setError] = useState<string | null>(notice);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
