@@ -25,6 +25,16 @@ const STATUS_BADGE_VARIANT: Record<string, BadgeVariant> = {
   not_a_fit: "destructive",
 };
 
+// Same score bands as the lead-score badge (LeadsQueue.scoreBadgeVariant),
+// reused for the company fit score so the two badges read consistently.
+function fitBadgeVariant(score: number | null): BadgeVariant {
+  if (score === null) return "outline";
+  if (score >= 9) return "success";
+  if (score >= 7) return "warning";
+  if (score >= 5) return "default";
+  return "outline";
+}
+
 export default async function ResponseDetailPage({
   params,
 }: {
@@ -96,6 +106,15 @@ export default async function ResponseDetailPage({
       typeof signal.value === "string" && signal.value.trim().length > 0
   );
 
+  // Company fit (lib/interview/company-fit.ts) — a separate assessment from
+  // lead_score. Fields are absent until the response_company_fit migration is
+  // applied, so read defensively.
+  const fitScore = typeof response.fit_score === "number" ? response.fit_score : null;
+  const fitReasoning = typeof response.fit_reasoning === "string" ? response.fit_reasoning : "";
+  const fitConfidence = typeof response.fit_confidence === "string" ? response.fit_confidence : null;
+  const fitUnavailable = fitConfidence === "unavailable";
+  const fitLowData = fitConfidence === "low";
+
   const initial = (
     response.respondent_name?.trim()?.[0] ??
     response.respondent_email?.trim()?.[0] ??
@@ -134,6 +153,25 @@ export default async function ResponseDetailPage({
         <div className="flex items-center gap-2">
           {response.is_test && <Badge variant="warning">Test response</Badge>}
           <Badge variant="default">Lead score {response.lead_score ?? "—"}</Badge>
+          {/* Company fit: a second, independent badge. lead_score = "did they
+              show pain?"; fit = "is this company worth calling?". */}
+          {fitUnavailable ? (
+            <Badge variant="outline" title="Company fit research was unavailable for this response.">
+              Fit n/a
+            </Badge>
+          ) : fitScore !== null ? (
+            <Badge
+              variant={fitBadgeVariant(fitScore)}
+              title={[fitReasoning, `Confidence: ${fitConfidence}`].filter(Boolean).join(" — ")}
+            >
+              Fit {fitScore}
+              {fitLowData ? " · limited data" : ""}
+            </Badge>
+          ) : (
+            <Badge variant="outline" title="Company fit not yet scored.">
+              Fit —
+            </Badge>
+          )}
           <Badge variant={STATUS_BADGE_VARIANT[status] ?? "default"}>
             {STATUS_LABELS[status] ?? status}
           </Badge>
@@ -144,6 +182,28 @@ export default async function ResponseDetailPage({
       {response.summary && (
         <div className="rounded-control bg-secondary px-4 py-3 text-sm text-card-foreground">
           {response.summary}
+        </div>
+      )}
+
+      {/* Company fit detail: score, confidence, and the evidence-based
+          reasoning inline. Shown once the fit agent has run (or errored). */}
+      {(fitScore !== null || fitUnavailable) && (
+        <div className="rounded-control border border-border px-4 py-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-card-foreground">Company fit</span>
+            {fitScore !== null && <Badge variant={fitBadgeVariant(fitScore)}>{fitScore}/10</Badge>}
+            {fitUnavailable ? (
+              <span className="text-xs text-muted-foreground">research unavailable</span>
+            ) : (
+              fitConfidence && (
+                <span className="text-xs text-muted-foreground">
+                  confidence: {fitConfidence}
+                  {fitLowData ? " · limited data, treat as a rough estimate" : ""}
+                </span>
+              )
+            )}
+          </div>
+          {fitReasoning && <p className="mt-1.5 text-card-foreground">{fitReasoning}</p>}
         </div>
       )}
 

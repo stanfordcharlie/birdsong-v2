@@ -25,12 +25,22 @@ export type LeadItem = {
   surveyId: string;
   surveyTitle: string;
   leadScore: number | null;
+  // Company fit (lib/interview/company-fit.ts) — independent of leadScore.
+  // fitConfidence: "high" | "medium" | "low" | "unavailable" | null (null =
+  // not yet scored). fitScore is null when unavailable or not yet scored.
+  fitScore: number | null;
+  fitConfidence: string | null;
+  fitReasoning: string | null;
   status: string;
   topPainPoint: string | null;
   createdAt: string;
   isTest: boolean;
   source: string | null;
 };
+
+// Which column the queue is sorted by. "default" keeps the server's order
+// (lead_score desc, then newest). Score and Fit are click-to-sort.
+type SortColumn = "default" | "score" | "fit";
 
 type StatusFilter = "all" | "new" | "contacted" | "qualified" | "not_a_fit";
 
@@ -58,6 +68,9 @@ function scoreBadgeVariant(score: number | null): "success" | "warning" | "defau
 }
 
 const HOT_SCORE_MIN = 7;
+// Fit uses the same threshold and the same banding as the lead score, so the
+// two columns read consistently and the "Fit 7+" filter mirrors "Score 7+".
+const HOT_FIT_MIN = 7;
 
 export function LeadsQueue({ items }: { items: LeadItem[] }) {
   // Local copy so inline status changes (StatusControl's optimistic update)
@@ -68,7 +81,24 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
   const [surveyFilter, setSurveyFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [hotOnly, setHotOnly] = useState(false);
+  const [fitHotOnly, setFitHotOnly] = useState(false);
   const [showTest, setShowTest] = useState(false);
+  const [sortColumn, setSortColumn] = useState<SortColumn>("default");
+  const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
+
+  // Click a sortable header: first click sorts that column descending, a
+  // second click flips to ascending, a third returns to the default order.
+  function toggleSort(column: Exclude<SortColumn, "default">) {
+    if (sortColumn !== column) {
+      setSortColumn(column);
+      setSortDir("desc");
+    } else if (sortDir === "desc") {
+      setSortDir("asc");
+    } else {
+      setSortColumn("default");
+      setSortDir("desc");
+    }
+  }
 
   // Only surveys that actually have completed responses can produce rows,
   // so the filter's options are derived from the rows themselves.
@@ -97,12 +127,13 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return leads.filter((lead) => {
+    const rows = leads.filter((lead) => {
       if (!showTest && lead.isTest) return false;
       if (statusFilter !== "all" && lead.status !== statusFilter) return false;
       if (surveyFilter !== "all" && lead.surveyId !== surveyFilter) return false;
       if (sourceFilter !== "all" && lead.source !== sourceFilter) return false;
       if (hotOnly && (lead.leadScore ?? 0) < HOT_SCORE_MIN) return false;
+      if (fitHotOnly && (lead.fitScore ?? 0) < HOT_FIT_MIN) return false;
       if (
         q &&
         ![lead.name, lead.email, lead.company].some((field) => field?.toLowerCase().includes(q))
@@ -111,7 +142,20 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
       }
       return true;
     });
-  }, [leads, query, statusFilter, surveyFilter, sourceFilter, hotOnly, showTest]);
+
+    if (sortColumn === "default") return rows;
+    // Nulls (unscored / no fit) always sort to the bottom regardless of
+    // direction, so an asc sort surfaces the lowest real score, not blanks.
+    const value = (lead: LeadItem) => (sortColumn === "score" ? lead.leadScore : lead.fitScore);
+    return [...rows].sort((a, b) => {
+      const av = value(a);
+      const bv = value(b);
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      return sortDir === "desc" ? bv - av : av - bv;
+    });
+  }, [leads, query, statusFilter, surveyFilter, sourceFilter, hotOnly, fitHotOnly, showTest, sortColumn, sortDir]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -158,6 +202,19 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
           )}
         >
           Score 7+
+        </button>
+        <button
+          type="button"
+          onClick={() => setFitHotOnly((prev) => !prev)}
+          aria-pressed={fitHotOnly}
+          className={cn(
+            "flex h-9 items-center rounded-control border px-3.5 text-[13px] font-medium transition-colors",
+            fitHotOnly
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-transparent text-muted-foreground hover:bg-secondary"
+          )}
+        >
+          Fit 7+
         </button>
         <select
           value={surveyFilter}
@@ -210,7 +267,31 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
               <TableHead>Company</TableHead>
               <TableHead>Survey</TableHead>
               {sourceOptions.length > 0 && <TableHead>Source</TableHead>}
-              <TableHead>Score</TableHead>
+              <TableHead aria-sort={sortColumn === "score" ? (sortDir === "desc" ? "descending" : "ascending") : "none"}>
+                <button
+                  type="button"
+                  onClick={() => toggleSort("score")}
+                  className="inline-flex items-center gap-1 font-[inherit] text-inherit hover:text-card-foreground"
+                >
+                  Score
+                  <span aria-hidden="true" className="text-[10px] text-muted-foreground">
+                    {sortColumn === "score" ? (sortDir === "desc" ? "▼" : "▲") : "↕"}
+                  </span>
+                </button>
+              </TableHead>
+              <TableHead aria-sort={sortColumn === "fit" ? (sortDir === "desc" ? "descending" : "ascending") : "none"}>
+                <button
+                  type="button"
+                  onClick={() => toggleSort("fit")}
+                  className="inline-flex items-center gap-1 font-[inherit] text-inherit hover:text-card-foreground"
+                  title="Company fit: how well this company matches your ICP, scored separately from lead score."
+                >
+                  Fit
+                  <span aria-hidden="true" className="text-[10px] text-muted-foreground">
+                    {sortColumn === "fit" ? (sortDir === "desc" ? "▼" : "▲") : "↕"}
+                  </span>
+                </button>
+              </TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Top pain point</TableHead>
               <TableHead>Completed</TableHead>
@@ -220,7 +301,7 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
             {filtered.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={sourceOptions.length > 0 ? 8 : 7}
+                  colSpan={sourceOptions.length > 0 ? 9 : 8}
                   className="text-center text-sm text-muted-foreground"
                 >
                   No leads match your filters.
@@ -257,6 +338,31 @@ export function LeadsQueue({ items }: { items: LeadItem[] }) {
                     <Badge variant={scoreBadgeVariant(lead.leadScore)}>
                       {lead.leadScore ?? "—"}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {lead.fitConfidence === "unavailable" ? (
+                      <span className="text-muted-foreground" title="Company fit research was unavailable.">
+                        —
+                      </span>
+                    ) : lead.fitScore !== null ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Badge variant={scoreBadgeVariant(lead.fitScore)} title={lead.fitReasoning ?? undefined}>
+                          {lead.fitScore}
+                        </Badge>
+                        {lead.fitConfidence === "low" && (
+                          <span
+                            className="text-[11px] text-muted-foreground"
+                            title="Limited data — low-confidence estimate."
+                          >
+                            limited data
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground" title="Not yet scored.">
+                        —
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="relative z-10 inline-flex">

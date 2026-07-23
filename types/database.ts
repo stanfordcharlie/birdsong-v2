@@ -94,6 +94,9 @@ export type Database = {
           pain_points: Json;
           lead_score: number | null;
           fit_reason: string | null;
+          fit_score: number | null;
+          fit_reasoning: string | null;
+          fit_confidence: string | null;
           completed: boolean;
           custom_field_values: Json;
           status: string;
@@ -116,6 +119,9 @@ export type Database = {
           pain_points?: Json;
           lead_score?: number | null;
           fit_reason?: string | null;
+          fit_score?: number | null;
+          fit_reasoning?: string | null;
+          fit_confidence?: string | null;
           completed?: boolean;
           custom_field_values?: Json;
           status?: string;
@@ -140,6 +146,9 @@ export type Database = {
           pain_points?: Json;
           lead_score?: number | null;
           fit_reason?: string | null;
+          fit_score?: number | null;
+          fit_reasoning?: string | null;
+          fit_confidence?: string | null;
           completed?: boolean;
           custom_field_values?: Json;
           status?: string;

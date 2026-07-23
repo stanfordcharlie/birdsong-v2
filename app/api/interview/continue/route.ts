@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
@@ -10,6 +11,7 @@ import {
   MAX_EXCHANGES,
 } from "@/lib/interview-prompt";
 import { extractInterviewInsights } from "@/lib/interview/extract";
+import { runCompanyFitScoring } from "@/lib/interview/company-fit";
 import { parseChips } from "@/lib/interview/chips";
 import { tokensMatch } from "@/lib/interview/token";
 import {
@@ -299,6 +301,32 @@ async function completeInterview(
   } catch (err) {
     console.error("Failed to send lead notification email", err);
   }
+
+  // Company fit-scoring: a separate, slower/costlier agent (it runs web
+  // search) that scores the respondent's COMPANY against the sponsor's ICP,
+  // distinct from the transcript-based lead_score above. It must never block
+  // completion or the notification, so it runs fire-and-forget via waitUntil
+  // — the response returns now; this finishes in the background and writes
+  // its own columns. Failures are fully contained inside runCompanyFitScoring
+  // (loud logs + an "unavailable" marker), never surfacing here. Not run for
+  // test responses (this branch is already the non-test path).
+  const respondentCustomValues =
+    (response.custom_field_values as Record<string, unknown> | null) ?? {};
+  const respondentCompanyName =
+    typeof respondentCustomValues.company === "string"
+      ? respondentCustomValues.company
+      : typeof respondentCustomValues.derived_company_name === "string"
+        ? respondentCustomValues.derived_company_name
+        : null;
+  const respondentEmailDomain =
+    typeof respondentCustomValues.email_domain === "string" ? respondentCustomValues.email_domain : null;
+  waitUntil(
+    runCompanyFitScoring({
+      responseId,
+      sponsorUserId: survey.user_id,
+      company: { name: respondentCompanyName, domain: respondentEmailDomain },
+    })
+  );
 
   return NextResponse.json({
     response_id: responseId,

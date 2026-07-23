@@ -21,9 +21,24 @@ export default async function LeadsPage() {
     .order("lead_score", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
+  // Company fit lives in its own columns (lib/interview/company-fit.ts) and is
+  // fetched separately so this page keeps working before the
+  // response_company_fit migration is applied: if those columns don't exist
+  // yet, this query simply errors and every lead falls back to no-fit, rather
+  // than breaking the whole queue. Merged by id below.
+  const { data: fitRows } = await supabase
+    .from("responses")
+    .select("id, fit_score, fit_confidence, fit_reasoning")
+    .eq("user_id", user?.id ?? "")
+    .eq("completed", true);
+  const fitById = new Map(
+    (fitRows ?? []).map((r) => [r.id, { score: r.fit_score, confidence: r.fit_confidence, reasoning: r.fit_reasoning }])
+  );
+
   const items: LeadItem[] = (responses ?? []).map((r) => {
     const customValues = (r.custom_field_values as Record<string, unknown> | null) ?? {};
     const painPoints = (r.pain_points as unknown as string[] | null) ?? [];
+    const fit = fitById.get(r.id);
     return {
       id: r.id,
       name: r.respondent_name,
@@ -37,6 +52,9 @@ export default async function LeadsPage() {
       surveyId: r.survey_id,
       surveyTitle: r.surveys?.title ?? "—",
       leadScore: r.lead_score,
+      fitScore: fit?.score ?? null,
+      fitConfidence: typeof fit?.confidence === "string" ? fit.confidence : null,
+      fitReasoning: typeof fit?.reasoning === "string" ? fit.reasoning : null,
       status: r.status ?? "new",
       topPainPoint: typeof painPoints[0] === "string" ? painPoints[0] : null,
       createdAt: r.created_at,
