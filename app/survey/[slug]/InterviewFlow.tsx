@@ -85,6 +85,20 @@ const MINUTES_PER_QUESTION = 1.5;
 
 const EMAIL_LIVE_CHECK_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+// Progressively formats the phone field as a US number — "(925) 948-4350" —
+// as the respondent types. Re-derived from the digits on every keystroke, so
+// it self-heals when they backspace (deleting a separator just re-strips the
+// digit behind it). Capped at 10 digits (US NANP). Non-US respondents are
+// rare for this field, which is optional; the raw digits are still what any
+// downstream dialer needs, and they remain recoverable from the display form.
+function formatUsPhone(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 10);
+  if (digits.length === 0) return "";
+  if (digits.length < 4) return `(${digits}`;
+  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 function wait(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
@@ -1099,7 +1113,7 @@ export function InterviewFlow({
                     enterKeyHint={enterHintFor(phoneIdx)}
                     required={parsePresetFieldRequired(survey.custom_fields, "phone")}
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => setPhone(formatUsPhone(e.target.value))}
                     onKeyDown={(e) => onFieldKeyDown(e, phoneIdx)}
                     disabled={loading}
                     className={cn(FIELD_INPUT_BASE, "px-4")}
