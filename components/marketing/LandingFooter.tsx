@@ -10,7 +10,13 @@ export function LandingFooter() {
           <BirdMark width={19} height={17} showEye={false} />
           <span className="font-bricolage text-[17px] font-bold">Birdsong</span>
         </Link>
-        <div className="flex items-center gap-7 text-sm text-landing-muted">
+        <div className="flex flex-wrap items-center gap-x-7 gap-y-2 text-sm text-landing-muted">
+          <Link href="/terms" className="text-landing-muted transition-colors hover:text-landing-green">
+            Terms
+          </Link>
+          <Link href="/privacy" className="text-landing-muted transition-colors hover:text-landing-green">
+            Privacy
+          </Link>
           <Link href="/admin/login" className="text-landing-muted transition-colors hover:text-landing-green">
             Log in
           </Link>

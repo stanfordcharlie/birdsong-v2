@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 // components already take for their own distinct palette.
 
 type Survey = Database["public"]["Tables"]["surveys"]["Row"];
-type Stage = "intro" | "chat" | "complete";
+type Stage = "welcome" | "intro" | "chat" | "complete";
 
 // Ground is the same eggshell as / (the landing page, #faf8f1, was beige
 // #f3ecdf); the warm radial glow stays — it's an alpha wash on top.
@@ -295,7 +295,10 @@ export function InterviewFlow({
   const hasCompany = enabledFields.includes("company");
   const hasLinkedin = enabledFields.includes("linkedin");
 
-  const [stage, setStage] = useState<Stage>("intro");
+  // Opens on the welcome beat; the completion-restore effect below still
+  // jumps straight to "complete" for a returning respondent, and tapping the
+  // welcome CTA advances to "intro" (the intake fields).
+  const [stage, setStage] = useState<Stage>("welcome");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   // Whether the email field has been blurred (or a submit attempted) —
@@ -695,6 +698,105 @@ export function InterviewFlow({
   }
 
   const surveyName = survey.external_title || survey.title;
+  const metaLine = survey.num_questions
+    ? `${survey.num_questions} questions · about ${Math.max(3, Math.round(survey.num_questions * MINUTES_PER_QUESTION))} minutes`
+    : null;
+
+  // Welcome beat (design_handoff_survey_respondent's established editorial
+  // language): one screen, one decision. It carries the pitch — title,
+  // sponsor attribution, a warm framing of the format, the incentive pill
+  // and timing — so the intro beat that follows can drop straight to the
+  // intake fields. Tapping the CTA advances to "intro", which remounts that
+  // subtree and replays its own rise-in animations exactly as before.
+  if (stage === "welcome") {
+    return (
+      <div
+        className={cn(
+          spectral.variable,
+          newsreader.variable,
+          "survey-viewport flex flex-col overflow-x-hidden font-sans text-[16px] text-[#262019]"
+        )}
+        style={PAGE_BACKGROUND_STYLE}
+      >
+        <TestModeBadge isTest={isTest} />
+        <div className="mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-10 sm:px-6 sm:py-16">
+          {survey.sponsor && logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={survey.sponsor} className="survey-intro-rise-1 mb-6 h-8 w-auto object-contain" />
+          )}
+
+          {(survey.gift_card_amount || metaLine) && (
+            <div className="survey-intro-rise-1 mb-[22px] flex flex-wrap items-center gap-2.5">
+              {survey.gift_card_amount ? (
+                <span className="rounded-full bg-[#e4ecdd] px-3 py-1.5 text-[13px] font-semibold tracking-[0.04em] text-[#3a6046]">
+                  ${survey.gift_card_amount} gift card
+                </span>
+              ) : null}
+              {metaLine && <span className="text-sm text-[#6f6757]">{metaLine}</span>}
+            </div>
+          )}
+
+          <div className="relative">
+            {/* The bird's hello. Perched top-right of the title, slid inboard
+                on phones so its floating notes clear the container's right
+                edge (same reason as the intro name-field perch). */}
+            <PerchedBird
+              className="pointer-events-none absolute -top-[30px] right-[54px] z-[2] sm:right-[10px]"
+              width={48}
+              height={46}
+              notes={INTRO_BIRD_NOTES}
+            />
+            <h1 className="survey-intro-rise-2 font-spectral mb-3 text-balance break-words text-[31px] font-medium leading-[1.12] tracking-[-0.01em] sm:text-[44px] sm:leading-[1.08]">
+              {surveyName}
+            </h1>
+          </div>
+
+          {survey.sponsor && (
+            <p className="survey-intro-rise-3 mb-3 text-sm text-[#6f6757]">
+              Research conducted on behalf of {survey.sponsor}
+            </p>
+          )}
+
+          <p className="survey-intro-rise-3 text-pretty mb-8 text-[16px] leading-[1.55] text-[#6f6757] sm:text-[17px]">
+            This is a short conversation about how you work, not a quiz or a sales call. Answer in
+            your own words; there are no wrong answers.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setStage("intro")}
+            className="survey-intro-rise-4 flex min-h-[52px] w-full touch-manipulation items-center justify-center gap-2.5 rounded-xl bg-[#241f18] px-6 text-[17px] font-semibold text-[#f3ecdf] transition-opacity active:scale-[.985] disabled:cursor-not-allowed disabled:opacity-60 [@media(hover:hover)]:hover:opacity-90 sm:w-auto sm:self-start sm:px-8"
+          >
+            Let&apos;s get started
+            <ArrowIcon size={17} />
+          </button>
+
+          <p className="survey-intro-rise-5 mt-4 text-[13px] leading-[1.5] text-[#a89d88]">
+            By continuing, you agree to our{" "}
+            <a
+              href="/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 [@media(hover:hover)]:hover:text-[#262019]"
+            >
+              Terms
+            </a>{" "}
+            and{" "}
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 [@media(hover:hover)]:hover:text-[#262019]"
+            >
+              Privacy Policy
+            </a>
+            .
+          </p>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   if (stage === "intro") {
     const nameOk = name.trim().length > 1;
@@ -719,9 +821,6 @@ export function InterviewFlow({
     const enterHintFor = (idx: number): "next" | "go" =>
       idx < totalFieldCount - 1 ? "next" : "go";
 
-    const metaLine = survey.num_questions
-      ? `${survey.num_questions} questions · about ${Math.max(3, Math.round(survey.num_questions * MINUTES_PER_QUESTION))} minutes`
-      : null;
     // Split rather than one string so the keyboard hint can be dropped on
     // phones, where there is no Enter key to press — the software keyboard
     // shows "next"/"go" (see enterHintFor) and the instruction reads as
@@ -743,20 +842,12 @@ export function InterviewFlow({
         <div className="mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-10 sm:px-6 sm:py-16">
           {survey.sponsor && logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt={survey.sponsor} className="mb-6 h-8 w-auto object-contain" />
+            <img src={logoUrl} alt={survey.sponsor} className="survey-intro-rise-1 mb-6 h-8 w-auto object-contain" />
           )}
 
-          {(survey.gift_card_amount || metaLine) && (
-            <div className="survey-intro-rise-1 mb-[22px] flex flex-wrap items-center gap-2.5">
-              {survey.gift_card_amount ? (
-                <span className="rounded-full bg-[#e4ecdd] px-3 py-1.5 text-[13px] font-semibold tracking-[0.04em] text-[#3a6046]">
-                  ${survey.gift_card_amount} gift card
-                </span>
-              ) : null}
-              {metaLine && <span className="text-sm text-[#6f6757]">{metaLine}</span>}
-            </div>
-          )}
-
+          {/* Incentive pill and timing meta now live on the welcome beat, so
+              they're deliberately gone from here — the intro is the intake
+              form, not a second pitch (don't show the pill twice). */}
           <h1 className="survey-intro-rise-2 font-spectral mb-3.5 text-balance break-words text-[31px] font-medium leading-[1.12] tracking-[-0.01em] sm:text-[44px] sm:leading-[1.08]">
             {surveyName}
           </h1>

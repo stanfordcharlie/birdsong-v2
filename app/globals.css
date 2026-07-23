@@ -153,6 +153,32 @@ select {
     @apply font-archivo text-[13px] font-normal text-muted-foreground;
   }
 
+  /* Legal pages (/terms, /privacy) prose. No typography plugin in this
+     project, so the running text is styled here by element. Reads the
+     marketing landing tokens (--lp-*) since LegalPage renders inside
+     LandingPageShell. */
+  .legal-prose {
+    @apply text-[15.5px] leading-[1.7] text-landing-muted;
+  }
+  .legal-prose h2 {
+    @apply mb-2.5 mt-9 font-bricolage text-[19px] font-bold text-landing-ink;
+  }
+  .legal-prose h3 {
+    @apply mb-1.5 mt-6 font-bricolage text-[16px] font-semibold text-landing-ink;
+  }
+  .legal-prose p {
+    @apply mb-4;
+  }
+  .legal-prose ul {
+    @apply mb-4 list-disc space-y-1.5 pl-5;
+  }
+  .legal-prose a {
+    @apply text-landing-green underline underline-offset-2;
+  }
+  .legal-prose strong {
+    @apply font-semibold text-landing-ink;
+  }
+
   /* Shared admin content containers (DESIGN.md "Layout containers").
      AdminShell wraps pages in p-8 (32px); the container's own pt-6 brings
      the top offset to 56px from viewport top to the eyebrow label. */
