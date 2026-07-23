@@ -1,12 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { logLoginEvent } from "@/lib/auth-events";
-import { PasswordInput } from "@/components/PasswordInput";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthScreen, AuthField, AuthPasswordField, AuthError, AuthSubmit } from "@/components/auth/AuthScreen";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
@@ -33,46 +31,51 @@ export function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-page px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Log in</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <Input
-              type="email"
-              name="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <PasswordInput
-              name="password"
-              placeholder="Password"
-              value={password}
-              onChange={setPassword}
-              required
-            />
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" disabled={loading}>
-              {loading ? "Logging in..." : "Log in"}
-            </Button>
-            <div className="flex flex-col items-center gap-1">
-              <a href="/admin/signup" className="text-sm text-muted-foreground hover:text-card-foreground">
-                Need an account? Sign up
-              </a>
-              <a
-                href="/admin/forgot-password"
-                className="text-sm text-muted-foreground hover:text-card-foreground"
-              >
-                Forgot your password?
-              </a>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+    <AuthScreen
+      heading="Welcome back"
+      subcopy="Log in to your Birdsong account."
+      belowCard={
+        <>
+          New to Birdsong?{" "}
+          <Link href="/admin/signup" className="font-semibold underline underline-offset-[3px]">
+            Create an account
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <AuthField
+          label="Work email"
+          type="email"
+          name="email"
+          autoComplete="email"
+          placeholder="you@company.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <AuthPasswordField
+          label="Password"
+          name="password"
+          autoComplete="current-password"
+          placeholder="Your password"
+          value={password}
+          onChange={setPassword}
+          required
+          labelAccessory={
+            <Link
+              href="/admin/forgot-password"
+              className="text-[13px] text-[#6f6757] underline underline-offset-[3px]"
+            >
+              Forgot your password?
+            </Link>
+          }
+        />
+        {error && <AuthError>{error}</AuthError>}
+        <AuthSubmit type="submit" disabled={loading}>
+          {loading ? "Logging in..." : "Log in"}
+        </AuthSubmit>
+      </form>
+    </AuthScreen>
   );
 }

@@ -1,12 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { logLoginEvent } from "@/lib/auth-events";
-import { PasswordInput } from "@/components/PasswordInput";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthScreen, AuthField, AuthPasswordField, AuthError, AuthSubmit } from "@/components/auth/AuthScreen";
 
 export function SignupForm() {
   const [firstName, setFirstName] = useState("");
@@ -64,72 +62,92 @@ export function SignupForm() {
 
   if (checkEmail) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-page px-4">
-        <Card className="w-full max-w-sm">
-          <CardContent className="flex flex-col gap-2 pt-6 text-center">
-            <h1 className="text-xl font-semibold text-card-foreground">Check your email</h1>
-            <p className="text-sm text-muted-foreground">
-              We sent a confirmation link to {email}. Click it to finish setting up your account.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <AuthScreen
+        heading="Check your email"
+        subcopy={`We sent a confirmation link to ${email}.`}
+        belowCard={
+          <Link href="/admin/login" className="font-semibold underline underline-offset-[3px]">
+            Back to log in
+          </Link>
+        }
+      >
+        <p className="text-center text-[15px] leading-[1.6] text-[#6f6757]">
+          Click the link in that email to finish setting up your account. You can close this tab once
+          you have.
+        </p>
+      </AuthScreen>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-page px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Sign up</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="flex gap-3">
-              <Input
-                type="text"
-                placeholder="First name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="flex-1"
-                required
-              />
-              <Input
-                type="text"
-                placeholder="Last name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="flex-1"
-                required
-              />
-            </div>
-            <Input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <PasswordInput
-              placeholder="Password"
-              value={password}
-              onChange={setPassword}
-              required
-              minLength={6}
-            />
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" disabled={loading}>
-              {loading ? "Signing up..." : "Sign up"}
-            </Button>
-            <a
-              href="/admin/login"
-              className="text-center text-sm text-muted-foreground hover:text-card-foreground"
-            >
-              Already have an account? Log in
-            </a>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+    <AuthScreen
+      heading="Start listening to your market"
+      subcopy="Create your account and launch your first interview in minutes."
+      belowCard={
+        <>
+          Already have an account?{" "}
+          <Link href="/admin/login" className="font-semibold underline underline-offset-[3px]">
+            Log in
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div className="grid grid-cols-2 gap-3">
+          <AuthField
+            label="First name"
+            type="text"
+            autoComplete="given-name"
+            placeholder="Ada"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+          />
+          <AuthField
+            label="Last name"
+            type="text"
+            autoComplete="family-name"
+            placeholder="Lark"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            required
+          />
+        </div>
+        <AuthField
+          label="Work email"
+          type="email"
+          autoComplete="email"
+          placeholder="you@company.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <AuthPasswordField
+          label="Password"
+          autoComplete="new-password"
+          placeholder="Choose a password"
+          value={password}
+          onChange={setPassword}
+          required
+          minLength={8}
+          helper="At least 8 characters."
+        />
+        {error && <AuthError>{error}</AuthError>}
+        <AuthSubmit type="submit" disabled={loading}>
+          {loading ? "Signing up..." : "Create account"}
+        </AuthSubmit>
+        <div className="text-center text-[12.5px] leading-[1.55] text-[#a89d88]">
+          By creating an account, you agree to our{" "}
+          <Link href="/terms" className="text-[#6f6757] underline underline-offset-[3px]">
+            Terms
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="text-[#6f6757] underline underline-offset-[3px]">
+            Privacy Policy
+          </Link>
+          .
+        </div>
+      </form>
+    </AuthScreen>
   );
 }

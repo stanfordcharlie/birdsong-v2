@@ -1,5 +1,5 @@
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import { AdminShell } from "@/components/AdminShell";
+import { AdminChrome } from "@/components/AdminChrome";
 import { userDisplayName } from "@/lib/user-name";
 
 export default async function AdminLayout({
@@ -18,8 +18,8 @@ export default async function AdminLayout({
   const userInitial = (displayName?.trim()?.[0] ?? "?").toUpperCase();
 
   return (
-    <AdminShell userName={displayName} userInitial={userInitial}>
+    <AdminChrome userName={displayName} userInitial={userInitial}>
       {children}
-    </AdminShell>
+    </AdminChrome>
   );
 }
