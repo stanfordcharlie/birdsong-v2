@@ -10,18 +10,20 @@ import { InterviewFlow, type PublicSurvey } from "./InterviewFlow";
 // request instead of hitting Supabase twice for the same survey.
 //
 // The column list is a security boundary, not an optimization: this row is
-// handed (in part) to a Client Component, so every column selected here is a
-// column that can reach the respondent's browser. Internal fields (topic,
-// question_guide, tone, num_questions, target_*) are deliberately NOT
-// selected, so they can never leak even by accident. status and user_id are
-// selected for server-only gating below and are never forwarded to the client
-// (see publicSurvey). Keep this list minimal; never widen it to select("*").
+// handed (in part) to a Client Component, so every column reachable by the
+// client must be deliberate. The genuinely sensitive internal fields (topic,
+// question_guide, tone, target_*) are NOT selected, so they can never leak
+// even by accident. status and user_id are selected for server-only gating
+// and are never forwarded to the client (see publicSurvey). num_questions is
+// selected only to derive the welcome screen's "N questions / M minutes"
+// display line; it is passed as the questionCount prop, never on publicSurvey.
+// Keep this list minimal; never widen it to select("*").
 const getSurvey = cache(async (slug: string) => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("surveys")
     .select(
-      "id, slug, title, external_title, sponsor, public_description, gift_card_amount, custom_fields, status, user_id"
+      "id, slug, title, external_title, sponsor, public_description, gift_card_amount, custom_fields, num_questions, status, user_id"
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -141,7 +143,13 @@ export default async function PublicSurveyPage({
     // document taller than the visible area and reintroduce the scroll
     // InterviewFlow's own dvh sizing exists to remove.
     <div className="font-archivo survey-viewport bg-page">
-      <InterviewFlow survey={publicSurvey} logoUrl={profile?.logo_url ?? null} isTest={isTest} source={source} />
+      <InterviewFlow
+        survey={publicSurvey}
+        logoUrl={profile?.logo_url ?? null}
+        isTest={isTest}
+        source={source}
+        questionCount={survey.num_questions}
+      />
     </div>
   );
 }

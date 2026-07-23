@@ -13,7 +13,7 @@ import { extractEmailDomain, isFreeEmailDomain } from "@/lib/interview/work-emai
 import { Badge } from "@/components/ui/badge";
 import { PerchedBird } from "@/components/marketing/PerchedBird";
 import { renderWithBold } from "@/lib/chat/render-with-bold";
-import { spectral, newsreader } from "@/lib/fonts";
+import { spectral, newsreader, bricolage } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
 // Design reference: design_handoff_survey_respondent/. Editorial palette
@@ -77,6 +77,11 @@ const SKIP_MESSAGE_CONTENT = "I'd rather not answer that one.";
 // respondent's browser, so the respondent UI shows progress against this
 // fixed value instead (computeProgressPercent handles running past it).
 const DEFAULT_TARGET_QUESTION_COUNT = 8;
+
+// Rough minutes-per-question used only to render the welcome screen's time
+// estimate from the (display-only) questionCount prop. 6 questions -> ~9 min,
+// matching the design handoff.
+const MINUTES_PER_QUESTION = 1.5;
 
 const EMAIL_LIVE_CHECK_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -230,6 +235,36 @@ function ArrowIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+// The Birdsong mascot as used across the welcome screen
+// (design_handoff_survey_welcome). Same 48x44 path as the marketing BirdMark,
+// but the welcome renders it at three sizes with different fills (ink body +
+// eggshell eye in the cluster; eggshell body on the ink interviewer avatar;
+// ink body in the footer), so it's inlined here with explicit fills rather
+// than routed through BirdMark's landing-token fills.
+function WelcomeBird({
+  width,
+  height,
+  fill,
+  eyeFill,
+  className,
+}: {
+  width: number;
+  height: number;
+  fill: string;
+  eyeFill?: string;
+  className?: string;
+}) {
+  return (
+    <svg width={width} height={height} viewBox="0 0 48 44" fill="none" aria-hidden="true" className={className}>
+      <path
+        d="M10 40 L19.5 28.5 C11.5 27.5 5.5 21.5 5.5 13.5 C5.5 9.5 7.5 5.5 10.5 4.5 C11.5 10.5 16.5 13.5 22.5 13.5 C31.5 13.5 38.5 19.5 38.5 27.5 C38.5 29 38.2 30.4 37.6 31.8 L44.5 34.5 L36.5 35 C33.5 38.5 28.5 40.5 23 40.5 L14.5 40.5 Z"
+        fill={fill}
+      />
+      {eyeFill && <circle cx="33" cy="25.5" r="1.8" fill={eyeFill} />}
+    </svg>
+  );
+}
+
 // Live name/email validation tick (intro only): pops in via the `pop`
 // keyframe (globals.css). motion-reduce:animate-none, not a settled-state
 // class, since the icon's presence (not its entrance) carries the actual
@@ -287,6 +322,7 @@ export function InterviewFlow({
   logoUrl,
   isTest = false,
   source = null,
+  questionCount = null,
 }: {
   survey: PublicSurvey;
   logoUrl: string | null;
@@ -298,6 +334,12 @@ export function InterviewFlow({
   // anywhere — just carried through to the start call unchanged, however
   // long the respondent takes to fill in the intro form.
   source?: string | null;
+  // The survey's planned question count, passed as a dedicated display prop
+  // (not on the PublicSurvey allowlist) purely to render the welcome's
+  // "N questions · about M minutes" line. It's a benign integer, kept off the
+  // survey object so that allowlist stays free of internal fields; the
+  // genuinely-sensitive fields never cross to the client either way.
+  questionCount?: number | null;
 }) {
   const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
   const customFieldDefs = parseCustomRespondentFieldDefs(survey.custom_fields);
@@ -710,99 +752,200 @@ export function InterviewFlow({
 
   const surveyName = survey.external_title || survey.title;
 
-  // Welcome beat (design_handoff_survey_respondent's established editorial
-  // language): one screen, one decision. It carries the pitch — title,
-  // sponsor attribution, a warm framing of the format, and the incentive
-  // pill — so the intro beat that follows can drop straight to the intake
-  // fields. Tapping the CTA advances to "intro", which remounts that subtree
-  // and replays its own rise-in animations exactly as before.
-  //
-  // No "N questions / M minutes" line: that was derived from num_questions,
-  // which is an internal field and must never reach the respondent's browser
-  // (it is no longer even sent, see PublicSurvey).
+  // Welcome screen — the redesign in design_handoff_survey_welcome. Single
+  // centered column in Birdsong's editorial brand system: eggshell ground
+  // with drifting washes/notes, bird-and-sticker cluster, Bricolage display
+  // title, interviewer speech bubble, ink pill CTA, powered-by footer. All
+  // exact values (colors, type, spacing, motion) are from the handoff README.
+  // Tapping the CTA advances to "intro" (the intake fields), unchanged.
   if (stage === "welcome") {
+    const minutes =
+      questionCount != null ? Math.max(3, Math.round(questionCount * MINUTES_PER_QUESTION)) : null;
+    const metaLine =
+      questionCount != null && minutes != null
+        ? `${questionCount} question${questionCount === 1 ? "" : "s"} · about ${minutes} minutes`
+        : null;
+
     return (
       <div
         className={cn(
-          spectral.variable,
-          newsreader.variable,
-          "survey-viewport flex flex-col overflow-x-hidden font-sans text-[16px] text-[#262019]"
+          bricolage.variable,
+          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[#241f18]"
         )}
-        style={PAGE_BACKGROUND_STYLE}
+        style={{ background: "#faf8f1" }}
       >
         <TestModeBadge isTest={isTest} />
-        <div className="mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-10 sm:px-6 sm:py-16">
-          {survey.sponsor && logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt={survey.sponsor} className="survey-intro-rise-1 mb-6 h-8 w-auto object-contain" />
-          )}
 
-          {survey.gift_card_amount ? (
-            <div className="survey-intro-rise-1 mb-[22px] flex flex-wrap items-center gap-2.5">
-              <span className="rounded-full bg-[#e4ecdd] px-3 py-1.5 text-[13px] font-semibold tracking-[0.04em] text-[#3a6046]">
-                ${survey.gift_card_amount} gift card
+        {/* Decorative ambient layer: two top radial washes, two blurred
+            drifting color blobs, three drifting note glyphs. aria-hidden. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+          style={{
+            background:
+              "radial-gradient(760px 420px at 24% -8%, rgba(58,96,70,.09), transparent 60%), radial-gradient(760px 420px at 76% -10%, rgba(84,116,158,.09), transparent 60%)",
+          }}
+        >
+          <div
+            className="sw-blob-a absolute left-[6%] top-[-80px] h-[300px] w-[300px] rounded-full"
+            style={{ background: "#e4ecdd", opacity: 0.5, filter: "blur(70px)" }}
+          />
+          <div
+            className="sw-blob-b absolute right-[5%] top-[-60px] h-[280px] w-[280px] rounded-full"
+            style={{ background: "#e4ebf4", opacity: 0.55, filter: "blur(70px)" }}
+          />
+          <span className="sw-bgnote-a absolute left-[14%] top-[14%] text-[20px]" style={{ color: "#3a6046", opacity: 0.4 }}>
+            &#9834;
+          </span>
+          <span className="sw-bgnote-b absolute right-[18%] top-[10%] text-[17px]" style={{ color: "#54749e", opacity: 0.4 }}>
+            &#9835;
+          </span>
+          <span className="sw-bgnote-c absolute right-[9%] top-[64%] text-[15px]" style={{ color: "#a89d88", opacity: 0.45 }}>
+            &#9834;
+          </span>
+        </div>
+
+        <main className="relative flex flex-1 items-center justify-center px-5 pb-10 pt-14 sm:px-8 sm:pb-12 sm:pt-[72px]">
+          <div className="flex w-full max-w-[640px] flex-col items-center text-center">
+            {/* Bird + sticker cluster (decorative). */}
+            <div aria-hidden="true" className="sw-rev relative mb-2.5 h-[76px] w-[180px]">
+              <span className="sw-clusternote-a absolute left-[52px] top-0 text-[17px]" style={{ color: "#3a6046", opacity: 0 }}>
+                &#9834;
               </span>
+              <span className="sw-clusternote-b absolute left-[96px] top-4 text-[14px]" style={{ color: "#a89d88", opacity: 0 }}>
+                &#9835;
+              </span>
+              <WelcomeBird
+                width={46}
+                height={42}
+                fill="#241f18"
+                eyeFill="#faf8f1"
+                className="sw-bird absolute bottom-0 left-[62px]"
+              />
+              {survey.gift_card_amount ? (
+                <div
+                  className="sw-sticker absolute right-[-52px] top-[-16px] h-[98px] w-[98px]"
+                  style={{ transform: "rotate(8deg)" }}
+                >
+                  <svg
+                    viewBox="0 0 100 100"
+                    className="absolute inset-0"
+                    style={{ filter: "drop-shadow(0 4px 10px rgba(38,32,25,.14))" }}
+                  >
+                    <polygon
+                      points="100,50 83.3,63.8 85.4,85.4 63.8,83.3 50,100 36.2,83.3 14.6,85.4 16.7,63.8 0,50 16.7,36.2 14.6,14.6 36.2,16.7 50,0 63.8,16.7 85.4,14.6 83.3,36.2"
+                      fill="#f7edcb"
+                      stroke="#241f18"
+                      strokeWidth="2.5"
+                    />
+                  </svg>
+                  <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-[#241f18]">
+                    <span className="text-[19px] font-bold italic">${survey.gift_card_amount}</span>
+                    <span className="text-[10.5px] font-semibold tracking-[0.02em]">gift card</span>
+                  </span>
+                </div>
+              ) : null}
             </div>
-          ) : null}
 
-          <div className="relative">
-            {/* The bird's hello. Perched top-right of the title, slid inboard
-                on phones so its floating notes clear the container's right
-                edge (same reason as the intro name-field perch). */}
-            <PerchedBird
-              className="pointer-events-none absolute -top-[30px] right-[54px] z-[2] sm:right-[10px]"
-              width={48}
-              height={46}
-              notes={INTRO_BIRD_NOTES}
-            />
-            <h1 className="survey-intro-rise-2 font-spectral mb-3 text-balance break-words text-[31px] font-medium leading-[1.12] tracking-[-0.01em] sm:text-[44px] sm:leading-[1.08]">
+            {/* Incentive is visual-only above (the cluster is aria-hidden), so
+                announce it once to assistive tech without changing the layout. */}
+            {survey.gift_card_amount ? (
+              <span className="sr-only">Includes a ${survey.gift_card_amount} gift card.</span>
+            ) : null}
+
+            {metaLine && <div className="sw-rev mb-4 text-[15px] font-medium text-[#6f6757]">{metaLine}</div>}
+
+            <h1
+              className="sw-rev m-0 mb-3.5 text-balance font-bricolage text-[40px] font-bold leading-[1.05] tracking-[-0.025em] sm:text-[58px]"
+              style={{ "--sw-delay": "0.08s" } as React.CSSProperties}
+            >
               {surveyName}
             </h1>
+
+            {survey.sponsor && (
+              <div
+                className="sw-rev mb-9 text-[15px] text-[#6f6757]"
+                style={{ "--sw-delay": "0.14s" } as React.CSSProperties}
+              >
+                Research conducted on behalf of{" "}
+                <span className="font-semibold text-[#241f18]">{survey.sponsor}</span>
+              </div>
+            )}
+
+            <div
+              className="sw-rev mb-[38px] flex flex-col items-center gap-2.5"
+              style={{ "--sw-delay": "0.22s" } as React.CSSProperties}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#241f18]">
+                  <WelcomeBird width={15} height={13} fill="#faf8f1" />
+                </span>
+                <span className="text-[12.5px] font-semibold tracking-[0.04em] text-[#a89d88]">YOUR INTERVIEWER</span>
+              </div>
+              <div
+                className="text-pretty max-w-[500px] rounded-[18px] border border-[#e9e3d3] bg-[#fffefa] px-[26px] py-4 text-[16.5px] leading-[1.6]"
+                style={{ boxShadow: "0 4px 14px rgba(38,32,25,.06)" }}
+              >
+                This is a short conversation about how you work, not a quiz or a sales call. Answer in
+                your own words; there are no wrong answers.
+              </div>
+            </div>
+
+            <div
+              className="sw-rev flex flex-col items-center"
+              style={{ "--sw-delay": "0.3s" } as React.CSSProperties}
+            >
+              <button
+                type="button"
+                onClick={() => setStage("intro")}
+                className="inline-flex touch-manipulation items-center gap-3 rounded-full bg-[#241f18] px-[30px] py-4 text-[16.5px] font-semibold text-[#faf8f1] [transition:transform_0.25s_ease,box-shadow_0.25s_ease] active:translate-y-0 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_14px_30px_rgba(38,32,25,.18)]"
+              >
+                Let&apos;s get started
+                <svg width="20" height="12" viewBox="0 0 22 12" fill="none" aria-hidden="true">
+                  <path
+                    d="M1 6h18m0 0l-4-4.5M19 6l-4 4.5"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <div className="mt-[18px] text-[13.5px] text-[#a89d88]">
+                By continuing, you agree to our{" "}
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#6f6757] underline [text-underline-offset:3px]"
+                >
+                  Terms
+                </a>{" "}
+                and{" "}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#6f6757] underline [text-underline-offset:3px]"
+                >
+                  Privacy Policy
+                </a>
+                .
+              </div>
+            </div>
           </div>
+        </main>
 
-          {survey.sponsor && (
-            <p className="survey-intro-rise-3 mb-3 text-sm text-[#6f6757]">
-              Research conducted on behalf of {survey.sponsor}
-            </p>
-          )}
-
-          <p className="survey-intro-rise-3 text-pretty mb-8 text-[16px] leading-[1.55] text-[#6f6757] sm:text-[17px]">
-            This is a short conversation about how you work, not a quiz or a sales call. Answer in
-            your own words; there are no wrong answers.
-          </p>
-
-          <button
-            type="button"
-            onClick={() => setStage("intro")}
-            className="survey-intro-rise-4 flex min-h-[52px] w-full touch-manipulation items-center justify-center gap-2.5 rounded-xl bg-[#241f18] px-6 text-[17px] font-semibold text-[#f3ecdf] transition-opacity active:scale-[.985] disabled:cursor-not-allowed disabled:opacity-60 [@media(hover:hover)]:hover:opacity-90 sm:w-auto sm:self-start sm:px-8"
-          >
-            Let&apos;s get started
-            <ArrowIcon size={17} />
-          </button>
-
-          <p className="survey-intro-rise-5 mt-4 text-[13px] leading-[1.5] text-[#a89d88]">
-            By continuing, you agree to our{" "}
-            <a
-              href="/terms"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 [@media(hover:hover)]:hover:text-[#262019]"
-            >
-              Terms
-            </a>{" "}
-            and{" "}
-            <a
-              href="/privacy"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 [@media(hover:hover)]:hover:text-[#262019]"
-            >
-              Privacy Policy
-            </a>
-            .
-          </p>
-        </div>
-        <Footer />
+        <footer
+          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-[34px] pt-[26px]"
+          style={{ "--sw-delay": "0.4s" } as React.CSSProperties}
+        >
+          <span className="text-[13.5px] text-[#a89d88]">Powered by</span>
+          <a href="/" className="inline-flex items-center gap-[7px]">
+            <WelcomeBird width={17} height={15} fill="#241f18" />
+            <span className="font-bricolage text-[15px] font-bold text-[#241f18]">Birdsong</span>
+          </a>
+        </footer>
       </div>
     );
   }

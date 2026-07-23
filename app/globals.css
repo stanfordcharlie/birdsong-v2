@@ -772,3 +772,131 @@ select {
 .survey-viewport input {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* --- Survey welcome screen (design_handoff_survey_welcome) ---
+   Ported directly from the prototype's keyframes and reveal/sticker/ambient
+   behavior so the redesign is motion-exact. Every element's resting state
+   (the styles set inline in the JSX) is already its final, fully-visible
+   frame; the animations below only apply under prefers-reduced-motion:
+   no-preference, so reduced-motion users get the static final composition
+   with no motion at all. The cluster's floating notes are the one exception:
+   they rest at opacity 0 (set inline) since they are purely decorative and
+   only ever exist mid-loop. */
+@keyframes sw-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sw-bob {
+  0%,
+  84%,
+  100% {
+    transform: none;
+  }
+  88% {
+    transform: translateY(-2px) rotate(-4deg);
+  }
+  93% {
+    transform: translateY(0) rotate(2.5deg);
+  }
+  97% {
+    transform: none;
+  }
+}
+@keyframes sw-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  33% {
+    transform: translate(9px, -14px) rotate(5deg);
+  }
+  66% {
+    transform: translate(-7px, -6px) rotate(-4deg);
+  }
+}
+@keyframes sw-note-a {
+  0%,
+  52%,
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+  58% {
+    opacity: 0.85;
+  }
+  74% {
+    opacity: 0;
+    transform: translateY(-26px);
+  }
+}
+@keyframes sw-note-b {
+  0%,
+  62%,
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+  68% {
+    opacity: 0.85;
+  }
+  84% {
+    opacity: 0;
+    transform: translateY(-24px);
+  }
+}
+@keyframes sw-sticker-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4) rotate(8deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(8deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Staggered entrance reveal. Delay is set per element inline via
+     --sw-delay; `both` fill holds each block at opacity 0 through its delay,
+     so it stays hidden until its turn. */
+  .sw-rev {
+    animation: sw-rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: var(--sw-delay, 0s);
+  }
+  /* Incentive sticker: springy overshoot pop, 0.6s after the reveal starts.
+     Rotation stays pinned at 8deg (its resting inline transform) throughout. */
+  .sw-sticker {
+    animation: sw-sticker-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.6s both;
+  }
+  /* Ambient loops. */
+  .sw-bird {
+    animation: sw-bob 6s ease infinite;
+  }
+  .sw-blob-a {
+    animation: sw-drift 14s ease-in-out infinite;
+  }
+  .sw-blob-b {
+    animation: sw-drift 17s ease-in-out 2s infinite reverse;
+  }
+  .sw-bgnote-a {
+    animation: sw-drift 9s ease-in-out infinite;
+  }
+  .sw-bgnote-b {
+    animation: sw-drift 11s ease-in-out 1.2s infinite;
+  }
+  .sw-bgnote-c {
+    animation: sw-drift 13s ease-in-out 0.6s infinite;
+  }
+  .sw-clusternote-a {
+    animation: sw-note-a 7s ease infinite;
+  }
+  .sw-clusternote-b {
+    animation: sw-note-b 7s ease 1s infinite;
+  }
+}
