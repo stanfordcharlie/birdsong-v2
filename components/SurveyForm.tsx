@@ -21,6 +21,7 @@ export type SurveyFormValues = {
   externalTitle: string;
   slug: string;
   sponsor: string;
+  publicDescription: string;
   topic: string;
   targetIndustry: string;
   targetJobTitle: string;
@@ -49,6 +50,7 @@ const EMPTY_VALUES: SurveyFormValues = {
   externalTitle: "",
   slug: "",
   sponsor: "",
+  publicDescription: "",
   topic: "",
   targetIndustry: "",
   targetJobTitle: "",
@@ -104,6 +106,7 @@ export function SurveyForm(props: SurveyFormProps) {
   // of the public URL respondents see.
   const [slugTouched, setSlugTouched] = useState(isEdit);
   const [sponsor, setSponsor] = useState(initial.sponsor);
+  const [publicDescription, setPublicDescription] = useState(initial.publicDescription);
   const [topic, setTopic] = useState(initial.topic);
   const [targetIndustry, setTargetIndustry] = useState(initial.targetIndustry);
   const [targetJobTitle, setTargetJobTitle] = useState(initial.targetJobTitle);
@@ -283,6 +286,7 @@ export function SurveyForm(props: SurveyFormProps) {
         title,
         external_title: externalTitle,
         sponsor: sponsor || null,
+        public_description: publicDescription || null,
         topic: topic || null,
         target_industry: targetIndustry || null,
         target_job_title: targetJobTitle || null,
@@ -392,6 +396,20 @@ export function SurveyForm(props: SurveyFormProps) {
               className={externalTitleInvalid ? invalidBorder : ""}
             />
             {externalTitleInvalid && <span className="text-xs text-destructive">Required</span>}
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-card-foreground">Public description</span>
+            <span className="text-xs text-muted-foreground">
+              Shown to respondents on the survey landing page. Keep it neutral and research-framed.
+              Never mention selling, pain points, or the sponsor&apos;s sales goals.
+            </span>
+            <Textarea
+              value={publicDescription}
+              onChange={(e) => setPublicDescription(e.target.value)}
+              rows={3}
+              placeholder="A short, neutral summary of what this conversation is about."
+            />
           </label>
 
           <label className="flex flex-col gap-1">
@@ -624,6 +642,9 @@ export function SurveyForm(props: SurveyFormProps) {
             <div className="flex flex-col gap-4">
               <label className="flex flex-col gap-1">
                 <span className="text-sm font-medium text-card-foreground">Topic</span>
+                <span className="text-xs text-muted-foreground">
+                  Internal. Used to guide the interview. Never shown to respondents.
+                </span>
                 <Textarea value={topic} onChange={(e) => setTopic(e.target.value)} rows={2} />
               </label>
 

@@ -45,6 +45,7 @@ export default async function SurveyDetailPage({
     externalTitle: survey.external_title ?? "",
     slug: survey.slug,
     sponsor: survey.sponsor ?? "",
+    publicDescription: survey.public_description ?? "",
     topic: survey.topic ?? "",
     targetIndustry: survey.target_industry ?? "",
     targetJobTitle: survey.target_job_title ?? "",

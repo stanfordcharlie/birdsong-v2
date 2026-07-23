@@ -4,15 +4,25 @@ import { notFound } from "next/navigation";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sanitizeSource } from "@/lib/interview/source";
-import { InterviewFlow } from "./InterviewFlow";
+import { InterviewFlow, type PublicSurvey } from "./InterviewFlow";
 
 // cache() so generateMetadata and the page component share one query per
 // request instead of hitting Supabase twice for the same survey.
+//
+// The column list is a security boundary, not an optimization: this row is
+// handed (in part) to a Client Component, so every column selected here is a
+// column that can reach the respondent's browser. Internal fields (topic,
+// question_guide, tone, num_questions, target_*) are deliberately NOT
+// selected, so they can never leak even by accident. status and user_id are
+// selected for server-only gating below and are never forwarded to the client
+// (see publicSurvey). Keep this list minimal; never widen it to select("*").
 const getSurvey = cache(async (slug: string) => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("surveys")
-    .select("*")
+    .select(
+      "id, slug, title, external_title, sponsor, public_description, gift_card_amount, custom_fields, status, user_id"
+    )
     .eq("slug", slug)
     .maybeSingle();
   return data;
@@ -37,10 +47,14 @@ export async function generateMetadata({
   }
 
   const name = survey.external_title || survey.title;
+  // public_description only, never topic: this description goes into public
+  // <meta>/OpenGraph/Twitter tags and link-preview unfurls, so the internal
+  // topic must never be sourced here. Falls back to a generic line, not to
+  // any internal field.
   const description =
-    [survey.topic?.trim() || null, survey.sponsor ? `Research by ${survey.sponsor}` : null]
+    [survey.public_description?.trim() || null, survey.sponsor ? `Research by ${survey.sponsor}` : null]
       .filter(Boolean)
-      .join(" · ") || "A short research conversation — share your perspective in your own words.";
+      .join(" · ") || "A short research conversation. Share your perspective in your own words.";
 
   return {
     title: name,
@@ -106,13 +120,28 @@ export default async function PublicSurveyPage({
     .eq("user_id", survey.user_id)
     .maybeSingle();
 
+  // Explicit allowlist of the only survey fields the respondent UI needs.
+  // status and user_id were selected for the server-side gates above but are
+  // intentionally excluded here so they never cross into the Client
+  // Component's serialized props. Anything not on this object cannot reach
+  // the browser.
+  const publicSurvey: PublicSurvey = {
+    id: survey.id,
+    title: survey.title,
+    external_title: survey.external_title,
+    sponsor: survey.sponsor,
+    public_description: survey.public_description,
+    gift_card_amount: survey.gift_card_amount,
+    custom_fields: survey.custom_fields,
+  };
+
   return (
     // survey-viewport, not min-h-screen: 100vh on iOS Safari is the
     // toolbars-hidden height, so a min-h-screen wrapper would keep the
     // document taller than the visible area and reintroduce the scroll
     // InterviewFlow's own dvh sizing exists to remove.
     <div className="font-archivo survey-viewport bg-page">
-      <InterviewFlow survey={survey} logoUrl={profile?.logo_url ?? null} isTest={isTest} source={source} />
+      <InterviewFlow survey={publicSurvey} logoUrl={profile?.logo_url ?? null} isTest={isTest} source={source} />
     </div>
   );
 }

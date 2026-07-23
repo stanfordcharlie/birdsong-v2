@@ -23,7 +23,17 @@ import { cn } from "@/lib/utils";
 // handoff's exact hex values throughout, the same approach the marketing
 // components already take for their own distinct palette.
 
-type Survey = Database["public"]["Tables"]["surveys"]["Row"];
+// The respondent-facing survey shape: an explicit allowlist of the only
+// fields this public Client Component is permitted to see. Derived via Pick
+// from the full Row so field types stay in sync, but structurally it CANNOT
+// name an internal field (topic, question_guide, tone, num_questions,
+// target_*, etc.) — referencing survey.topic here is a compile error, which
+// is the point. The page (app/survey/[slug]/page.tsx) constructs exactly
+// this object; nothing else reaches the browser.
+export type PublicSurvey = Pick<
+  Database["public"]["Tables"]["surveys"]["Row"],
+  "id" | "title" | "external_title" | "sponsor" | "public_description" | "gift_card_amount" | "custom_fields"
+>;
 type Stage = "welcome" | "intro" | "chat" | "complete";
 
 // Ground is the same eggshell as / (the landing page, #faf8f1, was beige
@@ -62,10 +72,11 @@ const CHIP_AUTO_SUBMIT_DELAY_MS = 260;
 // interviewer's existing evasive-answer handling can react to normally.
 const SKIP_MESSAGE_CONTENT = "I'd rather not answer that one.";
 
-// Estimated-minutes heuristic for the intro's meta line, since there's no
-// explicit time-estimate column on surveys. Named constant so it's a
-// one-line tune, not a buried magic number.
-const MINUTES_PER_QUESTION = 1.5;
+// Display target for the chat progress bar and "X of Y" counter. The real
+// per-survey num_questions is an internal field that must never reach the
+// respondent's browser, so the respondent UI shows progress against this
+// fixed value instead (computeProgressPercent handles running past it).
+const DEFAULT_TARGET_QUESTION_COUNT = 8;
 
 const EMAIL_LIVE_CHECK_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -277,7 +288,7 @@ export function InterviewFlow({
   isTest = false,
   source = null,
 }: {
-  survey: Survey;
+  survey: PublicSurvey;
   logoUrl: string | null;
   // Owner-verified server-side by the page; drives the "Test mode" marker,
   // the is_test flag on the start call (re-verified by the route), and
@@ -698,16 +709,17 @@ export function InterviewFlow({
   }
 
   const surveyName = survey.external_title || survey.title;
-  const metaLine = survey.num_questions
-    ? `${survey.num_questions} questions · about ${Math.max(3, Math.round(survey.num_questions * MINUTES_PER_QUESTION))} minutes`
-    : null;
 
   // Welcome beat (design_handoff_survey_respondent's established editorial
   // language): one screen, one decision. It carries the pitch — title,
-  // sponsor attribution, a warm framing of the format, the incentive pill
-  // and timing — so the intro beat that follows can drop straight to the
-  // intake fields. Tapping the CTA advances to "intro", which remounts that
-  // subtree and replays its own rise-in animations exactly as before.
+  // sponsor attribution, a warm framing of the format, and the incentive
+  // pill — so the intro beat that follows can drop straight to the intake
+  // fields. Tapping the CTA advances to "intro", which remounts that subtree
+  // and replays its own rise-in animations exactly as before.
+  //
+  // No "N questions / M minutes" line: that was derived from num_questions,
+  // which is an internal field and must never reach the respondent's browser
+  // (it is no longer even sent, see PublicSurvey).
   if (stage === "welcome") {
     return (
       <div
@@ -725,16 +737,13 @@ export function InterviewFlow({
             <img src={logoUrl} alt={survey.sponsor} className="survey-intro-rise-1 mb-6 h-8 w-auto object-contain" />
           )}
 
-          {(survey.gift_card_amount || metaLine) && (
+          {survey.gift_card_amount ? (
             <div className="survey-intro-rise-1 mb-[22px] flex flex-wrap items-center gap-2.5">
-              {survey.gift_card_amount ? (
-                <span className="rounded-full bg-[#e4ecdd] px-3 py-1.5 text-[13px] font-semibold tracking-[0.04em] text-[#3a6046]">
-                  ${survey.gift_card_amount} gift card
-                </span>
-              ) : null}
-              {metaLine && <span className="text-sm text-[#6f6757]">{metaLine}</span>}
+              <span className="rounded-full bg-[#e4ecdd] px-3 py-1.5 text-[13px] font-semibold tracking-[0.04em] text-[#3a6046]">
+                ${survey.gift_card_amount} gift card
+              </span>
             </div>
-          )}
+          ) : null}
 
           <div className="relative">
             {/* The bird's hello. Perched top-right of the title, slid inboard
@@ -852,9 +861,13 @@ export function InterviewFlow({
             {surveyName}
           </h1>
 
-          {survey.topic && (
+          {/* Respondent-facing description ONLY. Never the internal `topic`
+              field (which names the interview's intent and is not even
+              present on PublicSurvey). When public_description is unset,
+              nothing renders here; there is no fallback. */}
+          {survey.public_description?.trim() && (
             <p className="survey-intro-rise-3 text-pretty mb-7 text-[16px] leading-[1.55] text-[#6f6757] sm:mb-9 sm:text-[17px]">
-              {survey.topic}
+              {survey.public_description}
             </p>
           )}
 
@@ -1155,7 +1168,12 @@ export function InterviewFlow({
   const answeredCount = messages.filter((m) => m.role === "user").length;
   const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant")?.content ?? "";
   const questionText = lastAssistantMessage;
-  const targetQuestionCount = survey.num_questions ?? 8;
+  // Drives only the progress bar and the "X of Y" counter, both of which are
+  // deliberately loose. The real per-survey num_questions is an internal
+  // field that must not reach the browser, so this is a fixed display target,
+  // not the actual planned count (computeProgressPercent already handles the
+  // interview running past it).
+  const targetQuestionCount = DEFAULT_TARGET_QUESTION_COUNT;
   const hasAnswer = answer.trim().length > 0;
   // Same auto-grow heuristic as the design reference: line count plus a
   // rough characters-per-line estimate, not actual DOM measurement.

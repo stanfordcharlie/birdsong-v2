@@ -1,0 +1,11 @@
+-- Respondent-facing survey description.
+--
+-- surveys.topic is INTERNAL: it guides the interview and can name sales
+-- intent (e.g. "identify pain points and sell them on Rec"), so it must
+-- never render to a respondent or reach their browser. public_description
+-- is the neutral, research-framed text shown on the public survey landing
+-- page in its place.
+--
+-- Nullable on purpose: when unset, the public page renders nothing in that
+-- spot and never falls back to topic.
+alter table public.surveys add column if not exists public_description text;

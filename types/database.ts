@@ -16,6 +16,7 @@ export type Database = {
           title: string;
           external_title: string | null;
           topic: string | null;
+          public_description: string | null;
           sponsor: string | null;
           target_industry: string | null;
           target_job_title: string | null;
@@ -36,6 +37,7 @@ export type Database = {
           title: string;
           external_title?: string | null;
           topic?: string | null;
+          public_description?: string | null;
           sponsor?: string | null;
           target_industry?: string | null;
           target_job_title?: string | null;
@@ -56,6 +58,7 @@ export type Database = {
           title?: string;
           external_title?: string | null;
           topic?: string | null;
+          public_description?: string | null;
           sponsor?: string | null;
           target_industry?: string | null;
           target_job_title?: string | null;

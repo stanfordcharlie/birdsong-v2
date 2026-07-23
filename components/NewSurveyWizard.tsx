@@ -13,12 +13,18 @@ import { slugify, randomSlugSuffix } from "@/lib/surveys/slugify";
 import { SurveyOnboardingChat } from "@/components/SurveyOnboardingChat";
 import type { ExtractedSurveyDetails } from "@/lib/survey-onboarding/types";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // Steps 0-5 are the Typeform-style metadata questions; step 6 hands off
 // into the existing Survey details conversational panel unchanged.
-const METADATA_STEP_COUNT = 6;
+// Metadata steps are 0..METADATA_STEP_COUNT-1 (internal name, external name,
+// sponsor, slug, gift card, respondent info, then public description as the
+// last metadata step); the final step at index METADATA_STEP_COUNT is the
+// conversational interview setup. Public description is appended at the end
+// so the earlier step indices (and the showPreview 1/3 checks) are unchanged.
+const METADATA_STEP_COUNT = 7;
 const TOTAL_STEPS = METADATA_STEP_COUNT + 1;
 
 const invalidBorder = "border-destructive focus-visible:ring-destructive";
@@ -144,6 +150,7 @@ export function NewSurveyWizard() {
   const [title, setTitle] = useState("");
   const [externalTitle, setExternalTitle] = useState("");
   const [sponsor, setSponsor] = useState("");
+  const [publicDescription, setPublicDescription] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [giftCardAmount, setGiftCardAmount] = useState("");
@@ -291,6 +298,7 @@ export function NewSurveyWizard() {
         title,
         external_title: externalTitle,
         sponsor: sponsor || null,
+        public_description: publicDescription || null,
         topic: extracted.topic || null,
         target_industry: extracted.targetIndustry || null,
         target_job_title: extracted.targetJobTitle || null,
@@ -626,6 +634,24 @@ export function NewSurveyWizard() {
                   </Button>
                 </div>
               </div>
+            </StepShell>
+          )}
+
+          {step === 6 && (
+            <StepShell
+              label="Public description"
+              optional
+              hint="Shown to respondents on the survey landing page. Keep it neutral and research-framed. Never mention selling, pain points, or the sponsor's sales goals."
+              onBack={goBack}
+              footer={<StepFooter onNext={goNext} />}
+            >
+              <Textarea
+                autoFocus
+                value={publicDescription}
+                onChange={(e) => setPublicDescription(e.target.value)}
+                rows={3}
+                placeholder="A short, neutral summary of what this conversation is about."
+              />
             </StepShell>
           )}
 
