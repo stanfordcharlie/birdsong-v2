@@ -42,8 +42,6 @@ const PAGE_BACKGROUND_STYLE: React.CSSProperties = {
   background: "radial-gradient(130% 90% at 50% -8%, rgba(233,166,116,.22), transparent 58%), #faf8f1",
 };
 
-const ASSISTANT_BUBBLE =
-  "max-w-[80%] whitespace-pre-wrap break-words rounded-2xl border border-[#e7ddc9] bg-[#fffdf7] px-4 py-2.5 text-sm leading-relaxed text-[#262019]";
 const RESPONDENT_BUBBLE =
   "self-end max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-[#241f18] px-4 py-2.5 text-sm leading-relaxed text-[#f3ecdf]";
 
@@ -1243,81 +1241,197 @@ export function InterviewFlow({
     );
   }
 
+  // Completion / thank-you screen (design_handoff_survey_thanks) — matches the
+  // welcome screen's editorial system. One layout, one boolean: the
+  // showResponses toggle only mounts/unmounts the transcript below the pill;
+  // nothing above it restyles or re-lays-out between states (the fix for the
+  // old two-different-UIs bug).
   if (stage === "complete") {
+    const hasIncentive = survey.gift_card_amount != null;
     return (
       <div
         className={cn(
-          spectral.variable,
-          "survey-viewport flex flex-col overflow-x-hidden font-sans text-[16px] text-[#262019]"
+          bricolage.variable,
+          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[#241f18]"
         )}
-        style={PAGE_BACKGROUND_STYLE}
+        style={{ background: "#faf8f1" }}
       >
         <TestModeBadge isTest={isTest} />
-        <div className="flex flex-1 flex-col items-center justify-center px-5 py-12 text-center sm:px-6 sm:py-16">
-          <div className="bs-rise-repeat mx-auto w-full max-w-[560px]">
-            <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-[#e4ecdd]">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M5 12.5l4.5 4.5L19 7.5"
-                  stroke="#3a6046"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+
+        {/* Decorative ambient layer, identical to the welcome screen. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+          style={{
+            background:
+              "radial-gradient(760px 420px at 24% -8%, rgba(58,96,70,.09), transparent 60%), radial-gradient(760px 420px at 76% -10%, rgba(84,116,158,.09), transparent 60%)",
+          }}
+        >
+          <div
+            className="sw-blob-a absolute left-[6%] top-[-80px] h-[300px] w-[300px] rounded-full"
+            style={{ background: "#e4ecdd", opacity: 0.5, filter: "blur(70px)" }}
+          />
+          <div
+            className="sw-blob-b absolute right-[5%] top-[-60px] h-[280px] w-[280px] rounded-full"
+            style={{ background: "#e4ebf4", opacity: 0.55, filter: "blur(70px)" }}
+          />
+          <span className="sw-bgnote-a absolute left-[14%] top-[12%] text-[20px]" style={{ color: "#3a6046", opacity: 0.4 }}>
+            &#9834;
+          </span>
+          <span className="sw-bgnote-b absolute right-[18%] top-[9%] text-[17px]" style={{ color: "#54749e", opacity: 0.4 }}>
+            &#9835;
+          </span>
+          <span className="sw-bgnote-c absolute right-[9%] top-[58%] text-[15px]" style={{ color: "#a89d88", opacity: 0.45 }}>
+            &#9834;
+          </span>
+        </div>
+
+        <main className="relative flex flex-1 items-center justify-center px-5 pb-10 pt-14 sm:px-8 sm:pb-12 sm:pt-20">
+          <div className="flex w-full max-w-[640px] flex-col items-center text-center">
+            {/* Check + sticker cluster (decorative). */}
+            <div aria-hidden="true" className="sw-rev relative mb-[22px] h-[86px] w-[180px]">
+              <span className="sw-clusternote-a absolute left-[38px] top-0 text-[17px]" style={{ color: "#3a6046", opacity: 0 }}>
+                &#9834;
+              </span>
+              <span className="sw-clusternote-b absolute left-[130px] top-[14px] text-[14px]" style={{ color: "#a89d88", opacity: 0 }}>
+                &#9835;
+              </span>
+              <span className="sw-bird absolute bottom-0 left-[53px] flex h-[74px] w-[74px] items-center justify-center rounded-full border border-[#e9e3d3] bg-[#e4ecdd]">
+                <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+                  <path
+                    d="M7.5 15.5 L13 21 L23 9.5"
+                    stroke="#3a6046"
+                    strokeWidth="2.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="26"
+                    className="sw-check"
+                  />
+                </svg>
+              </span>
+              {hasIncentive && (
+                <div
+                  className="sw-sticker absolute right-[-46px] top-[-12px] h-[92px] w-[92px]"
+                  style={{ transform: "rotate(8deg)" }}
+                >
+                  <svg
+                    viewBox="0 0 100 100"
+                    className="absolute inset-0"
+                    style={{ filter: "drop-shadow(0 4px 10px rgba(38,32,25,.14))" }}
+                  >
+                    <polygon
+                      points="100,50 83.3,63.8 85.4,85.4 63.8,83.3 50,100 36.2,83.3 14.6,85.4 16.7,63.8 0,50 16.7,36.2 14.6,14.6 36.2,16.7 50,0 63.8,16.7 85.4,14.6 83.3,36.2"
+                      fill="#f7edcb"
+                      stroke="#241f18"
+                      strokeWidth="2.5"
+                    />
+                  </svg>
+                  <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-[#241f18]">
+                    <span className="text-[18px] font-bold italic">${survey.gift_card_amount}</span>
+                    <span className="text-[10px] font-semibold tracking-[0.02em]">on its way</span>
+                  </span>
+                </div>
+              )}
             </div>
-            <h1 className="font-spectral mb-3.5 text-balance text-[29px] font-medium leading-[1.18] sm:text-[38px] sm:leading-[1.15]">
+
+            <h1
+              className="sw-rev m-0 mb-[18px] text-balance font-bricolage text-[34px] font-bold leading-[1.06] tracking-[-0.025em] sm:text-[52px]"
+              style={{ "--sw-delay": "0.08s" } as React.CSSProperties}
+            >
               That&apos;s everything. Thank you.
             </h1>
-            <p className="text-pretty break-words text-base leading-[1.6] text-[#6f6757]">
+
+            <p
+              className="sw-rev text-pretty m-0 mb-9 max-w-[520px] text-[16px] leading-[1.6] text-[#6f6757] sm:text-[17px]"
+              style={{ "--sw-delay": "0.16s" } as React.CSSProperties}
+            >
               {closingMessage}
-              {survey.gift_card_amount ? (
+              {hasIncentive && (
                 <>
                   {" "}
                   The{" "}
-                  <strong className="font-semibold text-[#262019]">
-                    ${survey.gift_card_amount} gift card
-                  </strong>{" "}
+                  <span className="font-semibold text-[#241f18]">${survey.gift_card_amount} gift card</span>{" "}
                   will land in your inbox within a day or two.
                 </>
-              ) : null}
+              )}
             </p>
 
-            <button
-              type="button"
-              onClick={() => setShowResponses((prev) => !prev)}
-              className="mx-auto mt-8 flex min-h-[44px] touch-manipulation items-center gap-1.5 px-3 text-sm text-[#6f6757] transition-colors [@media(hover:hover)]:hover:text-[#262019]"
-              aria-expanded={showResponses}
+            {/* The toggle and the transcript share one wrapper: only the
+                transcript mounts/unmounts, so the pill never moves relative to
+                the content above it. */}
+            <div
+              className="sw-rev flex w-full flex-col items-center"
+              style={{ "--sw-delay": "0.24s" } as React.CSSProperties}
             >
-              {showResponses ? "Hide your responses" : "See your responses"}
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                className={cn("transition-transform", showResponses ? "rotate-180" : "")}
+              <button
+                type="button"
+                onClick={() => setShowResponses((prev) => !prev)}
+                aria-expanded={showResponses}
+                className="inline-flex touch-manipulation items-center gap-2.5 rounded-full border-[1.5px] border-[#e9e3d3] bg-transparent px-6 py-3 text-[15px] font-semibold text-[#6f6757] transition-colors duration-[250ms] motion-reduce:transition-none [@media(hover:hover)]:hover:border-[#3a6046] [@media(hover:hover)]:hover:text-[#3a6046]"
               >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
+                {showResponses ? "Hide your responses" : "See your responses"}
+                <svg
+                  width="14"
+                  height="9"
+                  viewBox="0 0 14 9"
+                  fill="none"
+                  aria-hidden="true"
+                  className={cn(
+                    "transition-transform duration-300 motion-reduce:transition-none",
+                    showResponses && "rotate-180"
+                  )}
+                >
+                  <path
+                    d="M1.5 1.5 L7 7 L12.5 1.5"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
 
-            {showResponses && (
-              <div className="mx-auto mt-4 flex max-w-md flex-col gap-3 text-left">
-                {messages.map((m, i) => (
-                  <div key={i} className={m.role === "assistant" ? ASSISTANT_BUBBLE : RESPONDENT_BUBBLE}>
-                    {m.role === "assistant" ? renderWithBold(m.content) : m.content}
+              {showResponses && (
+                <div className="mt-[34px] flex w-full max-w-[600px] flex-col gap-3.5 text-left">
+                  <div
+                    className="sw-bubble mb-1 self-center text-[12.5px] font-semibold tracking-[0.08em] text-[#a89d88]"
+                    style={{ "--sw-bubble-delay": "0s" } as React.CSSProperties}
+                  >
+                    YOUR RESPONSES
                   </div>
-                ))}
-              </div>
-            )}
+                  {messages.map((m, i) => {
+                    const isInterviewer = m.role === "assistant";
+                    return (
+                      <div
+                        key={i}
+                        className={cn(
+                          "sw-bubble whitespace-pre-wrap break-words text-[15.5px] leading-[1.6]",
+                          isInterviewer
+                            ? "max-w-[86%] self-start rounded-[16px_16px_16px_5px] border border-[#e9e3d3] bg-[#fffefa] px-5 py-3.5 text-[#241f18] shadow-[0_2px_8px_rgba(38,32,25,.05)]"
+                            : "max-w-[78%] self-end rounded-[16px_16px_5px_16px] bg-[#3a6046] px-[18px] py-3 text-[#f2f6ef]"
+                        )}
+                        style={{ "--sw-bubble-delay": `${0.05 + i * 0.07}s` } as React.CSSProperties}
+                      >
+                        {isInterviewer ? renderWithBold(m.content) : m.content}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-        <Footer />
+        </main>
+
+        <footer
+          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-[34px] pt-[26px]"
+          style={{ "--sw-delay": "0.34s" } as React.CSSProperties}
+        >
+          <span className="text-[13.5px] text-[#a89d88]">Powered by</span>
+          <a href="/" className="inline-flex items-center gap-[7px]">
+            <WelcomeBird width={17} height={15} fill="#241f18" />
+            <span className="font-bricolage text-[15px] font-bold text-[#241f18]">Birdsong</span>
+          </a>
+        </footer>
       </div>
     );
   }

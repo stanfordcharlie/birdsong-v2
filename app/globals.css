@@ -860,6 +860,28 @@ select {
     transform: scale(1) rotate(8deg);
   }
 }
+/* Thank-you screen: the success check strokes itself in (its path carries
+   stroke-dasharray: 26). At rest (reduced motion) stroke-dashoffset is 0, so
+   the check is simply fully drawn. */
+@keyframes sw-check-draw {
+  from {
+    stroke-dashoffset: 26;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+/* Transcript bubbles fade up as they mount on expand. */
+@keyframes sw-bubble {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 
 @media (prefers-reduced-motion: no-preference) {
   /* Staggered entrance reveal. Delay is set per element inline via
@@ -898,5 +920,15 @@ select {
   }
   .sw-clusternote-b {
     animation: sw-note-b 7s ease 1s infinite;
+  }
+  /* Success check draw-in (thank-you screen), 0.5s after the reveal starts. */
+  .sw-check {
+    animation: sw-check-draw 0.7s ease 0.5s backwards;
+  }
+  /* Transcript bubble fade-up; per-bubble stagger set inline via
+     --sw-bubble-delay. Fires on mount (each expand), so it replays every time
+     the transcript is reopened. */
+  .sw-bubble {
+    animation: sw-bubble 0.5s ease var(--sw-bubble-delay, 0s) backwards;
   }
 }
