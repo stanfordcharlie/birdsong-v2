@@ -65,13 +65,15 @@ export function SignupForm() {
       <AuthScreen
         heading="Check your email"
         subcopy={`We sent a confirmation link to ${email}.`}
+        align="center"
+        card={false}
         belowCard={
           <Link href="/admin/login" className="font-semibold underline underline-offset-[3px]">
             Back to log in
           </Link>
         }
       >
-        <p className="text-center text-[15px] leading-[1.6] text-[#6f6757]">
+        <p className="max-w-[400px] text-center text-[15px] leading-[1.6] text-[#6f6757]">
           Click the link in that email to finish setting up your account. You can close this tab once
           you have.
         </p>

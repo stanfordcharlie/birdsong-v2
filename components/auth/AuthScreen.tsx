@@ -37,11 +37,20 @@ export function AuthScreen({
   subcopy,
   children,
   belowCard,
+  // "top" anchors the column high so a form's CTA is visible on load; "center"
+  // vertically centers it, for short terminal states (e.g. the confirmation
+  // screen) that would otherwise float high with dead space below.
+  align = "top",
+  // The surface card is right for a form; a one-line confirmation looks
+  // over-padded in it, so those pass card={false} to render the message plain.
+  card = true,
 }: {
   heading: string;
   subcopy: string;
   children: ReactNode;
   belowCard?: ReactNode;
+  align?: "top" | "center";
+  card?: boolean;
 }) {
   return (
     <div
@@ -95,7 +104,12 @@ export function AuthScreen({
           the available space (not vertically centered), so the card — and the
           sign-up CTA below it — is visible on load rather than pushed low. The
           footer still sits at the bottom via main's flex-1. */}
-      <main className="relative flex flex-1 flex-col items-center justify-start px-6 pb-10 pt-2">
+      <main
+        className={cn(
+          "relative flex flex-1 flex-col items-center px-6 pb-10 pt-2",
+          align === "center" ? "justify-center" : "justify-start"
+        )}
+      >
         <div className="flex w-full max-w-[430px] flex-col items-center">
           {/* Bobbing mascot with two rising notes. */}
           <div aria-hidden="true" className="sw-rev relative mb-1.5 h-16 w-[120px]">
@@ -122,7 +136,12 @@ export function AuthScreen({
           </div>
 
           <div
-            className="sw-rev w-full rounded-[22px] border border-[#e9e3d3] bg-[#fffefa] px-[34px] pb-[30px] pt-8 shadow-[0_4px_14px_rgba(38,32,25,0.06)]"
+            className={cn(
+              "sw-rev w-full",
+              card
+                ? "rounded-[22px] border border-[#e9e3d3] bg-[#fffefa] px-[34px] pb-[30px] pt-8 shadow-[0_4px_14px_rgba(38,32,25,0.06)]"
+                : "flex flex-col items-center"
+            )}
             style={{ "--sw-delay": "0.16s" } as React.CSSProperties}
           >
             {children}
