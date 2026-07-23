@@ -7,26 +7,22 @@ export const metadata: Metadata = {
   title: "Birdsong",
   description: "AI-moderated survey platform for B2B demand gen.",
   icons: {
-    // icon.svg/icon.png are served from public/ rather than the app/icon.*
-    // file convention: Next only auto-picks one file per "icon" base name
-    // (it prefers the PNG over the SVG when both exist), so getting <link>
-    // tags for both variants needs this explicit config instead.
+    // Starburst-bird mark (design_handoff_favicon). The PNG tab icons live in
+    // public/ and are wired explicitly here. The .ico is not listed: Next
+    // auto-emits its own <link> for app/favicon.ico (and serves /favicon.ico
+    // for bare browser requests) regardless of this config, so listing it too
+    // would just duplicate that link.
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
-      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16.png", type: "image/png", sizes: "16x16" },
     ],
-    // apple-icon.png itself is still the plain app/ file convention (no
-    // naming collision there — it's the only file at that name) and Next
-    // still serves it at this URL either way; it has to be listed here too
-    // once any `icons` key is set, since that suppresses *all* file-based
-    // icon auto-detection, not just the `icon` key above.
-    apple: "/apple-icon.png",
+    apple: { url: "/apple-touch-icon.png", sizes: "180x180" },
   },
 };
 
-// Matches the "B" mark's rounded-square fill (public/icon.svg,
-// favicon.ico, etc.) — colors browser chrome (mobile address bar, PWA
-// splash/install UI) that would otherwise default to white.
+// Brand green for browser chrome (mobile address bar, PWA splash/install UI)
+// that would otherwise default to white; the manifest pairs it with the
+// eggshell background the favicon tile uses.
 //
 // width/initialScale restate Next's own defaults; viewportFit: "cover" is
 // the part that matters — without it iOS letterboxes the page inside the
