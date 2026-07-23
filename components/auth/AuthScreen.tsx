@@ -84,14 +84,18 @@ export function AuthScreen({
       </div>
 
       {/* Header: top-left logo lockup, links to the marketing landing. */}
-      <header className="sw-rev relative px-9 py-[26px]">
+      <header className="sw-rev relative px-9 py-4">
         <Link href="/" className="inline-flex items-center gap-2.5 [@media(hover:hover)]:hover:text-[#3a6046]">
           <AuthBird width={22} height={20} className="sw-bird" />
           <span className="font-bricolage text-[20px] font-bold tracking-[-0.01em]">Birdsong</span>
         </Link>
       </header>
 
-      <main className="relative flex flex-1 items-start justify-center px-6 pb-16 pt-7">
+      {/* Column direction + justify-start anchors the content to the top of
+          the available space (not vertically centered), so the card — and the
+          sign-up CTA below it — is visible on load rather than pushed low. The
+          footer still sits at the bottom via main's flex-1. */}
+      <main className="relative flex flex-1 flex-col items-center justify-start px-6 pb-10 pt-2">
         <div className="flex w-full max-w-[430px] flex-col items-center">
           {/* Bobbing mascot with two rising notes. */}
           <div aria-hidden="true" className="sw-rev relative mb-1.5 h-16 w-[120px]">
