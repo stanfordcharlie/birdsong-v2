@@ -93,7 +93,7 @@ export function AuthScreen({
       </div>
 
       {/* Header: top-left logo lockup, links to the marketing landing. */}
-      <header className="sw-rev relative px-9 py-4">
+      <header className="sw-rev relative px-9 py-3">
         <Link href="/" className="inline-flex items-center gap-2.5 [@media(hover:hover)]:hover:text-[#3a6046]">
           <AuthBird width={22} height={20} className="sw-bird" />
           <span className="font-bricolage text-[20px] font-bold tracking-[-0.01em]">Birdsong</span>
@@ -106,13 +106,13 @@ export function AuthScreen({
           footer still sits at the bottom via main's flex-1. */}
       <main
         className={cn(
-          "relative flex flex-1 flex-col items-center px-6 pb-10 pt-2",
+          "relative flex flex-1 flex-col items-center px-6 pb-6 pt-1",
           align === "center" ? "justify-center" : "justify-start"
         )}
       >
         <div className="flex w-full max-w-[430px] flex-col items-center">
           {/* Bobbing mascot with two rising notes. */}
-          <div aria-hidden="true" className="sw-rev relative mb-1.5 h-16 w-[120px]">
+          <div aria-hidden="true" className="sw-rev relative mb-1 h-[50px] w-[120px]">
             <span className="sw-clusternote-a absolute left-[26px] top-0 text-[16px]" style={{ color: "#3a6046", opacity: 0 }}>
               &#9834;
             </span>
@@ -123,13 +123,13 @@ export function AuthScreen({
           </div>
 
           <h1
-            className="sw-rev m-0 mb-2.5 text-balance text-center font-bricolage text-[36px] font-bold leading-[1.08] tracking-[-0.02em]"
+            className="sw-rev m-0 mb-2 text-balance text-center font-bricolage text-[36px] font-bold leading-[1.06] tracking-[-0.02em]"
             style={{ "--sw-delay": "0.06s" } as React.CSSProperties}
           >
             {heading}
           </h1>
           <div
-            className="sw-rev mb-7 text-center text-[15px] text-[#6f6757]"
+            className="sw-rev mb-4 text-center text-[15px] text-[#6f6757]"
             style={{ "--sw-delay": "0.1s" } as React.CSSProperties}
           >
             {subcopy}
@@ -139,7 +139,7 @@ export function AuthScreen({
             className={cn(
               "sw-rev w-full",
               card
-                ? "rounded-[22px] border border-[#e9e3d3] bg-[#fffefa] px-[34px] pb-[30px] pt-8 shadow-[0_4px_14px_rgba(38,32,25,0.06)]"
+                ? "rounded-[22px] border border-[#e9e3d3] bg-[#fffefa] px-[34px] pb-6 pt-6 shadow-[0_4px_14px_rgba(38,32,25,0.06)]"
                 : "flex flex-col items-center"
             )}
             style={{ "--sw-delay": "0.16s" } as React.CSSProperties}
@@ -149,7 +149,7 @@ export function AuthScreen({
 
           {belowCard && (
             <div
-              className="sw-rev mt-[22px] text-[14.5px] text-[#6f6757]"
+              className="sw-rev mt-4 text-[14.5px] text-[#6f6757]"
               style={{ "--sw-delay": "0.24s" } as React.CSSProperties}
             >
               {belowCard}
@@ -159,7 +159,7 @@ export function AuthScreen({
       </main>
 
       <footer
-        className="sw-rev relative flex flex-wrap items-center justify-center gap-x-[18px] gap-y-1.5 px-8 pb-[30px] pt-5 text-[13px] text-[#a89d88]"
+        className="sw-rev relative flex flex-wrap items-center justify-center gap-x-[18px] gap-y-1.5 px-8 pb-5 pt-4 text-[13px] text-[#a89d88]"
         style={{ "--sw-delay": "0.3s" } as React.CSSProperties}
       >
         <span>&copy; 2026 Birdsong</span>

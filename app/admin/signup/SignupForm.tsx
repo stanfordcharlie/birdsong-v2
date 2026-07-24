@@ -94,7 +94,7 @@ export function SignupForm() {
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
         <div className="grid grid-cols-2 gap-3">
           <AuthField
             label="First name"
