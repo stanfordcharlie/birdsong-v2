@@ -48,6 +48,23 @@ function parseQuestionGuide(text: string): string[] {
     .filter(Boolean);
 }
 
+function CopyIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
 function StatBlock({ value, label }: { value: React.ReactNode; label: string }) {
   return (
     <div>
@@ -99,6 +116,7 @@ export function SurveyDetailView({
 }) {
   const [editing, setEditing] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
   const [surveyUrl, setSurveyUrl] = useState(`/survey/${survey.slug}`);
   const questions = parseQuestionGuide(survey.questionGuide);
   const isLive = survey.status === "live";
@@ -113,6 +131,12 @@ export function SurveyDetailView({
     await navigator.clipboard.writeText(surveyUrl);
     setShareCopied(true);
     setTimeout(() => setShareCopied(false), 1500);
+  }
+
+  async function handleCopyUrl() {
+    await navigator.clipboard.writeText(surveyUrl);
+    setUrlCopied(true);
+    setTimeout(() => setUrlCopied(false), 2000);
   }
 
   if (editing) {
@@ -170,10 +194,19 @@ export function SurveyDetailView({
           </div>
         </div>
         {survey.externalTitle && (
-          <p className="mt-2 text-sm text-muted-foreground">
-            {survey.externalTitle} · <span className="font-mono text-[13px]">{survey.slug}</span>
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{survey.externalTitle}</p>
         )}
+        <div className="mt-2 flex max-w-[480px] items-center gap-1.5">
+          <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{surveyUrl}</span>
+          <button
+            type="button"
+            onClick={handleCopyUrl}
+            aria-label="Copy survey URL"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-secondary hover:text-card-foreground"
+          >
+            {urlCopied ? <CheckIcon /> : <CopyIcon />}
+          </button>
+        </div>
       </div>
 
       <div className="bs-rise-2 border-t border-border py-7">
