@@ -1,70 +1,60 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignOutButton } from "./SignOutButton";
 import { cn } from "@/lib/utils";
 
-const COLLAPSE_STORAGE_KEY = "bs-sidebar-collapsed";
-
-function ToggleIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <line x1="10" y1="4" x2="10" y2="20" />
-    </svg>
-  );
-}
-
+// Icon set redesigned per design_handoff_create_survey: 19px, 1.4px stroke,
+// rounder/thinner than the old Feather-style set — same four routes, new
+// paths lifted directly from the handoff for pixel fidelity.
 function HomeIcon() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-      <path d="M3 11l9-8 9 8" />
-      <path d="M5 10v10h14V10" />
+    <svg width="19" height="19" viewBox="0 0 18 18" fill="none" className="shrink-0">
+      <path d="M3 8l6-5 6 5v7a1 1 0 01-1 1H4a1 1 0 01-1-1V8z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
     </svg>
   );
 }
 
 function LeadsIcon() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-      <circle cx="9" cy="8" r="3.5" />
-      <path d="M3.5 20c0-3 2.5-5 5.5-5s5.5 2 5.5 5" />
-      <path d="M16 5.5a3.5 3.5 0 0 1 0 5" />
-      <path d="M17.5 15.5c2 .8 3 2.4 3 4.5" />
+    <svg width="19" height="19" viewBox="0 0 18 18" fill="none" className="shrink-0">
+      <circle cx="6.6" cy="6.2" r="2.4" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M2 14.6c0-2.6 2.1-4 4.6-4s4.6 1.4 4.6 4" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M11.8 4.2a2.4 2.4 0 010 4.3M13.4 10.9c1.6.6 2.6 1.9 2.6 3.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }
 
 function SurveysIcon() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-      <rect x="5" y="3" width="14" height="18" rx="2" />
-      <line x1="9" y1="8" x2="15" y2="8" />
-      <line x1="9" y1="12" x2="15" y2="12" />
-      <line x1="9" y1="16" x2="13" y2="16" />
+    <svg width="19" height="19" viewBox="0 0 18 18" fill="none" className="shrink-0">
+      <rect x="3.5" y="2.5" width="11" height="13" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+      <line x1="6" y1="6.5" x2="12" y2="6.5" stroke="currentColor" strokeWidth="1.3" />
+      <line x1="6" y1="9.5" x2="12" y2="9.5" stroke="currentColor" strokeWidth="1.3" />
     </svg>
   );
 }
 
 function CompanyProfileIcon() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-      <rect x="4" y="3" width="16" height="18" rx="1" />
-      <line x1="8" y1="7" x2="8" y2="7.01" />
-      <line x1="12" y1="7" x2="12" y2="7.01" />
-      <line x1="16" y1="7" x2="16" y2="7.01" />
-      <line x1="8" y1="11" x2="8" y2="11.01" />
-      <line x1="12" y1="11" x2="12" y2="11.01" />
-      <line x1="16" y1="11" x2="16" y2="11.01" />
-      <path d="M9 21v-4h6v4" />
+    <svg width="19" height="19" viewBox="0 0 18 18" fill="none" className="shrink-0">
+      <rect x="3.5" y="4.5" width="11" height="11" rx="1.2" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M6.5 4.5V3a1 1 0 011-1h3a1 1 0 011 1v1.5M6.3 8h5.4M6.3 11h3.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
     </svg>
   );
 }
 
-// Nav icon set (house/people/clipboard/building) — same hand-drawn stroke
-// style for any new admin nav items going forward, for consistency.
+function ChevronIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" className="shrink-0 text-[hsl(0_0%_42%)]">
+      <path d="M5 6l3-3 3 3M5 10l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 const NAV_ITEMS = [
   { href: "/admin", label: "Home", icon: HomeIcon },
   { href: "/admin/leads", label: "Leads", icon: LeadsIcon },
@@ -80,22 +70,11 @@ export function AdminSidebar({
   userInitial: string;
 }) {
   const pathname = usePathname();
-  // Starts expanded on both server and first client render (no
-  // localStorage access during SSR) to avoid a hydration mismatch, then
-  // syncs to the stored preference right after mount — a possible one-frame
-  // flash from expanded to collapsed on reload, traded deliberately for
-  // zero hydration-mismatch risk (same tradeoff as the admin home greeting).
-  const [collapsed, setCollapsed] = useState(false);
-  // Click-toggled, not hover-revealed: the collapsed flyout sits past a gap
-  // the cursor has to cross, and losing hover mid-crossing made the menu
-  // unclickable. A real toggle also works for touch and keyboard.
+  // Click-toggled, not hover-revealed: matches the account popover's
+  // previous interaction model (works for touch/keyboard, no lost-hover gap
+  // to cross).
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(COLLAPSE_STORAGE_KEY);
-    if (stored === "true") setCollapsed(true);
-  }, []);
 
   // Dismiss the account menu on outside click or Escape.
   useEffect(() => {
@@ -121,62 +100,26 @@ export function AdminSidebar({
     setAccountOpen(false);
   }, [pathname]);
 
-  function toggleCollapsed() {
-    setCollapsed((prev) => {
-      const next = !prev;
-      try {
-        window.localStorage.setItem(COLLAPSE_STORAGE_KEY, String(next));
-      } catch {
-        // Private browsing / storage disabled — the preference just won't persist.
-      }
-      return next;
-    });
-  }
-
   return (
-    <aside
-      className={cn(
-        // sticky, not fixed: a plain flex sibling of <main> (see
-        // AdminShell), so its rendered width is always what main's layout
-        // actually reserves — no separate padding value to keep in sync as
-        // the width transitions between collapsed/expanded.
-        // Top-anchored stack: wordmark row, then nav directly beneath it
-        // (28px gap), with mt-auto pinning the account chip to the bottom —
-        // no justify-between, which used to strand the nav mid-rail.
-        "sticky top-0 flex h-screen shrink-0 flex-col bg-sidebar pb-8 pt-10 transition-[width] duration-200 ease-out",
-        collapsed ? "w-16" : "w-[196px]"
-      )}
-    >
-      {/* overflow-hidden lives here, not on <aside> itself — narrow enough
-          to clip the wordmark cleanly during the width transition, but not
-          so broad that it also clips the account menu below (or, now, the
-          collapsed nav tooltips), both of which need to overflow past the
-          rail's edge to be readable. Horizontal padding is a constant 12px
-          (px-3) on every row here and in the account chip below, rather
-          than on the outer <aside> — the previous version put 28px on
-          <aside> *and* 12px on each nav item, and at 196px wide that
-          compounded enough to clip "Company profile"'s label. Nav itself
-          moved below, out of this wrapper, for the same overflow-escaping
-          reason as the account menu. */}
-      <div className="overflow-hidden">
-        <div className={cn("mb-7 flex items-center px-3", collapsed ? "justify-center" : "gap-2.5")}>
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-sidebar-accent/[0.06] text-sidebar-foreground transition-colors hover:bg-sidebar-accent/[0.12]"
-          >
-            <ToggleIcon />
-          </button>
-          {!collapsed && (
-            <Link href="/admin" className="whitespace-nowrap font-serif text-[19px] text-sidebar-foreground">
-              Birdsong
-            </Link>
-          )}
-        </div>
+    <aside className="sticky top-0 flex h-screen w-[252px] shrink-0 flex-col bg-sidebar pb-3.5 pt-[22px]">
+      <div className="mb-[30px] flex items-center gap-[11px] px-3">
+        <Image
+          src="/favicon-512.png"
+          alt="Birdsong"
+          width={30}
+          height={30}
+          className="block rounded-control"
+        />
+        <span className="font-spectral text-[21px] font-semibold tracking-[-0.01em] text-sidebar-active-foreground">
+          Birdsong
+        </span>
       </div>
 
-      <nav className={cn("flex flex-col gap-1", !collapsed && "px-2")}>
+      <div className="mb-2.5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[hsl(0_0%_42%)]">
+        Workspace
+      </div>
+
+      <nav className="flex flex-col gap-[3px] px-2">
         {NAV_ITEMS.map((item) => {
           // "/admin" is a prefix of every other admin route, so it needs an
           // exact-match carve-out to avoid lighting up alongside whichever
@@ -190,39 +133,30 @@ export function AdminSidebar({
             <Link
               key={item.href}
               href={item.href}
-              title={item.label}
               className={cn(
-                "group/tooltip relative flex items-center whitespace-nowrap rounded-control text-[13px] transition-colors",
-                collapsed ? "mx-auto h-10 w-10 justify-center" : "gap-2 px-2.5 py-[9px]",
+                "relative flex items-center gap-[13px] rounded-control px-3 py-[11px] text-[15px] font-medium tracking-[-0.005em] transition-colors duration-[130ms] ease-in-out",
                 isActive
-                  ? "bg-sidebar-accent font-semibold text-sidebar-active-foreground"
-                  : "font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent/[0.06] hover:text-sidebar-foreground"
+                  ? "bg-sidebar-accent text-sidebar-active-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-active-foreground"
               )}
             >
-              <Icon />
-              {!collapsed && <span>{item.label}</span>}
-              {/* Collapsed-only hover/focus preview of what the icon is —
-                  expanded already shows the label inline, so this would be
-                  redundant (and mispositioned) there. Same visual language
-                  as the account menu below: sidebar surface, subtle border,
-                  shadow. z-50 + the nav-outside-overflow-hidden move above
-                  are both required for this to actually render past the
-                  rail's edge instead of getting clipped. */}
-              {collapsed && (
-                <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-control border border-sidebar-border/[0.12] bg-sidebar px-2.5 py-1.5 text-xs font-medium text-sidebar-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover/tooltip:opacity-100 group-focus-visible/tooltip:opacity-100">
-                  {item.label}
-                </span>
+              {isActive && (
+                <span className="absolute inset-y-[9px] left-[-14px] w-[3px] rounded-[0_3px_3px_0] bg-indigo-chip" />
               )}
+              <Icon />
+              <span>{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
-      {/* Bottom: account chip. Clicking it toggles a small menu with
-          Settings and Sign out (outside click and Escape dismiss it). Not
-          shown in the static design reference, but Settings/Sign out have
-          to live somewhere — the main nav doesn't include them. */}
-      <div ref={accountRef} className="relative mt-auto px-3">
+      <div className="flex-1" />
+
+      {/* Account chip. Clicking it toggles a small menu with Settings and
+          Sign out (outside click and Escape dismiss it). Not shown in the
+          static design reference, but Settings/Sign out have to live
+          somewhere — the main nav doesn't include them. */}
+      <div ref={accountRef} className="relative mb-1.5 px-2">
         <button
           type="button"
           onClick={() => setAccountOpen((prev) => !prev)}
@@ -230,34 +164,28 @@ export function AdminSidebar({
           aria-expanded={accountOpen}
           aria-label="Account menu"
           className={cn(
-            "flex w-full items-center rounded-control py-1.5 text-left transition-colors hover:bg-sidebar-accent/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/40",
-            collapsed ? "justify-center" : "gap-2.5 px-1.5",
-            accountOpen && "bg-sidebar-accent/[0.06]"
+            "flex w-full items-center gap-[11px] rounded-control px-2.5 py-[9px] text-left transition-colors duration-[130ms] ease-in-out hover:bg-sidebar-accent",
+            accountOpen && "bg-sidebar-accent"
           )}
         >
-          <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-indigo-light text-[13px] font-semibold text-sidebar-active-foreground">
+          <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-indigo-chip text-[13.5px] font-semibold text-white">
             {userInitial}
           </span>
-          {!collapsed && (
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-semibold text-sidebar-foreground">
-                {userName ?? "Account"}
-              </span>
-              <span className="block text-[11px] text-sidebar-foreground/50">Admin</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[14px] font-medium text-sidebar-active-foreground">
+              {userName ?? "Account"}
             </span>
-          )}
+            <span className="block text-[12.5px] text-sidebar-foreground">Admin</span>
+          </span>
+          <ChevronIcon />
         </button>
 
         {/* Standard light popover (card surface, border, shadow — the
-            design system's menu treatment), toggled by the button above.
-            Expanded: sits above the chip, inset to the rail's 12px padding
-            so it never overhangs the sidebar edge; collapsed: flies out to
-            the right of the avatar, same side as the nav tooltips. */}
+            design system's menu treatment), toggled by the button above. */}
         <div
           role="menu"
           className={cn(
-            "absolute z-50 rounded-card border border-border bg-card p-1.5 shadow-lg transition-opacity duration-150",
-            collapsed ? "bottom-0 left-full ml-2 w-44" : "bottom-full left-3 right-3 mb-1.5",
+            "absolute bottom-full left-2 right-2 z-50 mb-1.5 rounded-card border border-border bg-card p-1.5 shadow-lg transition-opacity duration-150",
             accountOpen ? "opacity-100" : "pointer-events-none opacity-0"
           )}
         >

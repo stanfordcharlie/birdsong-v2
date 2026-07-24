@@ -46,15 +46,16 @@ in `tailwind.config.ts` (e.g. `--ds-primary` → `bg-primary`, `text-primary`).
 | Indigo | `text-indigo` | `#4338ca` | Links/chip text on light surfaces (e.g. "Open respondent view") |
 | Indigo light | `text-indigo-light` / `bg-indigo-light` | `#a5b4fc` | Highlights/accents on ink surfaces (survey names in the activity feed, pulsing dot, user-chip avatar) |
 | Indigo chip | `bg-indigo-chip` (used at low alpha, e.g. `/[0.08]`) | `#4f46e5` | Indigo chip fill, `rgba(79,70,229,.08)` |
-| Sidebar | `bg-sidebar` | `#1c1917` (ink) | The one permanently-dark surface: the nav rail (the admin home's old dark left panel is gone) |
-| Sidebar foreground | `text-sidebar-foreground` (alpha-modified per state: `/60` inactive, `/50` faint, full for active text) | `#f5f4ef` (cream) | Text on ink surfaces |
-| Sidebar active foreground | `text-sidebar-active-foreground` | `#1c1917` (ink) | Text on the *active* nav pill (inverted — ink-on-cream, not cream-on-ink) |
-| Sidebar accent | `bg-sidebar-accent` (alpha-modified: `/[0.06]` hover, full for the active pill) | `#f5f4ef` (cream) | Nav hover wash / active pill background |
-| Sidebar border | `border-sidebar-border` (used at `/[0.12]`) | `#f5f4ef` (cream) | Dividers on ink surfaces |
+| Sidebar | `bg-sidebar` | `#121212` (true near-black) | The one permanently-dark surface: the nav rail. Redesigned per `design_handoff_create_survey` — no longer the warm ink `#1c1917` used elsewhere |
+| Sidebar foreground | `text-sidebar-foreground` | `#9aa1ac` (cool gray-blue) | Inactive nav text/labels on ink surfaces |
+| Sidebar active foreground | `text-sidebar-active-foreground` | `#ffffff` | Text on hover/active nav items and the account row (no longer inverted — hover/active is now a conventional dark-fill-plus-white-text treatment, not a cream pill) |
+| Sidebar accent | `bg-sidebar-accent` | `#262626` | Hover/active nav item fill |
+| Sidebar border | `border-sidebar-border` | `#333333` | Dividers on ink surfaces |
 
-Note the sidebar's active-item colors are **inverted** from a typical dark-rail
-convention: inactive/hover text stays cream-on-ink, but the *active* item is a solid
-cream pill with ink text — straight from the handoff, not a mistake.
+The active nav item is marked by a 3px indigo (`bg-indigo-chip`) accent bar flush to
+the sidebar's left edge (`absolute`, `inset-y-[9px] left-[-14px]`), on top of the same
+hover/active dark fill every other item gets on hover — not by a distinct
+background/text treatment of its own.
 
 ## Typography roles
 
@@ -64,11 +65,12 @@ weights 400/500/600/700. **Display: [Young Serif](https://fonts.google.com/speci
 `font-normal`, never `font-medium`/`font-semibold`, which would be a silent no-op).
 Both from `lib/fonts.ts`.
 
-**Hard rule: serif is page-title only.** Young Serif appears in exactly two places in
+**Hard rule: serif is page-title only.** Young Serif appears in exactly one place in
 the admin: the single large page title at the top of each page (the `.type-page-title`
-role) and the sidebar "Birdsong" wordmark (`font-serif text-[19px]`). Nothing else —
-not table cell content, not card headings, not section titles, not survey names, not
-form headings, not stat values. Everything else is Archivo on the fixed scale below.
+role). Nothing else — not table cell content, not card headings, not section titles,
+not survey names, not form headings, not stat values. Everything else is Archivo on
+the fixed scale below. (The sidebar wordmark uses Spectral, a different serif — see
+the exceptions note below.)
 
 Every role is a reusable utility class defined in `app/globals.css` (`@layer
 components`) — pages reference roles, not raw sizes. Because the roles live in the
@@ -86,10 +88,16 @@ color).
 | Table header | (baked into `components/ui/table.tsx`) | Archivo | 12px (`text-xs`) / 600, uppercase, tracking wide | muted | Every table `<th>` |
 | Table cell | (baked into `components/ui/table.tsx`) | Archivo | 14px (`text-sm`) / 400 | ink | Every table `<td>`; row-title cells (survey internal names) step up to `text-[15px] font-medium` |
 
-Two sanctioned exceptions to the serif rule, both deliberate: the sidebar wordmark
-(serif 19px — branding, not a heading), and the company-profile setup wizard's step
-titles (serif 28px — each wizard step's single page title, sized down to fit its
-card; the wizard's left-rail "Company Profile" label is sans).
+Sanctioned exceptions to the serif rule, all deliberate: the sidebar wordmark
+(`font-spectral text-[21px]` — branding, not a heading, and a different serif face
+than `.type-page-title`'s Young Serif — reuses the Spectral face already loaded for
+the respondent interview rather than adding a second one), the company-profile setup
+wizard's step titles (serif 28px — each wizard step's single page title, sized down
+to fit its card; the wizard's left-rail "Company Profile" label is sans), and the
+new-survey wizard's live preview panel, which renders the respondent-facing external
+name in `font-spectral` to match the real respondent interview title (see "New
+survey wizard" below) — not `.type-page-title`, since it's mimicking respondent-facing
+copy, not an admin page title.
 
 `font-archivo` is **not** the global `<body>` default — that stays `font-sans` (Inter),
 since marketing pages need it. Instead, `font-archivo` is applied once at each section's
@@ -183,47 +191,79 @@ Header: uppercase, `text-muted-foreground`, bottom border only. Rows: bottom bor
 
 ### Admin shell (`components/AdminShell.tsx`, `components/AdminSidebar.tsx`)
 
-Collapsible ink sidebar (`bg-sidebar`), **196px expanded / 64px (`w-16`) collapsed**,
-`transition-[width,padding]` 0.2s ease. **Top-anchored stack** (no `justify-between`
-— the nav must never float mid-rail): the toggle button (panel icon, fixed position
-regardless of state) + Young Serif "Birdsong" wordmark (hidden collapsed) sit at the
-very top, with the nav links directly beneath after a 28px gap (`mb-7`). Four nav
-links (Home / Leads / Surveys / Company profile), each icon (house / people /
-clipboard / building — apply the same hand-drawn stroke set to any new admin nav
-items) + label (label hidden collapsed, `title` attribute picks up the slack), 8px
-radius, active item is a solid cream pill with ink text. Bottom, pinned with
-`mt-auto`: a 30px indigo-light circle with the user's initial (always visible) +
-name/"Admin" role label (hidden collapsed).
+Redesigned per `design_handoff_create_survey`. **Fixed 252px, no collapsed state**
+(the old collapse-to-64px toggle is gone entirely, along with its `localStorage`
+persistence and hover tooltips). Padding `22px 14px 14px`. **Top-anchored stack**:
+favicon logo (30×30, `rounded-control`) + Spectral serif "Birdsong" wordmark (21px/600,
+see below) sit at the top (`mb-[30px]`), then a "WORKSPACE" section label (11px/600,
+uppercase, tracking `.12em`, `hsl(0 0% 42%)`), then the nav links directly beneath.
 
-Clicking the account chip toggles a Settings/Sign out popover (not shown in the
-static design reference, but has to live somewhere since the handoff's nav doesn't
-include Settings). Click-toggled, not hover-revealed — hover made the collapsed
-flyout unreachable (the cursor lost hover crossing the gap to it) and doesn't work
-for touch or keyboard; outside click, Escape, and any navigation dismiss it. It's
-the design system's standard light menu: `bg-card`, 1px `border-border`,
-`rounded-card`, `shadow-lg`, `p-1.5`, items `text-sm` with 12px vertical padding
-(`py-3`) and `hover:bg-secondary`. Expanded, it sits above the chip inset to the
-rail's 12px padding (`left-3 right-3` — it must never overhang the sidebar edge);
-collapsed, it flies out to the right of the avatar, like the nav tooltips.
+Four nav links (Home / Leads / Surveys / Company profile), 19px icons (1.4px stroke
+— a rounder, thinner set than the old Feather-style icons; apply the same style to
+any new admin nav item), 15px/500 label, `gap-[13px]`, `rounded-control`. Hover and
+active both get the same treatment — solid dark fill (`bg-sidebar-accent`) + white
+text (`text-sidebar-active-foreground`) — with the *active* route additionally
+marked by a 3px indigo (`bg-indigo-chip`) accent bar flush to the rail's left edge.
+This is a departure from the rest of the platform's Young-Serif-is-page-title-only
+rule: the sidebar wordmark uses `font-spectral`, not `font-serif` (Young Serif) —
+Spectral is already loaded for the respondent interview (`lib/fonts.ts`), reused
+here rather than adding a second serif face.
 
-Collapsed state is local `useState` in `AdminSidebar`, persisted to `localStorage`
-(`bs-sidebar-collapsed`) and re-applied client-side after mount (server/first-client
-render always starts expanded, to avoid a hydration mismatch — same tradeoff as the
-admin home greeting, see below).
+Bottom, pinned with `mt-auto`/a trailing flex spacer: a 34px indigo (`bg-indigo-chip`)
+circle with the user's initials + name/"Admin" role label + a chevron icon. Clicking
+it toggles the same Settings/Sign out popover as before (not shown in the static
+design reference, but has to live somewhere since the handoff's nav doesn't include
+Settings) — click-toggled, not hover-revealed, for the same reasons as before:
+outside click, Escape, and any navigation dismiss it. Popover styling unchanged:
+`bg-card`, 1px `border-border`, `rounded-card`, `shadow-lg`, `p-1.5`, items `text-sm`
+with `py-3` and `hover:bg-secondary`, inset to the rail's padding (`left-2 right-2`).
 
 **Important:** the sidebar is `sticky`, not `fixed`, and is a normal flex sibling of
-`<main>` in `AdminShell` — `<main>` is just `flex-1`, no `pl-[...]` padding tracking the
-sidebar's width. An earlier version used `position: fixed` + a hardcoded `pl-[232px]`
-on `<main>` to compensate; once the sidebar's width became dynamic (collapse/expand),
-that padding value had no way to stay in sync and the layout could visibly
-break/overlap. Don't reintroduce fixed positioning here without also removing this
-comment and re-solving that sync problem.
+`<main>` in `AdminShell` — `<main>` is just `flex-1`, no `pl-[...]` padding tracking
+the sidebar's width. Don't reintroduce fixed positioning on the sidebar without also
+adding matching padding to `<main>`.
 
 A page can still break out of `<main>`'s `p-8` with `-m-8` for a full-bleed layout —
-today only the company profile onboarding wizard does this, for its own
-step-navigator sidebar. (The admin home used to as well, for a split-screen dark
-panel; it now sits on `.admin-container` — see "Layout containers & spacing
-rhythm".)
+the company profile onboarding wizard does this for its own step-navigator sidebar,
+and the new-survey wizard's External name step does the same for its two-pane layout
+(see below). (The admin home used to as well, for a split-screen dark panel; it now
+sits on `.admin-container` — see "Layout containers & spacing rhythm".)
+
+### New survey wizard (`components/NewSurveyWizard.tsx`)
+
+Every step but one is a plain boxed card on `.admin-container`, unchanged. The
+**External name** step (`design_handoff_create_survey`) is the one exception: it
+takes over the full content area with `-m-8 flex h-screen overflow-hidden` (same
+cancel-AdminShell's-padding trick as the company profile wizard) and splits into two
+independently-scrolling panes — a `flex-[1_1_55%]` form column (white card, Back
+link, "Step X of Y", title, AI suggestion pills, name input, OK button) and a
+`flex-[1_1_45%]` live preview column, `border-l border-border`. Only this one step
+does this; navigating to any other step (including Back/Next from this one) returns
+to the normal boxed layout, so the page's outer "Surveys" eyebrow / "New survey"
+title (rendered by `NewSurveyWizard` itself, not `page.tsx` — it has to be
+per-step-conditional) reappears there.
+
+AI suggestion pills are full-width stacked buttons (`bg-indigo-chip/[0.07]`,
+`border-indigo-chip/25`, `rounded-[18px]`), not the small flex-wrap chips used by the
+public-description step's single suggestion card. Picking one sets it apart with an
+inset ring (`ring-2 ring-inset ring-indigo-chip`, `border-transparent`,
+`bg-indigo-chip/10`); typing in the name input clears the selection. "Regenerate
+suggestions" reuses the same `/api/surveys/suggest-names` call as before — its
+refresh icon spins for as long as that real fetch is in flight, not a fixed mock
+delay.
+
+The live preview panel (`SurveyPreviewPanel`) is a simplified, stylized mock of the
+real respondent welcome screen — not a literal re-render of
+`InterviewFlow.tsx`'s (more elaborate) welcome stage — using the same cream palette
+that screen hardcodes as raw hex (`#f3ecdf`/`#fffdf7`/`#e7ddc9`/`#241f18`/`#6f6757`/
+`#a89d88`): a browser-chrome header (traffic lights + URL pill showing the real
+domain and live slug), a gift-card badge (`bg-success-bg`/`text-success` — this one
+detail *does* map to an existing `--ds-*` token, and is only shown when the admin
+actually set a gift card amount earlier in the wizard), the live external-name value
+as the title (`font-spectral`), ghost input fields, and a "Powered by Birdsong"
+footer. Updates on every keystroke, reusing the wizard's own real `slug`/`externalTitle`
+state (and the real `slugify()` from `lib/surveys/slugify.ts`) rather than a
+separate mock slug rule.
 
 ### Load-in animation (`globals.css`)
 
@@ -327,11 +367,11 @@ real, otherwise omitted rather than fabricated:
 - **"Wren"** (the interviewer name shown on the respondent screen, "Wren is asking") is
   hardcoded brand copy, not a per-survey or per-company field — same category as
   "Powered by Birdsong."
-- **Sidebar collapsed width mismatch in the design files themselves**: `Birdsong Home
-  v2.dc.html` specifies 196px/64px; `Company Profile.dc.html` and `Survey
-  Settings.dc.html` specify 232px/76px for the same mechanism. Implemented as 196/64
-  everywhere, per the explicit written spec that introduced this feature — treat the
-  232/76 pair in the other two files as stale if a future handoff touches them again.
+- **Sidebar collapse removed entirely** (`design_handoff_create_survey`): the sidebar
+  no longer has a collapsed state at all — it's a fixed 252px. The earlier
+  196px/64px collapsible mechanism (and its 232px/76px stale-spec footnote from an
+  older handoff) no longer applies; if a future handoff shows a collapsed sidebar
+  again, that's a new feature, not a revival of the old one.
 
 ## Deviations from the static mockups (kept for real functionality)
 
@@ -350,3 +390,13 @@ features aren't depicted there and were kept, styled to match:
 - **Company Profile / Survey Settings**: the "Edit with AI" bar (Company Profile) and
   the response table (Survey Settings) are real, previously-built features not shown in
   these particular mockups; both were kept and restyled rather than dropped.
+- **New survey wizard — External name step** (`design_handoff_create_survey`): the
+  handoff's browser-chrome URL pill shows a literal `www.usebirdsong.com` example;
+  implemented using the real `NEXT_PUBLIC_APP_URL`-derived domain with no `www.`
+  prefix added, matching what `lib/email/lead-notification.ts`/`lib/slack/lead-notification.ts`
+  actually send rather than the mockup's illustrative example. The gift-card badge
+  ("$25 GIFT CARD") is real, wired to the wizard's own `giftCardAmount` state from an
+  earlier step, and omitted rather than shown as a fabricated placeholder when that
+  field is empty. The "~10 minutes" estimate next to it has no backing field (there's
+  no rough-duration calculation available at this point in the wizard) and stays as
+  the mockup's static illustrative copy.

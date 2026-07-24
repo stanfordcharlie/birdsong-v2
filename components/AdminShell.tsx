@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import { AdminSidebar } from "./AdminSidebar";
+import { spectral } from "@/lib/fonts";
+import { cn } from "@/lib/utils";
 
 export function AdminShell({
   children,
@@ -34,11 +36,11 @@ export function AdminShell({
   }, []);
 
   return (
-    <div className="font-archivo flex min-h-screen bg-page text-card-foreground">
+    <div className={cn("font-archivo flex min-h-screen bg-page text-card-foreground", spectral.variable)}>
       <AdminSidebar userName={userName} userInitial={userInitial} />
-      {/* AdminSidebar is a normal (sticky, not fixed) flex sibling, so it
-          always reserves exactly its own current width — no padding value
-          here needs to track the sidebar's collapsed/expanded state. */}
+      {/* AdminSidebar is a normal (sticky, not fixed) flex sibling at a
+          fixed 252px, so it always reserves exactly its own width — no
+          padding value here needs to track it. */}
       <main className="min-w-0 flex-1">
         <div className="p-8">{children}</div>
       </main>

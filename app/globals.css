@@ -60,12 +60,18 @@
 
   --ds-ring: 24 10% 10%;               /* matches primary */
 
-  --ds-sidebar: 24 10% 10%;            /* #1c1917 ink — the one always-dark surface */
-  --ds-sidebar-foreground: 50 23% 95%; /* #f5f4ef cream, alpha-modified per state (inactive: /60, hover text: full) */
-  --ds-sidebar-active-foreground: 24 10% 10%; /* #1c1917 ink text on the active cream pill */
-  --ds-sidebar-accent: 50 23% 95%;     /* #f5f4ef cream, alpha-modified per state (hover fill: /6, active pill: full) */
-  --ds-sidebar-border: 50 23% 95%;     /* #f5f4ef cream, used at /[0.12] for dividers on ink */
-  --ds-sidebar-ring: 50 23% 95%;
+  /* Redesigned per design_handoff_create_survey: true near-black rail (not
+     the warm ink #1c1917 used elsewhere), cool gray-blue inactive nav text,
+     and a conventional (not inverted) hover/active treatment — hover and
+     active both go to a solid dark-gray fill with white text, with the
+     active route additionally marked by an indigo accent bar rather than by
+     text/bg inversion. See DESIGN.md. */
+  --ds-sidebar: 0 0% 7%;                /* #121212 */
+  --ds-sidebar-foreground: 218 11% 65%; /* #9aa1ac — inactive nav text/labels */
+  --ds-sidebar-active-foreground: 0 0% 100%; /* #fff — hover/active nav + account text */
+  --ds-sidebar-accent: 0 0% 15%;        /* #262626 — hover/active nav fill */
+  --ds-sidebar-border: 0 0% 20%;        /* #333333 */
+  --ds-sidebar-ring: 0 0% 20%;
 
   --ds-radius-card: 0.75rem;    /* 12px */
   --ds-radius-control: 0.5rem;  /* 8px */
