@@ -22,6 +22,7 @@ import {
 } from "@/lib/interview/rate-limit";
 import { MESSAGE_MAX_LENGTH } from "@/lib/interview/validation";
 import { sendLeadNotification } from "@/lib/email/lead-notification";
+import { sendLeadNotificationToSlack } from "@/lib/slack/lead-notification";
 import type { InterviewMessage } from "@/lib/interview/types";
 import type { Database, Json } from "@/types/database";
 
@@ -230,7 +231,7 @@ async function completeInterview(
   // fit against this sponsor's actual product, not generic friction.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("what_we_sell, target_icp, value_prop")
+    .select("what_we_sell, target_icp, value_prop, slack_webhook_url")
     .eq("user_id", survey.user_id)
     .maybeSingle();
 
@@ -266,6 +267,12 @@ async function completeInterview(
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
+  // Captured right as completion is confirmed, not whenever the Slack
+  // message eventually gets built/sent below (which can lag slightly behind
+  // — the email send is awaited first, and Slack itself goes out via
+  // waitUntil) — the notification's "Completed X min ago" is relative to
+  // this instant.
+  const completedAt = new Date().toISOString();
   console.log(`[interview/continue] response_id=${responseId} completed, lead_score=${leadScore}`);
 
   // Test runs still go through extraction above (the owner wants to see
@@ -279,6 +286,18 @@ async function completeInterview(
       complete: true,
     });
   }
+
+  // Shared between the Slack notification and company fit-scoring below.
+  const respondentCustomValues =
+    (response.custom_field_values as Record<string, unknown> | null) ?? {};
+  const respondentCompanyName =
+    typeof respondentCustomValues.company === "string"
+      ? respondentCustomValues.company
+      : typeof respondentCustomValues.derived_company_name === "string"
+        ? respondentCustomValues.derived_company_name
+        : null;
+  const respondentEmailDomain =
+    typeof respondentCustomValues.email_domain === "string" ? respondentCustomValues.email_domain : null;
 
   // Best-effort: the respondent's completion shouldn't fail because the
   // notification email did.
@@ -302,6 +321,41 @@ async function completeInterview(
     console.error("Failed to send lead notification email", err);
   }
 
+  // Slack: a second, independent consumer of the same completion event as
+  // the email above. Wrapped and sent separately so a Slack failure can
+  // never affect completion or the email path, and fired via waitUntil
+  // (fire-and-forget) rather than awaited, per sendLeadNotificationToSlack's
+  // own internal try/catch and ~5s fetch timeout. Only runs when the owner
+  // has a webhook configured, and only posts for leads scoring 7+ (see
+  // buildLeadNotificationMessage) — lower-scoring leads are still saved and
+  // emailed above, just not sent to Slack. response.fit_score comes from the
+  // company fit-scoring agent below, which hasn't run yet for a
+  // freshly-completed response (it fires after this point) — the typeof
+  // guard here also means this degrades gracefully if the fit column
+  // doesn't exist yet on this database, without a separate probe query.
+  const slackWebhookUrl = profile?.slack_webhook_url;
+  if (slackWebhookUrl) {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const fitScore = typeof response.fit_score === "number" ? response.fit_score : null;
+    const jobTitle = typeof respondentCustomValues.job_title === "string" ? respondentCustomValues.job_title : null;
+    waitUntil(
+      sendLeadNotificationToSlack(slackWebhookUrl, {
+        surveyTitle: survey.title,
+        respondentName: response.respondent_name,
+        respondentEmail: response.respondent_email,
+        respondentPhone: response.respondent_phone,
+        jobTitle,
+        company: respondentCompanyName,
+        leadScore,
+        fitScore,
+        topPainPoint: painPoints[0] ?? null,
+        callScriptOpener: callScript.opener.trim() || null,
+        completedAt,
+        responseUrl: `${appUrl}/admin/responses/${responseId}`,
+      })
+    );
+  }
+
   // Company fit-scoring: a separate, slower/costlier agent (it runs web
   // search) that scores the respondent's COMPANY against the sponsor's ICP,
   // distinct from the transcript-based lead_score above. It must never block
@@ -310,16 +364,6 @@ async function completeInterview(
   // its own columns. Failures are fully contained inside runCompanyFitScoring
   // (loud logs + an "unavailable" marker), never surfacing here. Not run for
   // test responses (this branch is already the non-test path).
-  const respondentCustomValues =
-    (response.custom_field_values as Record<string, unknown> | null) ?? {};
-  const respondentCompanyName =
-    typeof respondentCustomValues.company === "string"
-      ? respondentCustomValues.company
-      : typeof respondentCustomValues.derived_company_name === "string"
-        ? respondentCustomValues.derived_company_name
-        : null;
-  const respondentEmailDomain =
-    typeof respondentCustomValues.email_domain === "string" ? respondentCustomValues.email_domain : null;
   waitUntil(
     runCompanyFitScoring({
       responseId,
