@@ -6,7 +6,7 @@ import { BirdMark } from "./BirdMark";
 // with its last word in blue.
 export function LandingCta({ headlinePre, headlineBlue }: { headlinePre: string; headlineBlue: string }) {
   return (
-    <section className="mx-auto max-w-[1360px] px-6 pb-[130px] pt-5 md:px-12">
+    <section className="mx-auto max-w-[1360px] px-6 pb-[130px] pt-5 md:px-12 lp-mobile:px-[22px]">
       <div data-reveal="1" className="relative text-center">
         <div className="relative inline-block">
           <BirdMark width={40} height={37} className="lp-cta-bird mx-auto mb-[18px] block" />
@@ -26,7 +26,7 @@ export function LandingCta({ headlinePre, headlineBlue }: { headlinePre: string;
             &#9834;
           </span>
         </div>
-        <h2 className="text-balance m-0 font-bricolage text-[62px] font-bold leading-[1.06] tracking-[-0.022em]">
+        <h2 className="text-balance m-0 font-spectral text-[62px] font-medium leading-[1.1] tracking-[-0.015em] lp-mobile:text-[33px]">
           {headlinePre} <span className="text-landing-blue">{headlineBlue}</span>
         </h2>
         <div className="mt-[34px]">

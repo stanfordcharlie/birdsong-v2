@@ -38,10 +38,10 @@ export function ProofComparison({
   calloutText: string;
 }) {
   return (
-    <section className="mx-auto max-w-[1360px] px-6 pb-[100px] pt-9 md:px-12">
+    <section className="mx-auto max-w-[1360px] px-6 pb-[100px] pt-9 md:px-12 lp-mobile:px-[22px]">
       <h2
         data-reveal="1"
-        className="text-balance m-0 mb-3.5 max-w-[760px] font-bricolage text-[48px] font-bold leading-[1.08] tracking-[-0.02em]"
+        className="text-balance m-0 mb-3.5 max-w-[760px] font-spectral text-[48px] font-medium leading-[1.14] tracking-[-0.012em] lp-mobile:text-[33px]"
       >
         {headlinePre} <span className="text-landing-green">{headlineGreen}</span>
       </h2>

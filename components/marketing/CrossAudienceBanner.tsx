@@ -14,14 +14,14 @@ export function CrossAudienceBanner({
   href: string;
 }) {
   return (
-    <section className="mx-auto max-w-[1360px] px-6 pb-[100px] md:px-12">
+    <section className="mx-auto max-w-[1360px] px-6 pb-[100px] md:px-12 lp-mobile:px-[22px]">
       <Link
         data-reveal="1"
         href={href}
-        className="lp-lift flex flex-wrap items-center justify-between gap-7 rounded-[18px] border border-landing-border bg-landing-green-bg px-10 py-[34px]"
+        className="lp-lift flex flex-wrap items-center justify-between gap-7 rounded-[18px] border border-landing-border bg-landing-green-bg px-10 py-[34px] lp-mobile:flex-col lp-mobile:items-start"
       >
         <div>
-          <div className="mb-2 font-bricolage text-[25px] font-bold tracking-[-0.01em] text-landing-ink">
+          <div className="mb-2 font-spectral text-[25px] font-semibold tracking-[-0.006em] text-landing-ink">
             {heading}
           </div>
           <div className="text-[15.5px] leading-[1.55] text-landing-green">{subtext}</div>

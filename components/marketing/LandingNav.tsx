@@ -12,19 +12,33 @@ export function LandingNav({ crossLink }: { crossLink: { label: string; href: st
       <div className="flex items-center justify-between gap-6 rounded-full border border-[rgba(231,221,201,.85)] bg-[rgba(255,253,247,.6)] py-2.5 pl-6 pr-3 shadow-[0_10px_30px_rgba(38,32,25,.07)] backdrop-blur-[16px]">
         <Link href="#top" className="flex items-center gap-2.5">
           <BirdMark width={24} height={22} className="motion-safe:animate-[lp-bob_6s_ease_infinite]" />
-          <span className="font-bricolage text-[22px] font-bold tracking-[-0.01em]">Birdsong</span>
+          <span className="font-spectral text-[22px] font-semibold">Birdsong</span>
         </Link>
-        <div className="flex items-center gap-[34px] text-[15px] font-medium">
-          <Link href={crossLink.href} className="text-landing-muted transition-colors hover:text-landing-green">
+        {/* ≤920px (design_handoff_landing_mobile): the text links overflowed
+            the pill on phones, so they're hidden here entirely rather than
+            collapsed into a menu — the primary CTA (Get started) stays, and
+            the group's gap tightens 34px -> 12px so the pill hugs just the
+            logo and button. */}
+        <div className="flex items-center gap-[34px] text-[15px] font-medium lp-nav:gap-3">
+          <Link
+            href={crossLink.href}
+            className="text-landing-muted transition-colors hover:text-landing-green lp-nav:hidden"
+          >
             {crossLink.label}
           </Link>
-          <Link href="#how" className="text-landing-muted transition-colors hover:text-landing-green">
+          <Link href="#how" className="text-landing-muted transition-colors hover:text-landing-green lp-nav:hidden">
             How it works
           </Link>
-          <Link href="#features" className="text-landing-muted transition-colors hover:text-landing-green">
+          <Link
+            href="#features"
+            className="text-landing-muted transition-colors hover:text-landing-green lp-nav:hidden"
+          >
             Features
           </Link>
-          <Link href="/admin/login" className="text-landing-muted transition-colors hover:text-landing-green">
+          <Link
+            href="/admin/login"
+            className="text-landing-muted transition-colors hover:text-landing-green lp-nav:hidden"
+          >
             Log in
           </Link>
           <Link

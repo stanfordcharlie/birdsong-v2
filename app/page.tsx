@@ -90,7 +90,7 @@ export default async function RootPage({
       <HowItWorksSection
         headline="From first note to booked demo."
         headlineFontSizePx={48}
-        headlineLineHeight={1.06}
+        headlineLineHeight={1.14}
         headlineMaxWidthPx={640}
         kicker="Three steps, one owner: Birdsong. Your team only shows up for the demo."
       >
@@ -161,7 +161,7 @@ export default async function RootPage({
         calloutLabel="Call opener, generated:"
         calloutText="You said triage eats your team’s best hours. Walk me through the worst morning, and I’ll show you what we’d take off your plate first."
       />
-      <section id="features" className="mx-auto max-w-[1360px] px-6 pb-[100px] md:px-12">
+      <section id="features" className="mx-auto max-w-[1360px] px-6 pb-[100px] md:px-12 lp-mobile:px-[22px]">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <FeatureCard
             tint="green"

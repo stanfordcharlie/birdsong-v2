@@ -8,6 +8,16 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Custom max-width breakpoints for the marketing landing pages'
+      // responsive fix (design_handoff_landing_mobile) — the two exact
+      // cutoffs (920px nav collapse, 760px layout stack) don't land on any
+      // default Tailwind screen, and are max-width, not min-width, variants.
+      // Under `extend`, Tailwind merges these with the default sm/md/lg/xl/2xl
+      // (already used elsewhere, e.g. the admin app) rather than replacing them.
+      screens: {
+        "lp-nav": { max: "920px" },
+        "lp-mobile": { max: "760px" },
+      },
       colors: {
         // Legacy tokens, left as-is — see app/globals.css for why.
         background: "var(--background)",

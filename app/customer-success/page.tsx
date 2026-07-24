@@ -72,7 +72,7 @@ export default async function CustomerSuccessPage() {
       <HowItWorksSection
         headline="A real conversation for every account, not just the top fifteen."
         headlineFontSizePx={46}
-        headlineLineHeight={1.08}
+        headlineLineHeight={1.14}
         headlineMaxWidthPx={720}
         kicker="Three steps, one owner: Birdsong. Your CSMs only show up for accounts ready to grow."
       >
@@ -143,7 +143,7 @@ export default async function CustomerSuccessPage() {
         calloutLabel="Next step, drafted:"
         calloutText="You mentioned Design and Data want in. Want me to set up a pilot for both before renewal?"
       />
-      <section id="features" className="mx-auto max-w-[1360px] px-6 pb-[100px] md:px-12">
+      <section id="features" className="mx-auto max-w-[1360px] px-6 pb-[100px] md:px-12 lp-mobile:px-[22px]">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <FeatureCard
             tint="green"

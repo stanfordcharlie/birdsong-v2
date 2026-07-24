@@ -1,5 +1,15 @@
 import Link from "next/link";
 import { InterviewDemoCard, type InterviewDemoContent } from "./InterviewDemoCard";
+import { cn } from "@/lib/utils";
+
+// h1FontSizePx only ever takes these two literal values (one per landing
+// page) — mapped to literal Tailwind classes rather than an inline style so
+// the lp-mobile: variant below can actually override it. An inline
+// style.fontSize would always win over any class, mobile included.
+const H1_SIZE_CLASSES = {
+  62: "text-[62px]",
+  58: "text-[58px]",
+} as const;
 
 // Ambient background layer: two blurred drifting color blobs plus three
 // drifting music-note glyphs, identical on both landing pages
@@ -40,7 +50,7 @@ export function Hero({
   return (
     <section
       id="top"
-      className="relative px-6 py-20 md:px-12"
+      className="relative px-6 py-20 md:px-12 lp-mobile:px-[22px] lp-mobile:pb-14 lp-mobile:pt-11"
       style={{
         background:
           "radial-gradient(880px 460px at 28% -10%, rgba(58,96,70,.1), transparent 60%), radial-gradient(880px 460px at 72% -12%, rgba(84,116,158,.1), transparent 60%)",
@@ -50,11 +60,13 @@ export function Hero({
       <div className="relative mx-auto flex max-w-[1360px] flex-col items-center">
         <h1
           data-reveal="1"
-          className="text-balance relative m-0 max-w-[980px] text-center font-bricolage font-bold leading-[1.05] tracking-[-0.025em]"
-          style={{ fontSize: h1FontSizePx }}
+          className={cn(
+            "text-balance relative m-0 max-w-[980px] text-center font-spectral font-medium leading-[1.1] tracking-[-0.015em] lp-mobile:text-[40px]",
+            H1_SIZE_CLASSES[h1FontSizePx]
+          )}
         >
           {h1Pre}{" "}
-          <span className="relative inline-block text-landing-blue">
+          <span className="relative inline-block italic text-landing-blue">
             {h1Colored}
             <svg
               width="100%"

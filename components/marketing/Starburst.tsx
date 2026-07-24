@@ -23,7 +23,7 @@ export function Starburst({
 }) {
   return (
     <div
-      className={cn("lp-stk", className)}
+      className={cn("lp-stk lp-mobile:hidden", className)}
       style={{ "--lp-rot": `${rotationDeg}deg`, width: size, height: size } as React.CSSProperties}
     >
       <svg
@@ -40,7 +40,7 @@ export function Starburst({
       </svg>
       <span
         className={cn(
-          "absolute inset-0 flex items-center justify-center font-sans italic font-bold text-landing-ink",
+          "absolute inset-0 flex items-center justify-center font-spectral italic font-semibold text-landing-ink",
           labelClassName
         )}
       >
