@@ -192,6 +192,21 @@ export async function POST(request: Request) {
 
   const { text: reply, chips } = parseChips(rawReply);
 
+  // A non-empty reply can still parse down to nothing — most obviously when
+  // the whole message is a chips block, or when an unclosed ||CHIPS opener
+  // lands early enough that stripping from it leaves no prose. The rawReply
+  // check above can't catch that, and without this the empty string would be
+  // appended to the transcript and rendered as a blank bubble. Deliberately
+  // no placeholder substitution: the respondent's message is not persisted on
+  // this path, so they can simply resend.
+  if (!reply) {
+    console.error(
+      `[interview/continue] response_id=${response_id} reply was empty after chip parsing; raw model output:`,
+      JSON.stringify(rawReply)
+    );
+    return NextResponse.json({ error: "Failed to generate the next question" }, { status: 502 });
+  }
+
   const finalHistory: InterviewMessage[] = [
     ...updatedHistory,
     { role: "assistant", content: reply },

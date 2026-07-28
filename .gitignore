@@ -8,6 +8,8 @@
 
 # testing
 /coverage
+/.vitest
+vitest.config.ts.timestamp-*
 
 # next.js
 /.next/

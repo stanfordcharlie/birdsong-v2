@@ -188,6 +188,21 @@ export async function POST(request: Request) {
 
   const { text: openingQuestion, chips } = parseChips(rawOpeningQuestion);
 
+  // A non-empty reply can still parse down to nothing — most obviously when
+  // the whole message is a chips block, or when an unclosed ||CHIPS opener
+  // lands early enough that stripping from it leaves no prose. The
+  // rawOpeningQuestion check above can't catch that, and without this the
+  // empty string would be persisted and rendered as a blank first message.
+  // Deliberately no placeholder substitution: a fabricated opening question
+  // is worse than a failed start the respondent can retry.
+  if (!openingQuestion) {
+    console.error(
+      `[interview/start] survey_id=${survey_id} opening question was empty after chip parsing; raw model output:`,
+      JSON.stringify(rawOpeningQuestion)
+    );
+    return NextResponse.json({ error: "Failed to generate opening question" }, { status: 502 });
+  }
+
   const messages: InterviewMessage[] = [{ role: "assistant", content: openingQuestion }];
 
   // Bound to this row and required on every /api/interview/continue call

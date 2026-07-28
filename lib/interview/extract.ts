@@ -173,7 +173,7 @@ function transcriptToText(messages: InterviewMessage[]): string {
     .join("\n\n");
 }
 
-type ParsedToolInput = {
+export type ParsedToolInput = {
   pain_points?: unknown;
   lead_score?: unknown;
   fit_reason?: unknown;
@@ -189,7 +189,10 @@ type ParsedToolInput = {
 // FALLBACK_INSIGHTS silently (leadScore 5) with no log line, which is the
 // worst outcome on an otherwise-hot lead. We now retry the call once and log
 // loudly on every failure so a bad extraction is visible, not silent.
-function extractToolInput(result: Anthropic.Message): ParsedToolInput | null {
+//
+// Exported only so extract.test.ts can cover the invalid-shape branches
+// directly, without standing up a fake Anthropic client.
+export function extractToolInput(result: Anthropic.Message): ParsedToolInput | null {
   const toolUse = result.content.find(
     (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
   );

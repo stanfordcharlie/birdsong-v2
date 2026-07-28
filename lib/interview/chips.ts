@@ -29,7 +29,10 @@ const TRUNCATED_MARKER_PATTERN = /\|\|C(H(I(P(S)?)?)?)?$/;
 
 // Guards against turning stray prose into fake "chips" if the salvage path
 // below ever hits something that isn't actually a short quick-reply option.
-const MAX_CHIP_LENGTH = 100;
+// An option over this length is dropped silently, with the rest of the block
+// still parsed — exported so chips.test.ts can assert that against the real
+// threshold rather than a copy of it.
+export const MAX_CHIP_LENGTH = 100;
 
 function extractChipOptions(raw: string): string[] {
   return raw
