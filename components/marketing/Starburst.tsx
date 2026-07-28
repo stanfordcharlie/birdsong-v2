@@ -22,14 +22,20 @@ export function Starburst({
   className?: string;
 }) {
   return (
+    // data-reveal on the sticker itself, not just on an ancestor section:
+    // the .lp-in .lp-stk / .lp-in.lp-stk pair in globals.css supports both,
+    // and self-revealing means a sticker still pops when it sits inside
+    // something that never reveals — the "how it works" section carries no
+    // [data-reveal] of its own, so its handoff sticker relies on this.
     <div
+      data-reveal
       className={cn("lp-stk lp-mobile:hidden", className)}
       style={{ "--lp-rot": `${rotationDeg}deg`, width: size, height: size } as React.CSSProperties}
     >
       <svg
         viewBox="0 0 100 100"
         aria-hidden="true"
-        className="absolute inset-0 drop-shadow-[0_4px_10px_rgba(38,32,25,.14)]"
+        className="absolute inset-0 drop-shadow-[0_4px_10px_rgba(34,30,24,.14)]"
       >
         <polygon
           points="100,50 83.3,63.8 85.4,85.4 63.8,83.3 50,100 36.2,83.3 14.6,85.4 16.7,63.8 0,50 16.7,36.2 14.6,14.6 36.2,16.7 50,0 63.8,16.7 85.4,14.6 83.3,36.2"
@@ -40,7 +46,7 @@ export function Starburst({
       </svg>
       <span
         className={cn(
-          "absolute inset-0 flex items-center justify-center font-spectral italic font-semibold text-landing-ink",
+          "absolute inset-0 flex items-center justify-center font-spectral font-medium italic text-landing-ink",
           labelClassName
         )}
       >

@@ -83,32 +83,30 @@
    HSL-triplet/<alpha-value> convention: nothing here needs an
    alpha-modified variant. tailwind.config.ts's colors.landing reads these.
 
-   --lp-bg/surface/border default to the handoff's "cream" tone (the demand
-   gen page's default); [data-tone="eggshell"] on LandingPageShell swaps to
-   the "eggshell" tone (the customer-success page's default) — the same
-   two-value swap the design handoff itself implements via a data-tone
-   attribute, just driven by which page renders it instead of a prototype
-   prop. ink, muted, faint, and the green/blue/butter accents don't change
-   between tones, so they're unconditional. */
+   Values mirror the :root block in the handoff's own .dc.html files. The
+   earlier cream/eggshell tone swap is gone: the current design ships a
+   single palette, so there is no second set of bg/surface/border values to
+   switch between. */
 :root {
-  --lp-bg: #f3ecdf;
-  --lp-surface: #fffdf7;
-  --lp-border: #e7ddc9;
-  --lp-ink: #241f18;
-  --lp-muted: #6f6757;
-  --lp-faint: #a89d88;
-  --lp-green: #3a6046;
-  --lp-green-bg: #e4ecdd;
-  --lp-blue: #54749e;
-  --lp-blue-mid: #8fa8c8;
-  --lp-blue-bg: #e4ebf4;
-  --lp-butter-deep: #8a6b1f;
-  --lp-butter-bg: #f7edcb;
-}
-[data-tone="eggshell"] {
   --lp-bg: #faf8f1;
   --lp-surface: #fffefa;
-  --lp-border: #e9e3d3;
+  --lp-sunk: #f4f1e7;
+  --lp-ink: #221e18;
+  --lp-ink-soft: #3c362c;
+  --lp-muted: #6c6455;
+  --lp-faint: #a49a86;
+  --lp-border: #e7e1d1;
+  --lp-hair: #efeade;
+  --lp-green: #3a6046;
+  --lp-green-deep: #2c4a36;
+  --lp-green-bg: #e9efe4;
+  /* Hairlines and panel fills inside the ink-green #queue band, where the
+     normal --lp-hair would disappear against the dark ground. */
+  --lp-green-line: rgba(233, 239, 228, 0.22);
+  --lp-blue: #54749e;
+  --lp-blue-bg: #e8eef5;
+  --lp-butter-deep: #8a6b1f;
+  --lp-butter-bg: #f6efd8;
 }
 
 body {
@@ -162,15 +160,16 @@ select {
   /* Legal pages (/terms, /privacy) prose. No typography plugin in this
      project, so the running text is styled here by element. Reads the
      marketing landing tokens (--lp-*) since LegalPage renders inside
-     LandingPageShell. */
+     LandingPageShell, and Spectral for headings so the legal pages track
+     the landing pages' display face. */
   .legal-prose {
     @apply text-[15.5px] leading-[1.7] text-landing-muted;
   }
   .legal-prose h2 {
-    @apply mb-2.5 mt-9 font-bricolage text-[19px] font-bold text-landing-ink;
+    @apply mb-2.5 mt-9 font-spectral text-[20px] font-medium text-landing-ink;
   }
   .legal-prose h3 {
-    @apply mb-1.5 mt-6 font-bricolage text-[16px] font-semibold text-landing-ink;
+    @apply mb-1.5 mt-6 font-spectral text-[17px] font-medium text-landing-ink;
   }
   .legal-prose p {
     @apply mb-4;
@@ -256,6 +255,117 @@ select {
     opacity: 0.6;
   }
 }
+/* Branded loading states (design_handoff_loading): components/LoadingScreen.tsx
+   (full-screen flyby cutscene) and components/BirdLoader.tsx (small inline
+   loader). Applied via inline `style={{ animation: ... }}` at each call site
+   (durations/delays vary per element and, for the flyby, per the `speed`
+   prop), with a `motion-reduce:![animation:none]` class layered on top to
+   kill it under prefers-reduced-motion — same override trick PerchedBird
+   already uses, since an inline style otherwise beats a plain class rule. */
+@keyframes flyby {
+  0% {
+    transform: translate(-12vw, 16vh) rotate(4deg) scale(0.9);
+  }
+  30% {
+    transform: translate(28vw, -2vh) rotate(-10deg) scale(1);
+  }
+  55% {
+    transform: translate(62vw, 6vh) rotate(2deg) scale(1);
+  }
+  100% {
+    transform: translate(115vw, -14vh) rotate(-12deg) scale(0.85);
+  }
+}
+@keyframes flap {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.82) rotate(-3deg);
+  }
+}
+@keyframes trailNote {
+  0%,
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  60% {
+    opacity: 0;
+    transform: translate(-46px, -30px) rotate(-10deg);
+  }
+}
+@keyframes dotPulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: none;
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+@keyframes markBreathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+@keyframes miniBob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  30% {
+    transform: translateY(-3px) rotate(-5deg);
+  }
+  60% {
+    transform: translateY(-1px) rotate(2deg);
+  }
+}
+@keyframes miniFlap {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.84);
+  }
+}
+@keyframes miniNote {
+  0%,
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  70% {
+    opacity: 0;
+    transform: translate(10px, -16px) rotate(8deg);
+  }
+}
+@keyframes miniDot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .bs-rise-1 {
     animation: bs-rise 0.7s ease-out 0.35s both;
@@ -335,22 +445,25 @@ select {
 }
 
 /* --- Marketing landing pages: motion (design_handoff_landing_pages_full) ---
-   Continuous/always-on decorative loops (nav bird bob, demo card float,
-   hero blobs/notes drift, hero chat cycle, "how it works" dash flow/chip
-   cycle/badge pop/card-in, recording-dot blink) are applied per element via
+   Continuous/always-on decorative loops (nav bird bob, hero blob + note
+   drift, the demo card float, the 12s hero chat cycle, the sequence panels'
+   dash flow / invite chips / score badge pop) are applied per element via
    Tailwind's motion-safe:animate-[...] arbitrary values directly in JSX —
-   only the @keyframes live here, and every element carries a sensible
-   fully-visible/settled plain className as its base state, so omitting the
-   motion-safe utility (reduced motion) leaves a complete static scene, not
-   a mid-animation freeze-frame. Scroll reveal, the starburst sticker
-   overshoot, and the ancestor-gated one-shot animations (proof-section
-   notes, the CTA bird takeoff and its trailing notes — only fire once
-   their section's [data-reveal] ancestor has revealed) are stateful/
-   compound and stay as real classes below.
+   only the @keyframes live here, and every element carries a settled,
+   fully-visible plain className as its base state, so omitting the
+   motion-safe utility (reduced motion) leaves a complete static scene
+   rather than a mid-animation freeze-frame.
+
+   Scroll reveal, the sticker overshoot, the squiggle underline draw, and
+   the ancestor-gated one-shot animations (proof notes, CTA bird takeoff
+   and its trailing notes, which only fire once their section's
+   [data-reveal] ancestor has revealed) are stateful/compound and stay as
+   real classes below.
 
    Every keyframe name is lp-prefixed so none collide with PerchedBird's
-   noteFloat/headBob (still live, see above) or the admin/survey bs-rise
-   and q-reveal animations elsewhere in this file. */
+   noteFloat/headBob or the admin/survey bs-rise and q-reveal animations
+   elsewhere in this file. Timings are transcribed from the <style> block
+   in the handoff's .dc.html files. */
 @keyframes lp-bob {
   0%,
   84%,
@@ -373,7 +486,7 @@ select {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-9px);
+    transform: translateY(-8px);
   }
 }
 @keyframes lp-drift {
@@ -382,117 +495,140 @@ select {
     transform: translate(0, 0) rotate(0deg);
   }
   33% {
-    transform: translate(9px, -14px) rotate(5deg);
+    transform: translate(9px, -14px) rotate(4deg);
   }
   66% {
-    transform: translate(-7px, -6px) rotate(-4deg);
+    transform: translate(-7px, -6px) rotate(-3deg);
   }
 }
-@keyframes lp-hero-q {
+
+/* The hero demo's 12s loop: question, answer, follow-up question, then the
+   three signal chips landing one at a time. All six share one 12s duration
+   so their percentages stay in lockstep. */
+@keyframes lp-hero-q1 {
   0%,
   3% {
     opacity: 0;
-    transform: translateY(10px) scale(0.97);
+    transform: translateY(10px) scale(0.98);
   }
   9%,
-  88% {
+  90% {
     opacity: 1;
     transform: none;
   }
-  95%,
+  96%,
   100% {
     opacity: 0;
   }
 }
-@keyframes lp-hero-a {
+@keyframes lp-hero-a1 {
   0%,
-  20% {
+  22% {
     opacity: 0;
-    transform: translateY(10px) scale(0.97);
+    transform: translateY(10px) scale(0.98);
   }
-  26%,
-  88% {
+  28%,
+  90% {
     opacity: 1;
     transform: none;
   }
-  95%,
+  96%,
   100% {
     opacity: 0;
   }
 }
-@keyframes lp-hero-chip-1 {
-  0%,
-  38% {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  44%,
-  88% {
-    opacity: 1;
-    transform: none;
-  }
-  95%,
-  100% {
-    opacity: 0;
-  }
-}
-@keyframes lp-hero-chip-2 {
+@keyframes lp-hero-q2 {
   0%,
   44% {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(10px) scale(0.98);
   }
   50%,
-  88% {
+  90% {
     opacity: 1;
     transform: none;
   }
-  95%,
+  96%,
   100% {
     opacity: 0;
   }
 }
-@keyframes lp-hero-note-1 {
+@keyframes lp-signal-1 {
+  0%,
+  58% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  64%,
+  92% {
+    opacity: 1;
+    transform: none;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes lp-signal-2 {
+  0%,
+  68% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  74%,
+  92% {
+    opacity: 1;
+    transform: none;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes lp-signal-3 {
+  0%,
+  78% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  84%,
+  92% {
+    opacity: 1;
+    transform: none;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+/* The note glyph that rises out of the demo as the first question lands. */
+@keyframes lp-hero-note {
   0%,
   6% {
     opacity: 0;
     transform: none;
   }
   10% {
-    opacity: 0.85;
+    opacity: 0.7;
   }
   18%,
   100% {
     opacity: 0;
-    transform: translateY(-28px);
+    transform: translateY(-26px);
   }
 }
-@keyframes lp-hero-note-2 {
-  0%,
-  24% {
-    opacity: 0;
-    transform: none;
-  }
-  28% {
-    opacity: 0.85;
-  }
-  36%,
-  100% {
-    opacity: 0;
-    transform: translateY(-28px);
-  }
-}
+
 @keyframes lp-note-float {
   0% {
     opacity: 0;
     transform: translateY(8px);
   }
   22% {
-    opacity: 0.9;
+    opacity: 0.85;
   }
   100% {
     opacity: 0;
-    transform: translateY(-36px);
+    transform: translateY(-34px);
   }
 }
 @keyframes lp-takeoff {
@@ -514,13 +650,16 @@ select {
     transform: none;
   }
   18% {
-    opacity: 0.9;
+    opacity: 0.85;
   }
   100% {
     opacity: 0;
     transform: translate(130px, -95px);
   }
 }
+
+/* Sequence panel 01: dashed recruit paths flowing toward the personas, and
+   the two invite chips cycling on a 9s loop alongside panel 03's badge. */
 @keyframes lp-dash-flow {
   to {
     stroke-dashoffset: -20;
@@ -533,27 +672,27 @@ select {
     transform: translateY(6px);
   }
   12%,
-  60% {
+  62% {
     opacity: 1;
     transform: none;
   }
-  70%,
+  72%,
   100% {
     opacity: 0;
   }
 }
 @keyframes lp-invite-chip-b {
   0%,
-  20% {
+  22% {
     opacity: 0;
     transform: translateY(6px);
   }
-  26%,
-  60% {
+  28%,
+  62% {
     opacity: 1;
     transform: none;
   }
-  70%,
+  72%,
   100% {
     opacity: 0;
   }
@@ -562,11 +701,11 @@ select {
   0%,
   26% {
     opacity: 0;
-    transform: scale(0.4);
+    transform: scale(0.5);
   }
   34% {
     opacity: 1;
-    transform: scale(1.12);
+    transform: scale(1.08);
   }
   40%,
   90% {
@@ -578,53 +717,133 @@ select {
     opacity: 0;
   }
 }
-@keyframes lp-card-in {
-  0%,
-  8% {
+/* Queue panel swap, replayed on each selection because the element is
+   keyed by the selected row. */
+@keyframes lp-panel-in {
+  0% {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(10px);
   }
-  16%,
-  90% {
+  100% {
     opacity: 1;
     transform: none;
   }
-  97%,
-  100% {
-    opacity: 0;
-  }
-}
-@keyframes lp-dot-blink {
-  0%,
-  60%,
-  100% {
-    opacity: 0.25;
-  }
-  30% {
-    opacity: 1;
-  }
 }
 
-/* Hover lift's resulting state stays outside the media query below (a
-   hover state is meaningful feedback, not "motion" in the vestibular
-   sense) — only its animated transition is reduced-motion-gated, so
-   reduced-motion users still get the lifted state, just applied instantly
-   instead of tweened. */
+/* Scroll progress rail, fixed across the top of both pages. Width is set
+   from the scroll handler in LandingPageShell. */
+#lp-prog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 90;
+  height: 2px;
+  width: 0;
+  background: var(--lp-green);
+  opacity: 0.5;
+}
+
+/* Hover affordances. The settled (hovered) state lives outside the
+   reduced-motion gate so those users still get the feedback, just applied
+   instantly instead of tweened. */
 .lp-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 14px 34px rgba(38, 32, 25, 0.1);
+  transform: translateY(-3px);
+  box-shadow: 0 16px 40px rgba(34, 30, 24, 0.08);
+  border-color: var(--lp-faint);
+}
+.lp-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px rgba(34, 30, 24, 0.16);
+}
+/* Nav/footer links: a rule that wipes in from the left on hover. */
+.lp-undl {
+  position: relative;
+}
+.lp-undl::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.lp-undl:hover::after {
+  transform: scaleX(1);
+}
+
+/* The sequence section ("how it works") used to live here: a sticky 300vh
+   scroller whose data-step drove which of three panels was visible and which
+   step in the rail was inked in, plus a max-width:1080px block undoing all of
+   it. The section is plain flow with all three panels visible now, so it
+   needs no CSS of its own — see SequenceSection.tsx. */
+
+/* Queue rows (the ink-green #queue band). */
+.lp-qrow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--lp-green-line);
+  padding: 19px 4px;
+  cursor: pointer;
+  color: #eef2ea;
+}
+.lp-qrow:hover {
+  padding-left: 10px;
+}
+.lp-qrow[data-on="0"] {
+  opacity: 0.5;
+}
+.lp-qrow[data-on="0"]:hover {
+  opacity: 0.78;
+}
+
+/* FAQ disclosure. The marker is suppressed in favour of the plus/close
+   chevron, which rotates 45deg into an x when the item opens. */
+.lp-faq {
+  border-top: 1px solid var(--lp-hair);
+}
+.lp-faq > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 26px 2px;
+  font-family: var(--font-spectral), Georgia, serif;
+  font-weight: 500;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+.lp-faq > summary::-webkit-details-marker {
+  display: none;
+}
+.lp-faq > summary:hover {
+  color: var(--lp-green);
+}
+.lp-faq[open] .lp-chev {
+  transform: rotate(45deg);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Scroll reveal: useScrollReveal targets [data-reveal] directly (same
-     attribute the design handoff itself uses) and adds .lp-in at ~20%
-     visibility, once — no separate class needed on top of the attribute. */
+  /* Scroll reveal: useScrollReveal targets [data-reveal] directly (the same
+     attribute the design handoff uses) and adds .lp-in once the element is
+     16% visible, one-shot. Per-element stagger is set inline as
+     transition-delay. */
   [data-reveal] {
     opacity: 0;
-    transform: translateY(18px);
+    transform: translateY(16px);
     transition:
-      opacity 0.8s ease,
-      transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+      opacity 0.9s ease,
+      transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
   }
   [data-reveal].lp-in {
     opacity: 1;
@@ -632,7 +851,7 @@ select {
   }
   /* Starburst sticker: scale-in with overshoot, timed to land just after
      its section's own reveal transition finishes. --lp-rot is set inline
-     per sticker instance (design handoff's per-sticker rotation). */
+     per sticker instance. */
   .lp-stk {
     opacity: 0;
     transform: scale(0.4) rotate(var(--lp-rot, 0deg));
@@ -640,18 +859,62 @@ select {
       opacity 0.45s ease 0.55s,
       transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.55s;
   }
-  .lp-in .lp-stk {
+  .lp-in .lp-stk,
+  .lp-in.lp-stk {
     opacity: 1;
     transform: scale(1) rotate(var(--lp-rot, 0deg));
   }
+  /* Hand-drawn squiggle under the hero's coloured phrase, drawn on reveal.
+     --lp-ul-len is the path's own length in viewBox units, set per instance
+     because the two pages' phrases are different widths; without it the
+     dash pattern repeats partway along the longer path and leaves a stub
+     showing before the draw starts. Without the dasharray at all (reduced
+     motion) the path is simply solid. */
+  .lp-ul-draw {
+    stroke-dasharray: var(--lp-ul-len, 260);
+    stroke-dashoffset: var(--lp-ul-len, 260);
+    transition: stroke-dashoffset 1.4s cubic-bezier(0.4, 0, 0.2, 1) 0.5s;
+  }
+  .lp-in .lp-ul-draw {
+    stroke-dashoffset: 0;
+  }
   .lp-lift {
     transition:
+      transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1),
+      box-shadow 0.3s ease,
+      border-color 0.3s ease;
+  }
+  .lp-cta {
+    transition:
       transform 0.25s ease,
-      box-shadow 0.25s ease;
+      box-shadow 0.25s ease,
+      opacity 0.25s ease;
+  }
+  .lp-undl::after {
+    transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  #lp-prog {
+    transition: width 0.12s linear;
+  }
+  .lp-navpill {
+    transition:
+      padding 0.3s ease,
+      box-shadow 0.3s ease,
+      background 0.3s ease;
+  }
+  .lp-qrow {
+    transition:
+      padding-left 0.3s ease,
+      opacity 0.3s ease;
+  }
+  .lp-qpanel {
+    animation: lp-panel-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .lp-chev {
+    transition: transform 0.3s ease;
   }
   /* One-shot animations gated on an ancestor's [data-reveal] having
-     revealed — fire once, matching the design handoff's .rv-in-scoped
-     selectors. */
+     revealed — fire once, matching the handoff's .rv-in-scoped selectors. */
   .lp-in .lp-proof-note-1 {
     animation: lp-note-float 3.2s ease 0.9s;
   }
@@ -659,16 +922,16 @@ select {
     animation: lp-note-float 3.2s ease 1.5s;
   }
   .lp-in .lp-cta-bird {
-    animation: lp-takeoff 2s cubic-bezier(0.45, 0.05, 0.6, 1) 0.9s forwards;
+    animation: lp-takeoff 2.2s cubic-bezier(0.45, 0.05, 0.6, 1) 1s forwards;
   }
   .lp-in .lp-cta-trail-1 {
-    animation: lp-note-trail 1.7s ease 1.15s;
+    animation: lp-note-trail 1.7s ease 1.25s;
   }
   .lp-in .lp-cta-trail-2 {
-    animation: lp-note-trail 1.7s ease 1.45s;
+    animation: lp-note-trail 1.7s ease 1.55s;
   }
   .lp-in .lp-cta-trail-3 {
-    animation: lp-note-trail 1.7s ease 1.75s;
+    animation: lp-note-trail 1.7s ease 1.85s;
   }
 }
 
@@ -941,5 +1204,58 @@ select {
      the transcript is reopened. */
   .sw-bubble {
     animation: sw-bubble 0.5s ease var(--sw-bubble-delay, 0s) backwards;
+  }
+}
+
+/* --- Admin sidebar workspace plate (components/AdminSidebar.tsx) ---
+   Two ambient loops on the status row: the listening dot's twin pings
+   outward, and the music note bobs. Both keyframes are declared here but
+   only bound to their classes under prefers-reduced-motion: no-preference
+   (the same pattern the animations above use), so reduced-motion users get
+   the plate with a plain static dot and note.
+
+   The star avatar's tilt and hover spring live here too rather than as
+   Tailwind utilities: `duration-[250ms]` is ambiguous between transition-
+   and animation-duration, so Tailwind drops it silently and the spring
+   would quietly fall back to the default 150ms. The hover is keyed off the
+   whole user row (.ws-user-row) so hovering the name or chevron springs the
+   star as well; under reduced motion it simply holds its resting tilt. */
+@keyframes ws-ping {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@keyframes ws-note-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(8deg);
+  }
+}
+
+.ws-star {
+  transform: rotate(-6deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ws-ping {
+    animation: ws-ping 2.4s ease-out infinite;
+  }
+  .ws-note {
+    animation: ws-note-bob 3.2s ease-in-out infinite;
+  }
+  .ws-star {
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .ws-user-row:hover .ws-star {
+    transform: rotate(8deg) scale(1.08);
   }
 }
