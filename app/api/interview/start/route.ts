@@ -164,8 +164,9 @@ export async function POST(request: Request) {
       ? { whatWeSell: profile.what_we_sell, targetIcp: profile.target_icp, valueProp: profile.value_prop }
       : null,
     respondent,
-    exchangeCount: 1,
-    totalMessageCount: 1,
+    // Zero, not one: this call generates the opening question, so the
+    // respondent hasn't answered anything yet and no exchange is complete.
+    exchangeCount: 0,
   });
 
   const completion = await anthropic.messages.create({

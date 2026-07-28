@@ -153,11 +153,9 @@ export async function POST(request: Request) {
       name: response.respondent_name,
       customFieldValues: (response.custom_field_values as Record<string, unknown> | null) ?? {},
     },
+    // User turns only. The prompt's pacing line and its MAX_EXCHANGES
+    // ceiling both read from this one counter, so they always agree.
     exchangeCount,
-    // Total messages.length so far (both roles), for the exchange-budget
-    // line — distinct from exchangeCount above, which counts only user
-    // turns and drives the existing MAX_EXCHANGES hard-cap rule.
-    totalMessageCount: updatedHistory.length,
   });
 
   const claudeMessages: Anthropic.MessageParam[] = [
