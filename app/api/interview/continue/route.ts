@@ -30,6 +30,17 @@ type AdminClient = ReturnType<typeof createAdminClient>;
 type Survey = Database["public"]["Tables"]["surveys"]["Row"];
 type ResponseRow = Database["public"]["Tables"]["responses"]["Row"];
 
+// A normal turn is one Anthropic call and finishes in a few seconds, but the
+// final turn hands two background jobs to waitUntil — insight extraction
+// (up to two calls, then a write, then the notification) and company
+// fit-scoring (which runs web search). waitUntil defers that work past the
+// response the respondent sees, but it stays bounded by this function's max
+// duration: if the function is torn down first, the background task is
+// killed mid-flight and the response is left completed with null insight
+// columns. 120s is the same ceiling app/api/surveys/[id]/report already
+// runs under, and comfortably covers both jobs running concurrently.
+export const maxDuration = 120;
+
 // POST /api/interview/continue
 // Body: { response_id, message }
 // Appends the respondent's message, calls Claude for the next turn (or to
@@ -232,6 +243,11 @@ export async function POST(request: Request) {
   });
 }
 
+// The final turn used to be the slowest turn in the product: the respondent
+// watched a typing indicator through two Anthropic extraction calls and an
+// email send before being told they were done. Everything except the
+// completion write is now deferred to waitUntil, so CLOSING_MESSAGE lands as
+// soon as the row is marked complete.
 async function completeInterview(
   supabase: AdminClient,
   responseId: string,
@@ -239,68 +255,27 @@ async function completeInterview(
   survey: Survey,
   response: ResponseRow
 ) {
-  // Survey owner's company profile (what they sell, target ICP, value
-  // prop), used here to keep the lead score and call script anchored to
-  // fit against this sponsor's actual product, not generic friction.
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("what_we_sell, target_icp, value_prop, slack_webhook_url")
-    .eq("user_id", survey.user_id)
-    .maybeSingle();
-
-  const { painPoints, leadScore, fitReason, summary, callScript, signals } = await extractInterviewInsights(
-    history,
-    profile
-      ? { whatWeSell: profile.what_we_sell, targetIcp: profile.target_icp, valueProp: profile.value_prop }
-      : null
-  );
-
-  const { error: updateError } = await supabase
+  // Stays first and stays awaited: the `if (response.completed)` guard at
+  // the top of this route reads exactly this write to reject a replayed
+  // final turn. Deferring it would open a window where the same turn could
+  // be submitted twice and extracted twice.
+  const { error: completionError } = await supabase
     .from("responses")
-    .update({
-      messages: history as unknown as Json,
-      completed: true,
-      pain_points: painPoints as unknown as Json,
-      lead_score: leadScore,
-      fit_reason: fitReason,
-      summary,
-      call_script: { opener: callScript.opener, talking_points: callScript.talkingPoints } as unknown as Json,
-      signals: {
-        economic_buyer: signals.economicBuyer,
-        decision_criteria: signals.decisionCriteria,
-        decision_process: signals.decisionProcess,
-        metrics: signals.metrics,
-        champion: signals.champion,
-      } as unknown as Json,
-    })
+    .update({ messages: history as unknown as Json, completed: true })
     .eq("id", responseId);
 
-  if (updateError) {
-    console.error("[interview/continue] completion update failed:", updateError);
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
+  if (completionError) {
+    console.error("[interview/continue] completion update failed:", completionError);
+    return NextResponse.json({ error: completionError.message }, { status: 500 });
   }
 
-  // Captured right as completion is confirmed, not whenever the Slack
-  // message eventually gets built/sent below (which can lag slightly behind
-  // — the email send is awaited first, and Slack itself goes out via
-  // waitUntil) — the notification's "Completed X min ago" is relative to
-  // this instant.
+  // Captured the instant completion is confirmed rather than whenever the
+  // Slack message eventually gets built — that now happens behind extraction
+  // in the background task below, so "Completed X min ago" would otherwise
+  // drift by however long extraction took.
   const completedAt = new Date().toISOString();
-  console.log(`[interview/continue] response_id=${responseId} completed, lead_score=${leadScore}`);
+  console.log(`[interview/continue] response_id=${responseId} completed; extraction deferred to background`);
 
-  // Test runs still go through extraction above (the owner wants to see
-  // real scores and call scripts for their dry runs) but never notify —
-  // the email is the "new lead" signal and a test is not a lead.
-  if (response.is_test) {
-    console.log(`[interview/continue] response_id=${responseId} is a test run; skipping lead notification`);
-    return NextResponse.json({
-      response_id: responseId,
-      message: CLOSING_MESSAGE,
-      complete: true,
-    });
-  }
-
-  // Shared between the Slack notification and company fit-scoring below.
   const respondentCustomValues =
     (response.custom_field_values as Record<string, unknown> | null) ?? {};
   const respondentCompanyName =
@@ -312,47 +287,180 @@ async function completeInterview(
   const respondentEmailDomain =
     typeof respondentCustomValues.email_domain === "string" ? respondentCustomValues.email_domain : null;
 
-  // Best-effort: the respondent's completion shouldn't fail because the
-  // notification email did.
-  try {
-    const { data: ownerData } = await supabase.auth.admin.getUserById(survey.user_id);
-    const ownerEmail = ownerData?.user?.email;
-    if (ownerEmail) {
-      await sendLeadNotification({
-        survey: { id: survey.id, title: survey.title },
-        respondentName: response.respondent_name,
-        respondentEmail: response.respondent_email,
-        leadScore,
-        fitReason,
-        painPoints,
-        ownerEmail,
-      });
-    } else {
-      console.error(`No email on file for survey owner ${survey.user_id}; skipping notification`);
-    }
-  } catch (err) {
-    console.error("Failed to send lead notification email", err);
+  // Extraction, the insight-column write, and the notifications are one
+  // chained task because each depends on the previous: the notification
+  // needs leadScore/fitReason/painPoints.
+  waitUntil(
+    extractAndNotify({
+      supabase,
+      responseId,
+      history,
+      survey,
+      response,
+      respondentCustomValues,
+      respondentCompanyName,
+      completedAt,
+    })
+  );
+
+  // Company fit-scoring: a separate, slower/costlier agent (it runs web
+  // search) that scores the respondent's COMPANY against the sponsor's ICP,
+  // distinct from the transcript-based lead_score. It reads none of
+  // extraction's output, so it starts now and runs alongside the task above
+  // rather than queueing behind it. Failures are fully contained inside
+  // runCompanyFitScoring (loud logs + an "unavailable" marker). Not run for
+  // test responses, matching the notification skip below.
+  if (!response.is_test) {
+    waitUntil(
+      runCompanyFitScoring({
+        responseId,
+        sponsorUserId: survey.user_id,
+        company: { name: respondentCompanyName, domain: respondentEmailDomain },
+      })
+    );
   }
 
-  // Slack: a second, independent consumer of the same completion event as
-  // the email above. Wrapped and sent separately so a Slack failure can
-  // never affect completion or the email path, and fired via waitUntil
-  // (fire-and-forget) rather than awaited, per sendLeadNotificationToSlack's
-  // own internal try/catch and ~5s fetch timeout. Only runs when the owner
-  // has a webhook configured, and only posts for leads scoring 7+ (see
-  // buildLeadNotificationMessage) — lower-scoring leads are still saved and
-  // emailed above, just not sent to Slack. response.fit_score comes from the
-  // company fit-scoring agent below, which hasn't run yet for a
-  // freshly-completed response (it fires after this point) — the typeof
-  // guard here also means this degrades gracefully if the fit column
-  // doesn't exist yet on this database, without a separate probe query.
-  const slackWebhookUrl = profile?.slack_webhook_url;
-  if (slackWebhookUrl) {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const fitScore = typeof response.fit_score === "number" ? response.fit_score : null;
-    const jobTitle = typeof respondentCustomValues.job_title === "string" ? respondentCustomValues.job_title : null;
-    waitUntil(
-      sendLeadNotificationToSlack(slackWebhookUrl, {
+  return NextResponse.json({
+    response_id: responseId,
+    message: CLOSING_MESSAGE,
+    complete: true,
+  });
+}
+
+// Runs after the respondent has already been told the interview is over.
+//
+// Consequence of that, deliberately accepted: between the completion write
+// and the insight write below there is a window of a few seconds where a row
+// is completed = true but lead_score and pain_points are still null. The
+// admin lead queue (app/admin/leads/page.tsx) selects on completed = true, so
+// a just-finished interview appears there briefly unscored. LeadsQueue.tsx
+// already renders both nulls as an em dash (scoreBadgeVariant returns the
+// muted "outline" variant for a null score), and orders nulls last via
+// nullsFirst: false, so the row simply sits at the bottom of the queue until
+// this fills it in. No status column for it — a few seconds of "—" is not
+// worth permanent UI.
+//
+// EVERYTHING here is inside a try/catch: this runs detached from the
+// request, so an unhandled rejection surfaces nowhere at all — not as a
+// request error, not to the respondent, not to the owner. The only trace a
+// stuck response leaves is these logs, hence the response_id on each one.
+async function extractAndNotify({
+  supabase,
+  responseId,
+  history,
+  survey,
+  response,
+  respondentCustomValues,
+  respondentCompanyName,
+  completedAt,
+}: {
+  supabase: AdminClient;
+  responseId: string;
+  history: InterviewMessage[];
+  survey: Survey;
+  response: ResponseRow;
+  respondentCustomValues: Record<string, unknown>;
+  respondentCompanyName: string | null;
+  completedAt: string;
+}) {
+  try {
+    // Survey owner's company profile (what they sell, target ICP, value
+    // prop), used here to keep the lead score and call script anchored to
+    // fit against this sponsor's actual product, not generic friction.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("what_we_sell, target_icp, value_prop, slack_webhook_url")
+      .eq("user_id", survey.user_id)
+      .maybeSingle();
+
+    const { painPoints, leadScore, fitReason, summary, callScript, signals } = await extractInterviewInsights(
+      history,
+      profile
+        ? { whatWeSell: profile.what_we_sell, targetIcp: profile.target_icp, valueProp: profile.value_prop }
+        : null
+    );
+
+    // Note this no longer writes messages/completed — those landed in the
+    // awaited write before the response returned. Only the insight columns.
+    const { error: insightsError } = await supabase
+      .from("responses")
+      .update({
+        pain_points: painPoints as unknown as Json,
+        lead_score: leadScore,
+        fit_reason: fitReason,
+        summary,
+        call_script: { opener: callScript.opener, talking_points: callScript.talkingPoints } as unknown as Json,
+        signals: {
+          economic_buyer: signals.economicBuyer,
+          decision_criteria: signals.decisionCriteria,
+          decision_process: signals.decisionProcess,
+          metrics: signals.metrics,
+          champion: signals.champion,
+        } as unknown as Json,
+      })
+      .eq("id", responseId);
+
+    if (insightsError) {
+      // The interview itself is safe (completed, transcript stored); only
+      // the scoring is missing, so this logs and keeps going rather than
+      // skipping the notification the owner is waiting on.
+      console.error(
+        `[interview/continue] response_id=${responseId} insight write failed; row stays completed but unscored:`,
+        insightsError
+      );
+    } else {
+      console.log(`[interview/continue] response_id=${responseId} insights written, lead_score=${leadScore}`);
+    }
+
+    // Test runs still go through extraction above (the owner wants to see
+    // real scores and call scripts for their dry runs) but never notify —
+    // the email is the "new lead" signal and a test is not a lead.
+    if (response.is_test) {
+      console.log(`[interview/continue] response_id=${responseId} is a test run; skipping lead notification`);
+      return;
+    }
+
+    // Best-effort, wrapped independently: a failed email must not take the
+    // Slack notification down with it.
+    try {
+      const { data: ownerData } = await supabase.auth.admin.getUserById(survey.user_id);
+      const ownerEmail = ownerData?.user?.email;
+      if (ownerEmail) {
+        await sendLeadNotification({
+          survey: { id: survey.id, title: survey.title },
+          respondentName: response.respondent_name,
+          respondentEmail: response.respondent_email,
+          leadScore,
+          fitReason,
+          painPoints,
+          ownerEmail,
+        });
+      } else {
+        console.error(
+          `[interview/continue] response_id=${responseId}: no email on file for survey owner ${survey.user_id}; skipping notification`
+        );
+      }
+    } catch (err) {
+      console.error(`[interview/continue] response_id=${responseId} lead notification email failed:`, err);
+    }
+
+    // Slack: a second, independent consumer of the same completion event as
+    // the email above. Only runs when the owner has a webhook configured, and
+    // only posts for leads scoring 7+ (see buildLeadNotificationMessage) —
+    // lower-scoring leads are still saved and emailed above, just not sent to
+    // Slack. Awaiting it is safe: sendLeadNotificationToSlack contains its own
+    // try/catch and a ~5s fetch timeout, and nothing follows it here.
+    // response.fit_score comes from the company fit-scoring agent, which is
+    // running concurrently and has almost certainly not written yet for a
+    // freshly-completed response — the typeof guard also means this degrades
+    // gracefully if the fit column doesn't exist yet on this database,
+    // without a separate probe query.
+    const slackWebhookUrl = profile?.slack_webhook_url;
+    if (slackWebhookUrl) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const fitScore = typeof response.fit_score === "number" ? response.fit_score : null;
+      const jobTitle = typeof respondentCustomValues.job_title === "string" ? respondentCustomValues.job_title : null;
+      await sendLeadNotificationToSlack(slackWebhookUrl, {
         surveyTitle: survey.title,
         respondentName: response.respondent_name,
         respondentEmail: response.respondent_email,
@@ -365,29 +473,13 @@ async function completeInterview(
         callScriptOpener: callScript.opener.trim() || null,
         completedAt,
         responseUrl: `${appUrl}/admin/responses/${responseId}`,
-      })
+      });
+    }
+  } catch (err) {
+    console.error(
+      `[interview/continue] response_id=${responseId} background extraction/notification task failed; ` +
+        `the response is completed but may be unscored and unnotified:`,
+      err
     );
   }
-
-  // Company fit-scoring: a separate, slower/costlier agent (it runs web
-  // search) that scores the respondent's COMPANY against the sponsor's ICP,
-  // distinct from the transcript-based lead_score above. It must never block
-  // completion or the notification, so it runs fire-and-forget via waitUntil
-  // — the response returns now; this finishes in the background and writes
-  // its own columns. Failures are fully contained inside runCompanyFitScoring
-  // (loud logs + an "unavailable" marker), never surfacing here. Not run for
-  // test responses (this branch is already the non-test path).
-  waitUntil(
-    runCompanyFitScoring({
-      responseId,
-      sponsorUserId: survey.user_id,
-      company: { name: respondentCompanyName, domain: respondentEmailDomain },
-    })
-  );
-
-  return NextResponse.json({
-    response_id: responseId,
-    message: CLOSING_MESSAGE,
-    complete: true,
-  });
 }
