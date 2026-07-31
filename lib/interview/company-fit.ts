@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { runAgent } from "@/lib/agents/run";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAnthropicClient, INTERVIEW_MODEL } from "./anthropic";
+import { INTERVIEW_MODEL } from "./anthropic";
 
 // Company fit-scoring agent. This is a SEPARATE question from the existing
 // respondent lead_score (lib/interview/extract.ts): lead_score answers "did
@@ -122,13 +123,11 @@ const WEB_SEARCH_TOOL = {
   max_uses: MAX_WEB_SEARCHES,
 };
 
-function extractFit(message: Anthropic.Message): CompanyFit | null {
-  const toolUse = message.content.find(
-    (block): block is Anthropic.ToolUseBlock => block.type === "tool_use" && block.name === "record_company_fit"
-  );
-  if (!toolUse) return null;
-
-  const input = toolUse.input as { fit_score?: unknown; fit_reasoning?: unknown; fit_confidence?: unknown };
+// Validates the record_company_fit tool input. A malformed call reads the
+// same as no call at all, so the agent wrapper falls through to its recovery
+// turn rather than persisting a half-formed score.
+export function parseFit(rawInput: unknown): CompanyFit | null {
+  const input = (rawInput ?? {}) as { fit_score?: unknown; fit_reasoning?: unknown; fit_confidence?: unknown };
   const scoreOk =
     typeof input.fit_score === "number" &&
     Number.isInteger(input.fit_score) &&
@@ -147,7 +146,10 @@ function extractFit(message: Anthropic.Message): CompanyFit | null {
 // retry) resolves to the "unavailable" terminal state, logged loudly.
 export async function scoreCompanyFit(
   company: RespondentCompany,
-  sponsor: SponsorProfile
+  sponsor: SponsorProfile,
+  // Attributes the run to a response row in agent_runs. Optional because the
+  // scoring itself does not depend on it.
+  responseId?: string
 ): Promise<CompanyFit> {
   // Nothing to search on. This is an honest low-confidence outcome, not an
   // error: we ran, but had no identifier to research, so the score is the
@@ -160,53 +162,26 @@ export async function scoreCompanyFit(
     };
   }
 
-  try {
-    const anthropic = getAnthropicClient();
-    const system = buildFitSystemPrompt();
-    const messages: Anthropic.MessageParam[] = [
-      { role: "user", content: buildFitUserMessage(company, sponsor) },
-    ];
+  // Turn 1 offers web_search (server-executed within the call) alongside the
+  // record tool, chosen freely: the model searches, then records. If it ends
+  // that turn without recording, runAgent forces the tool on a second turn.
+  const run = await runAgent<CompanyFit>({
+    name: "company_fit",
+    model: INTERVIEW_MODEL,
+    maxTokens: 1500,
+    system: buildFitSystemPrompt(),
+    messages: [{ role: "user", content: buildFitUserMessage(company, sponsor) }],
+    tools: [WEB_SEARCH_TOOL, RECORD_FIT_TOOL],
+    recordTool: "record_company_fit",
+    context: { responseId },
+    parse: parseFit,
+  });
 
-    // Turn 1: web_search (server-executed within this call) plus the record
-    // tool, chosen freely — the model searches, then records.
-    const first = await anthropic.messages.create({
-      model: INTERVIEW_MODEL,
-      max_tokens: 1500,
-      system,
-      messages,
-      tools: [WEB_SEARCH_TOOL, RECORD_FIT_TOOL],
-    });
-
-    let fit = extractFit(first);
-    if (fit) return fit;
-
-    // The model researched but ended its turn without the structured call.
-    // Continue the same conversation and force the record tool now, so the
-    // reasoning it already did still produces an answer.
-    console.error("[scoreCompanyFit] first turn produced no record_company_fit call; forcing the tool");
-    messages.push({ role: "assistant", content: first.content });
-    messages.push({
-      role: "user",
-      content: "Record your assessment now by calling record_company_fit exactly once.",
-    });
-    const second = await anthropic.messages.create({
-      model: INTERVIEW_MODEL,
-      max_tokens: 512,
-      system,
-      messages,
-      tools: [RECORD_FIT_TOOL],
-      tool_choice: { type: "tool", name: "record_company_fit" },
-    });
-
-    fit = extractFit(second);
-    if (fit) return fit;
-
-    console.error("[scoreCompanyFit] no valid record_company_fit after forcing the tool; marking unavailable");
-    return FIT_UNAVAILABLE;
-  } catch (err) {
-    console.error("[scoreCompanyFit] agent call failed; marking unavailable:", err);
+  if (run.outcome === "failed") {
+    console.error("[scoreCompanyFit] marking unavailable:", run.error);
     return FIT_UNAVAILABLE;
   }
+  return run.result;
 }
 
 // Fire-and-forget runner: researches, then persists the result to the
@@ -247,7 +222,7 @@ export async function runCompanyFitScoring(params: {
       valueProp: profile?.value_prop ?? null,
     };
 
-    const fit = await scoreCompanyFit(params.company, sponsor);
+    const fit = await scoreCompanyFit(params.company, sponsor, params.responseId);
 
     const { error } = await supabase
       .from("responses")
