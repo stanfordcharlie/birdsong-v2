@@ -1,9 +1,15 @@
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { SurveysList, type SurveyListItem } from "./SurveysList";
 
-export default async function AdminDashboardPage() {
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
   const supabase = await createClient();
   const user = await getCurrentUser();
+  const { status } = await searchParams;
+  const initialStatusFilter = status === "live" ? "live" : status === "archived" ? "archived" : "all";
 
   // surveys_public_read (RLS) intentionally allows anyone to read any
   // survey, since the unauthenticated respondent flow needs to look one up
@@ -42,6 +48,7 @@ export default async function AdminDashboardPage() {
     status: survey.status,
     responseCount: responseCounts.get(survey.id) ?? 0,
     createdAt: survey.created_at,
+    archivedAt: survey.archived_at,
   }));
 
   return (
@@ -53,7 +60,7 @@ export default async function AdminDashboardPage() {
 
       {error && <p className="text-sm text-destructive">{error.message}</p>}
 
-      {!error && <SurveysList surveys={items} />}
+      {!error && <SurveysList surveys={items} initialStatusFilter={initialStatusFilter} />}
     </div>
   );
 }

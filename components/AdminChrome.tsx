@@ -13,18 +13,24 @@ const BARE_ROUTES = ["/admin/login", "/admin/signup"];
 export function AdminChrome({
   children,
   userName,
-  userInitial,
+  liveSurveyCount,
+  sidebarCollapsed,
 }: {
   children: React.ReactNode;
   userName: string | null;
-  userInitial: string;
+  liveSurveyCount: number;
+  sidebarCollapsed: boolean;
 }) {
   const pathname = usePathname();
   if (pathname && BARE_ROUTES.includes(pathname)) {
     return <>{children}</>;
   }
   return (
-    <AdminShell userName={userName} userInitial={userInitial}>
+    <AdminShell
+      userName={userName}
+      liveSurveyCount={liveSurveyCount}
+      sidebarCollapsed={sidebarCollapsed}
+    >
       {children}
     </AdminShell>
   );

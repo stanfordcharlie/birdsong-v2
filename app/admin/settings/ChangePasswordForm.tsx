@@ -4,11 +4,14 @@ import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PasswordInput } from "@/components/PasswordInput";
 import { Button } from "@/components/ui/button";
+import { BirdLoader } from "@/components/BirdLoader";
+import { useLoadingGate } from "@/components/useLoadingGate";
 
 export function ChangePasswordForm() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const showLoader = useLoadingGate(loading);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
@@ -56,6 +59,7 @@ export function ChangePasswordForm() {
       {success && <p className="text-sm text-muted-foreground">Password updated.</p>}
       <div>
         <Button type="submit" disabled={loading || !newPassword || !confirmPassword}>
+          {loading && showLoader && <BirdLoader size={18} label={false} />}
           {loading ? "Updating..." : "Update password"}
         </Button>
       </div>

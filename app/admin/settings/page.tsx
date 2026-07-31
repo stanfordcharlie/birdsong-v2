@@ -1,7 +1,8 @@
-import { getCurrentUser } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/SignOutButton";
 import { ChangeEmailForm } from "./ChangeEmailForm";
 import { ChangePasswordForm } from "./ChangePasswordForm";
+import { SlackNotificationsForm } from "./SlackNotificationsForm";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,6 +10,10 @@ import { AddSampleDataButton, RemoveSampleDataButton } from "@/components/Sample
 
 export default async function SettingsPage() {
   const user = await getCurrentUser();
+  const supabase = await createClient();
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("slack_webhook_url").eq("user_id", user.id).maybeSingle()
+    : { data: null };
 
   return (
     <div className="admin-container flex flex-col">
@@ -46,6 +51,15 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent className="p-0">
             <ChangePasswordForm />
+          </CardContent>
+        </Card>
+
+        <Card className="p-6">
+          <CardHeader className="p-0 pb-4">
+            <h2 className="type-heading">Notifications</h2>
+          </CardHeader>
+          <CardContent className="p-0">
+            <SlackNotificationsForm initialUrl={profile?.slack_webhook_url ?? null} />
           </CardContent>
         </Card>
 

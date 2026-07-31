@@ -8,6 +8,8 @@ import type { Database } from "@/types/database";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { BirdLoader } from "@/components/BirdLoader";
+import { useLoadingGate } from "@/components/useLoadingGate";
 import { cn } from "@/lib/utils";
 
 export type CompanyProfileValues = {
@@ -56,6 +58,14 @@ function EditIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6 9 17l-5-5" />
     </svg>
   );
 }
@@ -112,23 +122,30 @@ export function CompanyProfileView({
   initialValues,
   justFinishedSetup,
   onFactoryReset,
+  onStartAiFill,
 }: {
   initialValues: CompanyProfileValues;
   justFinishedSetup?: boolean;
   onFactoryReset: () => void;
+  onStartAiFill: () => void;
 }) {
   const [profile, setProfile] = useState(initialValues);
   const [editingSection, setEditingSection] = useState<SectionKey | null>(null);
   const [draft, setDraft] = useState<CompanyProfileValues>(initialValues);
   const [saving, setSaving] = useState(false);
+  const showSaveLoader = useLoadingGate(saving);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
+  const [basicsQuickSaveStatus, setBasicsQuickSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [basicsQuickSaveError, setBasicsQuickSaveError] = useState<string | null>(null);
+
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiStatus, setAiStatus] = useState<"idle" | "loading" | "sent" | "error">("idle");
+  const showAiLoader = useLoadingGate(aiStatus === "loading");
   const [aiError, setAiError] = useState<string | null>(null);
 
   const [resetting, setResetting] = useState(false);
@@ -230,6 +247,41 @@ export function CompanyProfileView({
     }
   }
 
+  // Explicit save/confirm for the Basics section from the logo row, which
+  // renders whether or not "basics" is the section currently being edited.
+  // Saves from `draft` while mid-edit (flushing pending field changes), or
+  // from `profile` otherwise (nothing pending, still a valid confirm-save).
+  async function handleBasicsQuickSave() {
+    setBasicsQuickSaveError(null);
+    setBasicsQuickSaveStatus("saving");
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in.");
+
+      const source = editingSection === "basics" ? draft : profile;
+      const patch: Partial<CompanyProfileValues> = {
+        companyName: source.companyName,
+        industry: source.industry,
+        website: source.website,
+        teamSize: source.teamSize,
+      };
+
+      const { error } = await supabase.from("profiles").update(fieldsToProfileUpdate(patch)).eq("user_id", user.id);
+      if (error) throw error;
+
+      setProfile((prev) => ({ ...prev, ...patch }));
+      if (editingSection === "basics") setEditingSection(null);
+      setBasicsQuickSaveStatus("saved");
+      setTimeout(() => setBasicsQuickSaveStatus("idle"), 2000);
+    } catch {
+      setBasicsQuickSaveError("Couldn't save, try again");
+      setBasicsQuickSaveStatus("idle");
+    }
+  }
+
   // Applies straight onto the saved profile (there's no page-wide draft
   // state anymore now that editing is per-section) — the admin sees the
   // change land immediately in whichever section(s) it touched.
@@ -327,16 +379,21 @@ export function CompanyProfileView({
 
   return (
     <div className="admin-container flex flex-col">
-      <div className="bs-rise-1 mb-6">
-        <div className="mb-2.5 type-label">Settings</div>
-        <h1 className="mb-2.5 type-page-title">Company profile</h1>
-        <p className="max-w-[520px] text-[15px] text-muted-foreground">
-          What Birdsong knows about your company. Every survey uses this to ask sharper questions and qualify the
-          right people.
-        </p>
-        {justFinishedSetup && (
-          <p className="mt-3 text-sm text-muted-foreground">Setup complete, saved. Anything to adjust?</p>
-        )}
+      <div className="bs-rise-1 mb-6 flex items-start justify-between gap-6">
+        <div>
+          <div className="mb-2.5 type-label">Settings</div>
+          <h1 className="mb-2.5 type-page-title">Company profile</h1>
+          <p className="max-w-[520px] text-[15px] text-muted-foreground">
+            What Birdsong knows about your company. Every survey uses this to ask sharper questions and qualify the
+            right people.
+          </p>
+          {justFinishedSetup && (
+            <p className="mt-3 text-sm text-muted-foreground">Setup complete, saved. Anything to adjust?</p>
+          )}
+        </div>
+        <Button type="button" variant="secondary" size="sm" onClick={onStartAiFill} className="shrink-0">
+          Have your AI fill this out
+        </Button>
       </div>
 
       <div className="bs-rise-2 mb-4 flex items-center gap-2.5 rounded-card border border-border bg-chip px-3.5 py-3">
@@ -359,6 +416,7 @@ export function CompanyProfileView({
           disabled={aiStatus === "loading" || !aiPrompt.trim()}
           className="shrink-0 px-4"
         >
+          {aiStatus === "loading" && showAiLoader && <BirdLoader size={18} label={false} />}
           {aiButtonLabel}
         </Button>
       </div>
@@ -406,6 +464,7 @@ export function CompanyProfileView({
                   disabled={saving}
                   onClick={() => saveSection(["companyName", "industry", "website", "teamSize"])}
                 >
+                  {saving && showSaveLoader && <BirdLoader size={18} label={false} />}
                   {saving ? "Saving..." : "Save"}
                 </Button>
               </div>
@@ -454,8 +513,27 @@ export function CompanyProfileView({
                 Remove
               </Button>
             )}
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleBasicsQuickSave}
+              disabled={basicsQuickSaveStatus === "saving"}
+              className="gap-1.5"
+            >
+              {basicsQuickSaveStatus === "saving" ? (
+                "Saving..."
+              ) : basicsQuickSaveStatus === "saved" ? (
+                <>
+                  <CheckIcon />
+                  Saved
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
           </div>
           {logoError && <p className="mt-2 text-xs text-destructive">{logoError}</p>}
+          {basicsQuickSaveError && <p className="mt-2 text-xs text-destructive">{basicsQuickSaveError}</p>}
         </Section>
 
         <Section
@@ -469,6 +547,7 @@ export function CompanyProfileView({
               <Textarea rows={3} value={draft.whatWeSell} onChange={(e) => setField("whatWeSell", e.target.value)} />
               <div className="flex justify-end">
                 <Button type="button" size="sm" disabled={saving} onClick={() => saveSection(["whatWeSell"])}>
+                  {saving && showSaveLoader && <BirdLoader size={18} label={false} />}
                   {saving ? "Saving..." : "Save"}
                 </Button>
               </div>
@@ -491,6 +570,7 @@ export function CompanyProfileView({
               <Textarea rows={5} value={draft.targetIcp} onChange={(e) => setField("targetIcp", e.target.value)} />
               <div className="flex justify-end">
                 <Button type="button" size="sm" disabled={saving} onClick={() => saveSection(["targetIcp"])}>
+                  {saving && showSaveLoader && <BirdLoader size={18} label={false} />}
                   {saving ? "Saving..." : "Save"}
                 </Button>
               </div>
@@ -513,6 +593,7 @@ export function CompanyProfileView({
               <Textarea rows={4} value={draft.valueProp} onChange={(e) => setField("valueProp", e.target.value)} />
               <div className="flex justify-end">
                 <Button type="button" size="sm" disabled={saving} onClick={() => saveSection(["valueProp"])}>
+                  {saving && showSaveLoader && <BirdLoader size={18} label={false} />}
                   {saving ? "Saving..." : "Save"}
                 </Button>
               </div>
@@ -540,6 +621,7 @@ export function CompanyProfileView({
               <p className="text-xs text-muted-foreground">Comma-separated descriptors, in whatever words fit.</p>
               <div className="flex justify-end">
                 <Button type="button" size="sm" disabled={saving} onClick={() => saveSection(["brandVoice"])}>
+                  {saving && showSaveLoader && <BirdLoader size={18} label={false} />}
                   {saving ? "Saving..." : "Save"}
                 </Button>
               </div>

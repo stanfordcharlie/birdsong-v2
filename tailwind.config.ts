@@ -8,13 +8,16 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      // Custom max-width breakpoints for the marketing landing pages'
-      // responsive fix (design_handoff_landing_mobile) — the two exact
-      // cutoffs (920px nav collapse, 760px layout stack) don't land on any
-      // default Tailwind screen, and are max-width, not min-width, variants.
+      // Custom max-width breakpoints for the marketing landing pages. None
+      // of the three cutoffs land on a default Tailwind screen, and all are
+      // max-width, not min-width, variants: lp-stack is the 1080px cutoff
+      // the design handoff's own stylesheet uses to collapse every two-column
+      // grid (hero, sequence, proof, FAQ, footer) to one column; lp-nav and
+      // lp-mobile are the finer nav/layout cutoffs from the mobile handoff.
       // Under `extend`, Tailwind merges these with the default sm/md/lg/xl/2xl
       // (already used elsewhere, e.g. the admin app) rather than replacing them.
       screens: {
+        "lp-stack": { max: "1080px" },
         "lp-nav": { max: "920px" },
         "lp-mobile": { max: "760px" },
       },
@@ -96,17 +99,23 @@ const config: Config = {
         landing: {
           bg: "var(--lp-bg)",
           surface: "var(--lp-surface)",
-          ink: "var(--lp-ink)",
+          sunk: "var(--lp-sunk)",
+          ink: {
+            DEFAULT: "var(--lp-ink)",
+            soft: "var(--lp-ink-soft)",
+          },
           muted: "var(--lp-muted)",
           faint: "var(--lp-faint)",
           border: "var(--lp-border)",
+          hair: "var(--lp-hair)",
           green: {
             DEFAULT: "var(--lp-green)",
+            deep: "var(--lp-green-deep)",
             bg: "var(--lp-green-bg)",
+            line: "var(--lp-green-line)",
           },
           blue: {
             DEFAULT: "var(--lp-blue)",
-            mid: "var(--lp-blue-mid)",
             bg: "var(--lp-blue-bg)",
           },
           butter: {

@@ -8,11 +8,13 @@ import { cn } from "@/lib/utils";
 export function AdminShell({
   children,
   userName,
-  userInitial,
+  liveSurveyCount,
+  sidebarCollapsed,
 }: {
   children: React.ReactNode;
   userName: string | null;
-  userInitial: string;
+  liveSurveyCount: number;
+  sidebarCollapsed: boolean;
 }) {
   // The browser paints overscroll/rubber-band regions with <body>'s actual
   // background-color, which is still the legacy --background white (see
@@ -37,10 +39,15 @@ export function AdminShell({
 
   return (
     <div className={cn("font-archivo flex min-h-screen bg-page text-card-foreground", spectral.variable)}>
-      <AdminSidebar userName={userName} userInitial={userInitial} />
-      {/* AdminSidebar is a normal (sticky, not fixed) flex sibling at a
-          fixed 252px, so it always reserves exactly its own width — no
-          padding value here needs to track it. */}
+      <AdminSidebar
+        userName={userName}
+        liveSurveyCount={liveSurveyCount}
+        initialCollapsed={sidebarCollapsed}
+      />
+      {/* AdminSidebar is a normal (sticky, not fixed) flex sibling that owns
+          its own width (240px expanded / 64px collapsed), so it always
+          reserves exactly its own width — no padding value here needs to
+          track it. */}
       <main className="min-w-0 flex-1">
         <div className="p-8">{children}</div>
       </main>

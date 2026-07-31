@@ -72,12 +72,20 @@ const HOT_SCORE_MIN = 7;
 // two columns read consistently and the "Fit 7+" filter mirrors "Score 7+".
 const HOT_FIT_MIN = 7;
 
-export function LeadsQueue({ items }: { items: LeadItem[] }) {
+export function LeadsQueue({
+  items,
+  initialStatusFilter = "all",
+}: {
+  items: LeadItem[];
+  // Deep-link from the admin home's "New leads awaiting contact" stat, e.g.
+  // ?status=new. Any value that isn't a recognized filter falls back to "all".
+  initialStatusFilter?: StatusFilter;
+}) {
   // Local copy so inline status changes (StatusControl's optimistic update)
   // are reflected in the rows the filters below operate on.
   const [leads, setLeads] = useState(items);
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
   const [surveyFilter, setSurveyFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [hotOnly, setHotOnly] = useState(false);

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { LoadingScreen } from "@/components/LoadingScreen";
+import { useFlybyGate } from "@/components/useLoadingGate";
 import type { SurveyReportContent } from "@/lib/report/generate";
 
 export type SurveyReportRow = {
@@ -61,6 +63,7 @@ export function ReportSection({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const showFlyby = useFlybyGate(generating, "report-generation");
 
   const enoughInterviews = completedInterviewCount >= 3;
 
@@ -90,6 +93,7 @@ export function ReportSection({
 
   return (
     <div className="border-t border-border py-8">
+      {showFlyby && <LoadingScreen statusText="Writing your report" />}
       <div className="mb-3.5 flex items-baseline justify-between gap-6">
         <h2 className="type-label">Report</h2>
         <div className="flex items-center gap-2.5">

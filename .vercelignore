@@ -4,3 +4,12 @@ Screenshot *.png
 birdsong_logo_mark_v2 copy.svg
 birdsong_logo_mark_v2.svg
 public/birdsong_logo_mark_v2.png
+
+# Never upload local secrets. .gitignore already excludes these, but a
+# .vercelignore entry is explicit and doesn't depend on that continuing to
+# be true — belt and suspenders after NEXT_PUBLIC_APP_URL's stale local
+# value (and this file's real API keys) turned up baked into a production
+# build.
+.env
+.env.local
+.env*.local

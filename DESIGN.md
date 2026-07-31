@@ -191,12 +191,30 @@ Header: uppercase, `text-muted-foreground`, bottom border only. Rows: bottom bor
 
 ### Admin shell (`components/AdminShell.tsx`, `components/AdminSidebar.tsx`)
 
-Redesigned per `design_handoff_create_survey`. **Fixed 252px, no collapsed state**
-(the old collapse-to-64px toggle is gone entirely, along with its `localStorage`
-persistence and hover tooltips). Padding `22px 14px 14px`. **Top-anchored stack**:
-favicon logo (30×30, `rounded-control`) + Spectral serif "Birdsong" wordmark (21px/600,
-see below) sit at the top (`mb-[30px]`), then a "WORKSPACE" section label (11px/600,
-uppercase, tracking `.12em`, `hsl(0 0% 42%)`), then the nav links directly beneath.
+Redesigned per `design_handoff_create_survey`, 252px fixed width. Later widened
+its gutters and gained a collapse toggle back (a new feature, not a revival of the
+old 196px/64px localStorage-based mechanism the handoff removed — see the note at
+the bottom of this section). **240px expanded / 64px collapsed**, animated with a
+200ms width transition. Horizontal padding is a consistent 16px (`px-4`) across the
+logo row, "WORKSPACE" label, nav, and account row when expanded. **Top-anchored
+stack**: favicon logo (30×30, `rounded-control`) + Spectral serif "Birdsong"
+wordmark (21px/600, see below) sit at the top (`mb-[30px]`) alongside a small
+collapse-toggle button (chevron, rotates 180° between states), then a "WORKSPACE"
+section label (11px/600, uppercase, tracking `.12em`, `hsl(0 0% 42%)`, hidden while
+collapsed), then the nav links directly beneath.
+
+**Collapsed state (64px):** icons only, centered in a 40×40 hit target; labels
+drop to a `title`/`aria-label` plus a hover tooltip (`bg-card`, `border-border`,
+`rounded-control`, `shadow-lg`, `text-sm`, flush against the rail's right edge via
+`left-full ml-2`) rather than being rendered inline. The account row collapses to
+just the avatar, with its Settings/Sign out popover flying out beside the rail
+(`left-full`, fixed `w-48`) instead of above it, since 64px can't fit the menu
+text. Toggle by clicking the chevron button or `Cmd+B` / `Ctrl+B` (ignored while
+a text input/textarea/contenteditable has focus, since Cmd+B is also "bold" in
+rich text elsewhere in admin). Preference persists via a `sidebar_collapsed`
+cookie (`path=/admin`, not `localStorage`) read server-side in
+`app/admin/layout.tsx` and passed down as the initial state, so there's no
+expand/collapse flash on load.
 
 Four nav links (Home / Leads / Surveys / Company profile), 19px icons (1.4px stroke
 — a rounder, thinner set than the old Feather-style icons; apply the same style to
@@ -367,11 +385,12 @@ real, otherwise omitted rather than fabricated:
 - **"Wren"** (the interviewer name shown on the respondent screen, "Wren is asking") is
   hardcoded brand copy, not a per-survey or per-company field — same category as
   "Powered by Birdsong."
-- **Sidebar collapse removed entirely** (`design_handoff_create_survey`): the sidebar
-  no longer has a collapsed state at all — it's a fixed 252px. The earlier
-  196px/64px collapsible mechanism (and its 232px/76px stale-spec footnote from an
-  older handoff) no longer applies; if a future handoff shows a collapsed sidebar
-  again, that's a new feature, not a revival of the old one.
+- **Sidebar collapse removed, then reintroduced as a new feature**: `design_handoff_create_survey`
+  removed the sidebar's collapsed state entirely (fixed 252px). The earlier 196px/64px
+  collapsible mechanism (and its 232px/76px stale-spec footnote from an older handoff)
+  no longer applies. Collapse was later added back at 240px/64px with a cookie instead
+  of `localStorage` — see "Admin shell" above — built fresh rather than restoring the
+  removed code.
 
 ## Deviations from the static mockups (kept for real functionality)
 

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { BirdLoader } from "@/components/BirdLoader";
+import { useLoadingGate } from "@/components/useLoadingGate";
 
 // Seeds the demo dataset and lands on the demo survey's detail page, where
 // the sample responses are visible. Styling is left to the caller so this
@@ -10,6 +12,7 @@ import { cn } from "@/lib/utils";
 export function AddSampleDataButton({ className }: { className?: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const showLoader = useLoadingGate(loading);
   const [error, setError] = useState<string | null>(null);
 
   async function handleAdd() {
@@ -28,7 +31,8 @@ export function AddSampleDataButton({ className }: { className?: string }) {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <button type="button" onClick={handleAdd} disabled={loading} className={cn(className)}>
+      <button type="button" onClick={handleAdd} disabled={loading} className={cn("inline-flex items-center gap-2", className)}>
+        {loading && showLoader && <BirdLoader size={18} label={false} />}
         {loading ? "Adding…" : "Add sample data"}
       </button>
       {error && <span className="text-xs text-destructive">{error}</span>}
@@ -39,6 +43,7 @@ export function AddSampleDataButton({ className }: { className?: string }) {
 export function RemoveSampleDataButton({ className }: { className?: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const showLoader = useLoadingGate(loading);
   const [message, setMessage] = useState<string | null>(null);
 
   async function handleRemove() {
@@ -59,7 +64,8 @@ export function RemoveSampleDataButton({ className }: { className?: string }) {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <button type="button" onClick={handleRemove} disabled={loading} className={cn(className)}>
+      <button type="button" onClick={handleRemove} disabled={loading} className={cn("inline-flex items-center gap-2", className)}>
+        {loading && showLoader && <BirdLoader size={18} label={false} />}
         {loading ? "Removing…" : "Remove sample data"}
       </button>
       {message && <span className="text-xs text-muted-foreground">{message}</span>}

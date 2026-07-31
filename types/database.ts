@@ -30,6 +30,7 @@ export type Database = {
           is_sample: boolean;
           user_id: string;
           created_at: string;
+          archived_at: string | null;
         };
         Insert: {
           id?: string;
@@ -51,6 +52,7 @@ export type Database = {
           is_sample?: boolean;
           user_id: string;
           created_at?: string;
+          archived_at?: string | null;
         };
         Update: {
           id?: string;
@@ -72,6 +74,7 @@ export type Database = {
           is_sample?: boolean;
           user_id?: string;
           created_at?: string;
+          archived_at?: string | null;
         };
         Relationships: [
           {
@@ -197,6 +200,7 @@ export type Database = {
           onboarding_completed_at: string | null;
           enrichment_sources: Json;
           last_enriched_at: string | null;
+          slack_webhook_url: string | null;
           created_at: string;
         };
         Insert: {
@@ -217,6 +221,7 @@ export type Database = {
           onboarding_completed_at?: string | null;
           enrichment_sources?: Json;
           last_enriched_at?: string | null;
+          slack_webhook_url?: string | null;
           created_at?: string;
         };
         Update: {
@@ -237,6 +242,7 @@ export type Database = {
           onboarding_completed_at?: string | null;
           enrichment_sources?: Json;
           last_enriched_at?: string | null;
+          slack_webhook_url?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -319,6 +325,63 @@ export type Database = {
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agent_runs: {
+        Row: {
+          id: string;
+          agent_name: string;
+          response_id: string | null;
+          survey_id: string | null;
+          model: string;
+          input_tokens: number | null;
+          output_tokens: number | null;
+          latency_ms: number;
+          outcome: "success" | "recovered" | "failed";
+          error: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          agent_name: string;
+          response_id?: string | null;
+          survey_id?: string | null;
+          model: string;
+          input_tokens?: number | null;
+          output_tokens?: number | null;
+          latency_ms: number;
+          outcome: "success" | "recovered" | "failed";
+          error?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          agent_name?: string;
+          response_id?: string | null;
+          survey_id?: string | null;
+          model?: string;
+          input_tokens?: number | null;
+          output_tokens?: number | null;
+          latency_ms?: number;
+          outcome?: "success" | "recovered" | "failed";
+          error?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_runs_response_id_fkey";
+            columns: ["response_id"];
+            isOneToOne: false;
+            referencedRelation: "responses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_runs_survey_id_fkey";
+            columns: ["survey_id"];
+            isOneToOne: false;
+            referencedRelation: "surveys";
             referencedColumns: ["id"];
           },
         ];

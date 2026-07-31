@@ -23,7 +23,7 @@ const getSurvey = cache(async (slug: string) => {
   const { data } = await supabase
     .from("surveys")
     .select(
-      "id, slug, title, external_title, sponsor, public_description, gift_card_amount, custom_fields, num_questions, status, user_id"
+      "id, slug, title, external_title, sponsor, public_description, gift_card_amount, custom_fields, num_questions, status, user_id, archived_at"
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -42,9 +42,9 @@ export async function generateMetadata({
   const { slug } = await params;
   const survey = await getSurvey(slug);
 
-  // Missing and draft surveys both render a 404, and their previews stay
-  // generic for the same least-information reason.
-  if (!survey || survey.status !== "live") {
+  // Missing, draft, and archived surveys all render a non-interview state,
+  // and their previews stay generic for the same least-information reason.
+  if (!survey || survey.status !== "live" || survey.archived_at) {
     return {};
   }
 
@@ -100,6 +100,30 @@ export default async function PublicSurveyPage({
   // ever sees a clean value; the start route re-sanitizes independently
   // since it's directly callable and can't trust this pass either.
   const source = sanitizeSource(src);
+
+  // Archiving is a deliberate, permanent-feeling close of the study, so it
+  // applies unconditionally — including to the owner's own ?test=1 preview,
+  // unlike the draft-preview exception right below. Never falls through to
+  // InterviewFlow: interview logic is never reached for an archived survey.
+  if (survey.archived_at) {
+    return (
+      <div className="font-sans survey-viewport flex flex-col items-center justify-center gap-3 bg-[#faf8f1] px-6 text-center">
+        {/* RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
+            No "sales", "pitch", "leads", "not a sales call", etc. Also never
+            claim their info is "only" used for X, or make any exclusive-use
+            / "never shared" claim — state true things we WILL do, don't
+            enumerate or limit what else happens. */}
+        <div className="max-w-[420px] rounded-[18px] border border-[#e9e3d3] bg-[#fffefa] px-7 py-8 shadow-[0_4px_14px_rgba(38,32,25,.06)]">
+          <h1 className="font-spectral text-[22px] font-medium text-[#241f18]">
+            This study is no longer accepting responses
+          </h1>
+          <p className="mt-2.5 text-[15px] leading-[1.6] text-[#6f6757]">
+            Thanks for your interest. This conversation has been closed.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // A draft survey isn't publicly answerable yet. A 404 (not a distinct
   // "this survey is closed" page) is deliberate: it's the least-informative

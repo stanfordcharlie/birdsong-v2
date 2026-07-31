@@ -4,9 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { LeadsQueue, type LeadItem } from "./LeadsQueue";
 
-export default async function LeadsPage() {
+const STATUS_FILTER_VALUES = new Set(["all", "new", "contacted", "qualified", "not_a_fit"]);
+
+export default async function LeadsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
   const supabase = await createClient();
   const user = await getCurrentUser();
+  const { status } = await searchParams;
+  const initialStatusFilter = STATUS_FILTER_VALUES.has(status ?? "")
+    ? (status as "all" | "new" | "contacted" | "qualified" | "not_a_fit")
+    : "all";
 
   // Cookie-authenticated client: responses_owner_all (RLS) already scopes
   // rows to the signed-in owner. The explicit user_id filter on top matches
@@ -86,7 +96,7 @@ export default async function LeadsPage() {
             </CardContent>
           </Card>
         ) : (
-          <LeadsQueue items={items} />
+          <LeadsQueue items={items} initialStatusFilter={initialStatusFilter} />
         ))}
     </div>
   );

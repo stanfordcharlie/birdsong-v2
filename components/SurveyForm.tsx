@@ -15,6 +15,8 @@ import { slugify, randomSlugSuffix } from "@/lib/surveys/slugify";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { BirdLoader } from "@/components/BirdLoader";
+import { useLoadingGate } from "@/components/useLoadingGate";
 
 export type SurveyFormValues = {
   title: string;
@@ -133,6 +135,7 @@ export function SurveyForm(props: SurveyFormProps) {
   const [newCustomFieldLabel, setNewCustomFieldLabel] = useState("");
   const [newCustomFieldRequired, setNewCustomFieldRequired] = useState(false);
   const [loading, setLoading] = useState(false);
+  const showSaveLoader = useLoadingGate(loading);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [guideLoading, setGuideLoading] = useState(false);
@@ -755,6 +758,7 @@ export function SurveyForm(props: SurveyFormProps) {
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={loading || showDetailsChat}>
+          {loading && showSaveLoader && <BirdLoader size={18} label={false} />}
           {loading ? "Saving..." : isEdit ? "Save changes" : "Create survey"}
         </Button>
         {saved && <span className="text-sm text-muted-foreground">Saved.</span>}

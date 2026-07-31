@@ -1,48 +1,73 @@
 import Link from "next/link";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import { getRecentActivity, type ActivityEvent } from "@/lib/activity";
 import { formatRelativeTime } from "@/lib/format-relative-time";
 import { userFirstName } from "@/lib/user-name";
 import { cn } from "@/lib/utils";
 import { GreetingBlock } from "./GreetingBlock";
-import { AddSampleDataButton } from "@/components/SampleDataControls";
+import { GreetingMascot } from "./GreetingMascot";
+import { CopySurveyLinkButton } from "./CopySurveyLinkButton";
+import { Badge, type badgeVariants } from "@/components/ui/badge";
+import type { VariantProps } from "class-variance-authority";
 
-function ActivityText({ event }: { event: ActivityEvent }) {
-  if (event.type === "new_responses") {
-    return (
-      <>
-        {event.count} new response{event.count === 1 ? "" : "s"} on{" "}
-        <span className="text-indigo">{event.surveyTitle}</span>
-      </>
-    );
-  }
+type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
+
+// A lead counts as qualified from 7 up — the same threshold the score badge
+// switches to its "warning" (warm) band at, so the stat and the badges below
+// it agree about what a good score looks like.
+const QUALIFIED_SCORE_MIN = 7;
+
+// Same bands as the Leads queue's score badge (LeadsQueue.scoreBadgeVariant),
+// reused here so a score reads the same way everywhere it appears.
+function scoreBadgeVariant(score: number | null): BadgeVariant {
+  if (score === null) return "outline";
+  if (score >= 9) return "success";
+  if (score >= QUALIFIED_SCORE_MIN) return "warning";
+  if (score >= 5) return "default";
+  return "outline";
+}
+
+function StatCard({ href, value, label }: { href: string; value: React.ReactNode; label: string }) {
   return (
-    <>
-      {event.count} lead{event.count === 1 ? "" : "s"} qualified from{" "}
-      <span className="text-indigo">{event.surveyTitle}</span>
-    </>
+    <Link
+      href={href}
+      className="rounded-card border border-border bg-card p-6 transition-colors hover:bg-card-foreground/[0.04]"
+    >
+      <div className="text-[26px] font-semibold leading-none tracking-[-0.01em] text-card-foreground">
+        {value}
+      </div>
+      <div className="mt-2 text-[13px] text-muted-foreground">{label}</div>
+    </Link>
   );
 }
 
-const ACTIONS = [
-  {
-    href: "/admin/surveys/new",
-    title: "Create a new survey",
-    description: "Build and launch an AI-moderated interview",
-  },
-  {
-    href: "/admin/surveys",
-    title: "View dashboard",
-    description: "See your surveys, responses, and leads",
-  },
-  {
-    href: "/admin/profile",
-    title: "Company profile",
-    description: "Set your ICP, brand voice, and survey defaults",
-  },
-] as const;
+// The two list cards share a shell: a titled surface card whose rows run
+// edge to edge, so row hover fills the card's full width rather than
+// floating inside its padding.
+function ListCard({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="flex flex-col rounded-card border border-border bg-card">
+      <div className="flex items-center justify-between gap-4 px-6 pb-4 pt-6">
+        <h2 className="type-heading">{title}</h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
 
-const ROW_ANIMATIONS = ["bs-rise-4", "bs-rise-5", "bs-rise-6"];
+// `pb` is dropped by the surveys card, whose trailing "New survey" link
+// supplies the card's bottom padding itself.
+function EmptyRow({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <p className={cn("px-6 pb-6 text-[13px] text-faint", className)}>{children}</p>;
+}
 
 export default async function AdminHomePage() {
   const supabase = await createClient();
@@ -50,107 +75,173 @@ export default async function AdminHomePage() {
 
   if (!user) return null;
 
-  const [{ data: profile }, events, { count: surveyCount }] = await Promise.all([
+  // Three parallel queries, no waterfall: profile for the greeting name,
+  // every survey this admin owns (small — status/count logic runs in JS),
+  // and every completed, non-test response (excluded at the query level so
+  // every downstream count/stat/list is clean by construction).
+  const [{ data: profile }, { data: surveysData }, { data: responsesData }] = await Promise.all([
     supabase.from("profiles").select("contact_name").eq("user_id", user.id).maybeSingle(),
-    getRecentActivity(supabase, user.id),
-    supabase.from("surveys").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+    supabase
+      .from("surveys")
+      .select("id, slug, title, status, created_at")
+      .eq("user_id", user.id)
+      // Archived surveys are excluded from every stat and list on this page,
+      // the same way they're excluded from the surveys list's default view.
+      .is("archived_at", null)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("responses")
+      .select("id, survey_id, respondent_name, lead_score, created_at")
+      .eq("user_id", user.id)
+      .eq("completed", true)
+      .eq("is_test", false)
+      .order("created_at", { ascending: false }),
   ]);
 
   const firstName = userFirstName(user, profile?.contact_name);
+  const surveys = surveysData ?? [];
+  const surveyIds = new Set(surveys.map((s) => s.id));
+  // A response whose survey has since been archived still exists, but this
+  // page has already dropped that survey — so drop its responses too, and
+  // every stat, count, and list stays consistent with what's on screen.
+  const responses = (responsesData ?? []).filter((r) => surveyIds.has(r.survey_id));
+
+  const surveyTitleById = new Map(surveys.map((s) => [s.id, s.title]));
+  const liveSurveyCount = surveys.filter((s) => s.status === "live").length;
+  const qualifiedCount = responses.filter((r) => (r.lead_score ?? 0) >= QUALIFIED_SCORE_MIN).length;
+
+  const responseCountBySurvey = new Map<string, number>();
+  for (const r of responses) {
+    responseCountBySurvey.set(r.survey_id, (responseCountBySurvey.get(r.survey_id) ?? 0) + 1);
+  }
+
+  const recentResponses = responses.slice(0, 5);
 
   return (
-    // Same shared content container as every other admin page — the old
-    // full-bleed split screen (a second full-height ink panel next to the
-    // nav rail) is gone; the greeting, activity feed, and action rows now
-    // stack inside one column on the page surface.
-    <div className="admin-container flex flex-col">
-      <GreetingBlock firstName={firstName} />
-
-      <section className="bs-rise-2 mt-12">
-        <div className="mb-4 flex items-center gap-2 type-label">
-          <span className="bs-dot inline-block h-[7px] w-[7px] rounded-full bg-indigo" />
-          What&apos;s been happening
+    <div className="admin-container flex flex-col gap-6">
+      {/* GreetingBlock carries its own bs-rise-1; the mascot gets the same
+          class so the two arrive together rather than nesting a second
+          animation around a block that already has one. */}
+      <div className="flex items-end justify-between gap-6">
+        <GreetingBlock firstName={firstName} />
+        <div className="bs-rise-1">
+          <GreetingMascot />
         </div>
+      </div>
 
-        {(surveyCount ?? 0) === 0 ? (
-          <div className="flex flex-col gap-3.5">
-            <p className="text-sm text-muted-foreground">
-              No surveys yet. Once you create one and share its link, completed interviews and
-              qualified leads show up here.
-            </p>
-            <Link
-              href="/admin/surveys/new"
-              className="text-sm font-semibold text-indigo transition-colors hover:text-indigo/80"
-            >
-              Create your first survey
-            </Link>
-            <AddSampleDataButton className="self-start text-sm font-medium text-muted-foreground underline underline-offset-2 transition-colors hover:text-card-foreground disabled:opacity-50" />
-          </div>
-        ) : events.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No activity yet — it&apos;ll show up here once responses start coming in.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3.5">
-            {events.map((event, i) => (
-              <div
-                key={`${event.type}-${event.surveyTitle}`}
-                className={cn(
-                  "flex items-baseline justify-between gap-4",
-                  i < events.length - 1 && "border-b border-border pb-[13px]"
-                )}
-              >
-                <span className="text-sm font-medium text-card-foreground">
-                  <ActivityText event={event} />
-                </span>
-                <span className="whitespace-nowrap type-meta">
-                  {formatRelativeTime(event.at)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+      <section className="bs-rise-2 grid grid-cols-1 gap-6 sm:grid-cols-3">
+        <StatCard href="/admin/leads" value={responses.length} label="Total responses" />
+        <StatCard href="/admin/leads" value={qualifiedCount} label="Qualified leads" />
+        <StatCard href="/admin/surveys?status=live" value={liveSurveyCount} label="Live surveys" />
       </section>
 
-      <section className="mt-12">
-        <div className="bs-rise-3 mb-2 type-label">Where to next</div>
-
-        <div className="flex flex-col">
-          {ACTIONS.map((action, i) => (
-            <Link
-              key={action.href}
-              href={action.href}
-              className={cn(
-                ROW_ANIMATIONS[i],
-                "group flex items-center gap-6 rounded-card px-4 py-6 transition-colors hover:bg-card-foreground/[0.04]",
-                i < ACTIONS.length - 1 && "border-b border-border"
-              )}
-            >
-              <span className="min-w-[26px] text-[13px] font-semibold text-faint">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <div className="flex-1">
-                <div className="mb-1 type-heading">{action.title}</div>
-                <div className="text-sm text-muted-foreground">{action.description}</div>
+      {/* Recent responses takes the wider column; the survey list is a
+          narrower companion. Below lg both stack to full width. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
+        <div className="bs-rise-3">
+          <ListCard
+            title="Recent responses"
+            action={
+              recentResponses.length > 0 ? (
+                <Link
+                  href="/admin/leads"
+                  className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-card-foreground"
+                >
+                  View all
+                </Link>
+              ) : undefined
+            }
+          >
+            {recentResponses.length === 0 ? (
+              <EmptyRow>
+                Once someone completes an interview, their score and details will show up here.
+              </EmptyRow>
+            ) : (
+              <div className="flex flex-col pb-2">
+                {recentResponses.map((r) => (
+                  <Link
+                    key={r.id}
+                    href={`/admin/responses/${r.id}`}
+                    className="flex items-center gap-4 border-t border-border px-6 py-4 transition-colors hover:bg-secondary"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[15px] font-medium text-card-foreground">
+                        {r.respondent_name || "Anonymous"}
+                      </div>
+                      <div className="mt-1 truncate text-sm text-muted-foreground">
+                        {surveyTitleById.get(r.survey_id) ?? "—"}
+                      </div>
+                    </div>
+                    <Badge variant={scoreBadgeVariant(r.lead_score)}>{r.lead_score ?? "—"}</Badge>
+                    <span className="w-[70px] shrink-0 text-right type-meta" suppressHydrationWarning>
+                      {formatRelativeTime(r.created_at)}
+                    </span>
+                  </Link>
+                ))}
               </div>
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="shrink-0 text-card-foreground"
-              >
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
-            </Link>
-          ))}
+            )}
+          </ListCard>
         </div>
-      </section>
+
+        <div className="bs-rise-4">
+          <ListCard title="Your surveys">
+            {surveys.length === 0 ? (
+              <EmptyRow className="pb-0">
+                No surveys yet. Create one and Wren starts interviewing the moment you share the
+                link.
+              </EmptyRow>
+            ) : (
+              <div className="flex flex-col">
+                {surveys.map((survey) => {
+                  const isLive = survey.status === "live";
+                  return (
+                    // relative + a stretched link inside: the whole row
+                    // navigates, while the copy button lifts above it with
+                    // relative z-10 so it stays independently clickable —
+                    // the same escape hatch the surveys table row uses.
+                    <div
+                      key={survey.id}
+                      className="relative flex items-center gap-3 border-t border-border px-6 py-4 transition-colors hover:bg-secondary"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          href={`/admin/surveys/${survey.id}`}
+                          className="text-[15px] font-medium text-card-foreground"
+                        >
+                          <span className="absolute inset-0" />
+                          <span className="block truncate">{survey.title}</span>
+                        </Link>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <Badge variant={isLive ? "success" : "warning"}>
+                            {isLive ? "Live" : "Draft"}
+                          </Badge>
+                          <span className="type-meta">
+                            {responseCountBySurvey.get(survey.id) ?? 0} response
+                            {(responseCountBySurvey.get(survey.id) ?? 0) === 1 ? "" : "s"}
+                          </span>
+                        </div>
+                      </div>
+                      {isLive && (
+                        <div className="relative z-10 shrink-0">
+                          <CopySurveyLinkButton slug={survey.slug} title={survey.title} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className={cn("px-6 pb-6 pt-4", surveys.length > 0 && "border-t border-border")}>
+              <Link
+                href="/admin/surveys/new"
+                className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-card-foreground"
+              >
+                New survey
+              </Link>
+            </div>
+          </ListCard>
+        </div>
+      </div>
     </div>
   );
 }

@@ -5,12 +5,15 @@ import { createClient } from "@/lib/supabase/client";
 import { PasswordInput } from "@/components/PasswordInput";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BirdLoader } from "@/components/BirdLoader";
+import { useLoadingGate } from "@/components/useLoadingGate";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const showLoader = useLoadingGate(loading);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -60,6 +63,7 @@ export default function ResetPasswordPage() {
             />
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" disabled={loading}>
+              {loading && showLoader && <BirdLoader size={18} label={false} />}
               {loading ? "Saving..." : "Set new password"}
             </Button>
           </form>

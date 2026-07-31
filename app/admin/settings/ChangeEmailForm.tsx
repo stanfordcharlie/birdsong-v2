@@ -4,10 +4,13 @@ import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { BirdLoader } from "@/components/BirdLoader";
+import { useLoadingGate } from "@/components/useLoadingGate";
 
 export function ChangeEmailForm() {
   const [newEmail, setNewEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const showLoader = useLoadingGate(loading);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
@@ -50,6 +53,7 @@ export function ChangeEmailForm() {
       )}
       <div>
         <Button type="submit" disabled={loading || !newEmail.trim()}>
+          {loading && showLoader && <BirdLoader size={18} label={false} />}
           {loading ? "Sending..." : "Update email"}
         </Button>
       </div>

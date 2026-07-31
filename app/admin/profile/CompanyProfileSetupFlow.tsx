@@ -184,6 +184,13 @@ function isStepComplete(stepDef: StepDef, data: Record<string, string>): boolean
   return stepDef.fields.every((f) => !f.required || (data[f.key] || "").trim().length > 0);
 }
 
+// Completeness hint only (optional fields count too) — distinct from
+// isStepComplete, which gates the required-field Continue button.
+function emptyFieldsForStep(stepDef: StepDef, data: Record<string, string>): FieldDef[] {
+  if (!stepDef.fields) return [];
+  return stepDef.fields.filter((f) => !(data[f.key] || "").trim());
+}
+
 function computeInitialStep(data: Record<string, string>): number {
   for (let i = 0; i < STEPS.length - 1; i++) {
     if (!isStepComplete(STEPS[i], data)) return i;
@@ -194,18 +201,42 @@ function computeInitialStep(data: Record<string, string>): number {
 export function CompanyProfileSetupFlow({
   initialData,
   onDone,
+  onRequestAiFill,
+  aiDraftedKeys,
+  startAtStep,
+  thinResultNote,
 }: {
   initialData: Record<string, string>;
   onDone: () => void;
+  // Entry point for the "fill this out with your AI" flow, shown on the
+  // first step alongside the manual path. Omit to hide it (not used today,
+  // but keeps this component's default rendering unchanged for any other
+  // caller).
+  onRequestAiFill?: () => void;
+  // Field keys pre-filled by that flow, so their labels can carry a subtle
+  // "AI-drafted" marker until the admin edits them. Undefined outside that
+  // flow.
+  aiDraftedKeys?: Set<string>;
+  // Overrides computeInitialStep — used to land back on step 0 after an
+  // AI-fill pass so the admin reviews every section, even ones that now
+  // look "complete" from the extracted values.
+  startAtStep?: number;
+  // One-line summary shown after landing from an AI-fill pass (e.g. "Filled
+  // 6 of 7 sections from your paste.").
+  thinResultNote?: string | null;
 }) {
   const router = useRouter();
-  const [step, setStep] = useState(() => computeInitialStep(initialData));
+  const [step, setStep] = useState(() => startAtStep ?? computeInitialStep(initialData));
   const [data, setData] = useState<Record<string, string>>(initialData);
   const [entering, setEntering] = useState(false);
   const [saveNote, setSaveNote] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
+  // Copies aiDraftedKeys once so an edit can clear the marker for just that
+  // field without mutating the prop.
+  const [draftedKeys, setDraftedKeys] = useState<Set<string>>(() => new Set(aiDraftedKeys ?? []));
+  const [showThinNote, setShowThinNote] = useState(!!thinResultNote);
 
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const saveNoteTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -246,6 +277,13 @@ export function CompanyProfileSetupFlow({
 
   function setField(field: FieldDef, value: string) {
     setData((prev) => ({ ...prev, [field.key]: value }));
+    if (draftedKeys.has(field.key)) {
+      setDraftedKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(field.key);
+        return next;
+      });
+    }
     scheduleSave(field, value);
   }
 
@@ -334,7 +372,10 @@ export function CompanyProfileSetupFlow({
 
         <div className="flex flex-col">
           {STEPS.map((s, i) => {
-            const status = i === step ? "current" : i < step ? "done" : "upcoming";
+            const visited = i < step;
+            const incomplete = emptyFieldsForStep(s, data).length > 0;
+            const status =
+              i === step ? "current" : visited ? (incomplete ? "visited-incomplete" : "done") : "upcoming";
             return (
               <div key={s.id} className="flex cursor-pointer gap-3" onClick={() => goTo(i)}>
                 <div className="flex flex-col items-center">
@@ -342,26 +383,37 @@ export function CompanyProfileSetupFlow({
                     className={cn(
                       "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-xs font-semibold",
                       status === "current" && "bg-primary text-primary-foreground",
-                      status === "done" && "bg-success-bg text-success",
+                      (status === "done" || status === "visited-incomplete") && "bg-success-bg text-success",
                       status === "upcoming" && "border border-border bg-card text-faint"
                     )}
                   >
-                    {status === "done" ? "✓" : i + 1}
+                    {status === "done" ? (
+                      "✓"
+                    ) : status === "visited-incomplete" ? (
+                      <span className="h-2 w-2 rounded-full bg-warning" />
+                    ) : (
+                      i + 1
+                    )}
                   </div>
                   {i < STEPS.length - 1 && (
                     <div className="min-h-[20px] w-px flex-1 bg-border" />
                   )}
                 </div>
                 <div className="pb-6 pt-0.5">
-                  <div
-                    className={cn(
-                      "text-sm",
-                      status === "current" && "font-semibold text-card-foreground",
-                      status === "done" && "font-medium text-muted-foreground",
-                      status === "upcoming" && "font-medium text-faint"
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={cn(
+                        "text-sm",
+                        status === "current" && "font-semibold text-card-foreground",
+                        (status === "done" || status === "visited-incomplete") && "font-medium text-muted-foreground",
+                        status === "upcoming" && "font-medium text-faint"
+                      )}
+                    >
+                      {s.section}
+                    </span>
+                    {incomplete && i !== step && (
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-warning" aria-hidden="true" />
                     )}
-                  >
-                    {s.section}
                   </div>
                 </div>
               </div>
@@ -383,11 +435,35 @@ export function CompanyProfileSetupFlow({
       <div className="flex flex-1 justify-center px-10 py-14">
         <div className="w-full max-w-[680px]">
           <div className="mb-3.5 flex items-center justify-between">
-            <div className="text-sm text-faint">{stepLabel}</div>
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-faint">{stepLabel}</div>
+              {step === 0 && onRequestAiFill && (
+                <button
+                  type="button"
+                  onClick={onRequestAiFill}
+                  className="text-sm font-medium text-indigo transition-colors hover:text-indigo/80"
+                >
+                  Have your AI fill this out
+                </button>
+              )}
+            </div>
             <Button type="button" variant="secondary" size="sm" onClick={handleSaveExit}>
               Save &amp; exit
             </Button>
           </div>
+
+          {thinResultNote && showThinNote && (
+            <div className="mb-5 flex items-center justify-between gap-4 rounded-control border border-border bg-indigo-chip/[0.08] px-4 py-3">
+              <span className="text-sm text-card-foreground">{thinResultNote}</span>
+              <button
+                type="button"
+                onClick={() => setShowThinNote(false)}
+                className="shrink-0 text-xs font-medium text-muted-foreground hover:text-card-foreground"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
           <div className="mb-9 h-1 w-full overflow-hidden rounded-full bg-secondary">
             <div
@@ -438,6 +514,40 @@ export function CompanyProfileSetupFlow({
                     ))}
                   </div>
 
+                  {(() => {
+                    const stepsMissing = STEPS.map((s, i) => ({ s, i, missing: emptyFieldsForStep(s, data) })).filter(
+                      ({ s, missing }) => !s.review && missing.length > 0
+                    );
+                    if (stepsMissing.length === 0) return null;
+                    return (
+                      <div className="mt-5 rounded-card border border-border p-[18px_20px]">
+                        <div className="mb-2.5 flex items-center gap-2 text-[13px] font-semibold text-card-foreground">
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-warning" aria-hidden="true" />
+                          Still incomplete
+                        </div>
+                        <div className="flex flex-col gap-2.5">
+                          {stepsMissing.map(({ s, i, missing }) => (
+                            <div key={s.id} className="text-sm">
+                              <span className="text-faint">{s.section}:</span>{" "}
+                              {missing.map((f, fi) => (
+                                <span key={f.key}>
+                                  {fi > 0 && ", "}
+                                  <button
+                                    type="button"
+                                    onClick={() => goTo(i)}
+                                    className="text-indigo underline-offset-2 hover:underline"
+                                  >
+                                    {f.label || s.section}
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <div className="mt-auto flex items-center justify-between pt-9">
                     <Button type="button" variant="secondary" onClick={goBack}>
                       Back
@@ -467,10 +577,21 @@ export function CompanyProfileSetupFlow({
                         : "grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5"
                     }
                   >
-                    {(current.fields ?? []).map((field) => (
+                    {(current.fields ?? []).map((field) => {
+                      const isDrafted = draftedKeys.has(field.key);
+                      return (
                       <div key={field.key} className="flex flex-col gap-2">
-                        {field.label && (
-                          <label className="text-sm font-semibold text-card-foreground">{field.label}</label>
+                        {(field.label || isDrafted) && (
+                          <div className="flex items-center gap-2">
+                            {field.label && (
+                              <label className="text-sm font-semibold text-card-foreground">{field.label}</label>
+                            )}
+                            {isDrafted && (
+                              <span className="inline-flex items-center rounded-full bg-indigo-chip/[0.08] px-2 py-0.5 text-[11px] font-medium text-indigo">
+                                AI-drafted
+                              </span>
+                            )}
+                          </div>
                         )}
                         {field.type === "textarea" ? (
                           <Textarea
@@ -491,7 +612,8 @@ export function CompanyProfileSetupFlow({
                         )}
                         {field.helper && <div className="text-[13px] text-faint">{field.helper}</div>}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   <div className="mt-auto flex items-center justify-between pt-9">

@@ -1,7 +1,22 @@
+"use client";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
+import { LoadingScreen } from "@/components/LoadingScreen";
+import { useFlybyGate } from "@/components/useLoadingGate";
 
 export default function ResponseDetailLoading() {
+  // Mounted for exactly as long as this route is loading, so the wait
+  // "starts" the moment this renders — the gate gives it the same nothing
+  // for ~300ms, then cutscene (at most once per session) treatment as the
+  // other known-long waits. Falls back to the skeleton below both before
+  // 300ms and on a repeat visit this session.
+  const showFlyby = useFlybyGate(true, "responses-view");
+
+  if (showFlyby) {
+    return <LoadingScreen statusText="Loading the transcript" />;
+  }
+
   return (
     <div className="admin-container flex flex-col gap-6">
       <Skeleton className="h-4 w-32" />
