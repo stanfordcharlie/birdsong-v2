@@ -47,6 +47,18 @@ export const continueIpRateLimiter = redis
     })
   : null;
 
+// 20 resume checks per minute per IP. A resume costs one row read and no
+// Anthropic call, and a tab can legitimately reconnect several times on a
+// flaky mobile connection, so this sits well above normal use and exists to
+// stop a scripted caller from cheaply probing response ids.
+export const resumeRateLimiter = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(20, "1 m"),
+      prefix: "ratelimit:interview-resume",
+    })
+  : null;
+
 export const continueResponseRateLimiter = redis
   ? new Ratelimit({
       redis,

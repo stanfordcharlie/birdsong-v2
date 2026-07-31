@@ -10,8 +10,16 @@ import {
   parsePresetFieldRequired,
 } from "@/lib/surveys/respondent-fields";
 import { extractEmailDomain, isFreeEmailDomain } from "@/lib/interview/work-email";
+import {
+  activeSessionStorageKey,
+  parseActiveSession,
+  serializeActiveSession,
+} from "@/lib/interview/active-session";
 import { Badge } from "@/components/ui/badge";
 import { PerchedBird } from "@/components/marketing/PerchedBird";
+import { LoadingScreen } from "@/components/LoadingScreen";
+import { BirdLoader } from "@/components/BirdLoader";
+import { useLoadingGate, useFlybyGate } from "@/components/useLoadingGate";
 import { renderWithBold } from "@/lib/chat/render-with-bold";
 import { spectral, newsreader, bricolage } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
@@ -164,27 +172,6 @@ const DOTS_FADE_MS = 150;
 // appeared, don't let it pop in over them mid-keystroke: hold it back
 // until they've paused typing for this long.
 const TYPING_PAUSE_MS = 10000;
-
-function TypingDots({ leaving = false }: { leaving?: boolean }) {
-  // Purely decorative — the hidden status live region in the chat stage is
-  // what tells screen reader users the interviewer is typing. `leaving`
-  // fades the dots to transparent just before the question replaces them,
-  // so the indicator→question handoff reads as a crossfade instead of a
-  // hard cut (instant under reduced motion via motion-safe).
-  return (
-    <div
-      aria-hidden="true"
-      className={cn(
-        "flex items-center gap-1.5 py-2 motion-safe:transition-opacity motion-safe:duration-150",
-        leaving && "opacity-0"
-      )}
-    >
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#a89d88] [animation-delay:-0.3s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#a89d88] [animation-delay:-0.15s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#a89d88]" />
-    </div>
-  );
-}
 
 // num_questions is a loose guideline the model is explicitly allowed to run
 // longer than, so progress can't just hard-cap at 90% once answered reaches
@@ -375,9 +362,19 @@ export function InterviewFlow({
   const [linkedin, setLinkedin] = useState("");
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [responseId, setResponseId] = useState<string | null>(null);
-  // Kept in memory only (never localStorage) — proves to /api/interview/continue
-  // that this tab is the one that started this interview, since response_id
-  // alone is a guessable UUID, not a credential.
+  // Proves to /api/interview/continue and /api/interview/resume that this tab
+  // is the one that started this interview, since response_id alone is a
+  // guessable UUID, not a credential.
+  //
+  // The ref is the live copy; a duplicate is also written to sessionStorage
+  // (see writeActiveSession) so a reload can rejoin the interview instead of
+  // stranding the respondent. That is a real tradeoff, taken deliberately:
+  // the token now sits on disk for the life of the tab rather than only in
+  // memory, so anything with access to this origin's sessionStorage in this
+  // tab can read it. sessionStorage, not localStorage, is what bounds that:
+  // it is scoped to this one tab and is discarded when the tab closes, so the
+  // token never becomes cross-tab or long-lived ambient state, and it is
+  // cleared the moment the interview completes or a resume is refused.
   const sessionTokenRef = useRef<string | null>(null);
   const [messages, setMessages] = useState<InterviewMessage[]>([]);
   const [answer, setAnswer] = useState("");
@@ -398,6 +395,24 @@ export function InterviewFlow({
   // content without appending a duplicate.
   const [failedMessage, setFailedMessage] = useState<string | null>(null);
   const [showResponses, setShowResponses] = useState(false);
+  // How many messages a restored session came back with, or null when this
+  // tab started the interview normally. The question that was already on
+  // screen before the reload must not replay its entrance animation, so the
+  // reveal is suppressed for exactly the render where messages.length still
+  // equals this. Answering anything grows the transcript past it and normal
+  // reveals resume with no cleanup needed.
+  const [restoredMessageCount, setRestoredMessageCount] = useState<number | null>(null);
+  // Full flyby cutscene while the first question is generated (known-long:
+  // the intake POST triggers Claude's opening question). Gated to the intro
+  // stage specifically since `loading` is also true later, during ordinary
+  // in-chat sends, which get the mini loader instead (see showBirdLoader).
+  const showIntroFlyby = useFlybyGate(stage === "intro" && loading, "survey-start");
+  // Mini loader between questions, and on the Retry button after a failed
+  // send. Both share the same 300ms "nothing first" gate; the mini loader
+  // itself takes over TypingDots' old spot rather than adding a screen
+  // takeover, per the design handoff's "not a takeover" placement rule.
+  const showBirdLoader = useLoadingGate(isTyping);
+  const showRetryLoader = useLoadingGate(loading && !!failedMessage);
   const answerInputRef = useRef<HTMLTextAreaElement>(null);
   // The chat stage's scroll box once the keyboard is up (see the
   // .survey-stage rules in globals.css) — scrolled back to the top when a
@@ -443,6 +458,106 @@ export function InterviewFlow({
       }
     }
     // Only ever meant to run once, against whatever's in storage at mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Storage can throw (a locked-down browser, a full quota). Losing the
+  // ability to resume is a downgrade, never a reason to fail the interview
+  // the respondent is actually in, so both sides swallow it.
+  function writeActiveSession(id: string, token: string) {
+    try {
+      window.sessionStorage.setItem(
+        activeSessionStorageKey(survey.id),
+        serializeActiveSession({ responseId: id, token, surveyId: survey.id })
+      );
+    } catch {
+      // Resume will simply not be available in this tab.
+    }
+  }
+
+  function clearActiveSession() {
+    try {
+      window.sessionStorage.removeItem(activeSessionStorageKey(survey.id));
+    } catch {
+      // Nothing to do; a stale pointer fails its resume check harmlessly.
+    }
+  }
+
+  // Rejoins an interview this tab already started, after a reload or after
+  // the OS discarded the page while the respondent was in another app. The
+  // server holds the transcript; the only thing this tab kept is the pointer.
+  //
+  // Every failure path is silent and ends on the normal welcome screen: a
+  // respondent who cannot resume has no idea a session existed, so an error
+  // about one would be nonsense to them.
+  useEffect(() => {
+    // Test mode never writes a pointer (see startInterview), so there is
+    // nothing to rejoin; previews stay repeatable.
+    if (isTest) return;
+    // An interview already recorded as finished short-circuits to the
+    // completion screen in the effect above; do not also resume it.
+    if (window.localStorage.getItem(completionStorageKey(survey.id))) return;
+
+    let pointer: ReturnType<typeof parseActiveSession> = null;
+    try {
+      pointer = parseActiveSession(
+        window.sessionStorage.getItem(activeSessionStorageKey(survey.id)),
+        survey.id
+      );
+    } catch {
+      return;
+    }
+    if (!pointer) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/interview/resume", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            response_id: pointer.responseId,
+            token: pointer.token,
+          }),
+        });
+        if (!res.ok) throw new Error("This interview session could not be resumed");
+        const data = await res.json();
+        if (cancelled || !isMountedRef.current) return;
+
+        if (data.complete) {
+          clearActiveSession();
+          // Match what a live completion writes, so later visits take the
+          // normal short-circuit path rather than resuming again. The
+          // transcript is not part of a completed resume payload, hence the
+          // empty history (the completion screen hides its transcript toggle
+          // when there is nothing to show).
+          window.localStorage.setItem(
+            completionStorageKey(survey.id),
+            JSON.stringify({ closingMessage: data.message, messages: [] })
+          );
+          setClosingMessage(data.message);
+          setStage("complete");
+          return;
+        }
+
+        const restored = (data.messages ?? []) as InterviewMessage[];
+        if (restored.length === 0) throw new Error("Nothing to restore");
+        setResponseId(pointer.responseId);
+        sessionTokenRef.current = pointer.token;
+        setMessages(restored);
+        setChips(Array.isArray(data.chips) ? data.chips : []);
+        setRestoredMessageCount(restored.length);
+        setStage("chat");
+      } catch {
+        if (cancelled) return;
+        clearActiveSession();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Mount only, against whatever pointer storage holds at that moment.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -588,6 +703,13 @@ export function InterviewFlow({
       if (!res.ok) throw new Error(data.error || "Failed to start the interview");
       setResponseId(data.response_id);
       sessionTokenRef.current = data.token ?? null;
+      // Written once, here, at the moment the chat stage begins: the server
+      // owns the transcript from now on, so this tab only needs to remember
+      // which interview is its own. Test runs deliberately skip it, matching
+      // how they already skip completion persistence.
+      if (!isTest && data.response_id && data.token) {
+        writeActiveSession(data.response_id, data.token);
+      }
       setStage("chat");
       await revealAssistantMessage(data.message, data.chips ?? []);
     } catch (err) {
@@ -642,10 +764,17 @@ export function InterviewFlow({
       if (!res.ok) throw new Error(data.error || "Failed to continue the interview");
       setFailedMessage(null);
       if (data.complete) {
+        // The interview is over, so the pointer has nothing left to point at:
+        // drop the stored token rather than leaving it readable for the rest
+        // of the tab's life.
+        clearActiveSession();
         if (!isTest) {
           window.localStorage.setItem(
             completionStorageKey(survey.id),
-            JSON.stringify({ closingMessage: data.message, messages: historyForCompletion })
+            JSON.stringify({
+              closingMessage: data.message,
+              messages: historyForCompletion,
+            })
           );
         }
         setIsTyping(false);
@@ -778,6 +907,26 @@ export function InterviewFlow({
         ? `${questionCount} question${questionCount === 1 ? "" : "s"} · about ${minutes} minutes`
         : null;
 
+    // Titles are usually short (the AI suggestion flow caps at ~8 words),
+    // but an admin can type anything here, and this heading is set at a
+    // large display size — long, unwrapped-friendly titles at that size
+    // stack into 3-4 lines and push the CTA off the bottom of the fold.
+    // Real clamp(), not a couple of hard breakpoints: the vw term gives
+    // genuine viewport-fluid scaling (small on phones, large on desktop),
+    // and the ceiling itself shrinks continuously as the title gets longer
+    // (only past TITLE_SHRINK_AFTER chars, so short titles are unaffected)
+    // instead of jumping between a few fixed sizes. TITLE_MIN_PX is the
+    // floor so even a very long title stays legible rather than vanishing.
+    const TITLE_MAX_PX = 58;
+    const TITLE_MIN_PX = 26;
+    const TITLE_SHRINK_AFTER = 20;
+    const TITLE_PX_PER_CHAR = 1.1;
+    const titleCeilingPx = Math.max(
+      TITLE_MIN_PX,
+      TITLE_MAX_PX - Math.max(0, surveyName.length - TITLE_SHRINK_AFTER) * TITLE_PX_PER_CHAR
+    );
+    const titleFontSize = `clamp(${TITLE_MIN_PX}px, 10vw, ${titleCeilingPx}px)`;
+
     return (
       <div
         className={cn(
@@ -817,10 +966,20 @@ export function InterviewFlow({
           </span>
         </div>
 
-        <main className="relative flex flex-1 items-center justify-center px-5 pb-10 pt-14 sm:px-8 sm:pb-12 sm:pt-[72px]">
+        <main className="relative flex flex-1 items-center justify-center px-5 pb-6 pt-8 sm:px-8 sm:pb-8 sm:pt-12">
           <div className="flex w-full max-w-[640px] flex-col items-center text-center">
-            {/* Bird + sticker cluster (decorative). */}
-            <div aria-hidden="true" className="sw-rev relative mb-2.5 h-[76px] w-[180px]">
+            {/* Bird + sticker cluster (decorative). The gift-card sticker
+                overhangs below this box (top-[-16px] + h-[98px] on a
+                h-[64px] box), so it needs extra bottom margin to clear the
+                meta line below it — plain mb-1.5 is enough with just the
+                bird, but not with the sticker's overhang. */}
+            <div
+              aria-hidden="true"
+              className={cn(
+                "sw-rev relative h-[64px] w-[180px]",
+                survey.gift_card_amount ? "mb-7" : "mb-1.5"
+              )}
+            >
               <span className="sw-clusternote-a absolute left-[52px] top-0 text-[17px]" style={{ color: "#3a6046", opacity: 0 }}>
                 &#9834;
               </span>
@@ -865,18 +1024,23 @@ export function InterviewFlow({
               <span className="sr-only">Includes a ${survey.gift_card_amount} gift card.</span>
             ) : null}
 
-            {metaLine && <div className="sw-rev mb-4 text-[15px] font-medium text-[#6f6757]">{metaLine}</div>}
+            {metaLine && <div className="sw-rev mb-3 text-[15px] font-medium text-[#6f6757]">{metaLine}</div>}
 
             <h1
-              className="sw-rev m-0 mb-3.5 text-balance font-bricolage text-[40px] font-bold leading-[1.05] tracking-[-0.025em] sm:text-[58px]"
-              style={{ "--sw-delay": "0.08s" } as React.CSSProperties}
+              className="sw-rev m-0 mb-2.5 text-balance font-bricolage font-bold leading-[1.05] tracking-[-0.025em]"
+              style={
+                {
+                  "--sw-delay": "0.08s",
+                  fontSize: titleFontSize,
+                } as React.CSSProperties
+              }
             >
               {surveyName}
             </h1>
 
             {survey.sponsor && (
               <div
-                className="sw-rev mb-9 text-[15px] text-[#6f6757]"
+                className="sw-rev mb-6 text-[15px] text-[#6f6757]"
                 style={{ "--sw-delay": "0.14s" } as React.CSSProperties}
               >
                 Research conducted on behalf of{" "}
@@ -885,21 +1049,28 @@ export function InterviewFlow({
             )}
 
             <div
-              className="sw-rev mb-[38px] flex flex-col items-center gap-2.5"
+              className="sw-rev mb-7 flex flex-col items-center gap-2.5"
               style={{ "--sw-delay": "0.22s" } as React.CSSProperties}
             >
               <div className="flex items-center gap-2.5">
                 <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#241f18]">
                   <WelcomeBird width={15} height={13} fill="#faf8f1" />
                 </span>
-                <span className="text-[12.5px] font-semibold tracking-[0.04em] text-[#a89d88]">YOUR INTERVIEWER</span>
+                <span className="text-[12.5px] font-semibold tracking-[0.04em] text-[#a89d88]">
+                  YOUR INTERVIEWER
+                </span>
               </div>
               <div
                 className="text-pretty max-w-[500px] rounded-[18px] border border-[#e9e3d3] bg-[#fffefa] px-[26px] py-4 text-[16.5px] leading-[1.6]"
                 style={{ boxShadow: "0 4px 14px rgba(38,32,25,.06)" }}
               >
-                This is a short conversation about how you work, not a quiz or a sales call. Answer in
-                your own words; there are no wrong answers.
+                {/* RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
+                    No "sales", "pitch", "leads", "not a sales call", etc. Also
+                    never claim their info is "only" used for X, or make any
+                    exclusive-use / "never shared" claim — state true things
+                    we WILL do, don't enumerate or limit what else happens. */}
+                This is a short, relaxed conversation about how you work. Answer in your own words; there are
+                no wrong answers.
               </div>
             </div>
 
@@ -949,7 +1120,7 @@ export function InterviewFlow({
         </main>
 
         <footer
-          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-[34px] pt-[26px]"
+          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-6 pt-5"
           style={{ "--sw-delay": "0.4s" } as React.CSSProperties}
         >
           <span className="text-[13.5px] text-[#a89d88]">Powered by</span>
@@ -982,16 +1153,7 @@ export function InterviewFlow({
     // does here, so the software keyboard agrees with the existing
     // Enter-advances-field handler instead of offering a generic "return"
     // that looks like it will insert a newline.
-    const enterHintFor = (idx: number): "next" | "go" =>
-      idx < totalFieldCount - 1 ? "next" : "go";
-
-    // Split rather than one string so the keyboard hint can be dropped on
-    // phones, where there is no Enter key to press — the software keyboard
-    // shows "next"/"go" (see enterHintFor) and the instruction reads as
-    // stale advice for a keyboard the respondent doesn't have.
-    const giftCardMicrocopy = survey.gift_card_amount
-      ? "Your info is only used to send the gift card"
-      : null;
+    const enterHintFor = (idx: number): "next" | "go" => (idx < totalFieldCount - 1 ? "next" : "go");
 
     return (
       <div
@@ -1002,11 +1164,16 @@ export function InterviewFlow({
         )}
         style={PAGE_BACKGROUND_STYLE}
       >
+        {showIntroFlyby && <LoadingScreen statusText="Preparing your conversation" />}
         <TestModeBadge isTest={isTest} />
         <div className="mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-10 sm:px-6 sm:py-16">
           {survey.sponsor && logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt={survey.sponsor} className="survey-intro-rise-1 mb-6 h-8 w-auto object-contain" />
+            <img
+              src={logoUrl}
+              alt={survey.sponsor}
+              className="survey-intro-rise-1 mb-6 h-8 w-auto object-contain"
+            />
           )}
 
           {/* Incentive pill and timing meta now live on the welcome beat, so
@@ -1230,10 +1397,13 @@ export function InterviewFlow({
             </button>
           </form>
 
-          <div className="survey-intro-rise-6 mt-3.5 text-balance text-center text-[13px] text-[#a89d88]">
-            <span className="hidden sm:inline">Press Enter to move between fields</span>
-            {giftCardMicrocopy && <span className="hidden sm:inline"> · </span>}
-            {giftCardMicrocopy}
+          {/* Desktop-only: the one hint left here describes a physical Enter
+              key, so the whole line is hidden on phones rather than leaving
+              an empty box under the button. The email field's own helper
+              text already says where the gift card goes; nothing about the
+              incentive is repeated here. */}
+          <div className="survey-intro-rise-6 mt-3.5 hidden text-balance text-center text-[13px] text-[#a89d88] sm:block">
+            <span>Press Enter to move between fields</span>
           </div>
         </div>
         <Footer />
@@ -1363,33 +1533,39 @@ export function InterviewFlow({
               className="sw-rev flex w-full flex-col items-center"
               style={{ "--sw-delay": "0.24s" } as React.CSSProperties}
             >
-              <button
-                type="button"
-                onClick={() => setShowResponses((prev) => !prev)}
-                aria-expanded={showResponses}
-                className="inline-flex touch-manipulation items-center gap-2.5 rounded-full border-[1.5px] border-[#e9e3d3] bg-transparent px-6 py-3 text-[15px] font-semibold text-[#6f6757] transition-colors duration-[250ms] motion-reduce:transition-none [@media(hover:hover)]:hover:border-[#3a6046] [@media(hover:hover)]:hover:text-[#3a6046]"
-              >
-                {showResponses ? "Hide your responses" : "See your responses"}
-                <svg
-                  width="14"
-                  height="9"
-                  viewBox="0 0 14 9"
-                  fill="none"
-                  aria-hidden="true"
-                  className={cn(
-                    "transition-transform duration-300 motion-reduce:transition-none",
-                    showResponses && "rotate-180"
-                  )}
+              {/* Hidden when there is no transcript to show, which happens
+                  when this tab resumed straight into an interview that was
+                  already finished: the resume payload carries the closing
+                  line, not the conversation. */}
+              {messages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowResponses((prev) => !prev)}
+                  aria-expanded={showResponses}
+                  className="inline-flex touch-manipulation items-center gap-2.5 rounded-full border-[1.5px] border-[#e9e3d3] bg-transparent px-6 py-3 text-[15px] font-semibold text-[#6f6757] transition-colors duration-[250ms] motion-reduce:transition-none [@media(hover:hover)]:hover:border-[#3a6046] [@media(hover:hover)]:hover:text-[#3a6046]"
                 >
-                  <path
-                    d="M1.5 1.5 L7 7 L12.5 1.5"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
+                  {showResponses ? "Hide your responses" : "See your responses"}
+                  <svg
+                    width="14"
+                    height="9"
+                    viewBox="0 0 14 9"
+                    fill="none"
+                    aria-hidden="true"
+                    className={cn(
+                      "transition-transform duration-300 motion-reduce:transition-none",
+                      showResponses && "rotate-180"
+                    )}
+                  >
+                    <path
+                      d="M1.5 1.5 L7 7 L12.5 1.5"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              )}
 
               {showResponses && (
                 <div className="mt-[34px] flex w-full max-w-[600px] flex-col gap-3.5 text-left">
@@ -1446,6 +1622,15 @@ export function InterviewFlow({
   // interview running past it).
   const targetQuestionCount = DEFAULT_TARGET_QUESTION_COUNT;
   const hasAnswer = answer.trim().length > 0;
+  // A restored question was already on screen before the reload, so replaying
+  // its entrance would animate in something the respondent has been reading
+  // for a while. Suppressed for that first render only; the moment they
+  // answer, messages.length moves past the restored count and every
+  // subsequent question reveals normally.
+  const isRestoredRender = restoredMessageCount !== null && messages.length === restoredMessageCount;
+  const questionRevealClass = isRestoredRender
+    ? QUESTION_REVEAL_CLASS.none
+    : QUESTION_REVEAL_CLASS[QUESTION_REVEAL];
   // Same auto-grow heuristic as the design reference: line count plus a
   // rough characters-per-line estimate, not actual DOM measurement.
   const draftRows = Math.min(6, Math.max(2, answer.split("\n").length + Math.floor(answer.length / 70)));
@@ -1494,12 +1679,22 @@ export function InterviewFlow({
           </div>
 
           {isTyping ? (
-            <TypingDots leaving={dotsLeaving} />
+            showBirdLoader && (
+              <div
+                aria-hidden="true"
+                className={cn(
+                  "py-2 motion-safe:transition-opacity motion-safe:duration-150",
+                  dotsLeaving && "opacity-0"
+                )}
+              >
+                <BirdLoader />
+              </div>
+            )
           ) : (
             // Keyed on messages.length so the entrance replays once per new
             // question — the key changes only when a message is appended,
             // never mid-animation, so the reveal can't double-fire.
-            <div key={messages.length} className={QUESTION_REVEAL_CLASS[QUESTION_REVEAL]}>
+            <div key={messages.length} className={questionRevealClass}>
               <div className="mb-1 flex items-center justify-end">
                 <span className="text-[13px] tabular-nums text-[#a89d88]">
                   {answeredCount + 1} of {targetQuestionCount}
@@ -1528,7 +1723,14 @@ export function InterviewFlow({
                       aria-label="Retry sending your answer"
                       className="inline-flex min-h-[44px] touch-manipulation items-center px-2 font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a6046] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:opacity-80"
                     >
-                      {loading ? "Retrying…" : "Retry"}
+                      {loading ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          {showRetryLoader && <BirdLoader size={18} label={false} />}
+                          Retrying…
+                        </span>
+                      ) : (
+                        "Retry"
+                      )}
                     </button>
                   </div>
                 </div>

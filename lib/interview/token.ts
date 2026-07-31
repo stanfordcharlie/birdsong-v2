@@ -22,3 +22,16 @@ export function tokensMatch(provided: string, stored: string): boolean {
   }
   return timingSafeEqual(providedBuf, storedBuf);
 }
+
+// The full check any route must pass before letting a caller act on a
+// responses row: a string token was supplied, the row actually has one, and
+// the two match in constant time. This is the same predicate
+// /api/interview/continue applies inline (see the session-token guard in
+// that route); it lives here so /api/interview/resume verifies identically
+// instead of growing its own near-copy. Keep the two in sync: any change to
+// what counts as a valid session belongs here first.
+export function sessionTokenIsValid(provided: unknown, stored: string | null | undefined): boolean {
+  if (!provided || typeof provided !== "string") return false;
+  if (!stored) return false;
+  return tokensMatch(provided, stored);
+}

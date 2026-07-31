@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateSessionToken, tokensMatch } from "@/lib/interview/token";
+import { generateSessionToken, sessionTokenIsValid, tokensMatch } from "@/lib/interview/token";
 
 describe("tokensMatch", () => {
   it("matches an identical token", () => {
@@ -37,6 +37,45 @@ describe("tokensMatch", () => {
 
   it("compares bytes, so two equal empty strings match", () => {
     expect(tokensMatch("", "")).toBe(true);
+  });
+});
+
+// The predicate /api/interview/continue applies inline before it will act on
+// a responses row, and now the one /api/interview/resume calls. These cases
+// pin it to what that inline check accepts and rejects: a string token, a
+// stored token on the row, and a constant-time match between them.
+describe("sessionTokenIsValid", () => {
+  it("accepts a supplied token that matches the stored one", () => {
+    const token = generateSessionToken();
+
+    expect(sessionTokenIsValid(token, token)).toBe(true);
+  });
+
+  it("rejects a token that does not match the stored one", () => {
+    expect(sessionTokenIsValid(generateSessionToken(), generateSessionToken())).toBe(false);
+    expect(sessionTokenIsValid(`${"a".repeat(63)}b`, "a".repeat(64))).toBe(false);
+  });
+
+  it("rejects a row with no stored token, whatever the caller supplies", () => {
+    expect(sessionTokenIsValid(generateSessionToken(), null)).toBe(false);
+    expect(sessionTokenIsValid(generateSessionToken(), undefined)).toBe(false);
+    expect(sessionTokenIsValid(generateSessionToken(), "")).toBe(false);
+  });
+
+  it("rejects a missing or non-string token without throwing", () => {
+    const stored = generateSessionToken();
+
+    for (const provided of [undefined, null, "", 0, 12345, true, {}, [], ["x"]]) {
+      expect(() => sessionTokenIsValid(provided, stored)).not.toThrow();
+      expect(sessionTokenIsValid(provided, stored)).toBe(false);
+    }
+  });
+
+  // Two empty strings match under tokensMatch, but an empty stored token
+  // means the row was never issued one, so this must still be a rejection.
+  it("rejects two empty strings, unlike the raw byte comparison", () => {
+    expect(tokensMatch("", "")).toBe(true);
+    expect(sessionTokenIsValid("", "")).toBe(false);
   });
 });
 
