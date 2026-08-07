@@ -135,8 +135,11 @@ export function SurveysList({
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-center gap-3">
+    // No gap on the column: the bulk-bar slot between the controls and the
+    // table owns its own bottom margin so it can collapse to nothing (see
+    // below). Everything else spaces itself with explicit margins.
+    <div className="flex flex-col">
+      <div className="mb-5 flex items-center gap-3">
         <div className="max-w-[320px] flex-1">
           <Input
             type="text"
@@ -173,18 +176,27 @@ export function SurveysList({
         </Button>
       </div>
 
-      {/* Always mounted — never conditionally added/removed — so this slot's
-          height is identical whether or not anything is selected and the
-          table below never reflows. Only opacity/pointer-events toggle;
-          selecting/deselecting is a ~150ms crossfade, not a layout change. */}
+      {/* Always mounted — never conditionally added/removed — so the bar
+          animates in and out instead of popping. Reserving its full height
+          while nothing is selected would be a permanent empty band under
+          the controls, which is the state this page is in almost all the
+          time, so the slot collapses to zero instead: the 0fr/1fr row is
+          what makes that a smooth open/close rather than a hard reflow, and
+          the bottom margin rides along so the gap collapses with it.
+          overflow-hidden clips the bar mid-transition; its dialogs portal to
+          document.body, so they're never caught by it. */}
       <div
         className={cn(
-          "transition-opacity duration-150",
-          selectedSurveys.length > 0 ? "opacity-100" : "pointer-events-none opacity-0"
+          "grid transition-[grid-template-rows,opacity,margin-bottom] duration-200 ease-out motion-reduce:transition-none",
+          selectedSurveys.length > 0
+            ? "mb-5 grid-rows-[1fr] opacity-100"
+            : "pointer-events-none mb-0 grid-rows-[0fr] opacity-0"
         )}
         aria-hidden={selectedSurveys.length === 0}
       >
-        <SurveyBulkActionsBar selected={selectedSurveys} onDone={() => setSelectedIds(new Set())} />
+        <div className="overflow-hidden">
+          <SurveyBulkActionsBar selected={selectedSurveys} onDone={() => setSelectedIds(new Set())} />
+        </div>
       </div>
 
       <Card className="overflow-hidden">
