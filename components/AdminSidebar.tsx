@@ -262,11 +262,12 @@ export function AdminSidebar({
         })}
       </nav>
 
-      {/* Workspace plate. Pinned to the rail's bottom (mt-auto), it pairs a
-          live "Listening · N live" status line with the account row, which
-          toggles a small menu holding Settings and Sign out (outside click
-          and Escape dismiss it) — those two have to live somewhere, and the
-          main nav doesn't include them.
+      {/* Workspace plate. Pinned to the rail's bottom (mt-auto), it holds the
+          account row, which toggles a small menu with Settings and Sign out
+          (outside click and Escape dismiss it) — those two have to live
+          somewhere, and the main nav doesn't include them. A "Listening · N
+          live" status line sits above it when, and only when, two or more
+          surveys are live.
 
           Collapsed rail: the plate collapses to the bare star button. 64px
           is too narrow for the status line, and a 5px-padded card around a
@@ -282,7 +283,11 @@ export function AdminSidebar({
               : "rounded-[16px] border border-[rgba(255,253,247,0.09)] bg-[rgba(255,253,247,0.05)] p-[5px] shadow-[0_10px_24px_rgba(0,0,0,0.22)]"
           }
         >
-          {!collapsed && (
+          {/* Only worth a line once there's more than one: at 0 or 1 the
+              count tells you nothing you can't see on the surveys page, and
+              a permanent "1 live" reads as chrome. It earns its place when
+              several are running at once and the number is actually news. */}
+          {!collapsed && liveSurveyCount >= 2 && (
             <div className="flex items-center gap-2 px-[11px] pb-[7px] pt-2">
               {/* The ping is a second, absolutely stacked copy of the dot
                   that scales out and fades — the solid dot underneath stays
