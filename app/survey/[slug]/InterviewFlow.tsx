@@ -21,7 +21,7 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate, useFlybyGate } from "@/components/useLoadingGate";
 import { renderWithBold } from "@/lib/chat/render-with-bold";
-import { spectral, newsreader, bricolage } from "@/lib/fonts";
+import { newsreader, bricolage } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
 // Design reference: design_handoff_survey_respondent/. Editorial palette
@@ -44,22 +44,34 @@ export type PublicSurvey = Pick<
 >;
 type Stage = "welcome" | "intro" | "chat" | "complete";
 
-// Ground is the same eggshell as / (the landing page, #faf8f1, was beige
-// #f3ecdf); the warm radial glow stays — it's an alpha wash on top.
-const PAGE_BACKGROUND_STYLE: React.CSSProperties = {
-  background: "radial-gradient(130% 90% at 50% -8%, rgba(233,166,116,.22), transparent 58%), #faf8f1",
-};
+// The welcome screen (stage === "welcome") is the frozen respondent design;
+// every other stage is styled from these values rather than from its own
+// palette, so the whole flow reads as one page. All of them are lifted
+// verbatim from that screen's JSX below.
+//   ground     #faf8f1        ink      #241f18
+//   card bg    #fffefa        muted    #a89d88
+//   hairline   #e9e3d3        soft     #6f6757
+//   accent     #3a6046        error    #b3432b
+const SURVEY_GROUND = "#faf8f1";
+const CARD_SHADOW = "0 4px 14px rgba(38,32,25,.06)";
+
+// The dark pill, matching "Let's get started" exactly (see the welcome CTA).
+const PILL_BUTTON =
+  "inline-flex touch-manipulation items-center gap-3 rounded-full bg-[#241f18] px-[30px] py-4 text-[16.5px] font-semibold text-[#faf8f1] [transition:transform_0.25s_ease,box-shadow_0.25s_ease] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_14px_30px_rgba(38,32,25,.18)]";
 
 const RESPONDENT_BUBBLE =
-  "self-end max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-[#241f18] px-4 py-2.5 text-sm leading-relaxed text-[#f3ecdf]";
+  "self-end max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-[#241f18] px-4 py-2.5 text-sm leading-relaxed text-[#faf8f1]";
 
 const FIELD_LABEL_CLASSES = "text-[13px] font-semibold text-[#6f6757]";
+// Same surface the welcome screen's interviewer card uses (#fffefa on an
+// #e9e3d3 hairline with CARD_SHADOW), just at input proportions.
+//
 // text-base (16px) is load-bearing on iOS, not just a type choice: Safari
 // auto-zooms the whole page on focus for any input under 16px and never
 // zooms back out. min-h-[48px] is the touch-target floor; on desktop the
 // py-[14px] + 16px line box already exceeds it, so it changes nothing there.
 const FIELD_INPUT_BASE =
-  "w-full min-w-0 min-h-[48px] rounded-xl border border-[#e7ddc9] bg-[#fffdf7] py-[14px] text-base text-[#262019] placeholder:text-[#a89d88] focus:border-[#6f6757] focus:outline-none focus:ring-[3px] focus:ring-[rgba(38,32,25,.07)] disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full min-w-0 min-h-[48px] rounded-[14px] border border-[#e9e3d3] bg-[#fffefa] py-[14px] text-base text-[#241f18] placeholder:text-[#a89d88] focus:border-[#6f6757] focus:outline-none focus:ring-[3px] focus:ring-[rgba(38,32,25,.07)] disabled:cursor-not-allowed disabled:opacity-60";
 
 // Same bird, different perch: 48x46 (vs the marketing default 40x38) and
 // its own two-note arrangement, per the handoff.
@@ -216,24 +228,6 @@ function TestModeBadge({ isTest }: { isTest: boolean }) {
   );
 }
 
-function ArrowIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M2.5 8h11M9 3.5L13.5 8 9 12.5" />
-    </svg>
-  );
-}
-
 // The Birdsong mascot as used across the welcome screen
 // (design_handoff_survey_welcome). Same 48x44 path as the marketing BirdMark,
 // but the welcome renders it at three sizes with different fills (ink body +
@@ -260,6 +254,58 @@ function WelcomeBird({
         fill={fill}
       />
       {eyeFill && <circle cx="33" cy="25.5" r="1.8" fill={eyeFill} />}
+    </svg>
+  );
+}
+
+// The welcome screen's decorative ambient layer, lifted verbatim (two top
+// radial washes, two blurred drifting blobs, three drifting note glyphs) so
+// the intro and chat stages sit on the same ground rather than their own
+// warm wash. Purely decorative, aria-hidden, and pointer-events-none, so it
+// never sits between the respondent and a field. Needs a `relative` parent.
+function AmbientBackdrop() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+      style={{
+        background:
+          "radial-gradient(760px 420px at 24% -8%, rgba(58,96,70,.09), transparent 60%), radial-gradient(760px 420px at 76% -10%, rgba(84,116,158,.09), transparent 60%)",
+      }}
+    >
+      <div
+        className="sw-blob-a absolute left-[6%] top-[-80px] h-[300px] w-[300px] rounded-full"
+        style={{ background: "#e4ecdd", opacity: 0.5, filter: "blur(70px)" }}
+      />
+      <div
+        className="sw-blob-b absolute right-[5%] top-[-60px] h-[280px] w-[280px] rounded-full"
+        style={{ background: "#e4ebf4", opacity: 0.55, filter: "blur(70px)" }}
+      />
+      <span className="sw-bgnote-a absolute left-[14%] top-[14%] text-[20px]" style={{ color: "#3a6046", opacity: 0.4 }}>
+        &#9834;
+      </span>
+      <span className="sw-bgnote-b absolute right-[18%] top-[10%] text-[17px]" style={{ color: "#54749e", opacity: 0.4 }}>
+        &#9835;
+      </span>
+      <span className="sw-bgnote-c absolute right-[9%] top-[64%] text-[15px]" style={{ color: "#a89d88", opacity: 0.45 }}>
+        &#9834;
+      </span>
+    </div>
+  );
+}
+
+// The arrow inside the welcome CTA, so every dark pill in the flow carries
+// the same one.
+function PillArrow() {
+  return (
+    <svg width="20" height="12" viewBox="0 0 22 12" fill="none" aria-hidden="true">
+      <path
+        d="M1 6h18m0 0l-4-4.5M19 6l-4 4.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -1158,15 +1204,18 @@ export function InterviewFlow({
     return (
       <div
         className={cn(
-          spectral.variable,
+          bricolage.variable,
+          // PerchedBird's note glyphs are set in font-newsreader; the rest of
+          // this stage is the welcome screen's font-sans / font-bricolage pair.
           newsreader.variable,
-          "survey-viewport flex flex-col overflow-x-hidden font-sans text-[16px] text-[#262019]"
+          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[16px] text-[#241f18]"
         )}
-        style={PAGE_BACKGROUND_STYLE}
+        style={{ background: SURVEY_GROUND }}
       >
         {showIntroFlyby && <LoadingScreen statusText="Preparing your conversation" />}
+        <AmbientBackdrop />
         <TestModeBadge isTest={isTest} />
-        <div className="mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-10 sm:px-6 sm:py-16">
+        <div className="relative mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-10 sm:px-6 sm:py-16">
           {survey.sponsor && logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -1179,7 +1228,10 @@ export function InterviewFlow({
           {/* Incentive pill and timing meta now live on the welcome beat, so
               they're deliberately gone from here — the intro is the intake
               form, not a second pitch (don't show the pill twice). */}
-          <h1 className="survey-intro-rise-2 font-spectral mb-3.5 text-balance break-words text-[31px] font-medium leading-[1.12] tracking-[-0.01em] sm:text-[44px] sm:leading-[1.08]">
+          {/* Welcome-screen heading treatment (Bricolage 700, -0.025em,
+              1.05 leading), held at the intro's smaller step size: the
+              display size belongs to the welcome beat, the type does not. */}
+          <h1 className="survey-intro-rise-2 mb-3.5 text-balance break-words font-bricolage text-[31px] font-bold leading-[1.05] tracking-[-0.025em] sm:text-[44px]">
             {surveyName}
           </h1>
 
@@ -1188,7 +1240,7 @@ export function InterviewFlow({
               present on PublicSurvey). When public_description is unset,
               nothing renders here; there is no fallback. */}
           {survey.public_description?.trim() && (
-            <p className="survey-intro-rise-3 text-pretty mb-7 text-[16px] leading-[1.55] text-[#6f6757] sm:mb-9 sm:text-[17px]">
+            <p className="survey-intro-rise-3 text-pretty mb-7 text-[16px] leading-[1.6] text-[#6f6757] sm:mb-9 sm:text-[17px]">
               {survey.public_description}
             </p>
           )}
@@ -1390,10 +1442,10 @@ export function InterviewFlow({
             <button
               type="submit"
               disabled={loading}
-              className="survey-intro-rise-5 mt-6 flex min-h-[52px] w-full touch-manipulation items-center justify-center gap-2.5 rounded-xl bg-[#241f18] px-6 text-[17px] font-semibold text-[#f3ecdf] transition-opacity active:scale-[.985] disabled:cursor-not-allowed disabled:opacity-60 [@media(hover:hover)]:hover:opacity-90"
+              className={cn(PILL_BUTTON, "survey-intro-rise-5 mt-7 flex w-fit")}
             >
               {loading ? "Starting…" : "Start"}
-              <ArrowIcon size={17} />
+              <PillArrow />
             </button>
           </form>
 
@@ -1402,7 +1454,7 @@ export function InterviewFlow({
               an empty box under the button. The email field's own helper
               text already says where the gift card goes; nothing about the
               incentive is repeated here. */}
-          <div className="survey-intro-rise-6 mt-3.5 hidden text-balance text-center text-[13px] text-[#a89d88] sm:block">
+          <div className="survey-intro-rise-6 mt-3.5 hidden text-balance text-[13.5px] text-[#a89d88] sm:block">
             <span>Press Enter to move between fields</span>
           </div>
         </div>
@@ -1638,23 +1690,24 @@ export function InterviewFlow({
   return (
     <div
       className={cn(
-        spectral.variable,
-        "survey-viewport flex flex-col overflow-x-hidden font-sans text-[16px] text-[#262019]"
+        bricolage.variable,
+        "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[16px] text-[#241f18]"
       )}
       data-keyboard={keyboardInset > 0 ? "open" : undefined}
       style={
         {
-          ...PAGE_BACKGROUND_STYLE,
+          background: SURVEY_GROUND,
           "--kb-inset": `${keyboardInset}px`,
         } as React.CSSProperties
       }
     >
+      <AmbientBackdrop />
       <TopProgressLine answered={answeredCount} target={targetQuestionCount} />
       <TestModeBadge isTest={isTest} />
 
       <div
         ref={stageRef}
-        className="survey-stage flex flex-1 items-center justify-center px-5 py-8 sm:px-6 sm:py-16"
+        className="survey-stage relative flex flex-1 items-center justify-center px-5 py-8 sm:px-6 sm:py-16"
       >
         <div className="w-full max-w-[640px]">
           {/* Hidden live regions, always mounted (a live region only fires
@@ -1696,7 +1749,7 @@ export function InterviewFlow({
             // never mid-animation, so the reveal can't double-fire.
             <div key={messages.length} className={questionRevealClass}>
               <div className="mb-1 flex items-center justify-end">
-                <span className="text-[13px] tabular-nums text-[#a89d88]">
+                <span className="text-[13.5px] tabular-nums text-[#a89d88]">
                   {answeredCount + 1} of {targetQuestionCount}
                 </span>
               </div>
@@ -1707,7 +1760,10 @@ export function InterviewFlow({
                   a line and a half without touching the desktop size. The
                   bolded-phrase underline treatment is unchanged; only
                   underline-offset tightens with the smaller type. */}
-              <h1 className="font-spectral text-pretty mb-5 break-words text-[23px] font-medium leading-[1.32] tracking-[-0.005em] [&_strong]:font-semibold [&_strong]:not-italic [&_strong]:underline [&_strong]:decoration-[#3a6046] [&_strong]:decoration-2 [&_strong]:underline-offset-[4px] sm:mb-[26px] sm:text-[32px] sm:leading-[1.28] sm:[&_strong]:underline-offset-[5px]">
+              {/* Welcome-screen heading type (Bricolage 700, -0.025em). The
+                  leading stays looser than the welcome title's 1.05: this is
+                  a multi-line question, not a two-line display headline. */}
+              <h1 className="text-pretty mb-5 break-words font-bricolage text-[23px] font-bold leading-[1.25] tracking-[-0.025em] [&_strong]:font-bold [&_strong]:not-italic [&_strong]:underline [&_strong]:decoration-[#3a6046] [&_strong]:decoration-2 [&_strong]:underline-offset-[4px] sm:mb-[26px] sm:text-[32px] sm:leading-[1.2] sm:[&_strong]:underline-offset-[5px]">
                 {renderWithBold(questionText)}
               </h1>
 
@@ -1755,11 +1811,15 @@ export function InterviewFlow({
                           aria-label={`Suggested reply: ${chip}`}
                           aria-pressed={picked}
                           className={cn(
-                            "min-h-[44px] touch-manipulation break-words rounded-full border px-[18px] py-[11px] text-left text-[15px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a6046] focus-visible:ring-offset-2",
+                            // Same card surface as the welcome screen's
+                            // interviewer bubble, at pill proportions; picked
+                            // resolves to the dark pill.
+                            "min-h-[44px] touch-manipulation break-words rounded-full border px-[18px] py-[11px] text-left text-[15px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a6046] focus-visible:ring-offset-2",
                             picked
-                              ? "border-[#241f18] bg-[#241f18] text-[#f3ecdf]"
-                              : "border-[#e7ddc9] bg-[#fffdf7] text-[#262019] active:scale-[.97] [@media(hover:hover)]:hover:border-[#a89d88] [@media(hover:hover)]:hover:bg-[#f6efe1]"
+                              ? "border-[#241f18] bg-[#241f18] text-[#faf8f1]"
+                              : "border-[#e9e3d3] bg-[#fffefa] text-[#241f18] active:scale-[.97] [@media(hover:hover)]:hover:border-[#3a6046] [@media(hover:hover)]:hover:text-[#3a6046]"
                           )}
+                          style={picked ? undefined : { boxShadow: CARD_SHADOW }}
                         >
                           {chip}
                         </button>
@@ -1789,21 +1849,26 @@ export function InterviewFlow({
                   // no room for the question or Continue on a 380px-tall
                   // visible area. sm:max-h-none keeps the full 6-row growth
                   // on desktop.
-                  className="max-h-[136px] w-full touch-manipulation resize-none overflow-y-auto rounded-[14px] border border-[#e7ddc9] bg-[#fffdf7] px-[18px] py-4 text-base leading-[1.5] text-[#262019] placeholder:text-[#a89d88] focus:border-[#6f6757] focus:outline-none focus:ring-[3px] focus:ring-[rgba(38,32,25,.07)] disabled:cursor-not-allowed disabled:opacity-60 sm:max-h-none"
+                  // Deliberately the welcome screen's interviewer-card
+                  // treatment (18px radius, #fffefa on #e9e3d3, CARD_SHADOW,
+                  // 16.5px/1.6): the respondent writes into the same kind of
+                  // card the interviewer speaks from.
+                  className="max-h-[136px] w-full touch-manipulation resize-none overflow-y-auto rounded-[18px] border border-[#e9e3d3] bg-[#fffefa] px-[26px] py-4 text-[16.5px] leading-[1.6] text-[#241f18] placeholder:text-[#a89d88] focus:border-[#6f6757] focus:outline-none focus:ring-[3px] focus:ring-[rgba(38,32,25,.07)] disabled:cursor-not-allowed disabled:opacity-60 sm:max-h-none"
+                  style={{ boxShadow: CARD_SHADOW }}
                 />
 
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   <button
                     type="submit"
                     disabled={!hasAnswer || loading}
-                    className="flex min-h-[48px] touch-manipulation items-center gap-2.5 rounded-xl bg-[#241f18] px-[26px] py-[14px] text-base font-semibold text-[#f3ecdf] transition-opacity active:scale-[.985] disabled:cursor-not-allowed disabled:opacity-45 [@media(hover:hover)]:hover:opacity-90"
+                    className={cn(PILL_BUTTON, "flex")}
                   >
-                    Continue <ArrowIcon size={15} />
+                    Continue <PillArrow />
                   </button>
                   {/* Describes physical keys the phone keyboard doesn't have;
                       enterKeyHint="send" on the textarea is the mobile
                       equivalent affordance. */}
-                  <span className="hidden text-[13px] text-[#a89d88] sm:inline">
+                  <span className="hidden text-[13.5px] text-[#a89d88] sm:inline">
                     Enter ↵ to send · Shift+Enter for a new line
                   </span>
                   <span className="flex-1" />
@@ -1811,7 +1876,7 @@ export function InterviewFlow({
                     type="button"
                     onClick={handleSkip}
                     disabled={loading}
-                    className="flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-control px-3 text-sm text-[#a89d88] transition-colors disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:text-[#262019]"
+                    className="flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-full px-3 text-[13.5px] text-[#a89d88] transition-colors disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:text-[#6f6757]"
                   >
                     Skip
                   </button>
@@ -1834,10 +1899,15 @@ function Footer() {
     // home indicator for the whole flow. When the keyboard is up this is
     // hidden (globals.css) and the clearance goes with it — correct, since
     // the keyboard is covering that strip anyway.
-    <div className="survey-footer pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] text-center">
-      <span className="text-xs text-[#a89d88]">
-        Powered by <span className="font-serif text-[#6f6757]">Birdsong</span>
-      </span>
+    //
+    // Same lockup as the welcome and completion screens' own footers: 13.5px
+    // muted "Powered by", the bird mark, then the Bricolage wordmark in ink.
+    <div className="survey-footer relative flex items-center justify-center gap-2.5 px-8 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
+      <span className="text-[13.5px] text-[#a89d88]">Powered by</span>
+      <a href="/" className="inline-flex items-center gap-[7px]">
+        <WelcomeBird width={17} height={15} fill="#241f18" />
+        <span className="font-bricolage text-[15px] font-bold text-[#241f18]">Birdsong</span>
+      </a>
     </div>
   );
 }
