@@ -199,6 +199,25 @@ function computeProgressPercent(answered: number, target: number): number {
   return Math.min(90 + Math.round(9 * (overage / (overage + target))), 99);
 }
 
+// Which question number to show against that same target. The counter and
+// the progress bar are fed the same two numbers, so it needs the same
+// running-past-the-target handling: `answered + 1` raw renders "11 of 8".
+//
+// The overshoot is the normal case, not a rare one. `target` counts topics
+// (num_questions is "cover around N distinct topics"), while `answered`
+// counts the respondent's turns, and the interviewer is allowed one
+// follow-up per topic, so a full interview can legitimately run to roughly
+// twice the target. Widening the denominator to that ceiling instead would
+// make every interview that wraps up on time read as abandoned partway.
+//
+// So it holds at the target rather than counting past it: the last stretch
+// of a long interview reads "8 of 8" while the bar creeps 90 to 99%, which
+// says "nearly done" without ever promising a total the interview is about
+// to overshoot or claiming completion before it happens.
+function displayedQuestionNumber(answered: number, target: number): number {
+  return Math.min(answered + 1, target);
+}
+
 function TopProgressLine({ answered, target }: { answered: number; target: number }) {
   const percent = computeProgressPercent(answered, target);
   return (
@@ -1750,7 +1769,8 @@ export function InterviewFlow({
             <div key={messages.length} className={questionRevealClass}>
               <div className="mb-1 flex items-center justify-end">
                 <span className="text-[13.5px] tabular-nums text-[#a89d88]">
-                  {answeredCount + 1} of {targetQuestionCount}
+                  {displayedQuestionNumber(answeredCount, targetQuestionCount)} of{" "}
+                  {targetQuestionCount}
                 </span>
               </div>
 
