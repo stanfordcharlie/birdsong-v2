@@ -45,7 +45,12 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-10 px-4 text-left align-middle text-xs font-semibold uppercase tracking-wide text-muted-foreground",
+      // [&_button]:uppercase is not redundant with the uppercase above it:
+      // the browser's own stylesheet sets text-transform: none on button,
+      // which beats inheritance, and Tailwind's preflight resets font family
+      // and size for form elements but not this. Without it a sortable
+      // header renders "Score" while every header beside it renders "STATUS".
+      "h-10 px-4 text-left align-middle text-xs font-semibold uppercase tracking-wide text-muted-foreground [&_button]:uppercase",
       className
     )}
     {...props}
