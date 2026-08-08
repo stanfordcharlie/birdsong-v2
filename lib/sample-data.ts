@@ -45,7 +45,12 @@ type SampleResponse = {
   summary: string | null;
   fit_reason: string | null;
   pain_points: string[];
-  call_script: { opener: string; talking_points: string[] } | null;
+  // Talking points pair the respondent's own words with the rep's angle on
+  // them (lib/interview/call-script.ts). Every `said` below is a verbatim
+  // line from that response's own `messages` transcript, the same rule the
+  // extraction prompt holds the model to, so the seeded data demonstrates
+  // the real thing rather than a plausible-looking imitation of it.
+  call_script: { opener: string; talking_points: { said: string; angle: string }[] } | null;
   signals: {
     economic_buyer: string | null;
     decision_criteria: string | null;
@@ -77,9 +82,18 @@ export const SAMPLE_RESPONSES: SampleResponse[] = [
       opener:
         "You mentioned your dispatch board crashing in the heat wave forced the team to route about 300 work orders by phone — I wanted to pick that thread up, because that's exactly the failure mode we built around.",
       talking_points: [
-        "Their invoicing runs three weeks late because billing re-keys everything; connect to automated job-to-invoice flow.",
-        "Dispatchers phone techs one at a time for after-hours calls; show automated on-call routing.",
-        "Budget is already approved for next fiscal year, so the conversation is about fit and timing, not funding.",
+        {
+          said: "Billing has to re-key every completed job into their own system, so invoices go out two, sometimes three weeks late.",
+          angle: "An automated job-to-invoice flow removes the re-keying step, which is what the three weeks are made of.",
+        },
+        {
+          said: "The on-call dispatcher keeps a list and calls technicians one by one until someone picks up.",
+          angle: "Automated on-call routing reaches the right technician without anyone working down a list.",
+        },
+        {
+          said: "We got budget approved for next fiscal year.",
+          angle: "Funding is already settled, so this conversation is about fit and timing rather than cost.",
+        },
       ],
     },
     signals: {
@@ -122,9 +136,18 @@ export const SAMPLE_RESPONSES: SampleResponse[] = [
       opener:
         "You described running fourteen crews off shared spreadsheets and eating the occasional double-booked tech — I'd love to show you what centralized scheduling would look like for a fleet your size.",
       talking_points: [
-        "Only two people can safely touch the master schedule, bottlenecking every change; connect to role-based access.",
-        "Service requests arrive by email and get lost; show the request-to-work-order pipeline.",
-        "His general manager asked him to gather options, so equip him to make the internal case.",
+        {
+          said: "We run 14 crews and the master schedule lives in a workbook only two of us are allowed to edit.",
+          angle: "Role-based access lets seasonal hires work their own crews without exposing the master schedule.",
+        },
+        {
+          said: "Email. Which means they sit in inboxes, and some just get lost.",
+          angle: "A request-to-work-order pipeline turns every inbound request into a tracked job instead of an inbox item.",
+        },
+        {
+          said: "My GM actually asked me last month to look into whether there's tooling that would fix this whole area.",
+          angle: "He has already been asked to bring options back, so give him what he needs to make the internal case.",
+        },
       ],
     },
     signals: {
@@ -165,9 +188,18 @@ export const SAMPLE_RESPONSES: SampleResponse[] = [
       opener:
         "You said Fridays basically disappear into matching work orders against invoices by hand — I wanted to talk about what that day looks like when reconciliation is automatic.",
       talking_points: [
-        "Duplicate bookings from missed confirmations create credit-memo work downstream; connect to reliable notifications.",
-        "Availability tracking lives in her head; show real-time technician availability in the product.",
-        "She isn't the buyer, so give her material that helps her make the case to her operations director.",
+        {
+          said: "Confirmation emails go to spam sometimes, customers think the booking didn't work, and they call in and book twice.",
+          angle: "Reliable notifications stop the duplicate bookings that turn into credit-memo work downstream.",
+        },
+        {
+          said: "It's in my head. The system has an availability view but nobody trusts it, so people just ask me.",
+          angle: "Real-time availability the team actually trusts takes that dependency off her, including the days she is out.",
+        },
+        {
+          said: "I export both and go row by row in a spreadsheet.",
+          angle: "Automatic reconciliation removes the export-and-match step, and the day it gives back is the case she can take to her operations director.",
+        },
       ],
     },
     signals: {
@@ -207,8 +239,14 @@ export const SAMPLE_RESPONSES: SampleResponse[] = [
       opener:
         "You mentioned install crews losing techs mid-week to service calls they couldn't see coming — I wanted to explore how shared schedule visibility might fit your side of the house.",
       talking_points: [
-        "Paper requisition forms still route across his desk; connect to digital approvals.",
-        "Install planning is blind to service bookings; show the shared schedule view.",
+        {
+          said: "My crews request equipment and materials, and those approvals still route across my desk on paper forms, believe it or not.",
+          angle: "Digital approvals move requisitions along without the paper detour across his desk.",
+        },
+        {
+          said: "I'll plan a week of installs and then find out two of my techs got pulled onto emergency service calls that morning.",
+          angle: "A shared schedule view surfaces service bookings before install planning is committed.",
+        },
       ],
     },
     signals: {
@@ -248,8 +286,14 @@ export const SAMPLE_RESPONSES: SampleResponse[] = [
       opener:
         "You mentioned your owners ask questions the canned reports can't answer — I'd keep this light, but that reporting gap is worth a look when the timing is right.",
       talking_points: [
-        "Fresh off a hard migration, so lead with respect for the switching cost, not against their current vendor.",
-        "Owner reporting is the one live wound; show custom reporting briefly and leave the door open.",
+        {
+          said: "The migration itself was rougher than promised, but we're through it.",
+          angle: "Lead with respect for what that cost them; arguing against their current vendor will close the conversation.",
+        },
+        {
+          said: "Our owners ask things like revenue per truck roll and I end up building it in a spreadsheet.",
+          angle: "Custom reporting answers the owners' questions directly. Show it briefly and leave the door open.",
+        },
       ],
     },
     signals: {
@@ -286,8 +330,14 @@ export const SAMPLE_RESPONSES: SampleResponse[] = [
       opener:
         "You were clear that scheduling tools aren't your problem and staffing is — this one's probably not a fit today, and honesty about that is the right opener if we talk at all.",
       talking_points: [
-        "No tooling pain surfaced; deprioritize.",
-        "If the company ever consolidates systems his usage would come along, but he is not an entry point.",
+        {
+          said: "I can't hire enough licensed techs. I could have the best software on earth and I'd still be turning away calls on Saturdays.",
+          angle: "His constraint is staffing, not tooling. Deprioritize rather than pushing a scheduling pitch at it.",
+        },
+        {
+          said: "Pretty smoothly, honestly. Our system handles booking fine.",
+          angle: "No tooling friction surfaced, so he is not an entry point even if the company later consolidates systems.",
+        },
       ],
     },
     signals: {

@@ -28,7 +28,10 @@ const VALID_INPUT = {
   summary: "Ops lead at a 40-tech shop, routes emergency calls by phone.",
   call_script: {
     opener: "You mentioned two dispatchers on weekends.",
-    talking_points: ["point one", "point two"],
+    talking_points: [
+      { said: "we keep two dispatchers on weekends", angle: "automated on-call routing replaces that" },
+      { said: "invoices go out three weeks late", angle: "job-to-invoice flow removes the re-keying" },
+    ],
   },
 };
 
@@ -45,6 +48,16 @@ describe("extractToolInput", () => {
 
     it("accepts an empty talking_points array, since only its type is checked", () => {
       const input = { ...VALID_INPUT, call_script: { opener: "hi", talking_points: [] } };
+
+      expect(extractToolInput(toolUse(input))).not.toBeNull();
+    });
+
+    // This validator gates on the array's type, not its element shape, so a
+    // flat legacy array still passes here. That is deliberate: parseCallScript
+    // reads both shapes downstream, so an old-shaped payload is normalized
+    // rather than thrown away as a failed extraction.
+    it("accepts flat legacy talking_points alongside the paired shape", () => {
+      const input = { ...VALID_INPUT, call_script: { opener: "hi", talking_points: ["a", "b"] } };
 
       expect(extractToolInput(toolUse(input))).not.toBeNull();
     });

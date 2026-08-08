@@ -1,11 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient, INTERVIEW_MODEL } from "./anthropic";
 import type { InterviewMessage } from "./types";
+import { parseCallScript, type CallScript } from "./call-script";
 
-export type CallScript = {
-  opener: string;
-  talkingPoints: string[];
-};
+export type { CallScript, TalkingPoint } from "./call-script";
 
 export type Signals = {
   economicBuyer: string | null;
@@ -83,7 +81,10 @@ Also pull out whatever deal signals the transcript actually surfaced, as a signa
 
 Write a call script for the rep:
 - opener: one to two sentences the rep can literally say to open the call. Connect something specific and true the respondent said (a tool they mentioned, a workflow they described, a frustration in their own words) to the sponsor's actual value proposition above. Never a generic opener that could apply to any respondent, and never a generic pitch that ignores what this respondent specifically said. When any of the signals surfaced something relevant, let it naturally inform the opener or a talking point instead of listing it separately.
-- talking_points: the 2 to 3 most glaring pain points from this specific interview, each phrased as a bridge from something the respondent actually said (quote or closely paraphrase their own words) to how the sponsor's product addresses it. Not a restatement of the pain_points list.
+- talking_points: the 2 to 3 most glaring pain points from this specific interview. Each one is a pair, because the rep sees them side by side on the call:
+  - said: the respondent's own words on that point, quoted verbatim from the transcript or trimmed to the part that carries it. Never your paraphrase, never words they did not say, and never the interviewer's line. One sentence at most. If the point genuinely came from something they conveyed across several turns and no single quote carries it, use the closest thing they actually said rather than inventing a cleaner one.
+  - angle: how the sponsor's product addresses what they said, in one sentence the rep can work from. This is the bridge, so it must not merely restate the quote.
+  Together the pairs must not be a restatement of the pain_points list.
 
 Call the record_interview_insights tool exactly once with your findings.`;
 }
@@ -153,11 +154,26 @@ const INSIGHTS_TOOL: Anthropic.Tool = {
           },
           talking_points: {
             type: "array",
-            items: { type: "string" },
+            items: {
+              type: "object",
+              properties: {
+                said: {
+                  type: "string",
+                  description:
+                    "The respondent's own words on this point, quoted from the transcript. Never a paraphrase, never the interviewer's line.",
+                },
+                angle: {
+                  type: "string",
+                  description:
+                    "One sentence on how the sponsor's product addresses what they said. The bridge, not a restatement of the quote.",
+                },
+              },
+              required: ["said", "angle"],
+            },
             minItems: 2,
             maxItems: 3,
             description:
-              "The 2 to 3 most glaring pain points from this interview, each bridging what the respondent said to the sponsor's product.",
+              "The 2 to 3 most glaring pain points from this interview, each pairing the respondent's own words with the rep's angle on them.",
           },
         },
         required: ["opener", "talking_points"],
@@ -274,12 +290,14 @@ export async function extractInterviewInsights(
     champion: normalizeSignal(rawSignals?.champion),
   };
 
-  // Validated in extractToolInput.
+  // Validated in extractToolInput. parseCallScript is the same normalizer the
+  // read path uses, so a point the model returns half-formed is dropped here
+  // rather than being written and then having to be handled at render time.
   const rawCallScript = input.call_script as { opener: string; talking_points: unknown[] };
-  const callScript: CallScript = {
-    opener: rawCallScript.opener,
-    talkingPoints: rawCallScript.talking_points.filter((p): p is string => typeof p === "string").slice(0, 3),
-  };
+  const parsedScript = parseCallScript(rawCallScript);
+  const callScript: CallScript = parsedScript
+    ? { opener: parsedScript.opener, talkingPoints: parsedScript.talkingPoints.slice(0, 3) }
+    : FALLBACK_INSIGHTS.callScript;
 
   return { painPoints, leadScore, fitReason, summary, callScript, signals };
 }
