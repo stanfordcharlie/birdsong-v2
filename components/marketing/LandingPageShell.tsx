@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { spectral } from "@/lib/fonts";
+import { bricolage, dmSans, spectral } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 import { MarketingBodyEffects } from "./MarketingBodyEffects";
 
@@ -76,8 +76,13 @@ export function LandingPageShell({ children }: { children: React.ReactNode }) {
     <div
       ref={ref}
       className={cn(
-        // Inter is already on <html> from the root layout; Spectral (the
-        // landing display + pull-quote face) is scoped to this shell.
+        // All three landing faces are scoped to this shell rather than the
+        // root layout: Bricolage Grotesque for display, DM Sans for body and
+        // UI (font-dmsans below overrides the app-wide Inter default for
+        // marketing only), and Spectral for the respondent pull quotes,
+        // which is the sole thing still set in a serif.
+        bricolage.variable,
+        dmSans.variable,
         spectral.variable,
         // overflow-x-clip, not overflow-x-hidden: `hidden` on one axis
         // computes the other from visible to auto, which makes this div a
@@ -86,7 +91,7 @@ export function LandingPageShell({ children }: { children: React.ReactNode }) {
         // to full content height it never scrolls itself, so the nav just
         // rode up out of view. `clip` does the same clipping (the CTA bird
         // flies 420px right, see lp-takeoff) without the scroll container.
-        "lp-shell min-h-screen overflow-x-clip bg-landing-bg font-sans text-landing-ink"
+        "lp-shell min-h-screen overflow-x-clip bg-landing-bg font-dmsans text-landing-ink"
       )}
     >
       <MarketingBodyEffects color={BODY_COLOR} />

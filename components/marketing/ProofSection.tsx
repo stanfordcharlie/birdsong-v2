@@ -41,7 +41,7 @@ export function ProofSection({
         data-reveal
         className="mb-[60px] grid grid-cols-[1.1fr_1fr] items-end gap-16 lp-stack:grid-cols-1 lp-stack:gap-6"
       >
-        <h2 className="m-0 max-w-[24ch] text-balance font-spectral text-[clamp(36px,3.5vw,54px)] font-medium leading-[1.06] tracking-[-0.018em]">
+        <h2 className="m-0 max-w-[24ch] text-balance font-bricolage text-[clamp(36px,3.5vw,54px)] font-bold leading-[1.06] tracking-[-0.018em]">
           {headlinePre}{" "}
           <span className="font-normal italic text-landing-green">{headlineAccent}</span>
         </h2>

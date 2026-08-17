@@ -31,7 +31,7 @@ export function LandingFooter({
         <div>
           <Link href={isLanding ? "#top" : "/"} className="flex items-center gap-[11px]">
             <BirdMark width={26} height={24} eyeFill="var(--lp-surface)" />
-            <span className="font-spectral text-[26px] font-medium tracking-[-0.008em]">
+            <span className="font-bricolage text-[26px] font-medium tracking-[-0.008em]">
               Birdsong
             </span>
           </Link>

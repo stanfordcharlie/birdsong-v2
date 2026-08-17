@@ -13,6 +13,7 @@ export function Starburst({
   fillClassName,
   labelClassName,
   className,
+  hard = false,
 }: {
   label: string;
   size: number;
@@ -20,6 +21,11 @@ export function Starburst({
   fillClassName: string;
   labelClassName?: string;
   className?: string;
+  // Chunky variant (design_handoff_landing_v2): a hard offset drop shadow
+  // and a heavier outline, matching the hero card it sits against. The
+  // blurred default stays for the sticker on the "how it works" panel,
+  // which the reference leaves soft.
+  hard?: boolean;
 }) {
   return (
     // data-reveal on the sticker itself, not just on an ancestor section:
@@ -35,13 +41,18 @@ export function Starburst({
       <svg
         viewBox="0 0 100 100"
         aria-hidden="true"
-        className="absolute inset-0 drop-shadow-[0_4px_10px_rgba(34,30,24,.14)]"
+        className={cn(
+          "absolute inset-0",
+          hard
+            ? "drop-shadow-[3px_4px_0_var(--lp-ink)]"
+            : "drop-shadow-[0_4px_10px_rgba(34,30,24,.14)]"
+        )}
       >
         <polygon
           points="100,50 83.3,63.8 85.4,85.4 63.8,83.3 50,100 36.2,83.3 14.6,85.4 16.7,63.8 0,50 16.7,36.2 14.6,14.6 36.2,16.7 50,0 63.8,16.7 85.4,14.6 83.3,36.2"
           className={fillClassName}
           stroke="var(--lp-ink)"
-          strokeWidth="2.5"
+          strokeWidth={hard ? "3" : "2.5"}
         />
       </svg>
       <span

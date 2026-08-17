@@ -143,9 +143,18 @@ const config: Config = {
         // Survey respondent flow (normal style) and, italic only, the
         // marketing landing pages' pull quotes.
         spectral: ["var(--font-spectral)", "Georgia", "serif"],
-        // Marketing landing pages only (design_handoff_landing_pages_full)
-        // — headings, weight 700.
-        bricolage: ["var(--font-bricolage)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        // Marketing landing pages only (design_handoff_landing_v2) —
+        // Bricolage Grotesque for display/headings at weight 700, DM Sans for
+        // body and UI. Applied at LandingPageShell, which is why neither
+        // touches the global `sans` default above.
+        bricolage: [
+          "var(--font-bricolage)",
+          "var(--font-dm-sans)",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
+        dmsans: ["var(--font-dm-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
       },
     },
   },

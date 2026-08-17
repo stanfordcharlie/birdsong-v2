@@ -14,7 +14,7 @@ export function FaqSection({
       <div className="grid grid-cols-[0.66fr_1.34fr] items-start gap-14 lp-stack:grid-cols-1 lp-stack:gap-6">
         <h2
           data-reveal
-          className="m-0 max-w-[16ch] text-balance font-spectral text-[clamp(30px,2.6vw,40px)] font-medium leading-[1.1] tracking-[-0.016em]"
+          className="m-0 max-w-[16ch] text-balance font-bricolage text-[clamp(30px,2.6vw,40px)] font-bold leading-[1.1] tracking-[-0.016em]"
         >
           {headline}
         </h2>

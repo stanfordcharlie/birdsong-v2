@@ -49,14 +49,14 @@ export function QueueSection({
           className="mb-14 grid grid-cols-[1.1fr_1fr] items-end gap-16 lp-stack:grid-cols-1 lp-stack:gap-6"
         >
           <div>
-            <div className="mb-5 text-[12.5px] font-semibold tracking-[0.14em] text-[rgba(238,242,234,0.6)]">
+            <div className="mb-5 text-[12.5px] font-semibold tracking-[0.14em] text-[rgba(238,242,234,0.78)]">
               THE HANDOFF
             </div>
-            <h2 className="m-0 max-w-[22ch] text-balance font-spectral text-[clamp(34px,3.3vw,50px)] font-medium leading-[1.07] tracking-[-0.018em] text-[#f4f7f1]">
+            <h2 className="m-0 max-w-[22ch] text-balance font-bricolage text-[clamp(34px,3.3vw,50px)] font-bold leading-[1.07] tracking-[-0.018em] text-[#f4f7f1]">
               {headline}
             </h2>
           </div>
-          <p className="m-0 mb-1.5 max-w-[44ch] text-pretty text-[17px] leading-[1.62] text-[rgba(238,242,234,0.72)]">
+          <p className="m-0 mb-1.5 max-w-[44ch] text-pretty text-[17px] leading-[1.62] text-[rgba(238,242,234,0.84)]">
             {intro}
           </p>
         </div>
@@ -74,14 +74,14 @@ export function QueueSection({
               >
                 <span>
                   <span className="block text-[16.5px] font-semibold">{row.name}</span>
-                  <span className="mt-1 block text-[13.5px] text-[rgba(238,242,234,0.62)]">
+                  <span className="mt-1 block text-[13.5px] text-[rgba(238,242,234,0.78)]">
                     {row.subtitle}
                   </span>
                 </span>
-                <span className="font-spectral text-[19px]">{row.score}</span>
+                <span className="font-bricolage text-[19px] font-bold">{row.score}</span>
               </button>
             ))}
-            <div className="border-t border-landing-green-line px-1 pt-[19px] text-[13px] text-[rgba(238,242,234,0.5)]">
+            <div className="border-t border-landing-green-line px-1 pt-[19px] text-[13px] text-[rgba(238,242,234,0.76)]">
               {footnote}
             </div>
           </div>
@@ -94,7 +94,7 @@ export function QueueSection({
               className="lp-qpanel rounded-2xl border border-landing-green-line bg-[rgba(255,254,250,0.05)] px-[38px] py-[34px] lp-mobile:px-6 lp-mobile:py-7"
             >
               <div className="flex flex-wrap items-center justify-between gap-5">
-                <div className="font-spectral text-[27px] font-medium tracking-[-0.012em] text-[#f4f7f1]">
+                <div className="font-bricolage text-[27px] font-bold tracking-[-0.025em] text-[#f4f7f1]">
                   {panel.verdict}
                 </div>
                 <span
@@ -109,7 +109,7 @@ export function QueueSection({
               <div className="mt-[26px] grid grid-cols-3 gap-[22px] border-t border-landing-green-line pt-[22px] lp-mobile:grid-cols-1 lp-mobile:gap-4">
                 {panel.facts.map((fact) => (
                   <div key={fact.label}>
-                    <div className="mb-[7px] text-[11.5px] font-semibold tracking-[0.1em] text-[rgba(238,242,234,0.5)]">
+                    <div className="mb-[7px] text-[11.5px] font-semibold tracking-[0.1em] text-[rgba(238,242,234,0.76)]">
                       {fact.label}
                     </div>
                     <div className="text-[14.5px] leading-[1.55] text-[rgba(238,242,234,0.86)]">

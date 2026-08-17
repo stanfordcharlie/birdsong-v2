@@ -31,14 +31,16 @@ export type HandoffPanel = {
   stickerLabel: string;
 };
 
-// "How it works": the three steps beside the three panels they describe.
+// "How it works": three static rows, each pairing a step with the panel it
+// describes.
 //
 // This was a 300vh scroller with a sticky inner panel, scrubbed by
 // LandingPageShell's scroll handler writing data-step (0/1/2) so one panel
-// showed at a time while the page stayed pinned. That pin is gone — the
-// section is now ordinary flow at every width, which is what it already
-// collapsed to below 1080px. With no active step to single out, every step
-// in the rail reads settled rather than one inked in and two greyed back.
+// showed at a time while the page stayed pinned. v2 drops the pin and the
+// step rail both: a header row, then one row per step, each with its own
+// hairline above it. The step's text and its panel now sit on the same
+// baseline instead of running as two parallel columns, so a reader never
+// has to count down the rail to work out which panel belongs to which step.
 export function SequenceSection({
   headline,
   intro,
@@ -54,47 +56,57 @@ export function SequenceSection({
   transcript: TranscriptPanel;
   handoff: HandoffPanel;
 }) {
+  const panels = [
+    <InvitePanelCard key="invite" data={invite} />,
+    <TranscriptPanelCard key="transcript" data={transcript} />,
+    <HandoffPanelCard key="handoff" data={handoff} />,
+  ];
+
   return (
-    <section id="how" className="relative mx-auto max-w-[1480px] px-6 py-[100px] md:px-10">
-      <div className="grid grid-cols-[0.9fr_1.1fr] items-start gap-[72px] lp-stack:grid-cols-1 lp-stack:gap-12">
-        <div className="flex flex-col">
-          <div className="mb-5 text-[12.5px] font-semibold tracking-[0.14em] text-landing-muted">
-            HOW IT WORKS
+    <section id="how" className="relative">
+      <div className="mx-auto max-w-[1480px] px-6 pt-[104px] md:px-10">
+        <div
+          data-reveal
+          className="grid grid-cols-[1.05fr_1fr] items-end gap-16 lp-stack:grid-cols-1 lp-stack:gap-8"
+        >
+          <div>
+            <div className="mb-[18px] text-[12.5px] font-bold tracking-[0.14em] text-landing-muted">
+              HOW IT WORKS
+            </div>
+            <h2 className="m-0 max-w-[16ch] text-balance font-bricolage text-[clamp(38px,3.9vw,60px)] font-bold leading-none tracking-[-0.035em]">
+              {headline}
+            </h2>
           </div>
-          <h2 className="m-0 mb-[22px] max-w-[20ch] text-balance font-spectral text-[clamp(36px,3.4vw,52px)] font-medium leading-[1.06] tracking-[-0.018em]">
-            {headline}
-          </h2>
-          <p className="m-0 mb-10 max-w-[42ch] text-pretty text-[17.5px] leading-[1.62] text-landing-muted">
+          <p className="m-0 mb-1.5 max-w-[44ch] text-pretty text-[17.5px] leading-[1.6] text-landing-muted">
             {intro}
           </p>
-          <div className="flex flex-col gap-[30px]">
-            {steps.map((step) => (
-              <div key={step.number}>
-                {/* Was a progress bar that filled green as its step became
-                    active; with nothing to track it is just the divider it
-                    always drew on top of. */}
-                <div className="h-px bg-landing-border" />
-                <div className="mt-4 flex items-baseline gap-3.5">
-                  <span className="font-spectral text-[15px] text-landing-green">{step.number}</span>
-                  <div>
-                    <div className="font-spectral text-2xl font-semibold tracking-[-0.012em] text-landing-ink">
-                      {step.title}
-                    </div>
-                    <p className="m-0 mt-2 max-w-[36ch] text-[15.5px] leading-[1.6] text-landing-muted">
-                      {step.body}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
+      </div>
 
-        <div className="flex flex-col gap-[22px]">
-          <InvitePanelCard data={invite} />
-          <TranscriptPanelCard data={transcript} />
-          <HandoffPanelCard data={handoff} />
-        </div>
+      <div className="mx-auto max-w-[1480px] px-6 pb-[104px] pt-11 md:px-10">
+        {steps.map((step, i) => (
+          <div
+            key={step.number}
+            data-reveal
+            className="grid grid-cols-[0.85fr_1.15fr] items-center gap-[76px] border-t border-landing-hair py-[62px] lp-stack:grid-cols-1 lp-stack:gap-[30px] lp-stack:py-11"
+          >
+            {/* Badge, title and copy all start at the same left edge: no
+                indent under the badge, which is what makes the three rows
+                read as one column of steps rather than three cards. */}
+            <div>
+              <span className="inline-flex h-[38px] min-w-10 items-center justify-center rounded-full border-2 border-landing-ink bg-landing-green px-2 font-bricolage text-[16px] font-bold tracking-[-0.02em] text-white shadow-[3px_3px_0_var(--lp-ink)]">
+                {step.number}
+              </span>
+              <h3 className="m-0 mt-[22px] max-w-[16ch] text-balance font-bricolage text-[clamp(28px,2.5vw,38px)] font-bold leading-[1.04] tracking-[-0.032em]">
+                {step.title}
+              </h3>
+              <p className="m-0 mt-3.5 max-w-[38ch] text-pretty text-[17px] leading-[1.6] text-landing-muted">
+                {step.body}
+              </p>
+            </div>
+            {panels[i]}
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -103,11 +115,11 @@ export function SequenceSection({
 function InvitePanelCard({ data }: { data: InvitePanel }) {
   return (
     <div className="flex items-stretch justify-center">
-      <div className="flex w-full flex-col rounded-2xl border border-landing-border bg-landing-surface px-10 py-[38px] shadow-[0_18px_50px_rgba(34,30,24,0.07)]">
+      <div className="flex w-full flex-col rounded-[18px] border-2 border-landing-ink bg-landing-surface px-10 py-[38px] shadow-[8px_8px_0_var(--lp-ink)]">
         <div className="mb-2 text-[12px] font-semibold tracking-[0.12em] text-landing-faint">
           {data.briefLabel}
         </div>
-        <div className="font-spectral text-[23px] font-medium tracking-[-0.01em]">{data.brief}</div>
+        <div className="font-bricolage text-2xl font-bold tracking-[-0.025em]">{data.brief}</div>
         <div className="relative mt-3.5 flex min-h-[210px] flex-1 items-center justify-center">
           <svg width="330" height="180" viewBox="0 0 290 168" fill="none" aria-hidden="true" className="max-w-full overflow-visible">
             <path
@@ -137,15 +149,15 @@ function InvitePanelCard({ data }: { data: InvitePanel }) {
               ♪
             </text>
             <circle cx="228" cy="30" r="15" fill="var(--lp-surface)" stroke="var(--lp-border)" strokeWidth="1.3" />
-            <text x="228" y="34" textAnchor="middle" fontSize="10" fontWeight="600" fill="var(--lp-muted)" fontFamily="Inter, sans-serif">
+            <text x="228" y="34" textAnchor="middle" fontSize="10" fontWeight="600" fill="var(--lp-muted)" fontFamily="var(--font-dm-sans), sans-serif">
               {data.personaTop}
             </text>
             <circle cx="228" cy="84" r="15" fill="var(--lp-green-bg)" stroke="var(--lp-green)" strokeWidth="1.3" />
-            <text x="228" y="88" textAnchor="middle" fontSize="10" fontWeight="600" fill="var(--lp-green)" fontFamily="Inter, sans-serif">
+            <text x="228" y="88" textAnchor="middle" fontSize="10" fontWeight="600" fill="var(--lp-green)" fontFamily="var(--font-dm-sans), sans-serif">
               {data.personaMid}
             </text>
             <circle cx="228" cy="138" r="15" fill="var(--lp-surface)" stroke="var(--lp-border)" strokeWidth="1.3" />
-            <text x="228" y="142" textAnchor="middle" fontSize="10" fontWeight="600" fill="var(--lp-muted)" fontFamily="Inter, sans-serif">
+            <text x="228" y="142" textAnchor="middle" fontSize="10" fontWeight="600" fill="var(--lp-muted)" fontFamily="var(--font-dm-sans), sans-serif">
               {data.personaBottom}
             </text>
           </svg>
@@ -169,7 +181,7 @@ function InvitePanelCard({ data }: { data: InvitePanel }) {
 function TranscriptPanelCard({ data }: { data: TranscriptPanel }) {
   return (
     <div className="flex items-stretch justify-center">
-      <div className="flex w-full flex-col justify-center rounded-2xl border border-landing-border bg-landing-surface px-9 pb-[30px] pt-8 shadow-[0_18px_50px_rgba(34,30,24,0.07)]">
+      <div className="flex w-full flex-col justify-center rounded-[18px] border-2 border-landing-ink bg-landing-surface px-9 pb-[30px] pt-8 shadow-[8px_8px_0_var(--lp-ink)]">
         <div className="mb-5 flex items-center justify-between gap-4">
           <div className="text-[12px] font-semibold tracking-[0.12em] text-landing-faint">
             {data.label}
@@ -214,7 +226,7 @@ function HandoffPanelCard({ data }: { data: HandoffPanel }) {
   return (
     <div className="flex items-stretch justify-center">
       <div className="relative flex w-full flex-col justify-center">
-        <div className="rounded-2xl border border-landing-border bg-landing-surface px-[38px] py-[34px] shadow-[0_18px_50px_rgba(34,30,24,0.07)]">
+        <div className="rounded-[18px] border-2 border-landing-ink bg-landing-surface px-[38px] py-[34px] shadow-[8px_8px_0_var(--lp-ink)]">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-lg font-semibold">{data.name}</div>

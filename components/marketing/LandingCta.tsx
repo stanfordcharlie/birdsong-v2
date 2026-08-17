@@ -37,7 +37,7 @@ export function LandingCta({
             ♪
           </span>
         </div>
-        <h2 className="m-0 mx-auto max-w-[22ch] text-balance font-spectral text-[clamp(40px,4.4vw,68px)] font-medium leading-[1.06] tracking-[-0.02em]">
+        <h2 className="m-0 mx-auto max-w-[22ch] text-balance font-bricolage text-[clamp(40px,4.4vw,68px)] font-bold leading-[1.06] tracking-[-0.02em]">
           {headlinePre} <span className="font-normal italic text-landing-green">{headlineAccent}</span>
         </h2>
         <p className="mx-auto mt-6 max-w-[48ch] text-pretty text-[18px] leading-[1.6] text-landing-muted">

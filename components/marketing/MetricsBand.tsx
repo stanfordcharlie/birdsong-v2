@@ -22,7 +22,7 @@ export function MetricsBand({
                 : "border-l border-landing-hair pl-14 lp-stack:border-l-0 lp-stack:pl-0"
             }
           >
-            <div className="font-spectral text-[52px] font-normal leading-none tracking-[-0.022em]">
+            <div className="font-bricolage text-[56px] font-bold leading-none tracking-[-0.035em]">
               {item.figure}
             </div>
             <div className="mt-3.5 max-w-[32ch] text-[15.5px] leading-[1.6] text-landing-muted">

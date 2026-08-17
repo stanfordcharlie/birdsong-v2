@@ -17,10 +17,15 @@ export function LandingNav({ crossLink }: { crossLink: { label: string; href: st
       data-scrolled="0"
       className="group/nav sticky top-4 z-[60] mx-auto max-w-[1480px] px-6 pt-4 md:px-10"
     >
-      <div className="lp-navpill flex items-center justify-between gap-6 rounded-full border border-landing-border bg-[rgba(255,254,250,0.9)] py-2.5 pl-[26px] pr-3 shadow-[0_8px_26px_rgba(34,30,24,0.05)] backdrop-blur-[18px] group-data-[scrolled=1]/nav:bg-[rgba(255,254,250,0.97)] group-data-[scrolled=1]/nav:py-2 group-data-[scrolled=1]/nav:pl-[22px] group-data-[scrolled=1]/nav:pr-2.5 group-data-[scrolled=1]/nav:shadow-[0_10px_30px_rgba(34,30,24,0.09)] lp-nav:pl-5">
+      {/* The scrolled state tightens the padding and deepens the hard shadow
+          4px -> 6px. The reference swaps in a blurred shadow at this point,
+          which is the one place it contradicts its own brief ("no blurred
+          shadows on the nav capsule"); the brief wins, so the capsule stays
+          hard-shadowed at both sizes. */}
+      <div className="lp-navpill flex items-center justify-between gap-6 rounded-full border-2 border-landing-ink bg-[rgba(255,254,250,0.92)] py-[9px] pl-6 pr-[11px] shadow-[4px_4px_0_var(--lp-ink)] backdrop-blur-[18px] group-data-[scrolled=1]/nav:bg-[rgba(255,254,250,0.97)] group-data-[scrolled=1]/nav:py-2 group-data-[scrolled=1]/nav:pl-[22px] group-data-[scrolled=1]/nav:pr-2.5 group-data-[scrolled=1]/nav:shadow-[6px_6px_0_var(--lp-ink)] lp-nav:pl-5">
         <Link href="#top" className="flex items-center gap-[11px]">
           <BirdMark className="shrink-0 motion-safe:animate-[lp-bob_7s_ease_infinite]" />
-          <span className="font-spectral text-[23px] font-medium tracking-[-0.005em]">Birdsong</span>
+          <span className="font-bricolage text-[23px] font-bold tracking-[-0.03em]">Birdsong</span>
         </Link>
         {/* ≤920px (design_handoff_landing_mobile): the text links overflowed
             the pill on phones, so they're hidden here entirely rather than
@@ -41,7 +46,7 @@ export function LandingNav({ crossLink }: { crossLink: { label: string; href: st
           </Link>
           <Link
             href="/admin/signup"
-            className="lp-cta rounded-full bg-landing-ink px-[22px] py-[11px] font-semibold text-landing-bg"
+            className="rounded-full bg-landing-ink px-[22px] py-[11px] font-bold text-landing-bg"
           >
             Get started
           </Link>

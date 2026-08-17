@@ -67,10 +67,16 @@ export default async function RootPage({
     <LandingPageShell>
       <LandingNav crossLink={{ label: "For customer success", href: "/customer-success" }} />
       <Hero
-        eyebrow="INTERVIEW-LED PIPELINE"
+        statusSticker="61 interviews running right now"
         headlinePre="Your best leads are already"
         headlineAccent="singing."
-        subhead="Birdsong runs paid, in-depth interviews with the people you want to reach, then hands your team the qualified ones with the whole conversation attached."
+        accentStyle="marker"
+        subhead="We run paid, in-depth interviews with the people you want to reach, then hand your team the qualified ones, whole conversation attached."
+        marquee={[
+          "22-minute median interview",
+          "every lead scored 1 to 10",
+          "first hot leads in 7 days",
+        ]}
         demo={{
           headerLabel: "Interview 04 · Head of Growth, Coretide",
           question: {

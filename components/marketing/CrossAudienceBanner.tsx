@@ -21,7 +21,7 @@ export function CrossAudienceBanner({
         className="lp-lift flex items-center justify-between gap-10 rounded-2xl border border-landing-border bg-landing-green-bg px-11 py-10 lp-stack:flex-col lp-stack:items-start lp-stack:gap-6 lp-mobile:px-6 lp-mobile:py-8"
       >
         <div>
-          <div className="mb-2.5 font-spectral text-[28px] font-medium tracking-[-0.012em] text-landing-ink">
+          <div className="mb-2.5 font-bricolage text-[28px] font-medium tracking-[-0.012em] text-landing-ink">
             {heading}
           </div>
           <div className="max-w-[60ch] text-[16.5px] leading-[1.6] text-landing-green-deep">

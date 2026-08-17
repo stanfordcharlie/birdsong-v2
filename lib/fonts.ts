@@ -1,4 +1,12 @@
-import { Archivo, Bricolage_Grotesque, Inter, Newsreader, Spectral, Young_Serif } from "next/font/google";
+import {
+  Archivo,
+  Bricolage_Grotesque,
+  DM_Sans,
+  Inter,
+  Newsreader,
+  Spectral,
+  Young_Serif,
+} from "next/font/google";
 
 // Marketing pages only (app/page.tsx, app/customer-success) — the platform redesign
 // (design_handoff_birdsong_platform) covers admin + the respondent survey,
@@ -56,12 +64,23 @@ export const spectral = Spectral({
   display: "swap",
 });
 
-// Marketing landing pages' display font (design_handoff_landing_pages_full)
-// — headings only, weight 700. Loaded as a variable font (no fixed weight
-// array) since Bricolage Grotesque ships wght 200-800 on Google Fonts and
-// the handoff's own token range (500-800) doesn't reduce to one static cut.
+// Marketing landing pages' display font (design_handoff_landing_v2)
+// — headings, the wordmark, and the step badges, weight 700. Loaded as a
+// variable font (no fixed weight array) since Bricolage Grotesque ships
+// wght 200-800 on Google Fonts and the handoff's own token range (500-800)
+// doesn't reduce to one static cut.
 export const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
   variable: "--font-bricolage",
+  display: "swap",
+});
+
+// Marketing landing pages' body/UI face (design_handoff_landing_v2, which
+// replaced Inter here). Scoped to LandingPageShell rather than swapped into
+// tailwind's global `sans`: Inter is still the default everywhere outside
+// marketing, and the admin/survey surfaces set Archivo explicitly.
+export const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans",
   display: "swap",
 });
