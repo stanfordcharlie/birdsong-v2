@@ -2,9 +2,9 @@ import Link from "next/link";
 import type { InterviewMessage } from "@/lib/interview/types";
 import { callScriptToText, isPairedPoint, type CallScript } from "@/lib/interview/call-script";
 import { Badge, type badgeVariants } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { StatusControl } from "@/components/StatusControl";
 import { CopyScriptButton } from "./CopyScriptButton";
+import { HubSpotSyncControl } from "./HubSpotSyncControl";
 import { ScoreMeter } from "./ScoreMeter";
 import type { VariantProps } from "class-variance-authority";
 
@@ -54,6 +54,9 @@ export type ResponseDetailData = {
   identityLine: string;
   status: string;
   isTest: boolean;
+  completed: boolean;
+  /** Last successful HubSpot sync, or null if it has never synced. */
+  hubspotSyncedAt: string | null;
   source: string | null;
   leadScore: number | null;
   /** One-line justification for the lead score. */
@@ -76,6 +79,8 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
     identityLine,
     status,
     isTest,
+    completed,
+    hubspotSyncedAt,
     source,
     leadScore,
     fitReason,
@@ -308,13 +313,19 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
         <StatusControl responseId={responseId} initialStatus={status} />
       </section>
 
-      {/* CRM sync placeholder, no real integration yet */}
-      <div className="flex items-center gap-3 pb-2">
-        <Button type="button" variant="secondary" disabled>
-          Push to HubSpot
-        </Button>
-        <span className="type-meta">Not synced yet.</span>
-      </div>
+      {/* CRM sync. Runs automatically when the interview completes; this is
+          the manual retry for when that background run failed. */}
+      <HubSpotSyncControl
+        responseId={responseId}
+        initialSyncedAt={hubspotSyncedAt}
+        disabledReason={
+          isTest
+            ? "Test responses are not synced to HubSpot."
+            : !completed
+              ? "Sync becomes available once the interview finishes."
+              : null
+        }
+      />
     </div>
   );
 }

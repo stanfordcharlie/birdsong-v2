@@ -64,6 +64,11 @@ export default async function ResponseDetailPage({
     identityLine: [jobTitle, company, response.respondent_email].filter(Boolean).join(" · "),
     status: response.status ?? "new",
     isTest: response.is_test,
+    completed: response.completed,
+    // Null until the first successful sync, and absent entirely on databases
+    // without the response_hubspot_sync migration, so read defensively the
+    // same way the company-fit columns above are.
+    hubspotSyncedAt: typeof response.hubspot_synced_at === "string" ? response.hubspot_synced_at : null,
     source: response.source,
     leadScore: response.lead_score,
     fitReason: response.fit_reason,

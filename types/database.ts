@@ -109,6 +109,12 @@ export type Database = {
           session_token: string | null;
           source: string | null;
           is_test: boolean;
+          // HubSpot sync bookkeeping (lib/hubspot-sync.ts). All null until a
+          // sync succeeds; hubspot_deal_id stays null for leads below the
+          // deal-creation threshold even after a successful contact sync.
+          hubspot_contact_id: string | null;
+          hubspot_deal_id: string | null;
+          hubspot_synced_at: string | null;
           user_id: string;
           created_at: string;
         };
@@ -134,6 +140,9 @@ export type Database = {
           session_token?: string | null;
           source?: string | null;
           is_test?: boolean;
+          hubspot_contact_id?: string | null;
+          hubspot_deal_id?: string | null;
+          hubspot_synced_at?: string | null;
           // Populated server-side by the set_response_user_id trigger; safe
           // to omit on insert even though the column is NOT NULL.
           user_id?: string;
@@ -161,6 +170,9 @@ export type Database = {
           session_token?: string | null;
           source?: string | null;
           is_test?: boolean;
+          hubspot_contact_id?: string | null;
+          hubspot_deal_id?: string | null;
+          hubspot_synced_at?: string | null;
           user_id?: string;
           created_at?: string;
         };

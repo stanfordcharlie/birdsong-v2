@@ -23,6 +23,8 @@ import {
 import { MESSAGE_MAX_LENGTH } from "@/lib/interview/validation";
 import { sendLeadNotification } from "@/lib/email/lead-notification";
 import { sendLeadNotificationToSlack } from "@/lib/slack/lead-notification";
+import { syncResponseToHubSpot } from "@/lib/hubspot-sync";
+import { selectCallScriptOpener, selectTopPainPoint } from "@/lib/lead-content";
 import type { InterviewMessage } from "@/lib/interview/types";
 import type { Database, Json } from "@/types/database";
 
@@ -420,6 +422,28 @@ async function extractAndNotify({
       return;
     }
 
+    // HubSpot: a third consumer of this same completion event, sitting
+    // alongside the email and Slack notifications rather than in front of
+    // them. Started here and settled at the very end of this task, so it runs
+    // concurrently with both and cannot delay either one. It never rejects
+    // (syncResponseToHubSpot returns failure as a value), skips itself
+    // silently when HUBSPOT_ACCESS_TOKEN is unset, and is unreachable from
+    // anything upstream: the respondent already has CLOSING_MESSAGE by the
+    // time this runs, however slow or broken HubSpot happens to be.
+    const hubspotSync = syncResponseToHubSpot({
+      supabase,
+      responseId,
+      surveyTitle: survey.title,
+      respondentName: response.respondent_name,
+      respondentEmail: response.respondent_email,
+      respondentPhone: response.respondent_phone,
+      company: respondentCompanyName,
+      leadScore,
+      painPoints,
+      callScript,
+      completedAt,
+    });
+
     // Best-effort, wrapped independently: a failed email must not take the
     // Slack notification down with it.
     try {
@@ -469,12 +493,18 @@ async function extractAndNotify({
         company: respondentCompanyName,
         leadScore,
         fitScore,
-        topPainPoint: painPoints[0] ?? null,
-        callScriptOpener: callScript.opener.trim() || null,
+        // Same two selections the HubSpot contact sync above uses, now shared
+        // via lib/lead-content.ts so the two destinations cannot drift.
+        topPainPoint: selectTopPainPoint(painPoints),
+        callScriptOpener: selectCallScriptOpener(callScript),
         completedAt,
         responseUrl: `${appUrl}/admin/responses/${responseId}`,
       });
     }
+
+    // Settled last, so this background task stays alive until the sync
+    // finishes without any notification having waited on it.
+    await hubspotSync;
   } catch (err) {
     console.error(
       `[interview/continue] response_id=${responseId} background extraction/notification task failed; ` +
