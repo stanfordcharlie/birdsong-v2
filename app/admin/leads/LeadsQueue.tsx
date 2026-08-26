@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { StatusControl } from "@/components/StatusControl";
+import { SurveyFilterCards, type SurveyCard } from "./SurveyFilterCards";
 import { formatRelativeTime } from "@/lib/format-relative-time";
 import { cn } from "@/lib/utils";
 import {
@@ -24,6 +25,8 @@ export type LeadItem = {
   company: string | null;
   surveyId: string;
   surveyTitle: string;
+  /** Whether the survey behind this lead is still collecting responses. */
+  surveyIsLive: boolean;
   leadScore: number | null;
   // Company fit (lib/interview/company-fit.ts) — independent of leadScore.
   // fitConfidence: "high" | "medium" | "low" | "unavailable" | null (null =
@@ -56,15 +59,45 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
 const SELECT_CLASSES =
   "flex h-9 rounded-control border border-input bg-card px-3 py-2 text-sm text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
-// Score bands mapped onto existing badge variants (DESIGN.md palette, no
-// new colors): 9-10 green ("call now"), 7-8 amber (warm), 5-6 neutral
-// chip, below 5 (and unscored) muted outline.
-function scoreBadgeVariant(score: number | null): "success" | "warning" | "default" | "outline" {
-  if (score === null) return "outline";
-  if (score >= 9) return "success";
-  if (score >= 7) return "warning";
-  if (score >= 5) return "default";
-  return "outline";
+// Avatar initials, same derivation as the admin home's activity feed.
+function initialsOf(name: string | null): string {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "—";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+// A 1-10 score read as a short bar plus the number. The bar is what makes a
+// column of scores scannable without reading any of them; the number is what
+// you check once the bar has pointed you at a row.
+//
+// `tone="lead"` colours the fill by band so hot leads carry green down the
+// column. Fit stays neutral in every band — two green columns side by side
+// and neither one reads as the signal.
+function ScoreMeter({ score, tone }: { score: number; tone: "lead" | "fit" }) {
+  const hot = tone === "lead" && score >= HOT_SCORE_MIN;
+  const mid = tone === "lead" && score >= 5;
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span aria-hidden className="h-[4px] w-[26px] overflow-hidden rounded-full bg-chip">
+        <span
+          className={cn(
+            "block h-full rounded-full",
+            hot ? "bg-success" : mid ? "bg-muted-foreground" : "bg-faint"
+          )}
+          style={{ width: `${Math.max(0, Math.min(score, 10)) * 10}%` }}
+        />
+      </span>
+      <span
+        className={cn(
+          "text-[13.5px] font-semibold tabular-nums",
+          hot ? "text-success" : "text-card-foreground"
+        )}
+      >
+        {score}
+      </span>
+    </span>
+  );
 }
 
 const HOT_SCORE_MIN = 7;
@@ -86,7 +119,9 @@ export function LeadsQueue({
   const [leads, setLeads] = useState(items);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
-  const [surveyFilter, setSurveyFilter] = useState<string>("all");
+  // null = the "All surveys" card. Driven by SurveyFilterCards above the
+  // queue, which replaced the toolbar's survey <select>.
+  const [surveyFilter, setSurveyFilter] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [hotOnly, setHotOnly] = useState(false);
   const [fitHotOnly, setFitHotOnly] = useState(false);
@@ -108,15 +143,105 @@ export function LeadsQueue({
     }
   }
 
-  // Only surveys that actually have completed responses can produce rows,
-  // so the filter's options are derived from the rows themselves.
-  const surveyOptions = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const lead of items) {
-      if (!seen.has(lead.surveyId)) seen.set(lead.surveyId, lead.surveyTitle);
+  // "All" is the no-filter choice, so clicking it also releases the Score 7+
+  // and Fit 7+ toggles sitting beside it. Without that, All can be lit up
+  // while two narrowing toggles are still on and the queue reads as empty
+  // for no visible reason. Every other status is a narrowing choice and
+  // leaves the toggles exactly as they were.
+  function selectStatus(value: StatusFilter) {
+    setStatusFilter(value);
+    if (value === "all") {
+      setHotOnly(false);
+      setFitHotOnly(false);
     }
-    return Array.from(seen, ([id, title]) => ({ id, title }));
-  }, [items]);
+  }
+
+  // Everything the cards and the tabs count is measured against this set:
+  // every lead the user can currently see, before any of the narrowing
+  // filters. Only the test toggle applies, because a hidden test row
+  // shouldn't be counted in a number sitting next to visible rows.
+  const visibleLeads = useMemo(
+    () => (showTest ? leads : leads.filter((lead) => !lead.isTest)),
+    [leads, showTest]
+  );
+
+  // A lead is worth a call at 7+ and still untouched — the same cutoff the
+  // admin home, the Slack notification and the HubSpot deal threshold use.
+  const worthACall = (lead: LeadItem) =>
+    (lead.leadScore ?? 0) >= HOT_SCORE_MIN && lead.status === "new";
+
+  // Only surveys that actually have completed responses can produce rows, so
+  // the cards are derived from the rows themselves rather than from the
+  // survey list — a survey nobody has finished has nothing to show here.
+  const surveyCards = useMemo<SurveyCard[]>(() => {
+    const bySurvey = new Map<string, SurveyCard>();
+    for (const lead of visibleLeads) {
+      let card = bySurvey.get(lead.surveyId);
+      if (!card) {
+        card = {
+          id: lead.surveyId,
+          title: lead.surveyTitle,
+          leadCount: 0,
+          worthACall: 0,
+          share: 0,
+          isLive: lead.surveyIsLive,
+        };
+        bySurvey.set(lead.surveyId, card);
+      }
+      card.leadCount += 1;
+      if (worthACall(lead)) card.worthACall += 1;
+    }
+
+    const total = visibleLeads.length;
+    const cards = Array.from(bySurvey.values())
+      // Most leads first: the survey producing the most pipeline is the one
+      // worth landing on, and it keeps the row's order stable as statuses
+      // change underneath it (which worth-a-call ordering would not).
+      .sort((a, b) => b.leadCount - a.leadCount)
+      .map((card) => ({ ...card, share: total > 0 ? card.leadCount / total : 0 }));
+
+    return [
+      {
+        id: null,
+        title: "All surveys",
+        leadCount: total,
+        worthACall: visibleLeads.filter(worthACall).length,
+        share: 1,
+        // Green while anything is still collecting.
+        isLive: cards.some((card) => card.isLive),
+      },
+      ...cards,
+    ];
+  }, [visibleLeads]);
+
+  // The survey card is the outermost filter: the header count, the subline and
+  // every status tab count all restate whatever it has selected.
+  const scopedLeads = useMemo(
+    () =>
+      surveyFilter === null
+        ? visibleLeads
+        : visibleLeads.filter((lead) => lead.surveyId === surveyFilter),
+    [visibleLeads, surveyFilter]
+  );
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<StatusFilter, number> = {
+      all: scopedLeads.length,
+      new: 0,
+      contacted: 0,
+      qualified: 0,
+      not_a_fit: 0,
+    };
+    for (const lead of scopedLeads) {
+      if (lead.status in counts) counts[lead.status as StatusFilter] += 1;
+    }
+    return counts;
+  }, [scopedLeads]);
+
+  const awaitingReply = useMemo(
+    () => scopedLeads.filter(worthACall).length,
+    [scopedLeads]
+  );
 
   // Distinct, non-null source values actually present in this user's data.
   // Most accounts won't have any ?src= traffic yet, so the whole control
@@ -135,10 +260,8 @@ export function LeadsQueue({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const rows = leads.filter((lead) => {
-      if (!showTest && lead.isTest) return false;
+    const rows = scopedLeads.filter((lead) => {
       if (statusFilter !== "all" && lead.status !== statusFilter) return false;
-      if (surveyFilter !== "all" && lead.surveyId !== surveyFilter) return false;
       if (sourceFilter !== "all" && lead.source !== sourceFilter) return false;
       if (hotOnly && (lead.leadScore ?? 0) < HOT_SCORE_MIN) return false;
       if (fitHotOnly && (lead.fitScore ?? 0) < HOT_FIT_MIN) return false;
@@ -163,80 +286,85 @@ export function LeadsQueue({
       if (bv === null) return -1;
       return sortDir === "desc" ? bv - av : av - bv;
     });
-  }, [leads, query, statusFilter, surveyFilter, sourceFilter, hotOnly, fitHotOnly, showTest, sortColumn, sortDir]);
+  }, [scopedLeads, query, statusFilter, sourceFilter, hotOnly, fitHotOnly, sortColumn, sortDir]);
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="max-w-[320px] flex-1 basis-[240px]">
-          <Input
-            type="text"
-            placeholder="Search leads"
-            aria-label="Search leads by name, email, or company"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+      {/* Masthead. The count chip and the subline both restate the selected
+          survey card, which is why they live in here rather than on the
+          server page. */}
+      <div className="flex flex-col gap-2">
+        <span className="type-label">Leads</span>
+        <div className="flex items-center gap-3">
+          <h1 className="type-page-title">Your lead queue</h1>
+          <span className="rounded-control bg-chip px-2.5 py-1 text-[13px] font-semibold text-muted-foreground">
+            {statusCounts.all}
+          </span>
         </div>
-        <div className="flex gap-1.5">
+        <p className="text-[15px] text-muted-foreground">
+          {awaitingReply === 0
+            ? "Nobody is waiting on a reply right now."
+            : `${awaitingReply} scored ${HOT_SCORE_MIN} or higher and ${
+                awaitingReply === 1 ? "has" : "have"
+              } not heard back yet.`}
+        </p>
+      </div>
+
+      <SurveyFilterCards
+        cards={surveyCards}
+        selectedId={surveyFilter}
+        onSelect={setSurveyFilter}
+      />
+
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Status tabs as one segmented track rather than five separate
+            bordered buttons: they are a single either/or choice, and the
+            counts make that much easier to read at a glance. */}
+        <div className="flex items-center gap-0.5 rounded-control bg-chip p-1">
           {STATUS_FILTERS.map((filter) => {
             const active = statusFilter === filter.value;
             return (
               <button
                 key={filter.value}
                 type="button"
-                onClick={() => setStatusFilter(filter.value)}
+                onClick={() => selectStatus(filter.value)}
                 aria-pressed={active}
                 className={cn(
-                  "flex h-9 items-center rounded-control border px-3.5 text-[13px] font-medium transition-colors",
+                  "flex h-7 items-center gap-1.5 rounded-[7px] px-2.5 text-[13px] font-medium transition-colors",
                   active
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-transparent text-muted-foreground hover:bg-secondary"
+                    ? "bg-card text-card-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-card-foreground"
                 )}
               >
                 {filter.label}
+                <span className={cn("text-[12px]", active ? "text-muted-foreground" : "text-faint")}>
+                  {statusCounts[filter.value]}
+                </span>
               </button>
             );
           })}
         </div>
-        <button
-          type="button"
-          onClick={() => setHotOnly((prev) => !prev)}
-          aria-pressed={hotOnly}
-          className={cn(
-            "flex h-9 items-center rounded-control border px-3.5 text-[13px] font-medium transition-colors",
-            hotOnly
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border bg-transparent text-muted-foreground hover:bg-secondary"
-          )}
-        >
-          Score 7+
-        </button>
-        <button
-          type="button"
-          onClick={() => setFitHotOnly((prev) => !prev)}
-          aria-pressed={fitHotOnly}
-          className={cn(
-            "flex h-9 items-center rounded-control border px-3.5 text-[13px] font-medium transition-colors",
-            fitHotOnly
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border bg-transparent text-muted-foreground hover:bg-secondary"
-          )}
-        >
-          Fit 7+
-        </button>
-        <select
-          value={surveyFilter}
-          onChange={(e) => setSurveyFilter(e.target.value)}
-          aria-label="Filter by survey"
-          className={SELECT_CLASSES}
-        >
-          <option value="all">All surveys</option>
-          {surveyOptions.map((survey) => (
-            <option key={survey.id} value={survey.id}>
-              {survey.title}
-            </option>
-          ))}
-        </select>
+
+        <div className="relative max-w-[300px] flex-1 basis-[220px]">
+          <svg
+            aria-hidden
+            viewBox="0 0 20 20"
+            fill="none"
+            className="pointer-events-none absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-faint"
+          >
+            <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.6" />
+            <path d="M13.2 13.2L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+          <Input
+            type="text"
+            placeholder="Name, company, keyword"
+            aria-label="Search leads by name, email, or company"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
         {sourceOptions.length > 0 && (
           <select
             value={sourceFilter}
@@ -252,19 +380,32 @@ export function LeadsQueue({
             ))}
           </select>
         )}
-        <button
-          type="button"
-          onClick={() => setShowTest((prev) => !prev)}
-          aria-pressed={showTest}
-          className={cn(
-            "flex h-9 items-center rounded-control border px-3.5 text-[13px] font-medium transition-colors",
-            showTest
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border bg-transparent text-muted-foreground hover:bg-secondary"
-          )}
-        >
-          Show test responses
-        </button>
+
+        {/* Kept as explicit toggles rather than folded into the mock's generic
+            "+ Filter" button: all three already work, and hiding working
+            filters behind a menu would cost function for nothing. */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {[
+            { label: `Score ${HOT_SCORE_MIN}+`, on: hotOnly, toggle: () => setHotOnly((p) => !p) },
+            { label: `Fit ${HOT_FIT_MIN}+`, on: fitHotOnly, toggle: () => setFitHotOnly((p) => !p) },
+            { label: "Show test", on: showTest, toggle: () => setShowTest((p) => !p) },
+          ].map((chip) => (
+            <button
+              key={chip.label}
+              type="button"
+              onClick={chip.toggle}
+              aria-pressed={chip.on}
+              className={cn(
+                "flex h-9 items-center rounded-control border px-3.5 text-[13px] font-medium transition-colors",
+                chip.on
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-transparent text-muted-foreground hover:bg-secondary"
+              )}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <Card className="overflow-hidden">
@@ -301,7 +442,7 @@ export function LeadsQueue({
                 </button>
               </TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Top pain point</TableHead>
+              <TableHead>Signal</TableHead>
               <TableHead>Completed</TableHead>
             </TableRow>
           </TableHeader>
@@ -319,23 +460,27 @@ export function LeadsQueue({
               filtered.map((lead) => (
                 <TableRow key={lead.id} className="relative">
                   <TableCell>
-                    <Link
-                      href={`/admin/responses/${lead.id}`}
-                      className="font-medium text-card-foreground hover:text-primary"
-                    >
-                      {/* Stretches to fill the whole row (position:relative
-                          on TableRow above), so anywhere in the row is
-                          clickable — interactive cells below sit over it
-                          with relative z-10, same as SurveysList's copy
-                          button. */}
-                      <span className="absolute inset-0" />
-                      {lead.name || "—"}
-                    </Link>
-                    {lead.isTest && (
-                      <Badge variant="warning" className="ml-2">
-                        Test
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <span
+                        aria-hidden
+                        className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-success-bg text-[11.5px] font-bold text-success"
+                      >
+                        {initialsOf(lead.name)}
+                      </span>
+                      <Link
+                        href={`/admin/responses/${lead.id}`}
+                        className="font-medium text-card-foreground hover:text-primary"
+                      >
+                        {/* Stretches to fill the whole row (position:relative
+                            on TableRow above), so anywhere in the row is
+                            clickable — interactive cells below sit over it
+                            with relative z-10, same as SurveysList's copy
+                            button. */}
+                        <span className="absolute inset-0" />
+                        {lead.name || "—"}
+                      </Link>
+                      {lead.isTest && <Badge variant="warning">Test</Badge>}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{lead.company || "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{lead.surveyTitle}</TableCell>
@@ -343,9 +488,11 @@ export function LeadsQueue({
                     <TableCell className="text-muted-foreground">{lead.source || "—"}</TableCell>
                   )}
                   <TableCell>
-                    <Badge variant={scoreBadgeVariant(lead.leadScore)}>
-                      {lead.leadScore ?? "—"}
-                    </Badge>
+                    {lead.leadScore === null ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : (
+                      <ScoreMeter score={lead.leadScore} tone="lead" />
+                    )}
                   </TableCell>
                   <TableCell>
                     {lead.fitConfidence === "unavailable" ? (
@@ -353,10 +500,8 @@ export function LeadsQueue({
                         —
                       </span>
                     ) : lead.fitScore !== null ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Badge variant={scoreBadgeVariant(lead.fitScore)} title={lead.fitReasoning ?? undefined}>
-                          {lead.fitScore}
-                        </Badge>
+                      <span className="inline-flex items-center gap-1.5" title={lead.fitReasoning ?? undefined}>
+                        <ScoreMeter score={lead.fitScore} tone="fit" />
                         {lead.fitConfidence === "low" && (
                           <span
                             className="text-[11px] text-muted-foreground"

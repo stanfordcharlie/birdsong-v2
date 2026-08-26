@@ -24,7 +24,7 @@ export default async function LeadsPage({
   const { data: responses, error } = await supabase
     .from("responses")
     .select(
-      "id, respondent_name, respondent_email, custom_field_values, lead_score, status, pain_points, created_at, survey_id, is_test, source, surveys(title)"
+      "id, respondent_name, respondent_email, custom_field_values, lead_score, status, pain_points, created_at, survey_id, is_test, source, surveys(title, status)"
     )
     .eq("user_id", user?.id ?? "")
     .eq("completed", true)
@@ -61,6 +61,9 @@ export default async function LeadsPage({
             : null,
       surveyId: r.survey_id,
       surveyTitle: r.surveys?.title ?? "—",
+      // Drives the live dot on the survey cards above the queue. Anything
+      // that isn't "live" (draft, closed, archived) reads as not collecting.
+      surveyIsLive: r.surveys?.status === "live",
       leadScore: r.lead_score,
       fitScore: fit?.score ?? null,
       fitConfidence: typeof fit?.confidence === "string" ? fit.confidence : null,
@@ -72,6 +75,17 @@ export default async function LeadsPage({
       source: r.source,
     };
   });
+
+  // LeadsQueue owns the header once there are rows: the count chip and the
+  // subline both restate whatever survey card is selected, so they have to
+  // live inside the client component that holds that selection.
+  if (!error && items.length > 0) {
+    return (
+      <div className="admin-container-wide">
+        <LeadsQueue items={items} initialStatusFilter={initialStatusFilter} />
+      </div>
+    );
+  }
 
   return (
     <div className="admin-container-wide flex flex-col gap-7">
@@ -95,9 +109,7 @@ export default async function LeadsPage({
               </Button>
             </CardContent>
           </Card>
-        ) : (
-          <LeadsQueue items={items} initialStatusFilter={initialStatusFilter} />
-        ))}
+        ) : null)}
     </div>
   );
 }

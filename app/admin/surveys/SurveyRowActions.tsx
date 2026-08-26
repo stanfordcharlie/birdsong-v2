@@ -31,22 +31,38 @@ const MENU_WIDTH = 190;
 export function SurveyRowActions({
   surveyId,
   internalName,
+  slug,
+  status,
   archivedAt,
   responseCount,
 }: {
   surveyId: string;
   internalName: string;
+  // Public respondent slug, used to build the share link the copy item puts
+  // on the clipboard.
+  slug: string;
+  status: string;
   archivedAt: string | null;
   responseCount: number;
 }) {
   const router = useRouter();
   const isArchived = archivedAt !== null;
   const canDelete = responseCount === 0;
+  // An archived survey's link only ever renders the closed screen, so there
+  // is nothing worth sharing. A draft's link is real but not answerable yet,
+  // which the item says on hover rather than by hiding itself: preparing a
+  // link before flipping a survey live is a normal thing to want.
+  const canCopyLink = !isArchived;
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+
+  // "idle" until the link is on the clipboard, then "copied" (or "error" if
+  // the browser refused). The menu stays open for a beat afterwards so the
+  // confirmation is actually seen, then closes itself.
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
 
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -57,6 +73,7 @@ export function SurveyRowActions({
   function openMenu() {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
+    setCopyState("idle");
     const left = Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8);
     setMenuPos({ top: rect.bottom + 6, left: Math.max(8, left) });
     setMenuOpen(true);
@@ -87,6 +104,30 @@ export function SurveyRowActions({
       window.removeEventListener("resize", onScrollOrResize);
     };
   }, [menuOpen]);
+
+  // Closes the menu a beat after a copy, so the "Copied" label lands before
+  // the menu goes away. Cleared if the menu is dismissed first.
+  useEffect(() => {
+    if (copyState === "idle" || !menuOpen) return;
+    const timer = setTimeout(() => setMenuOpen(false), 900);
+    return () => clearTimeout(timer);
+  }, [copyState, menuOpen]);
+
+  async function copyLink() {
+    // Built here rather than on mount: this component only ever runs in the
+    // browser after a click, so window.location is always available and
+    // there is no server-rendered markup to keep in agreement.
+    const url = `${window.location.origin}/survey/${slug}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopyState("copied");
+    } catch {
+      // Clipboard access can be refused outright (an insecure origin, or a
+      // browser permission prompt that was denied). Saying so beats a menu
+      // item that silently does nothing.
+      setCopyState("error");
+    }
+  }
 
   async function patchArchived(action: "archive" | "unarchive") {
     setPending(true);
@@ -147,6 +188,25 @@ export function SurveyRowActions({
             style={{ position: "fixed", top: menuPos.top, left: menuPos.left, width: MENU_WIDTH }}
             className="z-[100] rounded-card border border-border bg-card p-1.5 shadow-lg"
           >
+            {canCopyLink && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={copyLink}
+                title={
+                  status === "live"
+                    ? undefined
+                    : "This link starts working once the survey is live"
+                }
+                className="block w-full rounded-control px-3 py-2 text-left text-sm text-card-foreground transition-colors hover:bg-secondary"
+              >
+                {copyState === "copied"
+                  ? "Copied"
+                  : copyState === "error"
+                    ? "Copy failed"
+                    : "Copy link"}
+              </button>
+            )}
             {isArchived ? (
               <button
                 type="button"

@@ -1,22 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { SurveyRowActions } from "./SurveyRowActions";
+import { SurveyCard } from "./SurveyCard";
 import { SurveyBulkActionsBar } from "./SurveyBulkActionsBar";
 
 export type SurveyListItem = {
@@ -24,18 +14,39 @@ export type SurveyListItem = {
   title: string;
   slug: string;
   status: string;
+  /** survey.num_questions — the target topic count, null on older rows. */
+  questionCount: number | null;
   responseCount: number;
+  /** Seven daily counts, oldest first, for the card's sparkline. */
+  responsesByDay: number[];
+  lastResponseAt: string | null;
+  /** Newest answerers first, capped server-side, for the card's avatars. */
+  recentRespondents: string[];
   createdAt: string;
   archivedAt: string | null;
 };
 
-type StatusFilter = "all" | "live" | "archived";
+type StatusFilter = "all" | "live" | "draft" | "archived";
 
 const FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "live", label: "Live" },
+  { value: "draft", label: "Draft" },
   { value: "archived", label: "Archived" },
 ];
+
+// Shared by the tab counts and the grid so a tab can never promise a number
+// the grid then contradicts.
+function matchesStatus(survey: SurveyListItem, filter: StatusFilter): boolean {
+  const isArchived = survey.archivedAt !== null;
+  // "All", "Live" and "Draft" all exclude archived surveys — archived only
+  // ever shows up under its own tab.
+  if (filter === "archived") return isArchived;
+  if (isArchived) return false;
+  if (filter === "live") return survey.status === "live";
+  if (filter === "draft") return survey.status !== "live";
+  return true;
+}
 
 export function SurveysList({
   surveys,
@@ -52,19 +63,22 @@ export function SurveysList({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return surveys.filter((survey) => {
-      const isArchived = survey.archivedAt !== null;
-      if (statusFilter === "archived") {
-        if (!isArchived) return false;
-      } else {
-        // "All" and "Live" both exclude archived surveys — archived only
-        // ever shows up under its own filter.
-        if (isArchived) return false;
-        if (statusFilter === "live" && survey.status !== "live") return false;
-      }
+      if (!matchesStatus(survey, statusFilter)) return false;
       if (q && !survey.title.toLowerCase().includes(q)) return false;
       return true;
     });
   }, [surveys, query, statusFilter]);
+
+  // Tab counts ignore the search box: they describe what the account holds,
+  // and a tab reading "Live 0" mid-search would look like the surveys went
+  // away rather than like the query not matching them.
+  const statusCounts = useMemo(() => {
+    const counts = {} as Record<StatusFilter, number>;
+    for (const filter of FILTERS) {
+      counts[filter.value] = surveys.filter((s) => matchesStatus(s, filter.value)).length;
+    }
+    return counts;
+  }, [surveys]);
 
   // Switching tabs changes what "archived" even means for the selection
   // (Live vs. Archived have opposite bulk actions), so a stale selection
@@ -88,15 +102,7 @@ export function SurveysList({
     [filtered, selectedIds]
   );
 
-  const headerCheckboxRef = useRef<HTMLInputElement>(null);
   const allFilteredSelected = filtered.length > 0 && filtered.every((s) => selectedIds.has(s.id));
-  const someFilteredSelected = filtered.some((s) => selectedIds.has(s.id));
-
-  useEffect(() => {
-    if (headerCheckboxRef.current) {
-      headerCheckboxRef.current.indeterminate = someFilteredSelected && !allFilteredSelected;
-    }
-  }, [someFilteredSelected, allFilteredSelected]);
 
   function toggleOne(id: string) {
     setSelectedIds((prev) => {
@@ -139,16 +145,11 @@ export function SurveysList({
     // table owns its own bottom margin so it can collapse to nothing (see
     // below). Everything else spaces itself with explicit margins.
     <div className="flex flex-col">
-      <div className="mb-5 flex items-center gap-3">
-        <div className="max-w-[320px] flex-1">
-          <Input
-            type="text"
-            placeholder="Search surveys"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-1.5">
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        {/* One segmented track rather than separate bordered chips: these
+            are a single either/or choice, and the counts make the shape of
+            the account readable without opening each tab. */}
+        <div className="flex items-center gap-0.5 rounded-control bg-chip p-1">
           {FILTERS.map((filter) => {
             const active = statusFilter === filter.value;
             return (
@@ -158,22 +159,53 @@ export function SurveysList({
                 onClick={() => setStatusFilter(filter.value)}
                 aria-pressed={active}
                 className={cn(
-                  // h-9 matches the Input and Button defaults so the whole
-                  // controls row sits on one consistent height.
-                  "flex h-9 items-center rounded-control border px-3.5 text-[13px] font-medium transition-colors",
+                  "flex h-7 items-center gap-1.5 rounded-[7px] px-2.5 text-[13px] font-medium transition-colors",
                   active
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-transparent text-muted-foreground hover:bg-secondary"
+                    ? "bg-card text-card-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-card-foreground"
                 )}
               >
                 {filter.label}
+                <span className={cn("text-[12px]", active ? "text-muted-foreground" : "text-faint")}>
+                  {statusCounts[filter.value]}
+                </span>
               </button>
             );
           })}
         </div>
-        <Button asChild className="ml-auto">
-          <Link href="/admin/surveys/new">New survey</Link>
-        </Button>
+
+        <div className="relative max-w-[300px] flex-1 basis-[220px]">
+          <svg
+            aria-hidden
+            viewBox="0 0 20 20"
+            fill="none"
+            className="pointer-events-none absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-faint"
+          >
+            <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.6" />
+            <path d="M13.2 13.2L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+          <Input
+            type="text"
+            placeholder="Search surveys"
+            aria-label="Search surveys by name"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        <div className="ml-auto flex items-center gap-4">
+          {filtered.length > 0 && (
+            <button
+              type="button"
+              onClick={toggleAllFiltered}
+              className="text-[12.5px] font-medium text-muted-foreground transition-colors hover:text-card-foreground"
+            >
+              {allFilteredSelected ? "Clear selection" : "Select all"}
+            </button>
+          )}
+          <span className="whitespace-nowrap text-[12.5px] text-faint">{filtered.length} shown</span>
+        </div>
       </div>
 
       {/* Always mounted — never conditionally added/removed — so the bar
@@ -199,96 +231,22 @@ export function SurveysList({
         </div>
       </div>
 
-      <Card className="overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10">
-                <Checkbox
-                  ref={headerCheckboxRef}
-                  checked={allFilteredSelected}
-                  onChange={toggleAllFiltered}
-                  aria-label="Select all surveys"
-                />
-              </TableHead>
-              <TableHead>Internal name</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Responses</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                  No surveys match your search.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((survey) => {
-                const isArchived = survey.archivedAt !== null;
-                return (
-                  <TableRow key={survey.id} className="relative">
-                    <TableCell className="w-10">
-                      {/* relative z-10: same escape hatch as the actions
-                          cell below — lifts the checkbox above the
-                          row-spanning stretched-link span so it's actually
-                          clickable instead of triggering row navigation. */}
-                      <div className="relative z-10">
-                        <Checkbox
-                          checked={selectedIds.has(survey.id)}
-                          onChange={() => toggleOne(survey.id)}
-                          aria-label={`Select ${survey.title}`}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Link href={`/admin/surveys/${survey.id}`} className="text-[15px] font-medium text-card-foreground">
-                        {/* Stretches to fill the whole row (position:relative
-                            on TableRow above), so anywhere in the row is
-                            clickable, not just this text. */}
-                        <span className="absolute inset-0" />
-                        {survey.title}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant={survey.status === "live" ? "success" : "warning"}>
-                          {survey.status === "live" ? "Live" : "Draft"}
-                        </Badge>
-                        {isArchived && <Badge variant="outline">Archived</Badge>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-card-foreground">{survey.responseCount}</TableCell>
-                    <TableCell className="text-sm text-card-foreground">
-                      {new Date(survey.createdAt).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </TableCell>
-                    <TableCell className="w-10">
-                      {/* relative z-10: lifts this above the row-spanning
-                          stretched-link span in the first cell, so the
-                          overflow button is actually clickable instead of
-                          triggering row navigation. */}
-                      <div className="relative z-10 flex justify-end">
-                        <SurveyRowActions
-                          surveyId={survey.id}
-                          internalName={survey.title}
-                          archivedAt={survey.archivedAt}
-                          responseCount={survey.responseCount}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+      {filtered.length === 0 ? (
+        <Card className="p-8 text-center text-sm text-muted-foreground">
+          No surveys match your search.
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((survey) => (
+            <SurveyCard
+              key={survey.id}
+              survey={survey}
+              selected={selectedIds.has(survey.id)}
+              onToggleSelect={() => toggleOne(survey.id)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

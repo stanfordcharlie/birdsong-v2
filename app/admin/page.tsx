@@ -1,72 +1,82 @@
 import Link from "next/link";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import { formatRelativeTime } from "@/lib/format-relative-time";
 import { userFirstName } from "@/lib/user-name";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { GreetingBlock } from "./GreetingBlock";
-import { GreetingMascot } from "./GreetingMascot";
 import { CopySurveyLinkButton } from "./CopySurveyLinkButton";
-import { Badge, type badgeVariants } from "@/components/ui/badge";
-import type { VariantProps } from "class-variance-authority";
+import {
+  ActivityTable,
+  OutListening,
+  PriorityLeads,
+  QuietState,
+  ReportCard,
+  REPORT_INTERVIEW_MINIMUM,
+  WeekStatsStrip,
+  type ActivityEvent,
+  type ListeningSurvey,
+  type PriorityLead,
+  type ReportProgress,
+  type WeekStats,
+} from "./HomeSections";
 
-type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
+// Design reference: design_handoff_admin_home/AdminHome.dc.html. This file is
+// the data layer and the page composition; HomeSections.tsx holds the markup
+// and documents how the handoff's palette maps onto the shipped admin tokens.
 
-// A lead counts as qualified from 7 up — the same threshold the score badge
-// switches to its "warning" (warm) band at, so the stat and the badges below
-// it agree about what a good score looks like.
+// A lead is worth surfacing from 7 up — the same cutoff the Slack notification
+// and the HubSpot deal threshold use, so "qualified" means one thing across
+// the product.
 const QUALIFIED_SCORE_MIN = 7;
 
-// Same bands as the Leads queue's score badge (LeadsQueue.scoreBadgeVariant),
-// reused here so a score reads the same way everywhere it appears.
-function scoreBadgeVariant(score: number | null): BadgeVariant {
-  if (score === null) return "outline";
-  if (score >= 9) return "success";
-  if (score >= QUALIFIED_SCORE_MIN) return "warning";
-  if (score >= 5) return "default";
-  return "outline";
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// How many rows the activity feed pulls before filtering. It has to over-fetch
+// because a response that was started and abandoned before the first question
+// is not an event anyone wants to read about, so some rows get dropped.
+const ACTIVITY_FETCH_LIMIT = 12;
+const ACTIVITY_ROWS = 4;
+
+type InterviewMessageish = { role?: unknown };
+
+function initialsOf(name: string | null): string {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "—";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function StatCard({ href, value, label }: { href: string; value: React.ReactNode; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="rounded-card border border-border bg-card p-6 transition-colors hover:bg-card-foreground/[0.04]"
-    >
-      <div className="text-[26px] font-semibold leading-none tracking-[-0.01em] text-card-foreground">
-        {value}
-      </div>
-      <div className="mt-2 text-[13px] text-muted-foreground">{label}</div>
-    </Link>
-  );
+function displayName(name: string | null): string {
+  return name?.trim() || "Anonymous";
 }
 
-// The two list cards share a shell: a titled surface card whose rows run
-// edge to edge, so row hover fills the card's full width rather than
-// floating inside its padding.
-function ListCard({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="flex flex-col rounded-card border border-border bg-card">
-      <div className="flex items-center justify-between gap-4 px-6 pb-4 pt-6">
-        <h2 className="type-heading">{title}</h2>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
+function stringField(values: Record<string, unknown>, ...keys: string[]): string | null {
+  for (const key of keys) {
+    const value = values[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
 }
 
-// `pb` is dropped by the surveys card, whose trailing "New survey" link
-// supplies the card's bottom padding itself.
-function EmptyRow({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <p className={cn("px-6 pb-6 text-[13px] text-faint", className)}>{children}</p>;
+// Which question they were on when they stopped: the interviewer asks, the
+// respondent answers, so the count of assistant turns is the number of
+// questions they actually saw.
+function questionsAsked(messages: unknown): number {
+  if (!Array.isArray(messages)) return 0;
+  return (messages as InterviewMessageish[]).filter((m) => m?.role === "assistant").length;
+}
+
+// The subline states what is actually waiting, in the handoff's register:
+// plain, warm, no exclamation.
+function buildSubline(waiting: number, liveSurveyCount: number, everCompleted: number): string {
+  if (waiting === 1) return "One lead finished an interview and hasn’t heard back yet.";
+  if (waiting > 1) return `${waiting} leads finished interviews and none of them have heard back yet.`;
+  if (liveSurveyCount > 0) {
+    return liveSurveyCount === 1
+      ? "One survey is listening. Nothing is waiting on you right now."
+      : `${liveSurveyCount} surveys are listening. Nothing is waiting on you right now.`;
+  }
+  if (everCompleted > 0) return "Nothing is listening at the moment. Set a survey live to start again.";
+  return "Create your first survey and Wren starts interviewing the moment you share the link.";
 }
 
 export default async function AdminHomePage() {
@@ -75,173 +85,280 @@ export default async function AdminHomePage() {
 
   if (!user) return null;
 
-  // Three parallel queries, no waterfall: profile for the greeting name,
-  // every survey this admin owns (small — status/count logic runs in JS),
-  // and every completed, non-test response (excluded at the query level so
-  // every downstream count/stat/list is clean by construction).
-  const [{ data: profile }, { data: surveysData }, { data: responsesData }] = await Promise.all([
+  // Five parallel queries, no waterfall between them.
+  //
+  // The responses query deliberately drops the `completed` filter the old
+  // page had: completion rate needs the interviews that were started and
+  // abandoned too, so the filtering happens in JS below where both halves
+  // are available.
+  const [
+    { data: profile },
+    { data: surveysData },
+    { data: responsesData },
+    { data: activityData },
+    { data: reportRows },
+  ] = await Promise.all([
     supabase.from("profiles").select("contact_name").eq("user_id", user.id).maybeSingle(),
     supabase
       .from("surveys")
       .select("id, slug, title, status, created_at")
       .eq("user_id", user.id)
       // Archived surveys are excluded from every stat and list on this page,
-      // the same way they're excluded from the surveys list's default view.
+      // matching the surveys list's default view.
       .is("archived_at", null)
       .order("created_at", { ascending: false }),
     supabase
       .from("responses")
-      .select("id, survey_id, respondent_name, lead_score, created_at")
+      .select(
+        "id, survey_id, respondent_name, custom_field_values, lead_score, status, pain_points, completed, created_at"
+      )
       .eq("user_id", user.id)
-      .eq("completed", true)
       .eq("is_test", false)
       .order("created_at", { ascending: false }),
+    // Separate and hard-limited because it is the only query that needs
+    // `messages`, a full transcript per row — fetching that column across
+    // every response just to label four activity rows would dwarf the rest
+    // of this page's payload.
+    supabase
+      .from("responses")
+      .select("id, survey_id, respondent_name, lead_score, completed, created_at, messages")
+      .eq("user_id", user.id)
+      .eq("is_test", false)
+      .order("created_at", { ascending: false })
+      .limit(ACTIVITY_FETCH_LIMIT),
+    supabase.from("survey_reports").select("survey_id").eq("user_id", user.id),
   ]);
+
+  // Company fit lives in its own columns and is fetched separately for the
+  // same reason the leads queue does it: if the response_company_fit
+  // migration has not been applied to this database, this one query errors
+  // and every lead simply renders without a fit score, rather than the whole
+  // page failing.
+  const { data: fitRows } = await supabase
+    .from("responses")
+    .select("id, fit_score")
+    .eq("user_id", user.id)
+    .eq("completed", true);
+  const fitById = new Map((fitRows ?? []).map((r) => [r.id, r.fit_score]));
 
   const firstName = userFirstName(user, profile?.contact_name);
   const surveys = surveysData ?? [];
   const surveyIds = new Set(surveys.map((s) => s.id));
+  const surveyTitleById = new Map(surveys.map((s) => [s.id, s.title]));
+
   // A response whose survey has since been archived still exists, but this
   // page has already dropped that survey — so drop its responses too, and
-  // every stat, count, and list stays consistent with what's on screen.
+  // every stat, count and list stays consistent with what is on screen.
   const responses = (responsesData ?? []).filter((r) => surveyIds.has(r.survey_id));
+  const completed = responses.filter((r) => r.completed);
 
-  const surveyTitleById = new Map(surveys.map((s) => [s.id, s.title]));
-  const liveSurveyCount = surveys.filter((s) => s.status === "live").length;
-  const qualifiedCount = responses.filter((r) => (r.lead_score ?? 0) >= QUALIFIED_SCORE_MIN).length;
+  // --- This week ----------------------------------------------------------
 
-  const responseCountBySurvey = new Map<string, number>();
+  // Only "interviews completed" is windowed to the week. Completion rate and
+  // average score are quality measures, and over a single quiet week they are
+  // either noise or an em dash — read across every response they are a stable
+  // number that is actually worth putting on the page.
+  const weekAgo = Date.now() - WEEK_MS;
+  const completedThisWeek = completed.filter((r) => new Date(r.created_at).getTime() >= weekAgo);
+  const scored = completed.filter((r) => typeof r.lead_score === "number");
+
+  // "Awaiting first contact" is a current-state count, not a seven-day one:
+  // a lead that has been sitting untouched for nine days is exactly the one
+  // this cell exists to nag about.
+  const waitingLeads = completed.filter(
+    (r) => (r.lead_score ?? 0) >= QUALIFIED_SCORE_MIN && (r.status ?? "new") === "new"
+  );
+
+  const stats: WeekStats = {
+    awaiting: waitingLeads.length,
+    completedThisWeek: completedThisWeek.length,
+    completionRate: responses.length > 0 ? completed.length / responses.length : null,
+    averageScore:
+      scored.length > 0
+        ? scored.reduce((sum, r) => sum + (r.lead_score ?? 0), 0) / scored.length
+        : null,
+  };
+
+  // --- Worth a call today -------------------------------------------------
+
+  // waitingLeads already arrives newest-first from the query; sorting by score
+  // on top of that makes the tie-break "most recent of the equally hot ones".
+  const priorityLeads: PriorityLead[] = [...waitingLeads]
+    .sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0))
+    .slice(0, 2)
+    .map((r) => {
+      const customValues = (r.custom_field_values as Record<string, unknown> | null) ?? {};
+      const painPoints = (r.pain_points as unknown as string[] | null) ?? [];
+      return {
+        id: r.id,
+        name: displayName(r.respondent_name),
+        initials: initialsOf(r.respondent_name),
+        role: stringField(customValues, "job_title", "role", "title"),
+        company: stringField(customValues, "company", "derived_company_name"),
+        score: r.lead_score ?? 0,
+        fitScore: fitById.get(r.id) ?? null,
+        // Their own words, verbatim — the top pain point is the same one the
+        // Slack notification and the HubSpot contact quote.
+        quote: typeof painPoints[0] === "string" ? painPoints[0] : null,
+        createdAt: r.created_at,
+      };
+    });
+
+  // --- Out listening ------------------------------------------------------
+
+  const startedBySurvey = new Map<string, number>();
+  const completedBySurvey = new Map<string, number>();
   for (const r of responses) {
-    responseCountBySurvey.set(r.survey_id, (responseCountBySurvey.get(r.survey_id) ?? 0) + 1);
+    startedBySurvey.set(r.survey_id, (startedBySurvey.get(r.survey_id) ?? 0) + 1);
+    if (r.completed) {
+      completedBySurvey.set(r.survey_id, (completedBySurvey.get(r.survey_id) ?? 0) + 1);
+    }
   }
 
-  const recentResponses = responses.slice(0, 5);
+  const liveSurveys = surveys.filter((s) => s.status === "live");
+  // Drafts that have never been answered, last and muted — a draft someone
+  // has already responded to is a live survey that got paused, not the
+  // "never launched" row the handoff describes.
+  const neverLaunched = surveys.filter(
+    (s) => s.status !== "live" && (startedBySurvey.get(s.id) ?? 0) === 0
+  );
+
+  const listeningSurveys: ListeningSurvey[] = [...liveSurveys, ...neverLaunched].map((s) => {
+    const started = startedBySurvey.get(s.id) ?? 0;
+    const done = completedBySurvey.get(s.id) ?? 0;
+    return {
+      id: s.id,
+      title: s.title,
+      isLive: s.status === "live",
+      completedCount: done,
+      completionRate: started > 0 ? done / started : null,
+    };
+  });
+
+  // --- Industry report ----------------------------------------------------
+
+  // Points at whichever survey is closest to having a report worth reading:
+  // the one with the most completed interviews that has not been reported on
+  // yet. Hidden entirely until at least one interview exists, so it never
+  // shows up as an empty promise on a brand-new account.
+  const reportedSurveyIds = new Set((reportRows ?? []).map((r) => r.survey_id));
+  const reportCandidate = surveys
+    .filter((s) => !reportedSurveyIds.has(s.id) && (completedBySurvey.get(s.id) ?? 0) > 0)
+    .sort((a, b) => (completedBySurvey.get(b.id) ?? 0) - (completedBySurvey.get(a.id) ?? 0))[0];
+
+  const report: ReportProgress | null = reportCandidate
+    ? {
+        surveyId: reportCandidate.id,
+        completedCount: completedBySurvey.get(reportCandidate.id) ?? 0,
+        ready: (completedBySurvey.get(reportCandidate.id) ?? 0) >= REPORT_INTERVIEW_MINIMUM,
+      }
+    : null;
+
+  // --- What's been happening ----------------------------------------------
+
+  const events: ActivityEvent[] = (activityData ?? [])
+    .filter((r) => surveyIds.has(r.survey_id))
+    // An interview abandoned before the first question was even asked is not
+    // an event — nothing happened yet.
+    .filter((r) => r.completed || questionsAsked(r.messages) > 0)
+    .slice(0, ACTIVITY_ROWS)
+    .map((r) => ({
+      id: r.id,
+      name: displayName(r.respondent_name),
+      initials: initialsOf(r.respondent_name),
+      what: r.completed
+        ? `Completed ${surveyTitleById.get(r.survey_id) ?? "a survey"}`
+        : `Dropped off at question ${questionsAsked(r.messages)}`,
+      score: r.lead_score,
+      createdAt: r.created_at,
+    }));
+
+  // --- Composition --------------------------------------------------------
+
+  const firstLiveSurvey = liveSurveys[0];
+  const subline = buildSubline(waitingLeads.length, liveSurveys.length, completed.length);
 
   return (
-    <div className="admin-container flex flex-col gap-6">
-      {/* GreetingBlock carries its own bs-rise-1; the mascot gets the same
-          class so the two arrive together rather than nesting a second
-          animation around a block that already has one. */}
-      <div className="flex items-end justify-between gap-6">
-        <GreetingBlock firstName={firstName} />
-        <div className="bs-rise-1">
-          <GreetingMascot />
+    <div className="admin-container-wide">
+      {/* Masthead: greeting on the left, the two actions hard right on the
+          same line, and the week's four numbers ruled across underneath —
+          the strip is what separates the masthead from the page, so there is
+          no divider line of its own. */}
+      <div className="mb-[26px]">
+        <div className="mb-[22px] flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between sm:gap-10">
+          <div>
+            {/* GreetingBlock owns the eyebrow and the headline because both
+                depend on the browser's clock, not the server's. */}
+            <GreetingBlock firstName={firstName} />
+            <div className="mt-3 max-w-[46ch] text-[15px] text-muted-foreground">{subline}</div>
+          </div>
+          <div className="flex shrink-0 items-center gap-[18px] sm:pb-1.5">
+            {firstLiveSurvey && (
+              <CopySurveyLinkButton
+                slug={firstLiveSurvey.slug}
+                title={firstLiveSurvey.title}
+                variant="text"
+              />
+            )}
+            <Button
+              asChild
+              className="h-auto rounded-full px-[22px] py-3 text-sm font-semibold transition-[transform,box-shadow,background-color] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(28,25,23,0.22)]"
+            >
+              <Link href="/admin/surveys/new">New survey</Link>
+            </Button>
+          </div>
+        </div>
+        <div className="bs-rise-2">
+          <WeekStatsStrip stats={stats} />
         </div>
       </div>
 
-      <section className="bs-rise-2 grid grid-cols-1 gap-6 sm:grid-cols-3">
-        <StatCard href="/admin/leads" value={responses.length} label="Total responses" />
-        <StatCard href="/admin/leads" value={qualifiedCount} label="Qualified leads" />
-        <StatCard href="/admin/surveys?status=live" value={liveSurveyCount} label="Live surveys" />
-      </section>
-
-      {/* Recent responses takes the wider column; the survey list is a
-          narrower companion. Below lg both stack to full width. */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <div className="bs-rise-3">
-          <ListCard
-            title="Recent responses"
-            action={
-              recentResponses.length > 0 ? (
-                <Link
-                  href="/admin/leads"
-                  className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-card-foreground"
-                >
-                  View all
-                </Link>
-              ) : undefined
+      {/* Worth a call today, or the quiet state in its place */}
+      <div className="bs-rise-3">
+        {priorityLeads.length > 0 ? (
+          <PriorityLeads leads={priorityLeads} waiting={waitingLeads.length} />
+        ) : (
+          <QuietState
+            liveSurveyCount={liveSurveys.length}
+            copyLinkAction={
+              firstLiveSurvey ? (
+                <CopySurveyLinkButton
+                  slug={firstLiveSurvey.slug}
+                  title={firstLiveSurvey.title}
+                  variant="button"
+                  label="Share a survey link"
+                />
+              ) : (
+                <Button asChild variant="secondary" className="hover:border-faint/50">
+                  <Link href="/admin/surveys/new">Create a survey</Link>
+                </Button>
+              )
             }
-          >
-            {recentResponses.length === 0 ? (
-              <EmptyRow>
-                Once someone completes an interview, their score and details will show up here.
-              </EmptyRow>
-            ) : (
-              <div className="flex flex-col pb-2">
-                {recentResponses.map((r) => (
-                  <Link
-                    key={r.id}
-                    href={`/admin/responses/${r.id}`}
-                    className="flex items-center gap-4 border-t border-border px-6 py-4 transition-colors hover:bg-secondary"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[15px] font-medium text-card-foreground">
-                        {r.respondent_name || "Anonymous"}
-                      </div>
-                      <div className="mt-1 truncate text-sm text-muted-foreground">
-                        {surveyTitleById.get(r.survey_id) ?? "—"}
-                      </div>
-                    </div>
-                    <Badge variant={scoreBadgeVariant(r.lead_score)}>{r.lead_score ?? "—"}</Badge>
-                    <span className="w-[70px] shrink-0 text-right type-meta" suppressHydrationWarning>
-                      {formatRelativeTime(r.created_at)}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </ListCard>
-        </div>
-
-        <div className="bs-rise-4">
-          <ListCard title="Your surveys">
-            {surveys.length === 0 ? (
-              <EmptyRow className="pb-0">
-                No surveys yet. Create one and Wren starts interviewing the moment you share the
-                link.
-              </EmptyRow>
-            ) : (
-              <div className="flex flex-col">
-                {surveys.map((survey) => {
-                  const isLive = survey.status === "live";
-                  return (
-                    // relative + a stretched link inside: the whole row
-                    // navigates, while the copy button lifts above it with
-                    // relative z-10 so it stays independently clickable —
-                    // the same escape hatch the surveys table row uses.
-                    <div
-                      key={survey.id}
-                      className="relative flex items-center gap-3 border-t border-border px-6 py-4 transition-colors hover:bg-secondary"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <Link
-                          href={`/admin/surveys/${survey.id}`}
-                          className="text-[15px] font-medium text-card-foreground"
-                        >
-                          <span className="absolute inset-0" />
-                          <span className="block truncate">{survey.title}</span>
-                        </Link>
-                        <div className="mt-1.5 flex items-center gap-2">
-                          <Badge variant={isLive ? "success" : "warning"}>
-                            {isLive ? "Live" : "Draft"}
-                          </Badge>
-                          <span className="type-meta">
-                            {responseCountBySurvey.get(survey.id) ?? 0} response
-                            {(responseCountBySurvey.get(survey.id) ?? 0) === 1 ? "" : "s"}
-                          </span>
-                        </div>
-                      </div>
-                      {isLive && (
-                        <div className="relative z-10 shrink-0">
-                          <CopySurveyLinkButton slug={survey.slug} title={survey.title} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <div className={cn("px-6 pb-6 pt-4", surveys.length > 0 && "border-t border-border")}>
-              <Link
-                href="/admin/surveys/new"
-                className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-card-foreground"
-              >
-                New survey
-              </Link>
-            </div>
-          </ListCard>
-        </div>
+          />
+        )}
       </div>
+
+      {/* Out listening + the report card. The report card is hidden until at
+          least one interview exists, so the left card takes the full width on
+          a new account rather than leaving a 340px hole. */}
+      {listeningSurveys.length > 0 && (
+        <div
+          className={
+            report
+              ? "bs-rise-4 mb-[30px] grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_340px]"
+              : "bs-rise-4 mb-[30px]"
+          }
+        >
+          <OutListening surveys={listeningSurveys} />
+          {report && <ReportCard report={report} />}
+        </div>
+      )}
+
+      {events.length > 0 && (
+        <div className="bs-rise-5">
+          <ActivityTable events={events} />
+        </div>
+      )}
     </div>
   );
 }
