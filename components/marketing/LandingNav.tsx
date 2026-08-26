@@ -10,7 +10,17 @@ import { BirdMark } from "./BirdMark";
 // "Log in" / "Get started" point at the real auth routes rather than the
 // design reference's placeholder href="#", since this renders in the actual
 // app, not the prototype.
-export function LandingNav({ crossLink }: { crossLink: { label: string; href: string } }) {
+export function LandingNav({
+  crossLink,
+  // "The handoff" is an in-page jump to QueueSection's #queue anchor, and
+  // /customer-success still renders that section while / no longer does. The
+  // link is switched off per page rather than deleted here, so the page that
+  // still has the section keeps a working way to reach it.
+  hasQueueSection = true,
+}: {
+  crossLink: { label: string; href: string };
+  hasQueueSection?: boolean;
+}) {
   return (
     <nav
       data-landing-nav
@@ -38,9 +48,11 @@ export function LandingNav({ crossLink }: { crossLink: { label: string; href: st
           <Link href="#how" className="lp-undl text-landing-muted lp-nav:hidden">
             How it works
           </Link>
-          <Link href="#queue" className="lp-undl text-landing-muted lp-nav:hidden">
-            The handoff
-          </Link>
+          {hasQueueSection && (
+            <Link href="#queue" className="lp-undl text-landing-muted lp-nav:hidden">
+              The handoff
+            </Link>
+          )}
           <Link href="/admin/login" className="lp-undl text-landing-muted lp-nav:hidden">
             Log in
           </Link>

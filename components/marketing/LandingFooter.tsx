@@ -15,10 +15,14 @@ export function LandingFooter({
   // have no #how or #queue to jump to, so they drop that column and point
   // the wordmark at the home page instead of at this page's own top.
   variant = "landing",
+  // Same per-page switch the nav uses: the PRODUCT column's "The handoff"
+  // entry is an anchor to #queue, which only some landing pages still have.
+  hasQueueSection = true,
 }: {
   description: string;
   crossLink: { label: string; href: string };
   variant?: "landing" | "minimal";
+  hasQueueSection?: boolean;
 }) {
   const isLanding = variant === "landing";
   return (
@@ -47,9 +51,11 @@ export function LandingFooter({
             <Link href="#how" className="lp-undl w-fit text-landing-muted">
               How it works
             </Link>
-            <Link href="#queue" className="lp-undl w-fit text-landing-muted">
-              The handoff
-            </Link>
+            {hasQueueSection && (
+              <Link href="#queue" className="lp-undl w-fit text-landing-muted">
+                The handoff
+              </Link>
+            )}
             <Link href={crossLink.href} className="lp-undl w-fit text-landing-muted">
               {crossLink.label}
             </Link>
@@ -62,12 +68,6 @@ export function LandingFooter({
           <Link href="/admin/login" className="lp-undl w-fit text-landing-muted">
             Log in
           </Link>
-          <a
-            href="mailto:charlie@usebirdsong.com"
-            className="lp-undl w-fit font-medium text-landing-ink"
-          >
-            charlie@usebirdsong.com
-          </a>
           <Link href="/privacy" className="lp-undl w-fit text-landing-muted">
             Privacy
           </Link>

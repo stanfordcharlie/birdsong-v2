@@ -6,7 +6,6 @@ import { LandingNav } from "@/components/marketing/LandingNav";
 import { Hero } from "@/components/marketing/Hero";
 import { MetricsBand } from "@/components/marketing/MetricsBand";
 import { SequenceSection } from "@/components/marketing/SequenceSection";
-import { QueueSection } from "@/components/marketing/QueueSection";
 import { ProofSection } from "@/components/marketing/ProofSection";
 import { FaqSection } from "@/components/marketing/FaqSection";
 import { CrossAudienceBanner } from "@/components/marketing/CrossAudienceBanner";
@@ -65,7 +64,10 @@ export default async function RootPage({
 
   return (
     <LandingPageShell>
-      <LandingNav crossLink={{ label: "For customer success", href: "/customer-success" }} />
+      <LandingNav
+        crossLink={{ label: "For customer success", href: "/customer-success" }}
+        hasQueueSection={false}
+      />
       <Hero
         statusSticker="61 interviews running right now"
         headlinePre="Your best leads are already"
@@ -162,61 +164,6 @@ export default async function RootPage({
           stickerLabel: "booked!",
         }}
       />
-      <QueueSection
-        headline="This is what your reps open on Monday"
-        intro="Pick a respondent. The score, the reasoning and the opener were all written from what they actually said."
-        rows={[
-          { name: "Sam Okafor", subtitle: "Head of Growth · Coretide", score: "9" },
-          { name: "Priya Raman", subtitle: "VP Sales · Lattice Freight", score: "7" },
-          { name: "Daniel Ochoa", subtitle: "RevOps Lead · Northwind", score: "4" },
-        ]}
-        footnote="3 of 61 interviews shown"
-        panels={[
-          {
-            verdict: "Route to sales today",
-            scoreLabel: "Score 9 / 10",
-            scoreTone: "green",
-            quote: "“We spend our best hours triaging inbound that goes nowhere.”",
-            facts: [
-              { label: "WHY 9", value: "Named pain, quantified, budget owner in the room" },
-              { label: "TIMELINE", value: "Evaluating this quarter" },
-              { label: "NEXT STEP", value: "Warm intro accepted" },
-            ],
-            calloutLabel: "Opener:",
-            calloutText:
-              "“You said triage eats your team’s best hours. Walk me through the worst morning.”",
-          },
-          {
-            verdict: "Nurture, revisit next quarter",
-            scoreLabel: "Score 7 / 10",
-            scoreTone: "butter",
-            quote:
-              "“The problem is real, but we just signed a two year contract elsewhere.”",
-            facts: [
-              { label: "WHY 7", value: "Strong fit, wrong moment, renewal in March" },
-              { label: "TIMELINE", value: "Contract ends Q1" },
-              { label: "NEXT STEP", value: "Quarterly check in" },
-            ],
-            calloutLabel: "Opener:",
-            calloutText:
-              "“You mentioned the renewal in March. Worth comparing notes before you re-sign?”",
-          },
-          {
-            verdict: "Keep as research, not a lead",
-            scoreLabel: "Score 4 / 10",
-            scoreTone: "neutral",
-            quote: "“We built our own routing last year. It mostly works.”",
-            facts: [
-              { label: "WHY 4", value: "No active pain, no budget, internal tooling in place" },
-              { label: "STILL USEFUL", value: "Told us what “good enough” looks like" },
-              { label: "NEXT STEP", value: "None. Nobody calls him." },
-            ],
-            calloutLabel: "Why this matters:",
-            calloutText:
-              "a scored no is worth as much as a yes. Your reps never spend a morning on him.",
-          },
-        ]}
-      />
       <ProofSection
         headlinePre="Every lead arrives with the"
         headlineAccent="whole story"
@@ -290,6 +237,7 @@ export default async function RootPage({
       <LandingFooter
         description="Interview-led pipeline for teams who would rather hear it first hand."
         crossLink={{ label: "For customer success", href: "/customer-success" }}
+        hasQueueSection={false}
       />
     </LandingPageShell>
   );
