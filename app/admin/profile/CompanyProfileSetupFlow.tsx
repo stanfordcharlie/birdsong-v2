@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { Badge, Button, Card } from "@/components/admin/ui";
+import { EMPTY_VALUE } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
@@ -366,7 +366,7 @@ export function CompanyProfileSetupFlow({
           The app's own admin nav stays visible; only this flow's own
           step-navigator sidebar is new. */}
       <div className="sticky top-0 flex h-screen w-[220px] shrink-0 flex-col border-r border-border bg-card px-5 py-8">
-        <div className="mb-7 text-[15px] font-semibold tracking-[-0.01em] text-card-foreground">
+        <div className="type-heading mb-7">
           Company Profile
         </div>
 
@@ -381,7 +381,7 @@ export function CompanyProfileSetupFlow({
                 <div className="flex flex-col items-center">
                   <div
                     className={cn(
-                      "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                      "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-pill font-archivo text-xs font-semibold",
                       status === "current" && "bg-primary text-primary-foreground",
                       (status === "done" || status === "visited-incomplete") && "bg-success-bg text-success",
                       status === "upcoming" && "border border-border bg-card text-faint"
@@ -390,7 +390,7 @@ export function CompanyProfileSetupFlow({
                     {status === "done" ? (
                       "✓"
                     ) : status === "visited-incomplete" ? (
-                      <span className="h-2 w-2 rounded-full bg-warning" />
+                      <span className="h-2 w-2 rounded-pill bg-warning" />
                     ) : (
                       i + 1
                     )}
@@ -412,7 +412,7 @@ export function CompanyProfileSetupFlow({
                       {s.section}
                     </span>
                     {incomplete && i !== step && (
-                      <span className="h-2 w-2 shrink-0 rounded-full bg-warning" aria-hidden="true" />
+                      <span className="h-2 w-2 shrink-0 rounded-pill bg-warning" aria-hidden="true" />
                     )}
                   </div>
                 </div>
@@ -423,11 +423,11 @@ export function CompanyProfileSetupFlow({
 
         <div className="mt-auto flex flex-col gap-1">
           {saveError && (
-            <div role="alert" className="text-xs font-medium text-destructive">
+            <div role="alert" className="type-body-sm font-medium text-destructive">
               {saveError}
             </div>
           )}
-          <div className="text-xs text-faint">{saveNote || "Autosaved as you go"}</div>
+          <div className="type-body-sm text-faint">{saveNote || "Autosaved as you go"}</div>
         </div>
       </div>
 
@@ -458,16 +458,16 @@ export function CompanyProfileSetupFlow({
               <button
                 type="button"
                 onClick={() => setShowThinNote(false)}
-                className="shrink-0 text-xs font-medium text-muted-foreground hover:text-card-foreground"
+                className="focus-ring type-body-sm shrink-0 rounded-control font-medium text-muted-foreground hover:text-card-foreground"
               >
                 Dismiss
               </button>
             </div>
           )}
 
-          <div className="mb-9 h-1 w-full overflow-hidden rounded-full bg-secondary">
+          <div className="mb-9 h-1 w-full overflow-hidden rounded-pill bg-secondary">
             <div
-              className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+              className="h-full rounded-pill bg-primary transition-[width] duration-300 ease-out"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -482,16 +482,16 @@ export function CompanyProfileSetupFlow({
             <Card className="flex min-h-[540px] flex-col p-11">
               {isReview ? (
                 <div className="flex flex-1 flex-col">
-                  <h2 className="mb-2 font-serif text-[28px] font-normal tracking-[-0.01em] text-card-foreground">
+                  <h2 className="mb-2 font-serif text-display-sm font-normal text-card-foreground">
                     {current.title}
                   </h2>
-                  <p className="mb-8 text-[15.5px] leading-[1.6] text-muted-foreground">{current.subtitle}</p>
+                  <p className="type-body mb-8 text-muted-foreground">{current.subtitle}</p>
 
                   <div className="flex flex-col gap-5">
                     {STEPS.filter((s) => !s.review).map((s, i) => (
-                      <div key={s.id} className="rounded-card border border-border p-[18px_20px]">
+                      <div key={s.id} className="rounded-card border border-border px-5 py-[18px]">
                         <div className="mb-2.5 flex items-center justify-between">
-                          <div className="text-[13px] font-semibold text-card-foreground">{s.section}</div>
+                          <div className="type-body-sm font-semibold">{s.section}</div>
                           <Button
                             type="button"
                             variant="secondary"
@@ -506,7 +506,7 @@ export function CompanyProfileSetupFlow({
                           {(s.fields ?? []).map((f) => (
                             <div key={f.key} className="text-sm text-muted-foreground">
                               <span className="text-faint">{f.label || s.section}:</span>{" "}
-                              {data[f.key] ? data[f.key] : "—"}
+                              {data[f.key] ? data[f.key] : EMPTY_VALUE}
                             </div>
                           ))}
                         </div>
@@ -520,9 +520,9 @@ export function CompanyProfileSetupFlow({
                     );
                     if (stepsMissing.length === 0) return null;
                     return (
-                      <div className="mt-5 rounded-card border border-border p-[18px_20px]">
-                        <div className="mb-2.5 flex items-center gap-2 text-[13px] font-semibold text-card-foreground">
-                          <span className="h-2 w-2 shrink-0 rounded-full bg-warning" aria-hidden="true" />
+                      <div className="mt-5 rounded-card border border-border px-5 py-[18px]">
+                        <div className="type-body-sm mb-2.5 flex items-center gap-2 font-semibold">
+                          <span className="h-2 w-2 shrink-0 rounded-pill bg-warning" aria-hidden="true" />
                           Still incomplete
                         </div>
                         <div className="flex flex-col gap-2.5">
@@ -556,19 +556,19 @@ export function CompanyProfileSetupFlow({
                       <Button type="button" onClick={handleFinish} disabled={finishing}>
                         {finishing ? "Finishing..." : "Finish setup"}
                       </Button>
-                      {finishError && <span className="text-xs text-destructive">{finishError}</span>}
+                      {finishError && <span className="type-body-sm text-destructive">{finishError}</span>}
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-1 flex-col">
-                  <div className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.03em] text-muted-foreground">
+                  <div className="type-section-label mb-2.5">
                     {current.section}
                   </div>
-                  <h2 className="mb-2 font-serif text-[28px] font-normal tracking-[-0.01em] text-card-foreground">
+                  <h2 className="mb-2 font-serif text-display-sm font-normal text-card-foreground">
                     {current.title}
                   </h2>
-                  <p className="mb-8 text-[15.5px] leading-[1.6] text-muted-foreground">{current.subtitle}</p>
+                  <p className="type-body mb-8 text-muted-foreground">{current.subtitle}</p>
 
                   <div
                     className={
@@ -587,9 +587,9 @@ export function CompanyProfileSetupFlow({
                               <label className="text-sm font-semibold text-card-foreground">{field.label}</label>
                             )}
                             {isDrafted && (
-                              <span className="inline-flex items-center rounded-full bg-indigo-chip/[0.08] px-2 py-0.5 text-[11px] font-medium text-indigo">
+                              <Badge variant="accent" size="sm">
                                 AI-drafted
-                              </span>
+                              </Badge>
                             )}
                           </div>
                         )}
@@ -610,7 +610,7 @@ export function CompanyProfileSetupFlow({
                             className="h-11"
                           />
                         )}
-                        {field.helper && <div className="text-[13px] text-faint">{field.helper}</div>}
+                        {field.helper && <div className="type-body-sm text-faint">{field.helper}</div>}
                       </div>
                       );
                     })}

@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { Button, Card, PageHeader, PageShell } from "@/components/admin/ui";
 import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate } from "@/components/useLoadingGate";
 import { buildPasteExtractionPrompt } from "@/lib/profile-onboarding/company-profile-fields";
@@ -53,46 +52,43 @@ export function AiFillFlow({
   }
 
   return (
-    <div className="admin-container flex flex-col">
-      <div className="mb-6 flex items-start justify-between gap-6">
-        <div>
-          <div className="mb-2.5 type-label">Company profile</div>
-          <h1 className="mb-2.5 type-page-title">Have your AI fill this out</h1>
-          <p className="max-w-[560px] text-[15px] text-muted-foreground">
-            Copy the prompt below into a ChatGPT or Claude chat that already knows your company, then paste its
-            answer back here. Birdsong fills in whatever it can; anything missing you can fill in yourself.
-          </p>
-        </div>
-        <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
-          Back to manual setup
-        </Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Company profile"
+        title="Have your AI fill this out"
+        subtitle="Copy the prompt below into a ChatGPT or Claude chat that already knows your company, then paste its answer back here. Birdsong fills in whatever it can; anything missing you can fill in yourself."
+        actions={
+          <Button type="button" variant="secondary" onClick={onCancel}>
+            Back to manual setup
+          </Button>
+        }
+      />
 
-      <Card className="mb-5 flex flex-col gap-4 p-6">
+      <Card className="mb-5 flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="type-label">1. Copy this prompt</h2>
+          <h2 className="type-section-label">1. Copy this prompt</h2>
           <Button type="button" variant="secondary" size="sm" onClick={handleCopy}>
             {copied ? "Copied!" : "Copy"}
           </Button>
         </div>
-        <pre className="whitespace-pre-wrap rounded-control border border-border bg-chip px-4 py-3.5 font-mono text-[13px] leading-[1.6] text-card-foreground">
+        <pre className="type-code whitespace-pre-wrap rounded-control border border-border bg-chip px-4 py-3.5">
           {PROMPT}
         </pre>
-        <p className="text-sm text-muted-foreground">
+        <p className="type-body text-muted-foreground">
           Paste this into ChatGPT or Claude, then paste its answer below.
         </p>
       </Card>
 
-      <Card className="flex flex-col gap-4 p-6">
-        <h2 className="type-label">2. Paste its answer</h2>
+      <Card className="flex flex-col gap-4">
+        <h2 className="type-section-label">2. Paste its answer</h2>
         <Textarea
           value={pastedText}
           onChange={(e) => setPastedText(e.target.value)}
           placeholder="Paste the full response here..."
           rows={14}
-          className="resize-none font-mono text-[13px] leading-[1.6]"
+          className="type-code resize-none"
         />
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="type-body text-destructive">{error}</p>}
         <div className="flex justify-end">
           <Button type="button" onClick={handleExtract} disabled={extracting || !pastedText.trim()}>
             {extracting && showLoader && <BirdLoader size={18} label={false} />}
@@ -100,6 +96,6 @@ export function AiFillFlow({
           </Button>
         </div>
       </Card>
-    </div>
+    </PageShell>
   );
 }

@@ -355,6 +355,11 @@ select {
   .type-meta {
     @apply font-archivo text-[13px] font-normal text-muted-foreground;
   }
+  /* Monospace blocks: the copyable AI prompt, the paste box, inline ?src=
+     fragments. The one place admin leaves the Archivo scale. */
+  .type-code {
+    @apply font-mono text-[13px] leading-[1.5] text-card-foreground;
+  }
 
   /* Retained only so the not-yet-migrated admin routes keep rendering during
      the page-by-page refactor. Aliases .type-section-label. Delete once the

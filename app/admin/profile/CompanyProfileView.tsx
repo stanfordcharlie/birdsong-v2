@@ -7,9 +7,10 @@ import type { CompanyProfileEditFields } from "@/lib/profile-onboarding/edit";
 import type { Database } from "@/types/database";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { Badge, Button, PageHeader, PageShell } from "@/components/admin/ui";
 import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate } from "@/components/useLoadingGate";
+import { EMPTY_VALUE } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type CompanyProfileValues = {
@@ -88,7 +89,7 @@ function Section({
   return (
     <div className={cn("border-border py-6", !first && "border-t")}>
       <div className="mb-4 flex items-baseline justify-between gap-6">
-        <h2 className="type-label">{title}</h2>
+        <h2 className="type-section-label">{title}</h2>
         {editing ? (
           <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
             Cancel
@@ -108,14 +109,19 @@ function Section({
 function ReadField({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-faint">{label}</div>
-      <div className="text-[15px] text-card-foreground">{value || "—"}</div>
+      <div className="type-table-head mb-1">{label}</div>
+      <div className="type-body">{value || EMPTY_VALUE}</div>
     </div>
   );
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <div className="mb-2 text-sm font-semibold text-card-foreground">{children}</div>;
+  return <div className="type-body-sm mb-2 font-semibold">{children}</div>;
+}
+
+/** The read view of a free-text section. One measure for all four of them. */
+function ReadProse({ value }: { value: string }) {
+  return <p className="admin-measure type-body">{value || EMPTY_VALUE}</p>;
 }
 
 export function CompanyProfileView({
@@ -378,23 +384,28 @@ export function CompanyProfileView({
     .filter(Boolean);
 
   return (
-    <div className="admin-container flex flex-col">
-      <div className="bs-rise-1 mb-6 flex items-start justify-between gap-6">
-        <div>
-          <div className="mb-2.5 type-label">Settings</div>
-          <h1 className="mb-2.5 type-page-title">Company profile</h1>
-          <p className="max-w-[520px] text-[15px] text-muted-foreground">
-            What Birdsong knows about your company. Every survey uses this to ask sharper questions and qualify the
-            right people.
-          </p>
-          {justFinishedSetup && (
-            <p className="mt-3 text-sm text-muted-foreground">Setup complete, saved. Anything to adjust?</p>
-          )}
-        </div>
-        <Button type="button" variant="secondary" size="sm" onClick={onStartAiFill} className="shrink-0">
-          Have your AI fill this out
-        </Button>
-      </div>
+    <PageShell>
+      {/* Eyebrow matches the sidebar nav label that reaches this page. It used
+          to read "Settings", which is a different page. */}
+      <PageHeader
+        className="bs-rise-1"
+        eyebrow="Company profile"
+        title="Company profile"
+        subtitle={
+          <>
+            What Birdsong knows about your company. Every survey uses this to ask sharper questions
+            and qualify the right people.
+            {justFinishedSetup && (
+              <span className="mt-3 block">Setup complete, saved. Anything to adjust?</span>
+            )}
+          </>
+        }
+        actions={
+          <Button type="button" variant="secondary" onClick={onStartAiFill}>
+            Have your AI fill this out
+          </Button>
+        }
+      />
 
       <div className="bs-rise-2 mb-4 flex items-center gap-2.5 rounded-card border border-border bg-chip px-3.5 py-3">
         <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="shrink-0" aria-hidden="true">
@@ -406,23 +417,22 @@ export function CompanyProfileView({
           onChange={(e) => setAiPrompt(e.target.value)}
           onKeyDown={handleAiKeyDown}
           disabled={aiStatus === "loading"}
-          placeholder='Edit with AI — e.g. "update our value prop to mention the new AI feature"'
-          className="flex-1 border-none bg-transparent py-1.5 text-sm text-card-foreground placeholder:text-faint focus:outline-none disabled:opacity-60"
+          placeholder='Edit with AI, e.g. "update our value prop to mention the new AI feature"'
+          className="focus-ring flex-1 rounded-control border-none bg-transparent px-1 py-1.5 font-archivo text-sm text-card-foreground placeholder:text-faint disabled:opacity-60"
         />
         <Button
           type="button"
           size="sm"
           onClick={handleAiSend}
           disabled={aiStatus === "loading" || !aiPrompt.trim()}
-          className="shrink-0 px-4"
         >
           {aiStatus === "loading" && showAiLoader && <BirdLoader size={18} label={false} />}
           {aiButtonLabel}
         </Button>
       </div>
-      {aiError && <p className="-mt-2 mb-4 text-sm text-destructive">{aiError}</p>}
+      {aiError && <p className="type-body -mt-2 mb-4 text-destructive">{aiError}</p>}
 
-      {saveError && <p className="mb-4 text-sm text-destructive">{saveError}</p>}
+      {saveError && <p className="type-body mb-4 text-destructive">{saveError}</p>}
 
       <div className="flex flex-col">
         {/* Basics + logo: not part of the design reference (which only
@@ -487,7 +497,7 @@ export function CompanyProfileView({
                 className="h-12 w-12 rounded-card border border-border bg-card object-cover"
               />
             ) : (
-              <div className="flex h-12 w-12 items-center justify-center rounded-card border border-border bg-card text-sm font-semibold text-card-foreground">
+              <div className="flex h-12 w-12 items-center justify-center rounded-card border border-border bg-card font-archivo text-sm font-semibold text-card-foreground">
                 {initials}
               </div>
             )}
@@ -532,8 +542,8 @@ export function CompanyProfileView({
               )}
             </Button>
           </div>
-          {logoError && <p className="mt-2 text-xs text-destructive">{logoError}</p>}
-          {basicsQuickSaveError && <p className="mt-2 text-xs text-destructive">{basicsQuickSaveError}</p>}
+          {logoError && <p className="type-body-sm mt-2 text-destructive">{logoError}</p>}
+          {basicsQuickSaveError && <p className="type-body-sm mt-2 text-destructive">{basicsQuickSaveError}</p>}
         </Section>
 
         <Section
@@ -553,9 +563,7 @@ export function CompanyProfileView({
               </div>
             </div>
           ) : (
-            <p className="max-w-[620px] text-[15px] leading-[1.6] text-card-foreground">
-              {profile.whatWeSell || "—"}
-            </p>
+            <ReadProse value={profile.whatWeSell} />
           )}
         </Section>
 
@@ -576,9 +584,7 @@ export function CompanyProfileView({
               </div>
             </div>
           ) : (
-            <p className="max-w-[620px] text-[15px] leading-[1.6] text-card-foreground">
-              {profile.targetIcp || "—"}
-            </p>
+            <ReadProse value={profile.targetIcp} />
           )}
         </Section>
 
@@ -599,9 +605,7 @@ export function CompanyProfileView({
               </div>
             </div>
           ) : (
-            <p className="max-w-[620px] text-[15px] leading-[1.6] text-card-foreground">
-              {profile.valueProp || "—"}
-            </p>
+            <ReadProse value={profile.valueProp} />
           )}
         </Section>
 
@@ -618,7 +622,7 @@ export function CompanyProfileView({
                 onChange={(e) => setField("brandVoice", e.target.value)}
                 placeholder="e.g. Warm, plainspoken, curious"
               />
-              <p className="text-xs text-muted-foreground">Comma-separated descriptors, in whatever words fit.</p>
+              <p className="type-body-sm text-muted-foreground">Comma-separated descriptors, in whatever words fit.</p>
               <div className="flex justify-end">
                 <Button type="button" size="sm" disabled={saving} onClick={() => saveSection(["brandVoice"])}>
                   {saving && showSaveLoader && <BirdLoader size={18} label={false} />}
@@ -627,16 +631,13 @@ export function CompanyProfileView({
               </div>
             </div>
           ) : voiceChips.length === 0 ? (
-            <p className="text-sm text-muted-foreground">—</p>
+            <p className="type-body text-muted-foreground">{EMPTY_VALUE}</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {voiceChips.map((chip) => (
-                <span
-                  key={chip}
-                  className="rounded-full bg-indigo-chip/[0.08] px-3 py-1.5 text-[13px] font-medium text-indigo"
-                >
+                <Badge key={chip} variant="accent">
                   {chip}
-                </span>
+                </Badge>
               ))}
             </div>
           )}
@@ -654,8 +655,8 @@ export function CompanyProfileView({
         >
           {resetting ? "Resetting..." : "Start over"}
         </Button>
-        {resetError && <span className="text-xs text-destructive">{resetError}</span>}
+        {resetError && <span className="type-body-sm text-destructive">{resetError}</span>}
       </div>
-    </div>
+    </PageShell>
   );
 }

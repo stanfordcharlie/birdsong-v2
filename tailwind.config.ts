@@ -173,6 +173,16 @@ const config: Config = {
       maxWidth: {
         container: "var(--ds-container-max)",
       },
+      fontSize: {
+        // Named steps for the admin controls, so a primitive never writes a
+        // raw px font size. The prose scale lives in globals.css as .type-*
+        // roles; these are the sizes those roles cannot express, because a
+        // control needs a size without also inheriting a colour and leading.
+        micro: ["11.5px", { lineHeight: "1.2" }],
+        count: ["12px", { lineHeight: "1.2" }],
+        control: ["13px", { lineHeight: "1.2" }],
+        "display-sm": ["28px", { lineHeight: "1.2", letterSpacing: "-0.01em" }],
+      },
       fontFamily: {
         // Global body default. Marketing pages (out of scope for the
         // platform redesign) still render in Inter via this — the admin +

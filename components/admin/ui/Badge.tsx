@@ -24,8 +24,8 @@ const adminBadgeVariants = cva(
         outline: "border border-border text-muted-foreground",
       },
       size: {
-        default: "px-2.5 py-1 text-[13px]",
-        sm: "px-2 py-0.5 text-[11.5px]",
+        default: "px-2.5 py-1 text-control",
+        sm: "px-2 py-0.5 text-micro",
       },
     },
     defaultVariants: { variant: "count", size: "default" },

@@ -37,7 +37,7 @@ const adminButtonVariants = cva(
       },
       size: {
         default: "h-10 px-5 text-sm [&_svg]:size-4",
-        sm: "h-8 px-3.5 text-[13px] [&_svg]:size-3.5",
+        sm: "h-8 px-3.5 text-control [&_svg]:size-3.5",
       },
     },
     defaultVariants: { variant: "primary", size: "default" },

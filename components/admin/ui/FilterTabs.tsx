@@ -48,7 +48,7 @@ export function FilterTabs<T extends string>({
             onClick={() => onChange(tab.value)}
             aria-pressed={active}
             className={cn(
-              "focus-ring flex h-7 items-center gap-1.5 rounded-control px-2.5 font-archivo text-[13px] font-medium transition-colors",
+              "focus-ring flex h-7 items-center gap-1.5 rounded-control px-2.5 font-archivo text-control font-medium transition-colors",
               active
                 ? "bg-card text-card-foreground shadow-sm"
                 : "text-muted-foreground hover:text-card-foreground"
@@ -56,7 +56,7 @@ export function FilterTabs<T extends string>({
           >
             {tab.label}
             {tab.count !== undefined && (
-              <span className={cn("text-[12px]", active ? "text-muted-foreground" : "text-faint")}>
+              <span className={cn("text-count", active ? "text-muted-foreground" : "text-faint")}>
                 {tab.count}
               </span>
             )}
