@@ -20,6 +20,28 @@ function HomeIcon() {
   );
 }
 
+// Broadcast arcs around a filled center, same 19px / 1.4px stroke language
+// as the rest of the set.
+function LiveIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 18 18" fill="none" className="shrink-0">
+      <circle cx="9" cy="9" r="1.7" fill="currentColor" />
+      <path
+        d="M5.6 5.6a4.8 4.8 0 000 6.8M12.4 12.4a4.8 4.8 0 000-6.8"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M3.3 3.3a8 8 0 000 11.4M14.7 14.7a8 8 0 000-11.4"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function LeadsIcon() {
   return (
     <svg width="19" height="19" viewBox="0 0 18 18" fill="none" className="shrink-0">
@@ -101,6 +123,7 @@ function CollapseIcon({ collapsed }: { collapsed: boolean }) {
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Home", icon: HomeIcon },
+  { href: "/admin/live", label: "Live", icon: LiveIcon },
   { href: "/admin/leads", label: "Leads", icon: LeadsIcon },
   { href: "/admin/surveys", label: "Surveys", icon: SurveysIcon },
   { href: "/admin/profile", label: "Company profile", icon: CompanyProfileIcon },
