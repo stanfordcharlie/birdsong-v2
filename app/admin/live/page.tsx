@@ -1,4 +1,5 @@
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { PageHeader, PageShell } from "@/components/admin/ui";
 import { LiveBoard, type LiveSurvey } from "./LiveBoard";
 
 // Who is in an interview right now, read entirely from Supabase Realtime
@@ -29,15 +30,12 @@ export default async function LivePage() {
   }));
 
   return (
-    <div className="admin-container-wide flex flex-col gap-7">
-      <div className="flex flex-col gap-2">
-        <span className="type-label">Live</span>
-        <h1 className="type-page-title">Happening right now</h1>
-      </div>
+    <PageShell>
+      <PageHeader eyebrow="Live" title="Happening right now" />
 
-      {error && <p className="text-sm text-destructive">{error.message}</p>}
+      {error && <p className="type-body text-destructive">{error.message}</p>}
 
       {!error && <LiveBoard surveys={liveSurveys} />}
-    </div>
+    </PageShell>
   );
 }

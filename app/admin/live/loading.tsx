@@ -1,10 +1,11 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageShell } from "@/components/admin/ui";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function LiveLoading() {
   return (
-    <div className="admin-container-wide flex flex-col gap-7">
+    <PageShell>
       <div className="flex flex-col gap-2">
         <Skeleton className="h-4 w-10" />
         <Skeleton className="h-10 w-80" />
@@ -48,6 +49,6 @@ export default function LiveLoading() {
           </Table>
         </Card>
       </div>
-    </div>
+    </PageShell>
   );
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
+import { Badge, PageHeader, PageShell } from "@/components/admin/ui";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { formatRelativeTime } from "@/lib/format";
 import type { InterviewMessage } from "@/lib/interview/types";
@@ -35,35 +35,30 @@ export default async function LiveResponsePage({ params }: { params: Promise<{ i
   const messages = (response.messages as unknown as InterviewMessage[] | null) ?? [];
 
   return (
-    <div className="admin-container flex flex-col gap-7">
-      <div className="flex flex-col gap-2">
-        <Link
-          href="/admin/live"
-          className="type-label transition-colors hover:text-card-foreground"
-        >
-          Live
-        </Link>
-        <h1 className="type-page-title">{response.respondent_name || "Anonymous respondent"}</h1>
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-          <span className="type-meta">{response.surveys?.title ?? "Unknown survey"}</span>
-          <span className="type-meta" aria-hidden>
-            ·
+    <PageShell>
+      <PageHeader
+        eyebrow="Live"
+        title={response.respondent_name || "Anonymous respondent"}
+        badge={
+          <>
+            {response.is_test && <Badge variant="warning">Test</Badge>}
+            {response.completed && <Badge variant="live">Finished</Badge>}
+          </>
+        }
+        subtitle={
+          <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+            <span>{response.surveys?.title ?? "Unknown survey"}</span>
+            <span aria-hidden>·</span>
+            <span suppressHydrationWarning>Started {formatRelativeTime(response.created_at)}</span>
+            {response.respondent_email && (
+              <>
+                <span aria-hidden>·</span>
+                <span>{response.respondent_email}</span>
+              </>
+            )}
           </span>
-          <span className="type-meta" suppressHydrationWarning>
-            Started {formatRelativeTime(response.created_at)}
-          </span>
-          {response.respondent_email && (
-            <>
-              <span className="type-meta" aria-hidden>
-                ·
-              </span>
-              <span className="type-meta">{response.respondent_email}</span>
-            </>
-          )}
-          {response.is_test && <Badge variant="warning">Test</Badge>}
-          {response.completed && <Badge variant="success">Finished</Badge>}
-        </div>
-      </div>
+        }
+      />
 
       <LiveTranscript
         responseId={response.id}
@@ -72,13 +67,13 @@ export default async function LiveResponsePage({ params }: { params: Promise<{ i
       />
 
       {response.completed && (
-        <p className="text-sm text-muted-foreground">
-          <Link href={`/admin/responses/${response.id}`} className="text-indigo hover:underline">
+        <p className="type-body mt-4 text-muted-foreground">
+          <Link href={`/admin/responses/${response.id}`} className="focus-ring rounded-control underline">
             Open the full response
           </Link>{" "}
           for the score, pain points, and call script.
         </p>
       )}
-    </div>
+    </PageShell>
   );
 }

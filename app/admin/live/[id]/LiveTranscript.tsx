@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { InterviewMessage } from "@/lib/interview/types";
 import { renderWithBold } from "@/lib/chat/render-with-bold";
 import { createClient } from "@/lib/supabase/client";
+import { StatusDot } from "@/components/admin/ui";
 import { cn } from "@/lib/utils";
 
 // Read-only. There is no composer, no send path, and no write of any kind on
@@ -118,14 +119,8 @@ export function LiveTranscript({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2.5">
-        <span
-          aria-hidden
-          className={cn(
-            "block h-[7px] w-[7px] shrink-0 rounded-full",
-            connection === "live" && !completed ? "bs-dot bg-indigo-light" : "bg-chip"
-          )}
-        />
-        <span className="text-sm text-muted-foreground">
+        <StatusDot live={connection === "live" && !completed} pulse />
+        <span className="type-body text-muted-foreground">
           {completed
             ? "This interview has finished. The transcript below is final."
             : connection === "live"
@@ -136,19 +131,20 @@ export function LiveTranscript({
         </span>
       </div>
 
-      {/* The bubbles use the respondent interview's own editorial palette
-          rather than the admin stone tokens, so what an admin reads here
-          looks like what the respondent is looking at. Values copied from
-          the interview's transcript view, not imported from it: nothing on
-          this page should be able to pull in the interview's input or
-          submission logic. The cream ground comes with them, since the
-          near-white interviewer bubble has no contrast without it. */}
+      {/* The bubbles used to copy the respondent interview's editorial palette
+          verbatim, so an admin saw roughly what the respondent saw. That
+          brought a cream ground with it, which this design pass bans, and an
+          admin page painting itself from a second surface's colours is the
+          drift the pass exists to remove. The shape of the conversation (the
+          asymmetric tails, the left/right split, the accent on the
+          respondent's own words) is what carries the resemblance; it now does
+          so in admin tokens. */}
       <div
         ref={scrollRef}
-        className="max-h-[62vh] overflow-y-auto rounded-card border border-[#e9e3d3] bg-[#f3ecdf] p-5 sm:p-7"
+        className="max-h-[62vh] overflow-y-auto rounded-card border border-border bg-secondary p-5 sm:p-7"
       >
         {messages.length === 0 ? (
-          <p className="py-8 text-center text-[15px] text-[#6f6757]">
+          <p className="type-body py-8 text-center text-muted-foreground">
             No questions yet. The first one appears here as soon as the interview starts.
           </p>
         ) : (
@@ -159,10 +155,10 @@ export function LiveTranscript({
                 <div
                   key={i}
                   className={cn(
-                    "whitespace-pre-wrap break-words text-[15.5px] leading-[1.6]",
+                    "type-body whitespace-pre-wrap break-words",
                     isInterviewer
-                      ? "max-w-[86%] self-start rounded-[16px_16px_16px_5px] border border-[#e9e3d3] bg-[#fffefa] px-5 py-3.5 text-[#241f18] shadow-[0_2px_8px_rgba(38,32,25,.05)]"
-                      : "max-w-[78%] self-end rounded-[16px_16px_5px_16px] bg-[#3a6046] px-[18px] py-3 text-[#f2f6ef]"
+                      ? "max-w-[86%] self-start rounded-card rounded-bl-[5px] border border-border bg-card px-5 py-3.5 shadow-card"
+                      : "max-w-[78%] self-end rounded-card rounded-br-[5px] bg-brand px-4 py-3 text-primary-foreground"
                   )}
                 >
                   {isInterviewer ? renderWithBold(message.content) : message.content}
@@ -171,7 +167,7 @@ export function LiveTranscript({
             })}
 
             {!completed && lastRole !== null && (
-              <p className="mt-1 self-center text-[12.5px] font-semibold tracking-[0.08em] text-[#a89d88]">
+              <p className="type-eyebrow mt-1 self-center text-faint">
                 {lastRole === "assistant" ? "WAITING ON THEIR ANSWER" : "WRITING THE NEXT QUESTION"}
               </p>
             )}

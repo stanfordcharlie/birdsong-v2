@@ -31,6 +31,7 @@ export function DataTable<Row>({
   rows,
   rowKey,
   rowHref,
+  rowClassName,
   empty,
   className,
 }: {
@@ -39,6 +40,8 @@ export function DataTable<Row>({
   rowKey: (row: Row) => string;
   /** Makes the whole row navigable without nesting anchors inside cells. */
   rowHref?: (row: Row) => string | null;
+  /** Per-row modifier, e.g. dimming a row that has gone stale. */
+  rowClassName?: (row: Row) => string | undefined;
   empty: { title: string; description?: string; action?: React.ReactNode };
   className?: string;
 }) {
@@ -78,7 +81,8 @@ export function DataTable<Row>({
                   key={rowKey(row)}
                   className={cn(
                     "border-b border-chip transition-colors last:border-b-0",
-                    href && "relative hover:bg-secondary"
+                    href && "relative hover:bg-secondary",
+                    rowClassName?.(row)
                   )}
                 >
                   {columns.map((column, i) => (
