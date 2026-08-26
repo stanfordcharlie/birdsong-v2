@@ -57,7 +57,7 @@ export function SurveyFilterCards({
             onClick={() => onSelect(card.id)}
             aria-pressed={selected}
             className={cn(
-              "focus-ring flex min-w-[212px] flex-1 flex-col rounded-card border bg-card px-4 pb-3.5 pt-3 text-left shadow-card transition-colors",
+              "focus-ring flex min-w-[212px] flex-1 flex-col rounded-card border bg-card px-4 pb-3.5 pt-3 text-left transition-colors",
               selected
                 ? // The ink ring is the selected state. It sits inside the box
                   // (`ring-inset`) so selecting a card never nudges its
