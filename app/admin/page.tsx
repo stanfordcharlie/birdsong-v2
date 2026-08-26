@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { userFirstName } from "@/lib/user-name";
+import { EMPTY_VALUE } from "@/lib/format";
 import { Button, PageShell } from "@/components/admin/ui";
 import { GreetingBlock } from "./GreetingBlock";
 import { CopySurveyLinkButton } from "./CopySurveyLinkButton";
@@ -40,7 +41,7 @@ type InterviewMessageish = { role?: unknown };
 
 function initialsOf(name: string | null): string {
   const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "—";
+  if (parts.length === 0) return EMPTY_VALUE;
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }

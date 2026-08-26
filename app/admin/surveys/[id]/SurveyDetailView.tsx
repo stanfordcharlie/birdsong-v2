@@ -144,22 +144,24 @@ export function SurveyDetailView({
 
   if (editing) {
     return (
-      <Card padding="flush" className="admin-container">
-        <div className="flex items-center justify-between border-b border-border p-6 pb-4">
-          <h2 className="type-section-label">Edit survey</h2>
-          <Button type="button" variant="secondary" size="sm" onClick={() => setEditing(false)}>
-            Cancel
-          </Button>
-        </div>
-        <div className="p-6">
-          <SurveyForm
-            mode="edit"
-            surveyId={survey.id}
-            initialValues={initialValues}
-            onSaved={() => setEditing(false)}
-          />
-        </div>
-      </Card>
+      <PageShell>
+        <Card padding="flush">
+          <div className="flex items-center justify-between border-b border-border p-6 pb-4">
+            <h2 className="type-section-label">Edit survey</h2>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
+          <div className="p-6">
+            <SurveyForm
+              mode="edit"
+              surveyId={survey.id}
+              initialValues={initialValues}
+              onSaved={() => setEditing(false)}
+            />
+          </div>
+        </Card>
+      </PageShell>
     );
   }
 

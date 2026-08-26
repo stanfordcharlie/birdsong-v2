@@ -174,7 +174,7 @@ export function SurveyRowActions({
         aria-expanded={menuOpen}
         aria-label="Survey actions"
         onClick={() => (menuOpen ? setMenuOpen(false) : openMenu())}
-        className="flex h-9 w-9 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-secondary hover:text-card-foreground"
+        className="focus-ring flex h-9 w-9 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-secondary hover:text-card-foreground"
       >
         <OverflowIcon />
       </button>
@@ -198,7 +198,7 @@ export function SurveyRowActions({
                     ? undefined
                     : "This link starts working once the survey is live"
                 }
-                className="block w-full rounded-control px-3 py-2 text-left text-sm text-card-foreground transition-colors hover:bg-secondary"
+                className="focus-ring block w-full rounded-control px-3 py-2 text-left font-archivo text-sm text-card-foreground transition-colors hover:bg-secondary"
               >
                 {copyState === "copied"
                   ? "Copied"
@@ -215,7 +215,7 @@ export function SurveyRowActions({
                   setMenuOpen(false);
                   patchArchived("unarchive");
                 }}
-                className="block w-full rounded-control px-3 py-2 text-left text-sm text-card-foreground transition-colors hover:bg-secondary"
+                className="focus-ring block w-full rounded-control px-3 py-2 text-left font-archivo text-sm text-card-foreground transition-colors hover:bg-secondary"
               >
                 Unarchive
               </button>
@@ -228,7 +228,7 @@ export function SurveyRowActions({
                   setError(null);
                   setArchiveDialogOpen(true);
                 }}
-                className="block w-full rounded-control px-3 py-2 text-left text-sm text-card-foreground transition-colors hover:bg-secondary"
+                className="focus-ring block w-full rounded-control px-3 py-2 text-left font-archivo text-sm text-card-foreground transition-colors hover:bg-secondary"
               >
                 Archive
               </button>
@@ -243,7 +243,7 @@ export function SurveyRowActions({
                   setConfirmName("");
                   setDeleteDialogOpen(true);
                 }}
-                className="block w-full rounded-control px-3 py-2 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
+                className="focus-ring block w-full rounded-control px-3 py-2 text-left font-archivo text-sm text-destructive transition-colors hover:bg-destructive/10"
               >
                 Delete permanently
               </button>
@@ -259,7 +259,7 @@ export function SurveyRowActions({
         description={`"${internalName}" will be hidden from your default surveys list and stop accepting new responses. Existing responses stay exactly where they are, and you can unarchive it any time.`}
       >
         <div className="flex flex-col gap-3">
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="type-body text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setArchiveDialogOpen(false)} disabled={pending}>
               Cancel
@@ -286,7 +286,7 @@ export function SurveyRowActions({
             autoFocus
             className={cn(confirmName && confirmName !== internalName && "border-destructive")}
           />
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="type-body text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setDeleteDialogOpen(false)} disabled={pending}>
               Cancel

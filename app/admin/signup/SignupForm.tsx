@@ -43,7 +43,7 @@ export function SignupForm() {
       setError(
         raw && raw !== "{}" && !raw.startsWith("{")
           ? raw
-          : "We couldn't create your account just now — sending the confirmation email failed on our end. Please try again in a bit."
+          : "We couldn't create your account just now. Sending the confirmation email failed on our end, so please try again in a bit."
       );
       setLoading(false);
       return;
