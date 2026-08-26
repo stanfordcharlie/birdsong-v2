@@ -72,6 +72,14 @@
   --ds-sidebar-accent: 0 0% 15%;        /* #262626 — hover/active nav fill */
   --ds-sidebar-border: 0 0% 20%;        /* #333333 */
   --ds-sidebar-ring: 0 0% 20%;
+  /* The workspace plate at the rail's foot. These replace six rgba literals
+     that were the only place admin still wrote colour outside the token set.
+     --ds-sidebar-plate is consumed at low alpha (bg-sidebar-plate/[0.05]),
+     which is why it is plain white rather than a pre-mixed grey: mixing it
+     here would stop the same token serving both the fill and the border. */
+  --ds-sidebar-plate: 0 0% 100%;        /* #ffffff, used at 4-10% alpha */
+  --ds-sidebar-label: 0 0% 42%;         /* #6b6b6b — the "Workspace" label */
+  --ds-sidebar-muted: 40 25% 82%;       /* #d8d2c4 — plate secondary text */
 
   --ds-radius-card: 0.75rem;    /* 12px */
   --ds-radius-control: 0.5rem;  /* 8px */
