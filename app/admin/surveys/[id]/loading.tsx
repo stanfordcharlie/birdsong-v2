@@ -1,14 +1,15 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageShell } from "@/components/admin/ui";
 import { Card } from "@/components/ui/card";
 
 export default function SurveyDetailLoading() {
   return (
-    <div className="admin-container-wide flex flex-col gap-8">
+    <PageShell>
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Skeleton className="h-7 w-52" />
-            <Skeleton className="h-5 w-14 rounded-full" />
+            <Skeleton className="h-5 w-14 rounded-pill" />
           </div>
           <Skeleton className="h-9 w-16 rounded-control" />
         </div>
@@ -37,6 +38,6 @@ export default function SurveyDetailLoading() {
         <Skeleton className="h-5 w-32" />
         <Skeleton className="h-32 w-full" />
       </div>
-    </div>
+    </PageShell>
   );
 }

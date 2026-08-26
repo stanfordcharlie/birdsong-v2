@@ -2,29 +2,26 @@
 
 import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
-import { formatRelativeTime } from "@/lib/format";
+import { Badge, StatusDot } from "@/components/admin/ui";
+import { EMPTY_VALUE, formatDate, formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { SurveyRowActions } from "./SurveyRowActions";
 import type { SurveyListItem } from "./SurveysList";
 
-// Six muted three-stop gradients, picked deterministically per survey so a
-// card keeps the same cover across reloads, sorts and filters — the cover is
-// how you re-find a survey in the grid, so it has to be stable.
+// Three flat cover fills, picked deterministically per survey so a card keeps
+// the same cover across reloads, sorts and filters — the cover is how you
+// re-find a survey in the grid, so it has to be stable.
 //
-// Low-saturation on purpose: the covers sit behind a status pill and above
-// the title, and a bright fill would out-shout both. They are decoration
-// that makes cards distinguishable at a glance, not a signal to read.
-const COVERS = [
-  "linear-gradient(135deg, #f7e8da 0%, #eed6c2 52%, #dcbaa7 100%)", // sand
-  "linear-gradient(135deg, #e1dcf1 0%, #cec7e9 52%, #b7b2dc 100%)", // lilac
-  "linear-gradient(135deg, #f3dde7 0%, #e9cbdb 52%, #d6b2c7 100%)", // blush
-  "linear-gradient(135deg, #dfece0 0%, #cbe0ca 52%, #b2cfb4 100%)", // sage
-  "linear-gradient(135deg, #dae5f1 0%, #c6d8eb 52%, #adc5dd 100%)", // haze
-  "linear-gradient(135deg, #d8eae7 0%, #c2ddd9 52%, #a8ccc8 100%)", // mint
-];
+// This replaces six invented three-stop gradients, two of which ("sand" and
+// "blush") were the tan and cream this design pass bans. Flat rather than
+// gradient, and drawn from the neutral and accent families, because the cover
+// sits behind a status pill and above the title and a bright fill out-shouts
+// both. They are decoration that makes cards distinguishable at a glance, not
+// a signal to read.
+const COVERS = ["bg-cover-1", "bg-cover-2", "bg-cover-3"] as const;
 
 // FNV-1a over the survey id. Any stable hash would do; this one is short,
-// dependency-free and spreads sequential UUIDs across all six buckets.
+// dependency-free and spreads sequential UUIDs across all three buckets.
 function coverFor(id: string): string {
   let hash = 0x811c9dc5;
   for (let i = 0; i < id.length; i++) {
@@ -36,7 +33,7 @@ function coverFor(id: string): string {
 
 function initialsOf(name: string | null): string {
   const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "—";
+  if (parts.length === 0) return EMPTY_VALUE;
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
@@ -53,7 +50,7 @@ function Sparkbars({ days }: { days: number[] }) {
         return (
           <span
             key={i}
-            className="w-[4px] shrink-0 rounded-[2px] bg-card-foreground"
+            className="w-[4px] shrink-0 rounded-pill bg-card-foreground"
             style={{
               height: `${Math.max(3, Math.round(ratio * 22))}px`,
               opacity: 0.18 + ratio * 0.42,
@@ -67,19 +64,13 @@ function Sparkbars({ days }: { days: number[] }) {
 
 function StatusPill({ status, archived }: { status: string; archived: boolean }) {
   const label = archived ? "Archived" : status === "live" ? "Live" : "Draft";
-  const dot = archived ? "bg-faint" : status === "live" ? "bg-success" : "bg-warning";
+  // Carries its own opaque ground rather than relying on contrast with the
+  // cover behind it.
   return (
-    <span
-      className={cn(
-        // Sits on an unpredictable gradient, so it carries its own opaque
-        // ground rather than relying on contrast with the cover.
-        "inline-flex items-center gap-[7px] rounded-full bg-card/90 px-2.5 py-1 text-[12px] font-semibold backdrop-blur-sm",
-        archived ? "text-muted-foreground" : "text-card-foreground"
-      )}
-    >
-      <span className={cn("h-[6px] w-[6px] rounded-full", dot)} />
+    <Badge variant="count" size="sm" className="bg-card/90 text-card-foreground backdrop-blur-sm">
+      <StatusDot live={!archived && status === "live"} />
       {label}
-    </span>
+    </Badge>
   );
 }
 
@@ -93,20 +84,16 @@ export function SurveyCard({
   onToggleSelect: () => void;
 }) {
   const isArchived = survey.archivedAt !== null;
-  const created = new Date(survey.createdAt).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const created = formatDate(survey.createdAt);
 
   return (
     <div
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-card border bg-card transition-shadow",
-        selected ? "border-primary ring-1 ring-inset ring-primary" : "border-border hover:shadow-[0_4px_14px_rgba(28,25,23,0.08)]"
+        selected ? "border-primary ring-1 ring-inset ring-primary" : "border-border shadow-card hover:shadow-card-hover"
       )}
     >
-      <div className="relative h-[150px] shrink-0" style={{ background: coverFor(survey.id) }}>
+      <div className={cn("relative h-[150px] shrink-0", coverFor(survey.id))}>
         <div className="absolute left-3 top-3">
           <StatusPill status={survey.status} archived={isArchived} />
         </div>
@@ -115,7 +102,7 @@ export function SurveyCard({
             stays and keeps out of the way until it is wanted. */}
         <div
           className={cn(
-            "absolute right-3 top-3 z-10 rounded-[6px] bg-card/90 p-1 backdrop-blur-sm transition-opacity",
+            "absolute right-3 top-3 z-10 rounded-control bg-card/90 p-1 backdrop-blur-sm transition-opacity",
             selected ? "opacity-100" : "opacity-0 focus-within:opacity-100 group-hover:opacity-100"
           )}
         >
@@ -131,7 +118,7 @@ export function SurveyCard({
         <div className="flex items-start gap-2">
           <Link
             href={`/admin/surveys/${survey.id}`}
-            className="min-w-0 flex-1 text-[16px] font-semibold leading-[1.3] text-card-foreground"
+            className="focus-ring type-heading min-w-0 flex-1 rounded-control"
           >
             {/* Stretches over the whole card, so anywhere that isn't the
                 checkbox or the kebab navigates — same idiom the table rows
@@ -151,18 +138,16 @@ export function SurveyCard({
           </div>
         </div>
 
-        <div className="mt-1 text-[12.5px] text-muted-foreground">
-          {survey.questionCount ?? "—"} questions · created {created}
+        <div className="type-body-sm mt-1 text-muted-foreground">
+          {survey.questionCount ?? EMPTY_VALUE} questions · created {created}
         </div>
 
         <div className="mt-[18px] flex items-end justify-between gap-3">
           <div className="flex items-baseline gap-1.5">
             {/* Archivo, not a serif: DESIGN.md keeps the display face to the
                 one page title per page. */}
-            <span className="text-[26px] font-semibold leading-none tracking-[-0.01em] text-card-foreground">
-              {survey.responseCount}
-            </span>
-            <span className="text-[13px] text-muted-foreground">responses</span>
+            <span className="type-metric-value">{survey.responseCount}</span>
+            <span className="type-metric-label">responses</span>
           </div>
           <Sparkbars days={survey.responsesByDay} />
         </div>
@@ -173,16 +158,16 @@ export function SurveyCard({
               <span
                 key={i}
                 aria-hidden
-                className="flex h-[22px] w-[22px] items-center justify-center rounded-[6px] bg-chip text-[10px] font-bold text-muted-foreground"
+                className="flex h-[22px] w-[22px] items-center justify-center rounded-control bg-chip font-archivo text-micro font-bold text-muted-foreground"
               >
                 {initialsOf(name)}
               </span>
             ))}
           </div>
-          <span className="text-[12.5px] text-faint" suppressHydrationWarning>
+          <span className="type-body-sm text-faint" suppressHydrationWarning>
             {survey.lastResponseAt ? formatRelativeTime(survey.lastResponseAt) : "No responses yet"}
           </span>
-          <span className="ml-auto inline-flex items-center gap-1 text-[13px] font-semibold text-card-foreground">
+          <span className="type-body-sm ml-auto inline-flex items-center gap-1 font-semibold">
             Open
             <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden className="transition-transform duration-150 group-hover:translate-x-[3px]">
               <path d="M7.5 4.5l6 5.5-6 5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />

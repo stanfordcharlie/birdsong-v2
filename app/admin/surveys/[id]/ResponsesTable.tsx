@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EMPTY_VALUE } from "@/lib/format";
 import type { Database } from "@/types/database";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +29,7 @@ export function ResponsesTable({
       <Card className="flex flex-col items-start gap-3 p-6">
         <p className="text-sm text-muted-foreground">
           No responses yet. Interviews land here as respondents finish, each one scored with a call
-          script ready — use Share link above to send your survey out.
+          script ready. Use Share link above to send your survey out.
         </p>
         {previewHref && (
           <a
@@ -67,12 +68,12 @@ export function ResponsesTable({
                   {/* Stretches to fill the whole row (position:relative on
                       TableRow above), so anywhere in the row is clickable. */}
                   <span className="absolute inset-0" />
-                  {r.respondent_name || "—"}
+                  {r.respondent_name || EMPTY_VALUE}
                 </Link>
               </TableCell>
-              <TableCell className="text-muted-foreground">{r.respondent_email || "—"}</TableCell>
+              <TableCell className="text-muted-foreground">{r.respondent_email || EMPTY_VALUE}</TableCell>
               <TableCell>
-                <Badge variant="default">{r.lead_score ?? "—"}</Badge>
+                <Badge variant="default">{r.lead_score ?? EMPTY_VALUE}</Badge>
               </TableCell>
               <TableCell>
                 <Badge variant={r.completed ? "success" : "default"}>

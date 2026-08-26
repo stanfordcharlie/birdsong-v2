@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
+import { Badge, Button, PageHeader, PageShell, StatusDot } from "@/components/admin/ui";
 import { SurveysList, type SurveyListItem } from "./SurveysList";
 import { SurveyStats, type SurveyStatsData } from "./SurveyStats";
 
@@ -147,51 +147,42 @@ export default async function AdminDashboardPage({
           .join(", ") + ".";
 
   return (
-    <div className="admin-container-wide">
-      <div className="mb-6 flex flex-col gap-2">
-        <span className="type-label flex items-center gap-2">
-          <span
-            aria-hidden
-            className={cnDot(liveCount)}
-          />
-          {liveCount} live right now
-        </span>
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-10">
-          <div>
-            <h1 className="type-page-title">Your surveys</h1>
-            <p className="mt-2 text-[15px] text-muted-foreground">{subline}</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2.5 sm:pt-2">
-            <Button
-              asChild
-              className="h-auto rounded-full px-[22px] py-3 text-sm font-semibold transition-[transform,box-shadow,background-color] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(28,25,23,0.22)]"
-            >
-              <Link href="/admin/surveys/new">New survey</Link>
-            </Button>
-          </div>
-        </div>
-      </div>
+    <PageShell>
+      {/* The eyebrow is a section name, matching the sidebar nav item, like
+          every other page. The live count that used to live here as a status
+          readout ("3 LIVE RIGHT NOW") is now a Badge beside the H1, which is
+          the count treatment Leads already used. */}
+      <PageHeader
+        eyebrow="Surveys"
+        title="Your surveys"
+        badge={
+          liveCount > 0 ? (
+            <Badge variant="accent" className="gap-1.5">
+              <StatusDot live />
+              {liveCount} live
+            </Badge>
+          ) : null
+        }
+        subtitle={subline}
+        actions={
+          <Button asChild>
+            <Link href="/admin/surveys/new">New survey</Link>
+          </Button>
+        }
+      />
 
-      {error && <p className="text-sm text-destructive">{error.message}</p>}
+      {error && <p className="type-body text-destructive">{error.message}</p>}
 
       {!error && (
         <>
           {items.length > 0 && (
-            <div className="mb-[26px]">
+            <div className="mb-10">
               <SurveyStats stats={stats} />
             </div>
           )}
           <SurveysList surveys={items} initialStatusFilter={initialStatusFilter} />
         </>
       )}
-    </div>
+    </PageShell>
   );
-}
-
-// Green only while something is actually collecting; otherwise the dot is a
-// muted marker rather than a live indicator that is lying.
-function cnDot(liveCount: number): string {
-  return liveCount > 0
-    ? "h-[7px] w-[7px] rounded-full bg-[#8fbf7a]"
-    : "h-[7px] w-[7px] rounded-full bg-faint";
 }

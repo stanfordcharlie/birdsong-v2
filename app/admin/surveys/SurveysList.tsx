@@ -2,9 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Button, Card, EmptyState, FilterTabs, SearchInput } from "@/components/admin/ui";
 import { cn } from "@/lib/utils";
 import { SurveyCard } from "./SurveyCard";
 import { SurveyBulkActionsBar } from "./SurveyBulkActionsBar";
@@ -128,14 +126,16 @@ export function SurveysList({
 
   if (surveys.length === 0) {
     return (
-      <Card className="flex flex-col items-start gap-3 p-8">
-        <p className="text-sm text-card-foreground">
-          No surveys yet. Create one and Wren starts interviewing the moment you share the link —
-          every completed conversation comes back scored, with a call script ready.
-        </p>
-        <Button asChild>
-          <Link href="/admin/surveys/new">Create your first survey</Link>
-        </Button>
+      <Card padding="flush">
+        <EmptyState
+          title="No surveys yet"
+          description="Create one and Wren starts interviewing the moment you share the link. Every completed conversation comes back scored, with a call script ready."
+          action={
+            <Button asChild>
+              <Link href="/admin/surveys/new">Create your first survey</Link>
+            </Button>
+          }
+        />
       </Card>
     );
   }
@@ -146,65 +146,27 @@ export function SurveysList({
     // below). Everything else spaces itself with explicit margins.
     <div className="flex flex-col">
       <div className="mb-5 flex flex-wrap items-center gap-3">
-        {/* One segmented track rather than separate bordered chips: these
-            are a single either/or choice, and the counts make the shape of
-            the account readable without opening each tab. */}
-        <div className="flex items-center gap-0.5 rounded-control bg-chip p-1">
-          {FILTERS.map((filter) => {
-            const active = statusFilter === filter.value;
-            return (
-              <button
-                key={filter.value}
-                type="button"
-                onClick={() => setStatusFilter(filter.value)}
-                aria-pressed={active}
-                className={cn(
-                  "flex h-7 items-center gap-1.5 rounded-[7px] px-2.5 text-[13px] font-medium transition-colors",
-                  active
-                    ? "bg-card text-card-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-card-foreground"
-                )}
-              >
-                {filter.label}
-                <span className={cn("text-[12px]", active ? "text-muted-foreground" : "text-faint")}>
-                  {statusCounts[filter.value]}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <FilterTabs
+          label="Filter surveys by status"
+          tabs={FILTERS.map((f) => ({ ...f, count: statusCounts[f.value] }))}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
 
-        <div className="relative max-w-[300px] flex-1 basis-[220px]">
-          <svg
-            aria-hidden
-            viewBox="0 0 20 20"
-            fill="none"
-            className="pointer-events-none absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-faint"
-          >
-            <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.6" />
-            <path d="M13.2 13.2L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-          <Input
-            type="text"
-            placeholder="Search surveys"
-            aria-label="Search surveys by name"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        <SearchInput
+          value={query}
+          onChange={setQuery}
+          placeholder="Search surveys"
+          label="Search surveys by name"
+        />
 
         <div className="ml-auto flex items-center gap-4">
           {filtered.length > 0 && (
-            <button
-              type="button"
-              onClick={toggleAllFiltered}
-              className="text-[12.5px] font-medium text-muted-foreground transition-colors hover:text-card-foreground"
-            >
+            <Button type="button" variant="ghost" size="sm" onClick={toggleAllFiltered}>
               {allFilteredSelected ? "Clear selection" : "Select all"}
-            </button>
+            </Button>
           )}
-          <span className="whitespace-nowrap text-[12.5px] text-faint">{filtered.length} shown</span>
+          <span className="type-body-sm whitespace-nowrap text-faint">{filtered.length} shown</span>
         </div>
       </div>
 
@@ -232,8 +194,11 @@ export function SurveysList({
       </div>
 
       {filtered.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted-foreground">
-          No surveys match your search.
+        <Card padding="flush">
+          <EmptyState
+            title="No surveys match your search"
+            description="Try a different name, or clear the filters above."
+          />
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">

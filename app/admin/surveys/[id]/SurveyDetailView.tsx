@@ -1,11 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  PageHeader,
+  PageShell,
+  StatRow,
+  type Column,
+} from "@/components/admin/ui";
+import { formatPercent } from "@/lib/format";
 import { SurveyForm, type SurveyFormValues } from "@/components/SurveyForm";
 import { ReportSection, type SurveyReportRow } from "./ReportSection";
 import { cn } from "@/lib/utils";
@@ -65,14 +71,11 @@ function CheckIcon() {
   );
 }
 
-function StatBlock({ value, label }: { value: React.ReactNode; label: string }) {
-  return (
-    <div>
-      <div className="text-[26px] font-semibold leading-none tracking-[-0.01em] text-card-foreground">{value}</div>
-      <div className="mt-2 text-[13px] text-muted-foreground">{label}</div>
-    </div>
-  );
-}
+const SOURCE_COLUMNS: Column<SourceBreakdownRow>[] = [
+  { key: "source", header: "Source", cell: (row) => <span className="font-medium">{row.source}</span> },
+  { key: "starts", header: "Starts", align: "right", width: "110px", cell: (row) => row.starts },
+  { key: "completions", header: "Completions", align: "right", width: "130px", cell: (row) => row.completions },
+];
 
 function SectionHeader({
   title,
@@ -83,7 +86,7 @@ function SectionHeader({
 }) {
   return (
     <div className="mb-3.5 flex items-baseline justify-between gap-6">
-      <h2 className="type-label">{title}</h2>
+      <h2 className="type-section-label">{title}</h2>
       {onEdit && (
         <Button type="button" variant="secondary" size="sm" onClick={onEdit}>
           Edit
@@ -141,9 +144,9 @@ export function SurveyDetailView({
 
   if (editing) {
     return (
-      <Card className="admin-container-wide">
+      <Card padding="flush" className="admin-container">
         <div className="flex items-center justify-between border-b border-border p-6 pb-4">
-          <h2 className="type-label">Edit survey</h2>
+          <h2 className="type-section-label">Edit survey</h2>
           <Button type="button" variant="secondary" size="sm" onClick={() => setEditing(false)}>
             Cancel
           </Button>
@@ -161,100 +164,85 @@ export function SurveyDetailView({
   }
 
   return (
-    <div className="admin-container-wide flex flex-col">
-      <div className="bs-rise-1 mb-11">
-        <div className="mb-2.5 flex items-center gap-3">
-          <Link
-            href="/admin/surveys"
-            className="type-label transition-colors hover:text-card-foreground"
-          >
-            Surveys
-          </Link>
-          <span className="text-border">/</span>
-          <Badge variant={isLive ? "success" : "warning"}>{isLive ? "Live" : "Draft"}</Badge>
-        </div>
-        <div className="flex items-end justify-between gap-6">
-          <h1 className="type-page-title">{survey.title}</h1>
-          <div className="flex shrink-0 gap-2.5">
+    <PageShell>
+      <PageHeader
+        className="bs-rise-1"
+        eyebrow="Surveys"
+        title={survey.title}
+        badge={<Badge variant={isLive ? "live" : "draft"}>{isLive ? "Live" : "Draft"}</Badge>}
+        subtitle={
+          <>
+            {survey.externalTitle && <span className="block">{survey.externalTitle}</span>}
+            <span className="mt-2 flex items-center gap-1.5">
+              <span className="min-w-0 flex-1 truncate">{surveyUrl}</span>
+              <button
+                type="button"
+                onClick={handleCopyUrl}
+                aria-label="Copy survey URL"
+                className="focus-ring flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-secondary hover:text-card-foreground"
+              >
+                {urlCopied ? <CheckIcon /> : <CopyIcon />}
+              </button>
+            </span>
+          </>
+        }
+        actions={
+          <>
             {/* ?test=1: owner-verified server-side; lets the admin run the
                 interview (even on a draft) without creating a real lead,
                 firing the email, or skewing stats. The Share link below
                 stays the clean respondent URL. */}
-            <Button type="button" variant="secondary" size="sm" asChild>
+            <Button type="button" variant="secondary" asChild>
               <a href={`/survey/${survey.slug}?test=1`} target="_blank" rel="noreferrer">
                 Preview interview
               </a>
             </Button>
-            <Button type="button" size="sm" onClick={handleShare}>
+            <Button type="button" onClick={handleShare}>
               {shareCopied ? "Copied!" : "Share link"}
             </Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setEditing(true)}>
+            <Button type="button" variant="secondary" onClick={() => setEditing(true)}>
               Edit
             </Button>
-          </div>
-        </div>
-        {survey.externalTitle && (
-          <p className="mt-2 text-sm text-muted-foreground">{survey.externalTitle}</p>
-        )}
-        <div className="mt-2 flex max-w-[480px] items-center gap-1.5">
-          <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{surveyUrl}</span>
-          <button
-            type="button"
-            onClick={handleCopyUrl}
-            aria-label="Copy survey URL"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-secondary hover:text-card-foreground"
-          >
-            {urlCopied ? <CheckIcon /> : <CopyIcon />}
-          </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      <div className="bs-rise-2 border-t border-border py-7">
-        <div className="grid grid-cols-3 gap-4">
-          <StatBlock value={responseCount} label="Responses" />
-          <StatBlock value={qualifiedCount} label="Qualified leads" />
-          <StatBlock value={completionRate !== null ? `${completionRate}%` : "—"} label="Completion rate" />
-        </div>
+      <div className="bs-rise-2 mb-10">
+        <StatRow
+          stats={[
+            { label: "Responses", value: responseCount },
+            { label: "Qualified leads", value: qualifiedCount },
+            { label: "Completion rate", value: formatPercent(completionRate === null ? null : completionRate / 100) },
+          ]}
+        />
         {responseCount === 0 && (
-          <p className="mt-4 text-[13px] text-faint">
-            Stats fill in as interviews complete — share your link to get the first ones in.
+          <p className="type-body-sm mt-4 text-faint">
+            Stats fill in as interviews complete. Share your link to get the first ones in.
           </p>
         )}
       </div>
 
       {sourceBreakdown && (
-        <div className="border-t border-border py-8">
+        <div className="mb-10">
           <SectionHeader title="Sources" />
-          <p className="mb-3.5 text-[13px] text-faint">
-            Starts and completions by <code className="font-mono text-faint">?src=</code> on the shared
+          <p className="type-body-sm mb-3.5 text-faint">
+            Starts and completions by <code className="type-code text-faint">?src=</code> on the shared
             link. Untagged traffic shows as Direct.
           </p>
-          <Card className="overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Starts</TableHead>
-                  <TableHead>Completions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sourceBreakdown.map((row) => (
-                  <TableRow key={row.source}>
-                    <TableCell className="font-medium text-card-foreground">{row.source}</TableCell>
-                    <TableCell className="text-muted-foreground">{row.starts}</TableCell>
-                    <TableCell className="text-muted-foreground">{row.completions}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <Card padding="flush">
+            <DataTable
+              columns={SOURCE_COLUMNS}
+              rows={sourceBreakdown}
+              rowKey={(row) => row.source}
+              empty={{ title: "No tagged traffic yet" }}
+            />
           </Card>
         </div>
       )}
 
-      <div className="bs-rise-3 border-t border-border py-8">
+      <div className="bs-rise-3 mb-10">
         <SectionHeader title="Audience & goal" onEdit={() => setEditing(true)} />
-        <p className="max-w-[620px] text-[16px] leading-[1.65] text-card-foreground">
+        <p className="admin-measure type-body">
           {survey.topic || "No topic set yet."}
           {survey.targetAudience && (
             <>
@@ -265,9 +253,9 @@ export function SurveyDetailView({
         </p>
       </div>
 
-      <div className="bs-rise-4 border-t border-border py-8">
+      <div className="bs-rise-4 mb-10">
         <SectionHeader title="Questions" onEdit={() => setEditing(true)} />
-        <p className="mb-2 text-[13px] text-faint">
+        <p className="type-body-sm mb-2 text-faint">
           The interviewer asks up to 1 follow-up per question, in your brand voice.
         </p>
         {questions.length === 0 ? (
@@ -282,36 +270,33 @@ export function SurveyDetailView({
                   i < questions.length - 1 && "border-b border-chip"
                 )}
               >
-                <span className="min-w-[26px] text-[13px] font-semibold text-faint">
+                <span className="type-body-sm min-w-[26px] font-semibold text-faint">
                   {String(i + 1).padStart(2, "0")}
                 </span>
-                <span className="text-[16px] leading-[1.5] text-card-foreground">{question}</span>
+                <span className="type-body">{question}</span>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <div className="bs-rise-5 border-t border-border py-8">
+      <div className="bs-rise-5 mb-10">
         <SectionHeader title="Qualification" />
-        <p className="mb-4 max-w-[620px] text-[16px] leading-[1.65] text-card-foreground">
+        <p className="admin-measure type-body mb-4">
           Qualification is a judgment call, not an automatic rule: review a response&apos;s transcript and lead score,
           then mark it <strong className="font-semibold">Qualified</strong> from its detail page.
         </p>
-        <div className="flex max-w-[620px] items-center gap-6 rounded-card border border-border bg-card px-5 py-4">
-          <span className="flex-1 text-sm font-medium text-card-foreground">Try the interview yourself</span>
-          <a
-            href={`/survey/${survey.slug}?test=1`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1.5 text-sm font-semibold text-indigo transition-colors hover:text-indigo/80"
-          >
+        <div className="admin-measure flex items-center gap-6 rounded-card border border-border bg-card px-5 py-4">
+          <span className="type-body flex-1 font-medium">Try the interview yourself</span>
+          <Button asChild variant="ghost" size="sm">
+            <a href={`/survey/${survey.slug}?test=1`} target="_blank" rel="noreferrer">
             Open respondent view
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="5" y1="12" x2="19" y2="12" />
               <polyline points="12 5 19 12 12 19" />
             </svg>
-          </a>
+            </a>
+          </Button>
         </div>
       </div>
 
@@ -322,22 +307,22 @@ export function SurveyDetailView({
       />
 
       {survey.respondentChips.length > 0 && (
-        <div className="bs-rise-6 border-t border-border py-8">
+        <div className="bs-rise-6 mb-10">
           <SectionHeader title="Respondent info collected" onEdit={() => setEditing(true)} />
           <div className="flex flex-wrap gap-2">
             {survey.respondentChips.map((chip) => (
               <div
                 key={chip.label}
-                className="flex items-center gap-1.5 rounded-full bg-chip px-3 py-1.5 text-sm text-card-foreground"
+                className="flex items-center gap-1.5 rounded-pill bg-chip px-3 py-1.5 font-archivo text-sm text-card-foreground"
               >
                 {chip.label}
-                {chip.required && <span className="text-xs font-semibold text-muted-foreground">required</span>}
+                {chip.required && <span className="text-micro font-semibold text-muted-foreground">required</span>}
               </div>
             ))}
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">Name and email always collected.</p>
+          <p className="type-body-sm mt-2 text-muted-foreground">Name and email always collected.</p>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }
