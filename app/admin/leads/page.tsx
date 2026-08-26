@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button, Card, EmptyState, PageHeader, PageShell } from "@/components/admin/ui";
+import { EMPTY_VALUE } from "@/lib/format";
 import { LeadsQueue, type LeadItem } from "./LeadsQueue";
 
 const STATUS_FILTER_VALUES = new Set(["all", "new", "contacted", "qualified", "not_a_fit"]);
@@ -60,7 +60,7 @@ export default async function LeadsPage({
             ? customValues.derived_company_name
             : null,
       surveyId: r.survey_id,
-      surveyTitle: r.surveys?.title ?? "—",
+      surveyTitle: r.surveys?.title ?? EMPTY_VALUE,
       // Drives the live dot on the survey cards above the queue. Anything
       // that isn't "live" (draft, closed, archived) reads as not collecting.
       surveyIsLive: r.surveys?.status === "live",
@@ -81,35 +81,31 @@ export default async function LeadsPage({
   // live inside the client component that holds that selection.
   if (!error && items.length > 0) {
     return (
-      <div className="admin-container-wide">
+      <PageShell>
         <LeadsQueue items={items} initialStatusFilter={initialStatusFilter} />
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="admin-container-wide flex flex-col gap-7">
-      <div className="flex flex-col gap-2">
-        <span className="type-label">Leads</span>
-        <h1 className="type-page-title">Your lead queue</h1>
-      </div>
+    <PageShell>
+      <PageHeader eyebrow="Leads" title="Your lead queue" />
 
-      {error && <p className="text-sm text-destructive">{error.message}</p>}
+      {error && <p className="type-body text-destructive">{error.message}</p>}
 
-      {!error &&
-        (items.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-start gap-3 p-8">
-              <p className="text-sm text-card-foreground">
-                No completed interviews yet. As respondents finish interviews, every lead across all
-                your surveys lands here, hottest first.
-              </p>
+      {!error && (
+        <Card padding="flush">
+          <EmptyState
+            title="No completed interviews yet"
+            description="As respondents finish interviews, every lead across all your surveys lands here, hottest first."
+            action={
               <Button asChild>
                 <Link href="/admin/surveys/new">Create a survey</Link>
               </Button>
-            </CardContent>
-          </Card>
-        ) : null)}
-    </div>
+            }
+          />
+        </Card>
+      )}
+    </PageShell>
   );
 }

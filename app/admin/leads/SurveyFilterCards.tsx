@@ -1,5 +1,6 @@
 "use client";
 
+import { StatusDot } from "@/components/admin/ui";
 import { cn } from "@/lib/utils";
 
 // The survey selector for the lead queue (design reference: AdminLeads.dc.html
@@ -56,8 +57,7 @@ export function SurveyFilterCards({
             onClick={() => onSelect(card.id)}
             aria-pressed={selected}
             className={cn(
-              "flex min-w-[212px] flex-1 flex-col rounded-card border bg-card px-4 pb-3.5 pt-3 text-left transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              "focus-ring flex min-w-[212px] flex-1 flex-col rounded-card border bg-card px-4 pb-3.5 pt-3 text-left shadow-card transition-colors",
               selected
                 ? // The ink ring is the selected state. It sits inside the box
                   // (`ring-inset`) so selecting a card never nudges its
@@ -67,17 +67,11 @@ export function SurveyFilterCards({
             )}
           >
             <div className="flex items-center gap-2">
-              <span
-                aria-hidden
-                className={cn(
-                  "h-[7px] w-[7px] shrink-0 rounded-full",
-                  card.isLive ? "bg-[#8fbf7a]" : "bg-faint"
-                )}
-              />
-              <span className="truncate text-[13.5px] font-semibold text-card-foreground">
+              <StatusDot live={card.isLive} />
+              <span className="type-body-sm truncate font-semibold">
                 {card.title}
               </span>
-              <span className="ml-auto shrink-0 text-[12.5px] text-muted-foreground">
+              <span className="type-body-sm ml-auto shrink-0 text-muted-foreground">
                 {card.leadCount}
               </span>
             </div>
@@ -87,22 +81,18 @@ export function SurveyFilterCards({
                   one page title per page. */}
               <span
                 className={cn(
-                  "text-[26px] font-semibold leading-none tracking-[-0.01em]",
-                  selected
-                    ? "text-success"
-                    : card.worthACall === 0
-                      ? "text-faint"
-                      : "text-card-foreground"
+                  "type-metric-value",
+                  selected ? "text-brand" : card.worthACall === 0 ? "text-faint" : "text-card-foreground"
                 )}
               >
                 {card.worthACall}
               </span>
-              <span className="text-[12.5px] text-muted-foreground">worth a call</span>
+              <span className="type-metric-label">worth a call</span>
             </div>
 
-            <div className="mt-3 h-[5px] overflow-hidden rounded-[3px] bg-chip">
+            <div className="mt-3 h-[5px] overflow-hidden rounded-pill bg-chip">
               <div
-                className={cn("h-full rounded-[3px]", selected ? "bg-success" : "bg-faint")}
+                className={cn("h-full rounded-pill", selected ? "bg-brand" : "bg-faint")}
                 style={{ width: `${Math.round(card.share * 100)}%` }}
               />
             </div>

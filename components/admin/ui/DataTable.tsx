@@ -14,6 +14,8 @@ export type Column<Row> = {
   align?: "left" | "right";
   /** Fixed width, e.g. "92px". Omit to let the column size itself. */
   width?: string;
+  /** Set on a sortable column so the header announces its sort state. */
+  ariaSort?: "ascending" | "descending" | "none";
   cell: (row: Row) => React.ReactNode;
 };
 
@@ -49,9 +51,10 @@ export function DataTable<Row>({
               <th
                 key={column.key}
                 scope="col"
+                aria-sort={column.ariaSort}
                 style={column.width ? { width: column.width } : undefined}
                 className={cn(
-                  "type-table-head h-10 px-4 align-middle",
+                  "type-table-head h-10 px-4 align-middle [&_button]:uppercase",
                   column.align === "right" ? "text-right tabular-nums" : "text-left"
                 )}
               >

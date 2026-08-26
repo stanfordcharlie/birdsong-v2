@@ -1,22 +1,20 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import {
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  FilterTabs,
+  PageHeader,
+  SearchInput,
+  type Column,
+} from "@/components/admin/ui";
 import { StatusControl } from "@/components/StatusControl";
 import { SurveyFilterCards, type SurveyCard } from "./SurveyFilterCards";
-import { formatRelativeTime } from "@/lib/format";
+import { EMPTY_VALUE, formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 export type LeadItem = {
   id: string;
@@ -57,12 +55,12 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
 
 // Same select styling as StatusControl / SurveyForm's native selects.
 const SELECT_CLASSES =
-  "flex h-9 rounded-control border border-input bg-card px-3 py-2 text-sm text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  "focus-ring flex h-9 rounded-control border border-input bg-card px-3 py-2 font-archivo text-sm text-card-foreground";
 
 // Avatar initials, same derivation as the admin home's activity feed.
 function initialsOf(name: string | null): string {
   const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "—";
+  if (parts.length === 0) return EMPTY_VALUE;
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
@@ -79,24 +77,52 @@ function ScoreMeter({ score, tone }: { score: number; tone: "lead" | "fit" }) {
   const mid = tone === "lead" && score >= 5;
   return (
     <span className="inline-flex items-center gap-2">
-      <span aria-hidden className="h-[4px] w-[26px] overflow-hidden rounded-full bg-chip">
+      <span aria-hidden className="h-[4px] w-[26px] overflow-hidden rounded-pill bg-chip">
         <span
           className={cn(
-            "block h-full rounded-full",
-            hot ? "bg-success" : mid ? "bg-muted-foreground" : "bg-faint"
+            "block h-full rounded-pill",
+            hot ? "bg-brand" : mid ? "bg-muted-foreground" : "bg-faint"
           )}
           style={{ width: `${Math.max(0, Math.min(score, 10)) * 10}%` }}
         />
       </span>
       <span
         className={cn(
-          "text-[13.5px] font-semibold tabular-nums",
-          hot ? "text-success" : "text-card-foreground"
+          "type-body-sm font-semibold tabular-nums",
+          hot ? "text-brand" : "text-card-foreground"
         )}
       >
         {score}
       </span>
     </span>
+  );
+}
+
+function SortHeader({
+  label,
+  active,
+  dir,
+  onClick,
+  title,
+}: {
+  label: string;
+  active: boolean;
+  dir: "desc" | "asc";
+  onClick: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className="focus-ring inline-flex items-center gap-1 rounded-control font-[inherit] text-inherit hover:text-card-foreground"
+    >
+      {label}
+      <span aria-hidden="true" className="text-micro text-muted-foreground">
+        {active ? (dir === "desc" ? "▼" : "▲") : "↕"}
+      </span>
+    </button>
   );
 }
 
@@ -288,82 +314,148 @@ export function LeadsQueue({
     });
   }, [scopedLeads, query, statusFilter, sourceFilter, hotOnly, fitHotOnly, sortColumn, sortDir]);
 
-  return (
-    <div className="flex flex-col gap-5">
-      {/* Masthead. The count chip and the subline both restate the selected
-          survey card, which is why they live in here rather than on the
-          server page. */}
-      <div className="flex flex-col gap-2">
-        <span className="type-label">Leads</span>
-        <div className="flex items-center gap-3">
-          <h1 className="type-page-title">Your lead queue</h1>
-          <span className="rounded-control bg-chip px-2.5 py-1 text-[13px] font-semibold text-muted-foreground">
-            {statusCounts.all}
+  // Built here rather than at module scope so the sortable headers can close
+  // over the current sort state, and so the Source column can drop out
+  // entirely when this account has no tagged traffic.
+  const columns: Column<LeadItem>[] = [
+    {
+      key: "name",
+      header: "Name",
+      cell: (lead) => (
+        <span className="flex items-center gap-3">
+          <span
+            aria-hidden
+            className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-pill bg-brand-weak font-archivo text-micro font-bold text-brand-text"
+          >
+            {initialsOf(lead.name)}
           </span>
-        </div>
-        <p className="text-[15px] text-muted-foreground">
-          {awaitingReply === 0
+          <span className="font-medium">{lead.name || EMPTY_VALUE}</span>
+          {lead.isTest && <Badge variant="warning" size="sm">Test</Badge>}
+        </span>
+      ),
+    },
+    { key: "company", header: "Company", cell: (lead) => <span className="text-muted-foreground">{lead.company || EMPTY_VALUE}</span> },
+    { key: "survey", header: "Survey", cell: (lead) => <span className="text-muted-foreground">{lead.surveyTitle}</span> },
+    ...(sourceOptions.length > 0
+      ? [{ key: "source", header: "Source", cell: (lead: LeadItem) => <span className="text-muted-foreground">{lead.source || EMPTY_VALUE}</span> }]
+      : []),
+    {
+      key: "score",
+      header: <SortHeader label="Score" active={sortColumn === "score"} dir={sortDir} onClick={() => toggleSort("score")} />,
+      ariaSort: sortColumn === "score" ? (sortDir === "desc" ? "descending" : "ascending") : "none",
+      width: "110px",
+      cell: (lead) =>
+        lead.leadScore === null ? (
+          <span className="text-muted-foreground">{EMPTY_VALUE}</span>
+        ) : (
+          <ScoreMeter score={lead.leadScore} tone="lead" />
+        ),
+    },
+    {
+      key: "fit",
+      header: (
+        <SortHeader
+          label="Fit"
+          active={sortColumn === "fit"}
+          dir={sortDir}
+          onClick={() => toggleSort("fit")}
+          title="Company fit: how well this company matches your ICP, scored separately from lead score."
+        />
+      ),
+      ariaSort: sortColumn === "fit" ? (sortDir === "desc" ? "descending" : "ascending") : "none",
+      width: "150px",
+      cell: (lead) =>
+        lead.fitConfidence === "unavailable" ? (
+          <span className="text-muted-foreground" title="Company fit research was unavailable.">
+            {EMPTY_VALUE}
+          </span>
+        ) : lead.fitScore !== null ? (
+          <span className="inline-flex items-center gap-1.5" title={lead.fitReasoning ?? undefined}>
+            <ScoreMeter score={lead.fitScore} tone="fit" />
+            {lead.fitConfidence === "low" && (
+              <span className="text-micro text-muted-foreground" title="Limited data, low-confidence estimate.">
+                limited data
+              </span>
+            )}
+          </span>
+        ) : (
+          <span className="text-muted-foreground" title="Not yet scored.">
+            {EMPTY_VALUE}
+          </span>
+        ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (lead) => (
+        <StatusControl
+          responseId={lead.id}
+          initialStatus={lead.status}
+          onStatusChange={(status) => handleStatusChange(lead.id, status)}
+        />
+      ),
+    },
+    {
+      key: "signal",
+      header: "Signal",
+      cell: (lead) => (
+        <span className="block max-w-[260px] truncate text-muted-foreground" title={lead.topPainPoint ?? undefined}>
+          {lead.topPainPoint || EMPTY_VALUE}
+        </span>
+      ),
+    },
+    {
+      key: "completed",
+      header: "Completed",
+      align: "right",
+      width: "116px",
+      // suppressHydrationWarning: relative time is computed from Date.now(),
+      // which can differ between the server render and hydration across a
+      // minute boundary.
+      cell: (lead) => (
+        <span className="text-muted-foreground" suppressHydrationWarning>
+          {formatRelativeTime(lead.createdAt)}
+        </span>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      {/* The count chip and the subline both restate the selected survey card,
+          which is why the masthead lives in here rather than on the server
+          page. It still renders the shared PageHeader. */}
+      <PageHeader
+        eyebrow="Leads"
+        title="Your lead queue"
+        badge={<Badge variant="count">{statusCounts.all}</Badge>}
+        subtitle={
+          awaitingReply === 0
             ? "Nobody is waiting on a reply right now."
             : `${awaitingReply} scored ${HOT_SCORE_MIN} or higher and ${
                 awaitingReply === 1 ? "has" : "have"
-              } not heard back yet.`}
-        </p>
-      </div>
-
-      <SurveyFilterCards
-        cards={surveyCards}
-        selectedId={surveyFilter}
-        onSelect={setSurveyFilter}
+              } not heard back yet.`
+        }
       />
 
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Status tabs as one segmented track rather than five separate
-            bordered buttons: they are a single either/or choice, and the
-            counts make that much easier to read at a glance. */}
-        <div className="flex items-center gap-0.5 rounded-control bg-chip p-1">
-          {STATUS_FILTERS.map((filter) => {
-            const active = statusFilter === filter.value;
-            return (
-              <button
-                key={filter.value}
-                type="button"
-                onClick={() => selectStatus(filter.value)}
-                aria-pressed={active}
-                className={cn(
-                  "flex h-7 items-center gap-1.5 rounded-[7px] px-2.5 text-[13px] font-medium transition-colors",
-                  active
-                    ? "bg-card text-card-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-card-foreground"
-                )}
-              >
-                {filter.label}
-                <span className={cn("text-[12px]", active ? "text-muted-foreground" : "text-faint")}>
-                  {statusCounts[filter.value]}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+      <div className="mb-5">
+        <SurveyFilterCards cards={surveyCards} selectedId={surveyFilter} onSelect={setSurveyFilter} />
+      </div>
 
-        <div className="relative max-w-[300px] flex-1 basis-[220px]">
-          <svg
-            aria-hidden
-            viewBox="0 0 20 20"
-            fill="none"
-            className="pointer-events-none absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-faint"
-          >
-            <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.6" />
-            <path d="M13.2 13.2L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-          <Input
-            type="text"
-            placeholder="Name, company, keyword"
-            aria-label="Search leads by name, email, or company"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <FilterTabs
+          label="Filter leads by status"
+          tabs={STATUS_FILTERS.map((f) => ({ ...f, count: statusCounts[f.value] }))}
+          value={statusFilter}
+          onChange={selectStatus}
+        />
+
+        <SearchInput
+          value={query}
+          onChange={setQuery}
+          placeholder="Name, company, keyword"
+          label="Search leads by name, email, or company"
+        />
 
         {sourceOptions.length > 0 && (
           <select
@@ -381,8 +473,8 @@ export function LeadsQueue({
           </select>
         )}
 
-        {/* Kept as explicit toggles rather than folded into the mock's generic
-            "+ Filter" button: all three already work, and hiding working
+        {/* Kept as explicit toggles rather than folded into a generic
+            "+ Filter" menu: all three already work, and hiding working
             filters behind a menu would cost function for nothing. */}
         <div className="flex flex-wrap items-center gap-1.5">
           {[
@@ -390,162 +482,32 @@ export function LeadsQueue({
             { label: `Fit ${HOT_FIT_MIN}+`, on: fitHotOnly, toggle: () => setFitHotOnly((p) => !p) },
             { label: "Show test", on: showTest, toggle: () => setShowTest((p) => !p) },
           ].map((chip) => (
-            <button
+            <Button
               key={chip.label}
               type="button"
+              size="sm"
+              variant={chip.on ? "primary" : "secondary"}
               onClick={chip.toggle}
               aria-pressed={chip.on}
-              className={cn(
-                "flex h-9 items-center rounded-control border px-3.5 text-[13px] font-medium transition-colors",
-                chip.on
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-transparent text-muted-foreground hover:bg-secondary"
-              )}
             >
               {chip.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
 
-      <Card className="overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead>Survey</TableHead>
-              {sourceOptions.length > 0 && <TableHead>Source</TableHead>}
-              <TableHead aria-sort={sortColumn === "score" ? (sortDir === "desc" ? "descending" : "ascending") : "none"}>
-                <button
-                  type="button"
-                  onClick={() => toggleSort("score")}
-                  className="inline-flex items-center gap-1 font-[inherit] text-inherit hover:text-card-foreground"
-                >
-                  Score
-                  <span aria-hidden="true" className="text-[10px] text-muted-foreground">
-                    {sortColumn === "score" ? (sortDir === "desc" ? "▼" : "▲") : "↕"}
-                  </span>
-                </button>
-              </TableHead>
-              <TableHead aria-sort={sortColumn === "fit" ? (sortDir === "desc" ? "descending" : "ascending") : "none"}>
-                <button
-                  type="button"
-                  onClick={() => toggleSort("fit")}
-                  className="inline-flex items-center gap-1 font-[inherit] text-inherit hover:text-card-foreground"
-                  title="Company fit: how well this company matches your ICP, scored separately from lead score."
-                >
-                  Fit
-                  <span aria-hidden="true" className="text-[10px] text-muted-foreground">
-                    {sortColumn === "fit" ? (sortDir === "desc" ? "▼" : "▲") : "↕"}
-                  </span>
-                </button>
-              </TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Signal</TableHead>
-              <TableHead>Completed</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={sourceOptions.length > 0 ? 9 : 8}
-                  className="text-center text-sm text-muted-foreground"
-                >
-                  No leads match your filters.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((lead) => (
-                <TableRow key={lead.id} className="relative">
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <span
-                        aria-hidden
-                        className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-success-bg text-[11.5px] font-bold text-success"
-                      >
-                        {initialsOf(lead.name)}
-                      </span>
-                      <Link
-                        href={`/admin/responses/${lead.id}`}
-                        className="font-medium text-card-foreground hover:text-primary"
-                      >
-                        {/* Stretches to fill the whole row (position:relative
-                            on TableRow above), so anywhere in the row is
-                            clickable — interactive cells below sit over it
-                            with relative z-10, same as SurveysList's copy
-                            button. */}
-                        <span className="absolute inset-0" />
-                        {lead.name || "—"}
-                      </Link>
-                      {lead.isTest && <Badge variant="warning">Test</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{lead.company || "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{lead.surveyTitle}</TableCell>
-                  {sourceOptions.length > 0 && (
-                    <TableCell className="text-muted-foreground">{lead.source || "—"}</TableCell>
-                  )}
-                  <TableCell>
-                    {lead.leadScore === null ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : (
-                      <ScoreMeter score={lead.leadScore} tone="lead" />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {lead.fitConfidence === "unavailable" ? (
-                      <span className="text-muted-foreground" title="Company fit research was unavailable.">
-                        —
-                      </span>
-                    ) : lead.fitScore !== null ? (
-                      <span className="inline-flex items-center gap-1.5" title={lead.fitReasoning ?? undefined}>
-                        <ScoreMeter score={lead.fitScore} tone="fit" />
-                        {lead.fitConfidence === "low" && (
-                          <span
-                            className="text-[11px] text-muted-foreground"
-                            title="Limited data — low-confidence estimate."
-                          >
-                            limited data
-                          </span>
-                        )}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground" title="Not yet scored.">
-                        —
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="relative z-10 inline-flex">
-                      <StatusControl
-                        responseId={lead.id}
-                        initialStatus={lead.status}
-                        onStatusChange={(status) => handleStatusChange(lead.id, status)}
-                      />
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    <span
-                      className="block max-w-[260px] truncate"
-                      title={lead.topPainPoint ?? undefined}
-                    >
-                      {lead.topPainPoint || "—"}
-                    </span>
-                  </TableCell>
-                  {/* suppressHydrationWarning: relative time is computed
-                      from Date.now(), which can differ between the server
-                      render and hydration across a minute boundary. */}
-                  <TableCell className="text-[13px] text-muted-foreground" suppressHydrationWarning>
-                    {formatRelativeTime(lead.createdAt)}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <Card padding="flush">
+        <DataTable
+          columns={columns}
+          rows={filtered}
+          rowKey={(lead) => lead.id}
+          rowHref={(lead) => `/admin/responses/${lead.id}`}
+          empty={{
+            title: "No leads match your filters",
+            description: "Try a different search, or clear the filters above.",
+          }}
+        />
       </Card>
-    </div>
+    </>
   );
 }

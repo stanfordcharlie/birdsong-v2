@@ -1,17 +1,18 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageShell } from "@/components/admin/ui";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function LeadsLoading() {
   return (
-    <div className="admin-container-wide flex flex-col gap-7">
+    <PageShell>
       <div className="flex flex-col gap-2">
         <Skeleton className="h-4 w-12" />
         <Skeleton className="h-10 w-72" />
       </div>
 
       <div className="flex items-center gap-3">
-        <Skeleton className="h-9 max-w-[320px] flex-1 rounded-control" />
+        <Skeleton className="h-9 max-w-[300px] flex-1 rounded-control" />
         <Skeleton className="h-8 w-12 rounded-control" />
         <Skeleton className="h-8 w-14 rounded-control" />
         <Skeleton className="h-8 w-20 rounded-control" />
@@ -45,7 +46,7 @@ export default function LeadsLoading() {
                   <Skeleton className="h-4 w-28" />
                 </TableCell>
                 <TableCell>
-                  <Skeleton className="h-5 w-9 rounded-full" />
+                  <Skeleton className="h-5 w-9 rounded-pill" />
                 </TableCell>
                 <TableCell>
                   <Skeleton className="h-9 w-28 rounded-control" />
@@ -61,6 +62,6 @@ export default function LeadsLoading() {
           </TableBody>
         </Table>
       </Card>
-    </div>
+    </PageShell>
   );
 }
