@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { formatRelativeTime } from "@/lib/format-relative-time";
+import { formatRelativeTime } from "@/lib/format";
 
 // Manual retry for the HubSpot sync that already runs by itself when an
 // interview completes. It exists because that automatic run is fire-and-forget

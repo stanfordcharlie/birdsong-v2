@@ -147,8 +147,10 @@
      offset. An outline is never removed without this replacing it. */
   --ds-focus: 24 10% 10%;
 
-  /* One card shadow. No page defines its own. */
+  /* One card shadow, plus its hover step for cards that are themselves links.
+     No page defines its own. */
   --ds-shadow-card: 0 4px 14px rgba(28, 25, 23, 0.06);
+  --ds-shadow-card-hover: 0 6px 20px rgba(28, 25, 23, 0.09);
 }
 
 /* --- Marketing landing pages (design_handoff_landing_pages_full) ---

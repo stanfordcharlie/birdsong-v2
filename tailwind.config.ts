@@ -168,6 +168,7 @@ const config: Config = {
       boxShadow: {
         // The one admin card elevation. No page defines its own.
         card: "var(--ds-shadow-card)",
+        "card-hover": "var(--ds-shadow-card-hover)",
       },
       maxWidth: {
         container: "var(--ds-container-max)",

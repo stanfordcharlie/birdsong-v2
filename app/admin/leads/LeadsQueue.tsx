@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { StatusControl } from "@/components/StatusControl";
 import { SurveyFilterCards, type SurveyCard } from "./SurveyFilterCards";
-import { formatRelativeTime } from "@/lib/format-relative-time";
+import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   Table,

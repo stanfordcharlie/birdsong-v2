@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
-import { formatRelativeTime } from "@/lib/format-relative-time";
+import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { SurveyRowActions } from "./SurveyRowActions";
 import type { SurveyListItem } from "./SurveysList";

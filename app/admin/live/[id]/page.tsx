@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import { formatRelativeTime } from "@/lib/format-relative-time";
+import { formatRelativeTime } from "@/lib/format";
 import type { InterviewMessage } from "@/lib/interview/types";
 import { LiveTranscript } from "./LiveTranscript";
 

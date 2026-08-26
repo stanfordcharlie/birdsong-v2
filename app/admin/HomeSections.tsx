@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatRelativeTime } from "@/lib/format-relative-time";
+import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 // The Home dashboard's presentational layer (design_handoff_admin_home/

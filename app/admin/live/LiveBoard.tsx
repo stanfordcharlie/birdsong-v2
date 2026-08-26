@@ -19,6 +19,7 @@ import {
   surveyPresenceChannel,
   type SurveyPresence,
 } from "@/lib/presence/survey-presence";
+import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type LiveSurvey = {
@@ -38,18 +39,6 @@ type LiveRow = SurveyPresence & {
   isStale: boolean;
   sinceMs: number;
 };
-
-// Seconds matter here in a way they do not anywhere else in admin, so this
-// view uses its own formatter rather than the shared formatRelativeTime,
-// which starts at "Just now" and jumps straight to minutes.
-function formatSince(ms: number): string {
-  const seconds = Math.max(0, Math.round(ms / 1000));
-  if (seconds < 5) return "Just now";
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  return `${Math.floor(minutes / 60)}h ago`;
-}
 
 // "4 of 8" while the interview is inside its planned length. Past that the
 // count is still true but the fraction stops being, so the target is named
@@ -253,7 +242,7 @@ export function LiveBoard({ surveys }: { surveys: LiveSurvey[] }) {
                     </span>
                   </TableCell>
                   <TableCell className="text-[13px] text-muted-foreground" suppressHydrationWarning>
-                    {formatSince(row.sinceMs)}
+                    {formatRelativeTime(Date.now() - row.sinceMs, { seconds: true })}
                   </TableCell>
                   <TableCell className="text-right">
                     {/* Read-only view of this interview as it happens. The
