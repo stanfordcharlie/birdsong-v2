@@ -5,6 +5,7 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sanitizeSource } from "@/lib/interview/source";
 import { InterviewFlow, type PublicSurvey } from "./InterviewFlow";
+import { SurveyThemeProvider } from "./SurveyTheme";
 
 // cache() so generateMetadata and the page component share one query per
 // request instead of hitting Supabase twice for the same survey.
@@ -80,9 +81,9 @@ export default async function PublicSurveyPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ test?: string; src?: string }>;
+  searchParams: Promise<{ test?: string; testEmail?: string; src?: string }>;
 }) {
-  const [{ slug }, { test, src }] = await Promise.all([params, searchParams]);
+  const [{ slug }, { test, testEmail: testEmailParam, src }] = await Promise.all([params, searchParams]);
   const survey = await getSurvey(slug);
 
   if (!survey) {
@@ -94,6 +95,13 @@ export default async function PublicSurveyPage({
   // ignored entirely and normal rules apply, so a curious respondent
   // adding it gets exactly the standard behavior.
   const isTest = test === "1" && (await getCurrentUser())?.id === survey.user_id;
+
+  // ?testEmail= pins the address the test-mode auto-start fills in, so a
+  // preview can be re-run against the same respondent record instead of a
+  // fresh timestamped one every time. Gated on isTest for the same reason
+  // ?test=1 is: for anyone who is not the verified owner it resolves to null
+  // and never crosses into the Client Component's props at all.
+  const testEmail = isTest ? testEmailParam?.trim() || null : null;
 
   // ?src= tags which channel this link was shared through (in-app popup,
   // an email blast, paid ads, ...). Sanitized here so InterviewFlow only
@@ -107,21 +115,21 @@ export default async function PublicSurveyPage({
   // InterviewFlow: interview logic is never reached for an archived survey.
   if (survey.archived_at) {
     return (
-      <div className="font-sans survey-viewport flex flex-col items-center justify-center gap-3 bg-[#faf8f1] px-6 text-center">
+      <SurveyThemeProvider className="font-sans survey-viewport flex flex-col items-center justify-center gap-3 bg-survey-ground px-6 text-center">
         {/* RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
             No "sales", "pitch", "leads", "not a sales call", etc. Also never
             claim their info is "only" used for X, or make any exclusive-use
             / "never shared" claim — state true things we WILL do, don't
             enumerate or limit what else happens. */}
-        <div className="max-w-[420px] rounded-[18px] border border-[#e9e3d3] bg-[#fffefa] px-7 py-8 shadow-[0_4px_14px_rgba(38,32,25,.06)]">
-          <h1 className="font-spectral text-[22px] font-medium text-[#241f18]">
+        <div className="max-w-[420px] rounded-[18px] border border-survey-border bg-survey-surface px-7 py-8 shadow-[var(--sv-shadow-soft)]">
+          <h1 className="font-spectral text-[22px] font-medium text-survey-ink">
             This study is no longer accepting responses
           </h1>
-          <p className="mt-2.5 text-[15px] leading-[1.6] text-[#6f6757]">
+          <p className="mt-2.5 text-[15px] leading-[1.6] text-survey-muted">
             Thanks for your interest. This conversation has been closed.
           </p>
         </div>
-      </div>
+      </SurveyThemeProvider>
     );
   }
 
@@ -166,14 +174,16 @@ export default async function PublicSurveyPage({
     // toolbars-hidden height, so a min-h-screen wrapper would keep the
     // document taller than the visible area and reintroduce the scroll
     // InterviewFlow's own dvh sizing exists to remove.
-    <div className="font-archivo survey-viewport bg-page">
+    <SurveyThemeProvider className="font-archivo survey-viewport bg-survey-ground">
       <InterviewFlow
         survey={publicSurvey}
+        slug={slug}
         logoUrl={profile?.logo_url ?? null}
         isTest={isTest}
+        testEmail={testEmail}
         source={source}
         questionCount={survey.num_questions}
       />
-    </div>
+    </SurveyThemeProvider>
   );
 }

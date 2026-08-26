@@ -114,6 +114,98 @@
   --lp-butter-bg: #f6efd8;
 }
 
+/* ---------------------------------------------------------------------------
+   Respondent survey theme (--sv-*).
+
+   The survey UI used to paint itself from ~130 hardcoded hex literals; those
+   are now these tokens, which is what makes a second theme possible at all
+   (a half-converted UI would switch half its colours and look broken).
+
+   Every rule is scoped under `.survey-theme`, so admin and the marketing
+   pages cannot pick these up even by accident — the guarantee is structural,
+   not a matter of remembering. Values are HSL triplets to match the --ds-*
+   convention and to leave Tailwind's `<alpha-value>` slot usable.
+
+   Dark is NOT an inversion. It keeps the light theme's relationships: the
+   ground is a warm near-black carrying the eggshell's hue rather than a
+   neutral grey, and `surface` sits one step LIGHTER than `ground` exactly as
+   #fffefa sits above #faf8f1, so a card still lifts off the page.
+
+   Light is the unconditional default — prefers-color-scheme is deliberately
+   NOT consulted, so a respondent on a dark-set phone still opens the survey
+   in light and reaches dark only by tapping the toggle.
+
+   Contrast is verified, not asserted — scripts/survey-theme-contrast.ts
+   computes every text/background pair the UI renders. All 14 text pairs clear
+   WCAG AA in dark. See the note on --sv-faint below.
+   --------------------------------------------------------------------------- */
+.survey-theme {
+  --sv-ground: 46.7 47.4% 96.3%;
+  --sv-surface: 48 100% 99%;
+  --sv-raised: 94.3 28% 95.1%;
+  --sv-ink: 35 20% 11.8%;
+  --sv-muted: 40 12.1% 38.8%;
+  /* 2.52:1 on ground — below AA. Pre-existing in light mode and deliberately
+     left alone here (this pass is additive only); the marketing palette hit
+     the same problem and fixed it by darkening --lp-faint to #786e5e, which
+     is the precedent if light mode is ever allowed to change. The dark value
+     below does NOT inherit the flaw: it clears 4.5:1 on both surfaces. */
+  --sv-faint: 39.4 15.5% 59.6%;
+  --sv-border: 43.6 33.3% 87.1%;
+  --sv-accent: 138.9 24.7% 30.2%;
+  --sv-accent-bg: 92 28.3% 89.6%;
+  --sv-danger: 10.6 61.3% 43.5%;
+  --sv-info: 214.1 30.6% 47.5%;
+  --sv-info-bg: 213.8 42.1% 92.5%;
+  --sv-butter: 46.4 73.3% 88.2%;
+
+  /* Shadows are part of the palette here: on the eggshell ground they read as
+     soft warm depth, and the same values over a dark ground would be
+     invisible, so the dark theme deepens them instead of dropping them. */
+  --sv-shadow-soft: 0 4px 14px rgba(38, 32, 25, 0.06);
+  --sv-shadow-lift: 0 8px 24px rgba(38, 32, 25, 0.14);
+  --sv-shadow-bubble: 0 2px 8px rgba(38, 32, 25, 0.05);
+  --sv-shadow-press: 0 14px 30px rgba(38, 32, 25, 0.18);
+  --sv-drop-mascot: 0 4px 10px rgba(38, 32, 25, 0.14);
+  --sv-tint-accent: rgba(58, 96, 70, 0.09);
+  --sv-tint-info: rgba(84, 116, 158, 0.09);
+}
+
+/* Dark is opt-in only: the survey always opens in light, whatever the
+   respondent's OS is set to, and only a tap on the toggle switches it. */
+.survey-theme[data-theme="dark"] {
+  --sv-ground: 25.7 16.3% 8.4%;
+  --sv-surface: 30 16.7% 11.8%;
+  --sv-raised: 32.3 17.8% 14.3%;
+  --sv-ink: 41.2 42.1% 92.5%;
+  --sv-muted: 39.3 16.4% 65.3%;
+  --sv-faint: 36 11% 55.5%;
+  --sv-border: 32 14.9% 19.8%;
+  --sv-accent: 101.7 35% 61.4%;
+  --sv-accent-bg: 101.2 21.1% 14.9%;
+  --sv-danger: 13.8 70.2% 68.4%;
+  --sv-info: 213 49% 71.6%;
+  --sv-info-bg: 216 25% 15.7%;
+  --sv-butter: 39.1 24.7% 18.2%;
+  --sv-shadow-soft: 0 4px 14px rgba(0, 0, 0, 0.36);
+  --sv-shadow-lift: 0 8px 24px rgba(0, 0, 0, 0.48);
+  --sv-shadow-bubble: 0 2px 8px rgba(0, 0, 0, 0.34);
+  --sv-shadow-press: 0 14px 30px rgba(0, 0, 0, 0.55);
+  --sv-drop-mascot: 0 4px 10px rgba(0, 0, 0, 0.5);
+  --sv-tint-accent: rgba(143, 191, 122, 0.1);
+  --sv-tint-info: rgba(147, 179, 218, 0.1);
+}
+
+/* Keeps the browser's own chrome (form controls, scrollbars, the overscroll
+   gutter) in step with the theme. Pinned to light on the base selector so a
+   dark-set OS cannot restyle form controls out from under the light theme. */
+.survey-theme {
+  color-scheme: light;
+}
+.survey-theme[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);

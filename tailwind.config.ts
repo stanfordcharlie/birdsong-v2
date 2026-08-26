@@ -72,6 +72,25 @@ const config: Config = {
         input: "hsl(var(--ds-input) / <alpha-value>)",
         ring: "hsl(var(--ds-ring) / <alpha-value>)",
         chip: "hsl(var(--ds-chip) / <alpha-value>)",
+
+        // Respondent survey theme (app/globals.css `.survey-theme`). Only the
+        // survey route sets that class, so these resolve to nothing anywhere
+        // else and cannot leak into admin or marketing.
+        survey: {
+          ground: "hsl(var(--sv-ground) / <alpha-value>)",
+          surface: "hsl(var(--sv-surface) / <alpha-value>)",
+          raised: "hsl(var(--sv-raised) / <alpha-value>)",
+          ink: "hsl(var(--sv-ink) / <alpha-value>)",
+          muted: "hsl(var(--sv-muted) / <alpha-value>)",
+          faint: "hsl(var(--sv-faint) / <alpha-value>)",
+          border: "hsl(var(--sv-border) / <alpha-value>)",
+          accent: "hsl(var(--sv-accent) / <alpha-value>)",
+          "accent-bg": "hsl(var(--sv-accent-bg) / <alpha-value>)",
+          danger: "hsl(var(--sv-danger) / <alpha-value>)",
+          info: "hsl(var(--sv-info) / <alpha-value>)",
+          "info-bg": "hsl(var(--sv-info-bg) / <alpha-value>)",
+          butter: "hsl(var(--sv-butter) / <alpha-value>)",
+        },
         indigo: {
           DEFAULT: "hsl(var(--ds-indigo) / <alpha-value>)",
           light: "hsl(var(--ds-indigo-light) / <alpha-value>)",

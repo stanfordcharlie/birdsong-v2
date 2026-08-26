@@ -46,16 +46,16 @@ export function PerchedBird({
       >
         <path
           d="M8 25c0-7 5.2-13 12.3-13 3.2 0 5.2 1.3 6.5 3.2l5-1.4-2.9 4.7c.1.7.2 1.4.2 2.1 0 6.8-5.5 11.6-12.5 11.6H8l4.4-4.6C9.6 26.3 8 25 8 25Z"
-          fill="#211D16"
+          fill="hsl(var(--sv-ink))"
         />
-        <circle cx="24.7" cy="15.9" r="1.2" fill="#F5EFE3" />
-        <path d="M27 14.5l4.5-1.2" stroke="#33684B" strokeWidth="1.6" strokeLinecap="round" />
+        <circle cx="24.7" cy="15.9" r="1.2" fill="hsl(var(--sv-ground))" />
+        <path d="M27 14.5l4.5-1.2" stroke="hsl(var(--sv-accent))" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
       {notes.map((note, i) => (
         <span
           key={i}
           aria-hidden="true"
-          className="absolute font-newsreader text-[#33684B] motion-reduce:![animation:none]"
+          className="absolute font-newsreader text-survey-accent motion-reduce:![animation:none]"
           style={{
             top: note.top,
             left: note.left,

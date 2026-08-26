@@ -17,10 +17,12 @@ import {
 } from "@/lib/interview/active-session";
 import { Badge } from "@/components/ui/badge";
 import { PerchedBird } from "@/components/marketing/PerchedBird";
+import { SurveyThemeToggle } from "./SurveyTheme";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate, useFlybyGate } from "@/components/useLoadingGate";
 import { renderWithBold } from "@/lib/chat/render-with-bold";
+import { useSurveyPresence } from "@/lib/presence/use-survey-presence";
 import { newsreader, bricolage } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
@@ -48,30 +50,33 @@ type Stage = "welcome" | "intro" | "chat" | "complete";
 // every other stage is styled from these values rather than from its own
 // palette, so the whole flow reads as one page. All of them are lifted
 // verbatim from that screen's JSX below.
-//   ground     #faf8f1        ink      #241f18
-//   card bg    #fffefa        muted    #a89d88
-//   hairline   #e9e3d3        soft     #6f6757
-//   accent     #3a6046        error    #b3432b
-const SURVEY_GROUND = "#faf8f1";
-const CARD_SHADOW = "0 4px 14px rgba(38,32,25,.06)";
+//   bg-survey-ground / -surface / -raised   text-survey-ink / -muted / -faint
+//   border-survey-border   text-survey-accent   text-survey-danger
+//
+// Those resolve through the --sv-* custom properties in app/globals.css,
+// which is what gives this screen a dark theme (see SurveyTheme.tsx). Do not
+// reintroduce raw hex here: a literal will not switch, and a single one is
+// enough to make a themed screen look broken.
+const SURVEY_GROUND = "hsl(var(--sv-ground))";
+const CARD_SHADOW = "var(--sv-shadow-soft)";
 
 // The dark pill, matching "Let's get started" exactly (see the welcome CTA).
 const PILL_BUTTON =
-  "inline-flex touch-manipulation items-center gap-3 rounded-full bg-[#241f18] px-[30px] py-4 text-[16.5px] font-semibold text-[#faf8f1] [transition:transform_0.25s_ease,box-shadow_0.25s_ease] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_14px_30px_rgba(38,32,25,.18)]";
+  "inline-flex touch-manipulation items-center gap-3 rounded-full bg-survey-ink px-[30px] py-4 text-[16.5px] font-semibold text-survey-ground [transition:transform_0.25s_ease,box-shadow_0.25s_ease] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[var(--sv-shadow-press)]";
 
 const RESPONDENT_BUBBLE =
-  "self-end max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-[#241f18] px-4 py-2.5 text-sm leading-relaxed text-[#faf8f1]";
+  "self-end max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-survey-ink px-4 py-2.5 text-sm leading-relaxed text-survey-ground";
 
-const FIELD_LABEL_CLASSES = "text-[13px] font-semibold text-[#6f6757]";
-// Same surface the welcome screen's interviewer card uses (#fffefa on an
-// #e9e3d3 hairline with CARD_SHADOW), just at input proportions.
+const FIELD_LABEL_CLASSES = "text-[13px] font-semibold text-survey-muted";
+// Same surface the welcome screen's interviewer card uses (survey-surface on
+// a survey-border hairline with CARD_SHADOW), just at input proportions.
 //
 // text-base (16px) is load-bearing on iOS, not just a type choice: Safari
 // auto-zooms the whole page on focus for any input under 16px and never
 // zooms back out. min-h-[48px] is the touch-target floor; on desktop the
 // py-[14px] + 16px line box already exceeds it, so it changes nothing there.
 const FIELD_INPUT_BASE =
-  "w-full min-w-0 min-h-[48px] rounded-[14px] border border-[#e9e3d3] bg-[#fffefa] py-[14px] text-base text-[#241f18] placeholder:text-[#a89d88] focus:border-[#6f6757] focus:outline-none focus:ring-[3px] focus:ring-[rgba(38,32,25,.07)] disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full min-w-0 min-h-[48px] rounded-[14px] border border-survey-border bg-survey-surface py-[14px] text-base text-survey-ink placeholder:text-survey-faint focus:border-survey-muted focus:outline-none focus:ring-[3px] focus:ring-survey-ink/[0.07] disabled:cursor-not-allowed disabled:opacity-60";
 
 // Same bird, different perch: 48x46 (vs the marketing default 40x38) and
 // its own two-note arrangement, per the handoff.
@@ -102,6 +107,28 @@ const DEFAULT_TARGET_QUESTION_COUNT = 8;
 const MINUTES_PER_QUESTION = 1.5;
 
 const EMAIL_LIVE_CHECK_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+// What test mode types into the intake form on the owner's behalf. Static,
+// so two previews of the same survey differ only in what the owner actually
+// says — a run-to-run diff of the transcript is then meaningful. Every
+// enabled field gets a value, including the preset optionals, so a survey
+// that marks any of them required still passes firstMissingRequiredField
+// and starts rather than erroring on a form nobody can see.
+const TEST_RESPONDENT = {
+  name: "Test Respondent",
+  phone: "(555) 010-0000",
+  jobTitle: "Test Job Title",
+  company: "Test Company",
+  linkedin: "https://www.linkedin.com/in/test-respondent",
+  customField: "Test value",
+} as const;
+
+// The email is the one value that varies: a fixed address would collide on
+// the same respondent record every run. ?testEmail= (owner-verified by the
+// page) pins it when reusing one address across runs is the point.
+function testRespondentEmail(pinned: string | null): string {
+  return pinned?.trim() || `test+${Math.floor(Date.now() / 1000)}@example.com`;
+}
 
 // Progressively formats the phone field as a US number — "(925) 948-4350" —
 // as the respondent types. Re-derived from the digits on every keystroke, so
@@ -221,9 +248,9 @@ function displayedQuestionNumber(answered: number, target: number): number {
 function TopProgressLine({ answered, target }: { answered: number; target: number }) {
   const percent = computeProgressPercent(answered, target);
   return (
-    <div aria-hidden="true" className="fixed inset-x-0 top-0 z-30 h-1 bg-[rgba(38,32,25,.08)]">
+    <div aria-hidden="true" className="fixed inset-x-0 top-0 z-30 h-1 bg-survey-ink/[0.08]">
       <div
-        className="h-full rounded-r-sm bg-[#3a6046] transition-[width] duration-[450ms] ease-[cubic-bezier(.4,0,.2,1)]"
+        className="h-full rounded-r-sm bg-survey-accent transition-[width] duration-[450ms] ease-[cubic-bezier(.4,0,.2,1)]"
         style={{ width: `${percent}%` }}
       />
     </div>
@@ -289,24 +316,24 @@ function AmbientBackdrop() {
       className="pointer-events-none absolute inset-0 overflow-hidden"
       style={{
         background:
-          "radial-gradient(760px 420px at 24% -8%, rgba(58,96,70,.09), transparent 60%), radial-gradient(760px 420px at 76% -10%, rgba(84,116,158,.09), transparent 60%)",
+          "radial-gradient(760px 420px at 24% -8%, var(--sv-tint-accent), transparent 60%), radial-gradient(760px 420px at 76% -10%, var(--sv-tint-info), transparent 60%)",
       }}
     >
       <div
         className="sw-blob-a absolute left-[6%] top-[-80px] h-[300px] w-[300px] rounded-full"
-        style={{ background: "#e4ecdd", opacity: 0.5, filter: "blur(70px)" }}
+        style={{ background: "hsl(var(--sv-accent-bg))", opacity: 0.5, filter: "blur(70px)" }}
       />
       <div
         className="sw-blob-b absolute right-[5%] top-[-60px] h-[280px] w-[280px] rounded-full"
-        style={{ background: "#e4ebf4", opacity: 0.55, filter: "blur(70px)" }}
+        style={{ background: "hsl(var(--sv-info-bg))", opacity: 0.55, filter: "blur(70px)" }}
       />
-      <span className="sw-bgnote-a absolute left-[14%] top-[14%] text-[20px]" style={{ color: "#3a6046", opacity: 0.4 }}>
+      <span className="sw-bgnote-a absolute left-[14%] top-[14%] text-[20px]" style={{ color: "hsl(var(--sv-accent))", opacity: 0.4 }}>
         &#9834;
       </span>
-      <span className="sw-bgnote-b absolute right-[18%] top-[10%] text-[17px]" style={{ color: "#54749e", opacity: 0.4 }}>
+      <span className="sw-bgnote-b absolute right-[18%] top-[10%] text-[17px]" style={{ color: "hsl(var(--sv-info))", opacity: 0.4 }}>
         &#9835;
       </span>
-      <span className="sw-bgnote-c absolute right-[9%] top-[64%] text-[15px]" style={{ color: "#a89d88", opacity: 0.45 }}>
+      <span className="sw-bgnote-c absolute right-[9%] top-[64%] text-[15px]" style={{ color: "hsl(var(--sv-faint))", opacity: 0.45 }}>
         &#9834;
       </span>
     </div>
@@ -346,7 +373,7 @@ function CheckIcon({ className }: { className?: string }) {
     >
       <path
         d="M5 12.5l4.5 4.5L19 7.5"
-        stroke="#3a6046"
+        stroke="hsl(var(--sv-accent))"
         strokeWidth="2.4"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -373,7 +400,7 @@ function XIcon({ className }: { className?: string }) {
     >
       <path
         d="M6.5 6.5l11 11M17.5 6.5l-11 11"
-        stroke="#b3432b"
+        stroke="hsl(var(--sv-danger))"
         strokeWidth="2.4"
         strokeLinecap="round"
       />
@@ -383,17 +410,28 @@ function XIcon({ className }: { className?: string }) {
 
 export function InterviewFlow({
   survey,
+  slug,
   logoUrl,
   isTest = false,
+  testEmail = null,
   source = null,
   questionCount = null,
 }: {
   survey: PublicSurvey;
+  // The public slug already in this page's URL, passed as its own display
+  // prop rather than being added to the PublicSurvey allowlist. Used only to
+  // label the respondent's entry on the admin Live page (see
+  // lib/presence/survey-presence.ts); the interview itself never reads it.
+  slug: string;
   logoUrl: string | null;
   // Owner-verified server-side by the page; drives the "Test mode" marker,
   // the is_test flag on the start call (re-verified by the route), and
   // skipping completion persistence so previews are repeatable.
   isTest?: boolean;
+  // Overrides the timestamped address test mode would otherwise generate
+  // (from ?testEmail=). Already gated on isTest server-side by the page, so
+  // it is null on every real run. Ignored entirely when isTest is false.
+  testEmail?: string | null;
   // Already sanitized server-side by the page (from ?src=). Never rendered
   // anywhere — just carried through to the start call unchanged, however
   // long the respondent takes to fill in the intro form.
@@ -415,17 +453,30 @@ export function InterviewFlow({
   // Opens on the welcome beat; the completion-restore effect below still
   // jumps straight to "complete" for a returning respondent, and tapping the
   // welcome CTA advances to "intro" (the intake fields).
-  const [stage, setStage] = useState<Stage>("welcome");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  //
+  // Test mode opens on "intro" instead, with no welcome beat and no form: the
+  // field state below is already filled in, and the mount effect further down
+  // submits it immediately, so "intro" is only ever the in-flight moment
+  // between mount and the first question.
+  const [stage, setStage] = useState<Stage>(isTest ? "intro" : "welcome");
+  // Initializers rather than a later setState, and this matters: the
+  // auto-start effect calls startInterview(), which reads these values out of
+  // the closure of the render it was created in. Anything written after the
+  // first render would not be visible to it.
+  const [name, setName] = useState(() => (isTest ? TEST_RESPONDENT.name : ""));
+  const [email, setEmail] = useState(() => (isTest ? testRespondentEmail(testEmail) : ""));
   // Whether the email field has been blurred (or a submit attempted) —
   // gates the invalid-email X so it never flashes mid-typing.
   const [emailTouched, setEmailTouched] = useState(false);
-  const [phone, setPhone] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
-  const [company, setCompany] = useState("");
-  const [linkedin, setLinkedin] = useState("");
-  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+  const [phone, setPhone] = useState(() => (isTest ? TEST_RESPONDENT.phone : ""));
+  const [jobTitle, setJobTitle] = useState(() => (isTest ? TEST_RESPONDENT.jobTitle : ""));
+  const [company, setCompany] = useState(() => (isTest ? TEST_RESPONDENT.company : ""));
+  const [linkedin, setLinkedin] = useState(() => (isTest ? TEST_RESPONDENT.linkedin : ""));
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>(() =>
+    isTest
+      ? Object.fromEntries(customFieldDefs.map((field) => [field.key, TEST_RESPONDENT.customField]))
+      : {}
+  );
   const [responseId, setResponseId] = useState<string | null>(null);
   // Proves to /api/interview/continue and /api/interview/resume that this tab
   // is the one that started this interview, since response_id alone is a
@@ -495,6 +546,28 @@ export function InterviewFlow({
   // an explicit send/skip can all cancel a still-pending one and avoid a
   // double-send.
   const chipSubmitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guards the test-mode auto-start against React's double-invoked mount
+  // effects in development, which would otherwise open two interviews (and
+  // create two response rows) on every preview.
+  const autoStartedRef = useRef(false);
+
+  // Live presence for the admin Live page. Additive only: it observes state
+  // this component already keeps and changes nothing about the interview.
+  // Joined once the chat stage begins (never on the welcome or intake
+  // screens) and dropped when the stage leaves "chat", which covers both
+  // INTERVIEW_COMPLETE and a mid-interview unmount. Test previews are
+  // excluded so an owner checking their own survey does not show up as a
+  // respondent.
+  useSurveyPresence({
+    enabled: stage === "chat" && !isTest && responseId !== null,
+    surveyId: survey.id,
+    slug,
+    responseId,
+    respondentName: name,
+    // Questions asked so far. Derived from the transcript that is already in
+    // state, so nothing new needs tracking on this side.
+    currentStep: messages.filter((m) => m.role === "assistant").length,
+  });
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -623,6 +696,21 @@ export function InterviewFlow({
       cancelled = true;
     };
     // Mount only, against whatever pointer storage holds at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Test mode has no welcome beat and no intake form: the field state above
+  // is already what the form would have collected, so the interview starts
+  // here, on mount, and the owner's next frame is the first question. This is
+  // the ordinary start path with the typing skipped — same startInterview,
+  // same payload, same chat UI, same is_test flag (re-verified by the route).
+  useEffect(() => {
+    if (!isTest || autoStartedRef.current) return;
+    autoStartedRef.current = true;
+    startInterview();
+    // Mount only. startInterview is deliberately not a dependency: it closes
+    // over the first render's prefilled field state, which is exactly the
+    // state it needs, and re-running this is never correct.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -996,11 +1084,12 @@ export function InterviewFlow({
       <div
         className={cn(
           bricolage.variable,
-          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[#241f18]"
+          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-survey-ink"
         )}
-        style={{ background: "#faf8f1" }}
+        style={{ background: "hsl(var(--sv-ground))" }}
       >
         <TestModeBadge isTest={isTest} />
+        <SurveyThemeToggle offsetForBadge={isTest} />
 
         {/* Decorative ambient layer: two top radial washes, two blurred
             drifting color blobs, three drifting note glyphs. aria-hidden. */}
@@ -1009,24 +1098,24 @@ export function InterviewFlow({
           className="pointer-events-none absolute inset-0 overflow-hidden"
           style={{
             background:
-              "radial-gradient(760px 420px at 24% -8%, rgba(58,96,70,.09), transparent 60%), radial-gradient(760px 420px at 76% -10%, rgba(84,116,158,.09), transparent 60%)",
+              "radial-gradient(760px 420px at 24% -8%, var(--sv-tint-accent), transparent 60%), radial-gradient(760px 420px at 76% -10%, var(--sv-tint-info), transparent 60%)",
           }}
         >
           <div
             className="sw-blob-a absolute left-[6%] top-[-80px] h-[300px] w-[300px] rounded-full"
-            style={{ background: "#e4ecdd", opacity: 0.5, filter: "blur(70px)" }}
+            style={{ background: "hsl(var(--sv-accent-bg))", opacity: 0.5, filter: "blur(70px)" }}
           />
           <div
             className="sw-blob-b absolute right-[5%] top-[-60px] h-[280px] w-[280px] rounded-full"
-            style={{ background: "#e4ebf4", opacity: 0.55, filter: "blur(70px)" }}
+            style={{ background: "hsl(var(--sv-info-bg))", opacity: 0.55, filter: "blur(70px)" }}
           />
-          <span className="sw-bgnote-a absolute left-[14%] top-[14%] text-[20px]" style={{ color: "#3a6046", opacity: 0.4 }}>
+          <span className="sw-bgnote-a absolute left-[14%] top-[14%] text-[20px]" style={{ color: "hsl(var(--sv-accent))", opacity: 0.4 }}>
             &#9834;
           </span>
-          <span className="sw-bgnote-b absolute right-[18%] top-[10%] text-[17px]" style={{ color: "#54749e", opacity: 0.4 }}>
+          <span className="sw-bgnote-b absolute right-[18%] top-[10%] text-[17px]" style={{ color: "hsl(var(--sv-info))", opacity: 0.4 }}>
             &#9835;
           </span>
-          <span className="sw-bgnote-c absolute right-[9%] top-[64%] text-[15px]" style={{ color: "#a89d88", opacity: 0.45 }}>
+          <span className="sw-bgnote-c absolute right-[9%] top-[64%] text-[15px]" style={{ color: "hsl(var(--sv-faint))", opacity: 0.45 }}>
             &#9834;
           </span>
         </div>
@@ -1045,17 +1134,17 @@ export function InterviewFlow({
                 survey.gift_card_amount ? "mb-7" : "mb-1.5"
               )}
             >
-              <span className="sw-clusternote-a absolute left-[52px] top-0 text-[17px]" style={{ color: "#3a6046", opacity: 0 }}>
+              <span className="sw-clusternote-a absolute left-[52px] top-0 text-[17px]" style={{ color: "hsl(var(--sv-accent))", opacity: 0 }}>
                 &#9834;
               </span>
-              <span className="sw-clusternote-b absolute left-[96px] top-4 text-[14px]" style={{ color: "#a89d88", opacity: 0 }}>
+              <span className="sw-clusternote-b absolute left-[96px] top-4 text-[14px]" style={{ color: "hsl(var(--sv-faint))", opacity: 0 }}>
                 &#9835;
               </span>
               <WelcomeBird
                 width={46}
                 height={42}
-                fill="#241f18"
-                eyeFill="#faf8f1"
+                fill="hsl(var(--sv-ink))"
+                eyeFill="hsl(var(--sv-ground))"
                 className="sw-bird absolute bottom-0 left-[62px]"
               />
               {survey.gift_card_amount ? (
@@ -1066,16 +1155,16 @@ export function InterviewFlow({
                   <svg
                     viewBox="0 0 100 100"
                     className="absolute inset-0"
-                    style={{ filter: "drop-shadow(0 4px 10px rgba(38,32,25,.14))" }}
+                    style={{ filter: "drop-shadow(var(--sv-drop-mascot))" }}
                   >
                     <polygon
                       points="100,50 83.3,63.8 85.4,85.4 63.8,83.3 50,100 36.2,83.3 14.6,85.4 16.7,63.8 0,50 16.7,36.2 14.6,14.6 36.2,16.7 50,0 63.8,16.7 85.4,14.6 83.3,36.2"
-                      fill="#f7edcb"
-                      stroke="#241f18"
+                      fill="hsl(var(--sv-butter))"
+                      stroke="hsl(var(--sv-ink))"
                       strokeWidth="2.5"
                     />
                   </svg>
-                  <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-[#241f18]">
+                  <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-survey-ink">
                     <span className="text-[19px] font-bold italic">${survey.gift_card_amount}</span>
                     <span className="text-[10.5px] font-semibold tracking-[0.02em]">gift card</span>
                   </span>
@@ -1089,7 +1178,7 @@ export function InterviewFlow({
               <span className="sr-only">Includes a ${survey.gift_card_amount} gift card.</span>
             ) : null}
 
-            {metaLine && <div className="sw-rev mb-3 text-[15px] font-medium text-[#6f6757]">{metaLine}</div>}
+            {metaLine && <div className="sw-rev mb-3 text-[15px] font-medium text-survey-muted">{metaLine}</div>}
 
             <h1
               className="sw-rev m-0 mb-2.5 text-balance font-bricolage font-bold leading-[1.05] tracking-[-0.025em]"
@@ -1105,11 +1194,11 @@ export function InterviewFlow({
 
             {survey.sponsor && (
               <div
-                className="sw-rev mb-6 text-[15px] text-[#6f6757]"
+                className="sw-rev mb-6 text-[15px] text-survey-muted"
                 style={{ "--sw-delay": "0.14s" } as React.CSSProperties}
               >
                 Research conducted on behalf of{" "}
-                <span className="font-semibold text-[#241f18]">{survey.sponsor}</span>
+                <span className="font-semibold text-survey-ink">{survey.sponsor}</span>
               </div>
             )}
 
@@ -1118,16 +1207,16 @@ export function InterviewFlow({
               style={{ "--sw-delay": "0.22s" } as React.CSSProperties}
             >
               <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#241f18]">
-                  <WelcomeBird width={15} height={13} fill="#faf8f1" />
+                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-survey-ink">
+                  <WelcomeBird width={15} height={13} fill="hsl(var(--sv-ground))" />
                 </span>
-                <span className="text-[12.5px] font-semibold tracking-[0.04em] text-[#a89d88]">
+                <span className="text-[12.5px] font-semibold tracking-[0.04em] text-survey-faint">
                   YOUR INTERVIEWER
                 </span>
               </div>
               <div
-                className="text-pretty max-w-[500px] rounded-[18px] border border-[#e9e3d3] bg-[#fffefa] px-[26px] py-4 text-[16.5px] leading-[1.6]"
-                style={{ boxShadow: "0 4px 14px rgba(38,32,25,.06)" }}
+                className="text-pretty max-w-[500px] rounded-[18px] border border-survey-border bg-survey-surface px-[26px] py-4 text-[16.5px] leading-[1.6]"
+                style={{ boxShadow: "var(--sv-shadow-soft)" }}
               >
                 {/* RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
                     No "sales", "pitch", "leads", "not a sales call", etc. Also
@@ -1146,7 +1235,7 @@ export function InterviewFlow({
               <button
                 type="button"
                 onClick={() => setStage("intro")}
-                className="inline-flex touch-manipulation items-center gap-3 rounded-full bg-[#241f18] px-[30px] py-4 text-[16.5px] font-semibold text-[#faf8f1] [transition:transform_0.25s_ease,box-shadow_0.25s_ease] active:translate-y-0 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_14px_30px_rgba(38,32,25,.18)]"
+                className="inline-flex touch-manipulation items-center gap-3 rounded-full bg-survey-ink px-[30px] py-4 text-[16.5px] font-semibold text-survey-ground [transition:transform_0.25s_ease,box-shadow_0.25s_ease] active:translate-y-0 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[var(--sv-shadow-press)]"
               >
                 Let&apos;s get started
                 <svg width="20" height="12" viewBox="0 0 22 12" fill="none" aria-hidden="true">
@@ -1159,13 +1248,13 @@ export function InterviewFlow({
                   />
                 </svg>
               </button>
-              <div className="mt-[18px] text-[13.5px] text-[#a89d88]">
+              <div className="mt-[18px] text-[13.5px] text-survey-faint">
                 By continuing, you agree to our{" "}
                 <a
                   href="/terms"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#6f6757] underline [text-underline-offset:3px]"
+                  className="text-survey-muted underline [text-underline-offset:3px]"
                 >
                   Terms
                 </a>{" "}
@@ -1174,7 +1263,7 @@ export function InterviewFlow({
                   href="/privacy"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#6f6757] underline [text-underline-offset:3px]"
+                  className="text-survey-muted underline [text-underline-offset:3px]"
                 >
                   Privacy Policy
                 </a>
@@ -1188,10 +1277,10 @@ export function InterviewFlow({
           className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-6 pt-5"
           style={{ "--sw-delay": "0.4s" } as React.CSSProperties}
         >
-          <span className="text-[13.5px] text-[#a89d88]">Powered by</span>
+          <span className="text-[13.5px] text-survey-faint">Powered by</span>
           <a href="/" className="inline-flex items-center gap-[7px]">
-            <WelcomeBird width={17} height={15} fill="#241f18" />
-            <span className="font-bricolage text-[15px] font-bold text-[#241f18]">Birdsong</span>
+            <WelcomeBird width={17} height={15} fill="hsl(var(--sv-ink))" />
+            <span className="font-bricolage text-[15px] font-bold text-survey-ink">Birdsong</span>
           </a>
         </footer>
       </div>
@@ -1199,6 +1288,36 @@ export function InterviewFlow({
   }
 
   if (stage === "intro") {
+    // Test mode reaches this stage only while the auto-started interview is
+    // in flight, so there is no form to draw — just the ground, the badge and
+    // the same flyby a real run shows between Start and the first question.
+    // Wrapper, palette and error treatment are the real intro's, verbatim.
+    if (isTest) {
+      return (
+        <div
+          className={cn(
+            bricolage.variable,
+            newsreader.variable,
+            "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[16px] text-survey-ink"
+          )}
+          style={{ background: SURVEY_GROUND }}
+        >
+          {showIntroFlyby && <LoadingScreen statusText="Preparing your conversation" />}
+          <AmbientBackdrop />
+          <TestModeBadge isTest={isTest} />
+        <SurveyThemeToggle offsetForBadge={isTest} />
+          {/* Nothing here can be retried by hand (there are no fields to fix),
+              but a start that fails must still say so rather than leaving the
+              owner on an empty ground wondering. */}
+          {error && (
+            <div className="relative mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-10 sm:px-6 sm:py-16">
+              <p className="text-sm text-survey-danger">{error}</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     const nameOk = name.trim().length > 1;
     const emailOk = EMAIL_LIVE_CHECK_PATTERN.test(email.trim());
     const emailShowsX = !emailOk && emailTouched && email.trim().length > 0;
@@ -1227,13 +1346,14 @@ export function InterviewFlow({
           // PerchedBird's note glyphs are set in font-newsreader; the rest of
           // this stage is the welcome screen's font-sans / font-bricolage pair.
           newsreader.variable,
-          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[16px] text-[#241f18]"
+          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[16px] text-survey-ink"
         )}
         style={{ background: SURVEY_GROUND }}
       >
         {showIntroFlyby && <LoadingScreen statusText="Preparing your conversation" />}
         <AmbientBackdrop />
         <TestModeBadge isTest={isTest} />
+        <SurveyThemeToggle offsetForBadge={isTest} />
         <div className="relative mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-10 sm:px-6 sm:py-16">
           {survey.sponsor && logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -1259,7 +1379,7 @@ export function InterviewFlow({
               present on PublicSurvey). When public_description is unset,
               nothing renders here; there is no fallback. */}
           {survey.public_description?.trim() && (
-            <p className="survey-intro-rise-3 text-pretty mb-7 text-[16px] leading-[1.6] text-[#6f6757] sm:mb-9 sm:text-[17px]">
+            <p className="survey-intro-rise-3 text-pretty mb-7 text-[16px] leading-[1.6] text-survey-muted sm:mb-9 sm:text-[17px]">
               {survey.public_description}
             </p>
           )}
@@ -1304,7 +1424,7 @@ export function InterviewFlow({
                 <label htmlFor="respondent-email" className={FIELD_LABEL_CLASSES}>
                   Work email
                 </label>
-                <p className="text-[13px] text-[#a89d88]">
+                <p className="text-[13px] text-survey-faint">
                   This is where we&apos;ll send your gift card and a copy of the report.
                 </p>
                 <input
@@ -1328,7 +1448,7 @@ export function InterviewFlow({
                   className={cn(
                     FIELD_INPUT_BASE,
                     "pl-4 pr-11",
-                    emailShowsX && "border-[#b3432b] focus:border-[#b3432b]"
+                    emailShowsX && "border-survey-danger focus:border-survey-danger"
                   )}
                 />
                 {emailOk && <CheckIcon className="absolute bottom-4 right-[15px]" />}
@@ -1455,7 +1575,7 @@ export function InterviewFlow({
                 </div>
               ))}
 
-              {error && <p className="text-sm text-[#b3432b]">{error}</p>}
+              {error && <p className="text-sm text-survey-danger">{error}</p>}
             </div>
 
             <button
@@ -1473,7 +1593,7 @@ export function InterviewFlow({
               an empty box under the button. The email field's own helper
               text already says where the gift card goes; nothing about the
               incentive is repeated here. */}
-          <div className="survey-intro-rise-6 mt-3.5 hidden text-balance text-[13.5px] text-[#a89d88] sm:block">
+          <div className="survey-intro-rise-6 mt-3.5 hidden text-balance text-[13.5px] text-survey-faint sm:block">
             <span>Press Enter to move between fields</span>
           </div>
         </div>
@@ -1493,11 +1613,12 @@ export function InterviewFlow({
       <div
         className={cn(
           bricolage.variable,
-          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[#241f18]"
+          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-survey-ink"
         )}
-        style={{ background: "#faf8f1" }}
+        style={{ background: "hsl(var(--sv-ground))" }}
       >
         <TestModeBadge isTest={isTest} />
+        <SurveyThemeToggle offsetForBadge={isTest} />
 
         {/* Decorative ambient layer, identical to the welcome screen. */}
         <div
@@ -1505,24 +1626,24 @@ export function InterviewFlow({
           className="pointer-events-none absolute inset-0 overflow-hidden"
           style={{
             background:
-              "radial-gradient(760px 420px at 24% -8%, rgba(58,96,70,.09), transparent 60%), radial-gradient(760px 420px at 76% -10%, rgba(84,116,158,.09), transparent 60%)",
+              "radial-gradient(760px 420px at 24% -8%, var(--sv-tint-accent), transparent 60%), radial-gradient(760px 420px at 76% -10%, var(--sv-tint-info), transparent 60%)",
           }}
         >
           <div
             className="sw-blob-a absolute left-[6%] top-[-80px] h-[300px] w-[300px] rounded-full"
-            style={{ background: "#e4ecdd", opacity: 0.5, filter: "blur(70px)" }}
+            style={{ background: "hsl(var(--sv-accent-bg))", opacity: 0.5, filter: "blur(70px)" }}
           />
           <div
             className="sw-blob-b absolute right-[5%] top-[-60px] h-[280px] w-[280px] rounded-full"
-            style={{ background: "#e4ebf4", opacity: 0.55, filter: "blur(70px)" }}
+            style={{ background: "hsl(var(--sv-info-bg))", opacity: 0.55, filter: "blur(70px)" }}
           />
-          <span className="sw-bgnote-a absolute left-[14%] top-[12%] text-[20px]" style={{ color: "#3a6046", opacity: 0.4 }}>
+          <span className="sw-bgnote-a absolute left-[14%] top-[12%] text-[20px]" style={{ color: "hsl(var(--sv-accent))", opacity: 0.4 }}>
             &#9834;
           </span>
-          <span className="sw-bgnote-b absolute right-[18%] top-[9%] text-[17px]" style={{ color: "#54749e", opacity: 0.4 }}>
+          <span className="sw-bgnote-b absolute right-[18%] top-[9%] text-[17px]" style={{ color: "hsl(var(--sv-info))", opacity: 0.4 }}>
             &#9835;
           </span>
-          <span className="sw-bgnote-c absolute right-[9%] top-[58%] text-[15px]" style={{ color: "#a89d88", opacity: 0.45 }}>
+          <span className="sw-bgnote-c absolute right-[9%] top-[58%] text-[15px]" style={{ color: "hsl(var(--sv-faint))", opacity: 0.45 }}>
             &#9834;
           </span>
         </div>
@@ -1531,17 +1652,17 @@ export function InterviewFlow({
           <div className="flex w-full max-w-[640px] flex-col items-center text-center">
             {/* Check + sticker cluster (decorative). */}
             <div aria-hidden="true" className="sw-rev relative mb-[22px] h-[86px] w-[180px]">
-              <span className="sw-clusternote-a absolute left-[38px] top-0 text-[17px]" style={{ color: "#3a6046", opacity: 0 }}>
+              <span className="sw-clusternote-a absolute left-[38px] top-0 text-[17px]" style={{ color: "hsl(var(--sv-accent))", opacity: 0 }}>
                 &#9834;
               </span>
-              <span className="sw-clusternote-b absolute left-[130px] top-[14px] text-[14px]" style={{ color: "#a89d88", opacity: 0 }}>
+              <span className="sw-clusternote-b absolute left-[130px] top-[14px] text-[14px]" style={{ color: "hsl(var(--sv-faint))", opacity: 0 }}>
                 &#9835;
               </span>
-              <span className="sw-bird absolute bottom-0 left-[53px] flex h-[74px] w-[74px] items-center justify-center rounded-full border border-[#e9e3d3] bg-[#e4ecdd]">
+              <span className="sw-bird absolute bottom-0 left-[53px] flex h-[74px] w-[74px] items-center justify-center rounded-full border border-survey-border bg-survey-accent-bg">
                 <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
                   <path
                     d="M7.5 15.5 L13 21 L23 9.5"
-                    stroke="#3a6046"
+                    stroke="hsl(var(--sv-accent))"
                     strokeWidth="2.6"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -1558,16 +1679,16 @@ export function InterviewFlow({
                   <svg
                     viewBox="0 0 100 100"
                     className="absolute inset-0"
-                    style={{ filter: "drop-shadow(0 4px 10px rgba(38,32,25,.14))" }}
+                    style={{ filter: "drop-shadow(var(--sv-drop-mascot))" }}
                   >
                     <polygon
                       points="100,50 83.3,63.8 85.4,85.4 63.8,83.3 50,100 36.2,83.3 14.6,85.4 16.7,63.8 0,50 16.7,36.2 14.6,14.6 36.2,16.7 50,0 63.8,16.7 85.4,14.6 83.3,36.2"
-                      fill="#f7edcb"
-                      stroke="#241f18"
+                      fill="hsl(var(--sv-butter))"
+                      stroke="hsl(var(--sv-ink))"
                       strokeWidth="2.5"
                     />
                   </svg>
-                  <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-[#241f18]">
+                  <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-survey-ink">
                     <span className="text-[18px] font-bold italic">${survey.gift_card_amount}</span>
                     <span className="text-[10px] font-semibold tracking-[0.02em]">on its way</span>
                   </span>
@@ -1583,7 +1704,7 @@ export function InterviewFlow({
             </h1>
 
             <p
-              className="sw-rev text-pretty m-0 mb-9 max-w-[520px] text-[16px] leading-[1.6] text-[#6f6757] sm:text-[17px]"
+              className="sw-rev text-pretty m-0 mb-9 max-w-[520px] text-[16px] leading-[1.6] text-survey-muted sm:text-[17px]"
               style={{ "--sw-delay": "0.16s" } as React.CSSProperties}
             >
               {closingMessage}
@@ -1591,7 +1712,7 @@ export function InterviewFlow({
                 <>
                   {" "}
                   The{" "}
-                  <span className="font-semibold text-[#241f18]">${survey.gift_card_amount} gift card</span>{" "}
+                  <span className="font-semibold text-survey-ink">${survey.gift_card_amount} gift card</span>{" "}
                   will land in your inbox within a day or two.
                 </>
               )}
@@ -1613,7 +1734,7 @@ export function InterviewFlow({
                   type="button"
                   onClick={() => setShowResponses((prev) => !prev)}
                   aria-expanded={showResponses}
-                  className="inline-flex touch-manipulation items-center gap-2.5 rounded-full border-[1.5px] border-[#e9e3d3] bg-transparent px-6 py-3 text-[15px] font-semibold text-[#6f6757] transition-colors duration-[250ms] motion-reduce:transition-none [@media(hover:hover)]:hover:border-[#3a6046] [@media(hover:hover)]:hover:text-[#3a6046]"
+                  className="inline-flex touch-manipulation items-center gap-2.5 rounded-full border-[1.5px] border-survey-border bg-transparent px-6 py-3 text-[15px] font-semibold text-survey-muted transition-colors duration-[250ms] motion-reduce:transition-none [@media(hover:hover)]:hover:border-survey-accent [@media(hover:hover)]:hover:text-survey-accent"
                 >
                   {showResponses ? "Hide your responses" : "See your responses"}
                   <svg
@@ -1641,7 +1762,7 @@ export function InterviewFlow({
               {showResponses && (
                 <div className="mt-[34px] flex w-full max-w-[600px] flex-col gap-3.5 text-left">
                   <div
-                    className="sw-bubble mb-1 self-center text-[12.5px] font-semibold tracking-[0.08em] text-[#a89d88]"
+                    className="sw-bubble mb-1 self-center text-[12.5px] font-semibold tracking-[0.08em] text-survey-faint"
                     style={{ "--sw-bubble-delay": "0s" } as React.CSSProperties}
                   >
                     YOUR RESPONSES
@@ -1654,8 +1775,8 @@ export function InterviewFlow({
                         className={cn(
                           "sw-bubble whitespace-pre-wrap break-words text-[15.5px] leading-[1.6]",
                           isInterviewer
-                            ? "max-w-[86%] self-start rounded-[16px_16px_16px_5px] border border-[#e9e3d3] bg-[#fffefa] px-5 py-3.5 text-[#241f18] shadow-[0_2px_8px_rgba(38,32,25,.05)]"
-                            : "max-w-[78%] self-end rounded-[16px_16px_5px_16px] bg-[#3a6046] px-[18px] py-3 text-[#f2f6ef]"
+                            ? "max-w-[86%] self-start rounded-[16px_16px_16px_5px] border border-survey-border bg-survey-surface px-5 py-3.5 text-survey-ink shadow-[var(--sv-shadow-bubble)]"
+                            : "max-w-[78%] self-end rounded-[16px_16px_5px_16px] bg-survey-accent px-[18px] py-3 text-survey-raised"
                         )}
                         style={{ "--sw-bubble-delay": `${0.05 + i * 0.07}s` } as React.CSSProperties}
                       >
@@ -1673,10 +1794,10 @@ export function InterviewFlow({
           className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-[34px] pt-[26px]"
           style={{ "--sw-delay": "0.34s" } as React.CSSProperties}
         >
-          <span className="text-[13.5px] text-[#a89d88]">Powered by</span>
+          <span className="text-[13.5px] text-survey-faint">Powered by</span>
           <a href="/" className="inline-flex items-center gap-[7px]">
-            <WelcomeBird width={17} height={15} fill="#241f18" />
-            <span className="font-bricolage text-[15px] font-bold text-[#241f18]">Birdsong</span>
+            <WelcomeBird width={17} height={15} fill="hsl(var(--sv-ink))" />
+            <span className="font-bricolage text-[15px] font-bold text-survey-ink">Birdsong</span>
           </a>
         </footer>
       </div>
@@ -1710,7 +1831,7 @@ export function InterviewFlow({
     <div
       className={cn(
         bricolage.variable,
-        "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[16px] text-[#241f18]"
+        "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[16px] text-survey-ink"
       )}
       data-keyboard={keyboardInset > 0 ? "open" : undefined}
       style={
@@ -1723,6 +1844,7 @@ export function InterviewFlow({
       <AmbientBackdrop />
       <TopProgressLine answered={answeredCount} target={targetQuestionCount} />
       <TestModeBadge isTest={isTest} />
+        <SurveyThemeToggle offsetForBadge={isTest} />
 
       <div
         ref={stageRef}
@@ -1768,7 +1890,7 @@ export function InterviewFlow({
             // never mid-animation, so the reveal can't double-fire.
             <div key={messages.length} className={questionRevealClass}>
               <div className="mb-1 flex items-center justify-end">
-                <span className="text-[13.5px] tabular-nums text-[#a89d88]">
+                <span className="text-[13.5px] tabular-nums text-survey-faint">
                   {displayedQuestionNumber(answeredCount, targetQuestionCount)} of{" "}
                   {targetQuestionCount}
                 </span>
@@ -1783,21 +1905,21 @@ export function InterviewFlow({
               {/* Welcome-screen heading type (Bricolage 700, -0.025em). The
                   leading stays looser than the welcome title's 1.05: this is
                   a multi-line question, not a two-line display headline. */}
-              <h1 className="text-pretty mb-5 break-words font-bricolage text-[23px] font-bold leading-[1.25] tracking-[-0.025em] [&_strong]:font-bold [&_strong]:not-italic [&_strong]:underline [&_strong]:decoration-[#3a6046] [&_strong]:decoration-2 [&_strong]:underline-offset-[4px] sm:mb-[26px] sm:text-[32px] sm:leading-[1.2] sm:[&_strong]:underline-offset-[5px]">
+              <h1 className="text-pretty mb-5 break-words font-bricolage text-[23px] font-bold leading-[1.25] tracking-[-0.025em] [&_strong]:font-bold [&_strong]:not-italic [&_strong]:underline [&_strong]:decoration-survey-accent [&_strong]:decoration-2 [&_strong]:underline-offset-[4px] sm:mb-[26px] sm:text-[32px] sm:leading-[1.2] sm:[&_strong]:underline-offset-[5px]">
                 {renderWithBold(questionText)}
               </h1>
 
               {failedMessage && (
                 <div className="mb-5 flex flex-col items-end gap-1.5">
                   <div className={cn(RESPONDENT_BUBBLE, "opacity-60")}>{failedMessage}</div>
-                  <div className="flex items-center gap-2 text-xs text-[#b3432b]">
+                  <div className="flex items-center gap-2 text-xs text-survey-danger">
                     <span>Failed to send</span>
                     <button
                       type="button"
                       onClick={retrySend}
                       disabled={loading}
                       aria-label="Retry sending your answer"
-                      className="inline-flex min-h-[44px] touch-manipulation items-center px-2 font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a6046] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:opacity-80"
+                      className="inline-flex min-h-[44px] touch-manipulation items-center px-2 font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-survey-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:opacity-80"
                     >
                       {loading ? (
                         <span className="inline-flex items-center gap-1.5">
@@ -1834,10 +1956,10 @@ export function InterviewFlow({
                             // Same card surface as the welcome screen's
                             // interviewer bubble, at pill proportions; picked
                             // resolves to the dark pill.
-                            "min-h-[44px] touch-manipulation break-words rounded-full border px-[18px] py-[11px] text-left text-[15px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a6046] focus-visible:ring-offset-2",
+                            "min-h-[44px] touch-manipulation break-words rounded-full border px-[18px] py-[11px] text-left text-[15px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-survey-accent focus-visible:ring-offset-2",
                             picked
-                              ? "border-[#241f18] bg-[#241f18] text-[#faf8f1]"
-                              : "border-[#e9e3d3] bg-[#fffefa] text-[#241f18] active:scale-[.97] [@media(hover:hover)]:hover:border-[#3a6046] [@media(hover:hover)]:hover:text-[#3a6046]"
+                              ? "border-survey-ink bg-survey-ink text-survey-ground"
+                              : "border-survey-border bg-survey-surface text-survey-ink active:scale-[.97] [@media(hover:hover)]:hover:border-survey-accent [@media(hover:hover)]:hover:text-survey-accent"
                           )}
                           style={picked ? undefined : { boxShadow: CARD_SHADOW }}
                         >
@@ -1870,10 +1992,10 @@ export function InterviewFlow({
                   // visible area. sm:max-h-none keeps the full 6-row growth
                   // on desktop.
                   // Deliberately the welcome screen's interviewer-card
-                  // treatment (18px radius, #fffefa on #e9e3d3, CARD_SHADOW,
+                  // treatment (18px radius, survey-surface on survey-border, CARD_SHADOW,
                   // 16.5px/1.6): the respondent writes into the same kind of
                   // card the interviewer speaks from.
-                  className="max-h-[136px] w-full touch-manipulation resize-none overflow-y-auto rounded-[18px] border border-[#e9e3d3] bg-[#fffefa] px-[26px] py-4 text-[16.5px] leading-[1.6] text-[#241f18] placeholder:text-[#a89d88] focus:border-[#6f6757] focus:outline-none focus:ring-[3px] focus:ring-[rgba(38,32,25,.07)] disabled:cursor-not-allowed disabled:opacity-60 sm:max-h-none"
+                  className="max-h-[136px] w-full touch-manipulation resize-none overflow-y-auto rounded-[18px] border border-survey-border bg-survey-surface px-[26px] py-4 text-[16.5px] leading-[1.6] text-survey-ink placeholder:text-survey-faint focus:border-survey-muted focus:outline-none focus:ring-[3px] focus:ring-survey-ink/[0.07] disabled:cursor-not-allowed disabled:opacity-60 sm:max-h-none"
                   style={{ boxShadow: CARD_SHADOW }}
                 />
 
@@ -1888,7 +2010,7 @@ export function InterviewFlow({
                   {/* Describes physical keys the phone keyboard doesn't have;
                       enterKeyHint="send" on the textarea is the mobile
                       equivalent affordance. */}
-                  <span className="hidden text-[13.5px] text-[#a89d88] sm:inline">
+                  <span className="hidden text-[13.5px] text-survey-faint sm:inline">
                     Enter ↵ to send · Shift+Enter for a new line
                   </span>
                   <span className="flex-1" />
@@ -1896,13 +2018,13 @@ export function InterviewFlow({
                     type="button"
                     onClick={handleSkip}
                     disabled={loading}
-                    className="flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-full px-3 text-[13.5px] text-[#a89d88] transition-colors disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:text-[#6f6757]"
+                    className="flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-full px-3 text-[13.5px] text-survey-faint transition-colors disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:text-survey-muted"
                   >
                     Skip
                   </button>
                 </div>
               </form>
-              {error && <p className="mt-3 text-sm text-[#b3432b]">{error}</p>}
+              {error && <p className="mt-3 text-sm text-survey-danger">{error}</p>}
             </div>
           )}
         </div>
@@ -1923,10 +2045,10 @@ function Footer() {
     // Same lockup as the welcome and completion screens' own footers: 13.5px
     // muted "Powered by", the bird mark, then the Bricolage wordmark in ink.
     <div className="survey-footer relative flex items-center justify-center gap-2.5 px-8 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
-      <span className="text-[13.5px] text-[#a89d88]">Powered by</span>
+      <span className="text-[13.5px] text-survey-faint">Powered by</span>
       <a href="/" className="inline-flex items-center gap-[7px]">
-        <WelcomeBird width={17} height={15} fill="#241f18" />
-        <span className="font-bricolage text-[15px] font-bold text-[#241f18]">Birdsong</span>
+        <WelcomeBird width={17} height={15} fill="hsl(var(--sv-ink))" />
+        <span className="font-bricolage text-[15px] font-bold text-survey-ink">Birdsong</span>
       </a>
     </div>
   );
