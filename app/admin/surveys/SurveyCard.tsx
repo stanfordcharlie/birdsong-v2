@@ -44,7 +44,7 @@ function initialsOf(name: string | null): string {
 function Sparkbars({ days }: { days: number[] }) {
   const peak = Math.max(...days, 1);
   return (
-    <span aria-hidden className="flex h-[22px] items-end gap-[3px]">
+    <span aria-hidden className="flex h-[22px] items-end gap-1">
       {days.map((count, i) => {
         const ratio = count / peak;
         return (

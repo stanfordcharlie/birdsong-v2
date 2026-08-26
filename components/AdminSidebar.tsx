@@ -208,10 +208,10 @@ export function AdminSidebar({
       <div
         className={cn(
           "mb-[30px] flex items-center",
-          collapsed ? "flex-col gap-2 px-2" : "justify-between gap-[11px] px-4"
+          collapsed ? "flex-col gap-2 px-2" : "justify-between gap-3 px-4"
         )}
       >
-        <div className={cn("flex items-center gap-[11px]", collapsed && "flex-col gap-2")}>
+        <div className={cn("flex items-center gap-3", collapsed && "flex-col gap-2")}>
           <Image
             src="/favicon-512.png"
             alt="Birdsong"
@@ -242,7 +242,7 @@ export function AdminSidebar({
         </div>
       )}
 
-      <nav className={cn("flex flex-col gap-[3px]", collapsed ? "px-3" : "px-4")}>
+      <nav className={cn("flex flex-col gap-1", collapsed ? "px-3" : "px-4")}>
         {NAV_ITEMS.map((item) => {
           // "/admin" is a prefix of every other admin route, so it needs an
           // exact-match carve-out to avoid lighting up alongside whichever
@@ -260,7 +260,7 @@ export function AdminSidebar({
               className={cn(
                 "group relative flex items-center rounded-control font-archivo text-nav font-medium transition-colors duration-[130ms] ease-in-out",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-active-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
-                collapsed ? "h-10 w-10 justify-center" : "gap-[13px] px-3 py-[11px]",
+                collapsed ? "h-10 w-10 justify-center" : "gap-3 px-3 py-3",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-active-foreground"
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-active-foreground"
