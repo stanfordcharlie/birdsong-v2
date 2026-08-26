@@ -1,6 +1,7 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageShell } from "@/components/admin/ui";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useFlybyGate } from "@/components/useLoadingGate";
 
@@ -18,25 +19,30 @@ export default function AdminHomeLoading() {
   }
 
   return (
-    <div className="admin-container flex flex-col gap-6">
-      <div className="flex items-end justify-between gap-6">
+    <PageShell>
+      <div className="mb-8 flex items-end justify-between gap-6">
         <div className="flex flex-col gap-3">
           <Skeleton className="h-3 w-44" />
-          <Skeleton className="h-10 w-80" />
+          <Skeleton className="h-[46px] w-80" />
         </div>
-        <Skeleton className="h-16 w-[120px] shrink-0 rounded-card" />
+        <div className="flex shrink-0 items-center gap-3">
+          <Skeleton className="h-10 w-36 rounded-pill" />
+          <Skeleton className="h-10 w-32 rounded-pill" />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-[98px] w-full rounded-card" />
-        ))}
+      {/* One joined stat bar, matching StatRow, rather than three cards. */}
+      <Skeleton className="mb-10 h-[92px] w-full rounded-card" />
+
+      <div className="mb-10 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Skeleton className="h-[196px] w-full rounded-card" />
+        <Skeleton className="h-[196px] w-full rounded-card" />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <Skeleton className="h-[330px] w-full rounded-card" />
-        <Skeleton className="h-[330px] w-full rounded-card" />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
+        <Skeleton className="h-[260px] w-full rounded-card" />
+        <Skeleton className="h-[260px] w-full rounded-card" />
       </div>
-    </div>
+    </PageShell>
   );
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { userFirstName } from "@/lib/user-name";
-import { Button } from "@/components/ui/button";
+import { Button, PageShell } from "@/components/admin/ui";
 import { GreetingBlock } from "./GreetingBlock";
 import { CopySurveyLinkButton } from "./CopySurveyLinkButton";
 import {
@@ -279,20 +279,15 @@ export default async function AdminHomePage() {
   const subline = buildSubline(waitingLeads.length, liveSurveys.length, completed.length);
 
   return (
-    <div className="admin-container-wide">
-      {/* Masthead: greeting on the left, the two actions hard right on the
-          same line, and the week's four numbers ruled across underneath —
-          the strip is what separates the masthead from the page, so there is
-          no divider line of its own. */}
-      <div className="mb-[26px]">
-        <div className="mb-[22px] flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between sm:gap-10">
-          <div>
-            {/* GreetingBlock owns the eyebrow and the headline because both
-                depend on the browser's clock, not the server's. */}
-            <GreetingBlock firstName={firstName} />
-            <div className="mt-3 max-w-[46ch] text-[15px] text-muted-foreground">{subline}</div>
-          </div>
-          <div className="flex shrink-0 items-center gap-[18px] sm:pb-1.5">
+    <PageShell>
+      {/* GreetingBlock owns the masthead because the eyebrow and the headline
+          both depend on the browser's clock, not the server's. It renders the
+          shared PageHeader, so Home's header cannot drift from any other. */}
+      <GreetingBlock
+        firstName={firstName}
+        subtitle={subline}
+        actions={
+          <>
             {firstLiveSurvey && (
               <CopySurveyLinkButton
                 slug={firstLiveSurvey.slug}
@@ -300,17 +295,15 @@ export default async function AdminHomePage() {
                 variant="text"
               />
             )}
-            <Button
-              asChild
-              className="h-auto rounded-full px-[22px] py-3 text-sm font-semibold transition-[transform,box-shadow,background-color] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(28,25,23,0.22)]"
-            >
+            <Button asChild>
               <Link href="/admin/surveys/new">New survey</Link>
             </Button>
-          </div>
-        </div>
-        <div className="bs-rise-2">
-          <WeekStatsStrip stats={stats} />
-        </div>
+          </>
+        }
+      />
+
+      <div className="bs-rise-2 mb-10">
+        <WeekStatsStrip stats={stats} />
       </div>
 
       {/* Worth a call today, or the quiet state in its place */}
@@ -329,7 +322,7 @@ export default async function AdminHomePage() {
                   label="Share a survey link"
                 />
               ) : (
-                <Button asChild variant="secondary" className="hover:border-faint/50">
+                <Button asChild variant="secondary">
                   <Link href="/admin/surveys/new">Create a survey</Link>
                 </Button>
               )
@@ -345,8 +338,8 @@ export default async function AdminHomePage() {
         <div
           className={
             report
-              ? "bs-rise-4 mb-[30px] grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_340px]"
-              : "bs-rise-4 mb-[30px]"
+              ? "bs-rise-4 mb-10 grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_340px]"
+              : "bs-rise-4 mb-10"
           }
         >
           <OutListening surveys={listeningSurveys} />
@@ -359,6 +352,6 @@ export default async function AdminHomePage() {
           <ActivityTable events={events} />
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }
