@@ -441,7 +441,7 @@ export function CompanyProfileSetupFlow({
                 <button
                   type="button"
                   onClick={onRequestAiFill}
-                  className="text-sm font-medium text-indigo transition-colors hover:text-indigo/80"
+                  className="focus-ring rounded-control font-archivo text-sm font-medium text-brand-text transition-colors hover:underline"
                 >
                   Have your AI fill this out
                 </button>
@@ -535,7 +535,7 @@ export function CompanyProfileSetupFlow({
                                   <button
                                     type="button"
                                     onClick={() => goTo(i)}
-                                    className="text-indigo underline-offset-2 hover:underline"
+                                    className="focus-ring rounded-control text-brand-text underline-offset-2 hover:underline"
                                   >
                                     {f.label || s.section}
                                   </button>

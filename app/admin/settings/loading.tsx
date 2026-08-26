@@ -1,9 +1,10 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageShell } from "@/components/admin/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function SettingsLoading() {
   return (
-    <div className="admin-container flex flex-col gap-6">
+    <PageShell>
       <div className="flex flex-col gap-2">
         <Skeleton className="h-4 w-16" />
         <Skeleton className="h-10 w-48" />
@@ -40,6 +41,6 @@ export default function SettingsLoading() {
           <Skeleton className="h-9 w-full max-w-sm" />
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }

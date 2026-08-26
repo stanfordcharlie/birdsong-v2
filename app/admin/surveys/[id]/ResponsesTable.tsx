@@ -36,7 +36,7 @@ export function ResponsesTable({
             href={previewHref}
             target="_blank"
             rel="noreferrer"
-            className="text-sm font-semibold text-indigo transition-colors hover:text-indigo/80"
+            className="focus-ring rounded-control font-archivo text-sm font-semibold text-brand-text transition-colors hover:underline"
           >
             Preview the interview yourself
           </a>

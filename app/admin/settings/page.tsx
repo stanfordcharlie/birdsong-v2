@@ -3,8 +3,8 @@ import { SignOutButton } from "@/components/SignOutButton";
 import { ChangeEmailForm } from "./ChangeEmailForm";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 import { SlackNotificationsForm } from "./SlackNotificationsForm";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
+import { Card, PageHeader, PageShell } from "@/components/admin/ui";
+import { adminButtonVariants } from "@/components/admin/ui";
 import { cn } from "@/lib/utils";
 import { AddSampleDataButton, RemoveSampleDataButton } from "@/components/SampleDataControls";
 
@@ -16,71 +16,70 @@ export default async function SettingsPage() {
     : { data: null };
 
   return (
-    <div className="admin-container flex flex-col">
-      <div className="mb-10 flex flex-col gap-2">
-        <span className="type-label">Settings</span>
-        <h1 className="type-page-title">Settings</h1>
-      </div>
+    <PageShell>
+      {/* The eyebrow names the section the sidebar's account menu reached
+          this page through, rather than repeating the H1 verbatim. */}
+      <PageHeader eyebrow="Account" title="Settings" />
 
       <div className="flex flex-col gap-5">
-        <Card className="p-6">
-          <CardHeader className="p-0 pb-4">
+        <Card>
+          <div className="pb-4">
             <h2 className="type-heading">Account</h2>
-          </CardHeader>
-          <CardContent className="flex items-end justify-between gap-5 p-0">
+          </div>
+          <div className="flex items-end justify-between gap-5">
             <div className="flex flex-col gap-1">
-              <span className="text-xs font-medium uppercase tracking-wide text-faint">Email</span>
-              <span className="text-[15px] text-card-foreground">{user?.email ?? "Not signed in"}</span>
+              <span className="type-table-head">Email</span>
+              <span className="type-body">{user?.email ?? "Not signed in"}</span>
             </div>
-            <SignOutButton className={cn(buttonVariants({ variant: "secondary" }))} />
-          </CardContent>
+            <SignOutButton className={cn(adminButtonVariants({ variant: "secondary" }))} />
+          </div>
         </Card>
 
-        <Card className="p-6">
-          <CardHeader className="p-0 pb-4">
+        <Card>
+          <div className="pb-4">
             <h2 className="type-heading">Change email</h2>
-          </CardHeader>
-          <CardContent className="p-0">
+          </div>
+          <div>
             <ChangeEmailForm />
-          </CardContent>
+          </div>
         </Card>
 
-        <Card className="p-6">
-          <CardHeader className="p-0 pb-4">
+        <Card>
+          <div className="pb-4">
             <h2 className="type-heading">Change password</h2>
-          </CardHeader>
-          <CardContent className="p-0">
+          </div>
+          <div>
             <ChangePasswordForm />
-          </CardContent>
+          </div>
         </Card>
 
-        <Card className="p-6">
-          <CardHeader className="p-0 pb-4">
+        <Card>
+          <div className="pb-4">
             <h2 className="type-heading">Notifications</h2>
-          </CardHeader>
-          <CardContent className="p-0">
+          </div>
+          <div>
             <SlackNotificationsForm initialUrl={profile?.slack_webhook_url ?? null} />
-          </CardContent>
+          </div>
         </Card>
 
-        <Card className="p-6">
-          <CardHeader className="p-0 pb-4">
+        <Card>
+          <div className="pb-4">
             <h2 className="type-heading">Sample data</h2>
-          </CardHeader>
-          <CardContent className="flex flex-col items-start gap-3 p-0">
-            <p className="text-sm text-muted-foreground">
+          </div>
+          <div className="flex flex-col items-start gap-3">
+            <p className="type-body text-muted-foreground">
               Explore Birdsong with a demo survey and eight realistic test responses. Sample data
               never counts as real leads, never emails you, and removes cleanly.
             </p>
             <div className="flex items-center gap-3">
-              <AddSampleDataButton className={cn(buttonVariants({ variant: "secondary" }))} />
+              <AddSampleDataButton className={cn(adminButtonVariants({ variant: "secondary" }))} />
               <RemoveSampleDataButton
-                className={cn(buttonVariants({ variant: "secondary" }), "text-destructive")}
+                className={cn(adminButtonVariants({ variant: "secondary" }), "text-destructive")}
               />
             </div>
-          </CardContent>
+          </div>
         </Card>
       </div>
-    </div>
+    </PageShell>
   );
 }

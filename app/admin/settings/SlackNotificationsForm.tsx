@@ -65,13 +65,13 @@ export function SlackNotificationsForm({ initialUrl }: { initialUrl: string | nu
           onChange={(e) => setUrl(e.target.value)}
         />
       </label>
-      <p className="text-xs text-muted-foreground">
+      <p className="type-body-sm text-muted-foreground">
         Create an incoming webhook for the channel you want notified, then paste its URL here. See{" "}
         <a
           href="https://api.slack.com/messaging/webhooks"
           target="_blank"
           rel="noreferrer"
-          className="text-indigo hover:text-indigo/80"
+          className="focus-ring rounded-control underline"
         >
           Slack&apos;s incoming webhooks guide
         </a>

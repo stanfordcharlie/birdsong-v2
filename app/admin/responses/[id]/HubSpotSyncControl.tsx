@@ -53,7 +53,7 @@ export function HubSpotSyncControl({
         {loading ? "Syncing..." : syncedAt ? "Re-sync to HubSpot" : "Sync to HubSpot"}
       </Button>
       {error ? (
-        <span className="text-xs text-destructive">{error}</span>
+        <span className="type-body-sm text-destructive">{error}</span>
       ) : (
         <span className="type-meta">
           {disabledReason ?? (syncedAt ? `Synced ${formatRelativeTime(syncedAt)}.` : "Not synced yet.")}

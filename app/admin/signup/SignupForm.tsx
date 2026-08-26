@@ -73,7 +73,7 @@ export function SignupForm() {
           </Link>
         }
       >
-        <p className="max-w-[400px] text-center text-[15px] leading-[1.6] text-[#6f6757]">
+        <p className="type-body max-w-[400px] text-center text-muted-foreground">
           Click the link in that email to finish setting up your account. You can close this tab once
           you have.
         </p>
@@ -138,13 +138,13 @@ export function SignupForm() {
         <AuthSubmit type="submit" disabled={loading}>
           {loading ? "Signing up..." : "Create account"}
         </AuthSubmit>
-        <div className="text-center text-[12.5px] leading-[1.55] text-[#a89d88]">
+        <div className="type-body-sm text-center text-faint">
           By creating an account, you agree to our{" "}
-          <Link href="/terms" className="text-[#6f6757] underline underline-offset-[3px]">
+          <Link href="/terms" className="focus-ring rounded-control text-muted-foreground underline underline-offset-[3px]">
             Terms
           </Link>{" "}
           and{" "}
-          <Link href="/privacy" className="text-[#6f6757] underline underline-offset-[3px]">
+          <Link href="/privacy" className="focus-ring rounded-control text-muted-foreground underline underline-offset-[3px]">
             Privacy Policy
           </Link>
           .

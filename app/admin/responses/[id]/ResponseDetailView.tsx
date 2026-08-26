@@ -1,7 +1,13 @@
 import Link from "next/link";
 import type { InterviewMessage } from "@/lib/interview/types";
 import { callScriptToText, isPairedPoint, type CallScript } from "@/lib/interview/call-script";
-import { Badge, type badgeVariants } from "@/components/ui/badge";
+import {
+  Badge,
+  Button,
+  PageHeader,
+  PageShell,
+  adminBadgeVariants,
+} from "@/components/admin/ui";
 import { StatusControl } from "@/components/StatusControl";
 import { CopyScriptButton } from "./CopyScriptButton";
 import { HubSpotSyncControl } from "./HubSpotSyncControl";
@@ -37,12 +43,12 @@ const STATUS_LABELS: Record<string, string> = {
   not_a_fit: "Not a fit",
 };
 
-type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
+type BadgeVariant = NonNullable<VariantProps<typeof adminBadgeVariants>["variant"]>;
 
 const STATUS_BADGE_VARIANT: Record<string, BadgeVariant> = {
-  new: "success",
+  new: "accent",
   contacted: "warning",
-  qualified: "success",
+  qualified: "accent",
   not_a_fit: "outline",
 };
 
@@ -97,52 +103,42 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
   const fitUnavailable = fitConfidence === "unavailable";
   const fitLowData = fitConfidence === "low";
   const scriptText = callScript ? callScriptToText(callScript) : "";
-  const initial = (respondentName?.trim()?.[0] ?? identityLine.trim()[0] ?? "?").toUpperCase();
 
   return (
-    <div className="admin-container flex flex-col gap-4">
-      {survey && (
-        <Link
-          href={`/admin/surveys/${survey.id}`}
-          className="type-label inline-flex w-fit items-center gap-1.5 hover:text-card-foreground"
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path
-              d="M10 3.5L5.5 8l4.5 4.5"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          {survey.title}
-        </Link>
-      )}
+    <PageShell>
+      <PageHeader
+        eyebrow={survey ? survey.title : "Leads"}
+        title={respondentName || "Unnamed respondent"}
+        badge={
+          <>
+            <Badge variant={STATUS_BADGE_VARIANT[status] ?? "count"}>
+              {STATUS_LABELS[status] ?? status}
+            </Badge>
+            {isTest && <Badge variant="warning">Test response</Badge>}
+          </>
+        }
+        subtitle={identityLine || undefined}
+        actions={scriptText ? <CopyScriptButton text={scriptText} label="Copy call script" /> : undefined}
+      />
 
-      {/* Identity row: who they are and the one action a rep wants from this
-          page, which is the script on their clipboard before they dial. */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-4">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-secondary text-lg font-semibold text-card-foreground">
-            {initial}
-          </span>
-          <div className="flex min-w-0 flex-col gap-1">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="type-page-title text-[32px] leading-none">
-                {respondentName || "Unnamed respondent"}
-              </h1>
-              <Badge variant={STATUS_BADGE_VARIANT[status] ?? "default"}>
-                {STATUS_LABELS[status] ?? status}
-              </Badge>
-              {isTest && <Badge variant="warning">Test response</Badge>}
-            </div>
-            {identityLine && <p className="type-meta break-words">{identityLine}</p>}
-          </div>
+      {survey && (
+        <div className="-mt-4 mb-8">
+          <Button asChild variant="ghost" size="sm" className="-ml-3.5">
+            <Link href={`/admin/surveys/${survey.id}`}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M10 3.5L5.5 8l4.5 4.5"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Back to {survey.title}
+            </Link>
+          </Button>
         </div>
-        {scriptText && (
-          <CopyScriptButton text={scriptText} label="Copy call script" size="default" />
-        )}
-      </div>
+      )}
 
       {/* Scores, side by side: "did they show friction?" next to "is this
           company worth calling?" — two independent questions a rep weighs
@@ -178,13 +174,13 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
           with what the respondent actually named underneath it as chips. */}
       {(summary || painPoints.length > 0) && (
         <section className="rounded-card border border-border bg-card p-5">
-          <h2 className="type-label mb-3">At a glance</h2>
-          {summary && <p className="type-body max-w-[68ch] text-[16px]">{summary}</p>}
+          <h2 className="type-section-label mb-3">At a glance</h2>
+          {summary && <p className="admin-measure type-body">{summary}</p>}
           <div className="mt-4 flex flex-wrap gap-2">
             {painPoints.map((point, i) => (
               <span
                 key={i}
-                className="rounded-full border border-border bg-secondary px-3 py-1.5 text-[13px] text-card-foreground"
+                className="rounded-pill border border-border bg-secondary px-3 py-1.5 font-archivo text-control text-card-foreground"
               >
                 {point}
               </span>
@@ -193,7 +189,7 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
                 leverage should see that none surfaced rather than wonder
                 whether the section just failed to render. */}
             {signals.length === 0 && (
-              <span className="rounded-full border border-dashed border-border px-3 py-1.5 text-[13px] text-faint">
+              <span className="rounded-pill border border-dashed border-border px-3 py-1.5 font-archivo text-control text-faint">
                 No buying signals yet
               </span>
             )}
@@ -211,8 +207,8 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
 
           {callScript.opener && (
             <>
-              <h3 className="type-label mb-2">Opener</h3>
-              <p className="mb-6 max-w-[68ch] text-[15px] leading-relaxed text-card-foreground">
+              <h3 className="type-section-label mb-2">Opener</h3>
+              <p className="admin-measure type-body mb-6">
                 &ldquo;{callScript.opener}&rdquo;
               </p>
             </>
@@ -220,7 +216,7 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
 
           {callScript.talkingPoints.length > 0 && (
             <>
-              <h3 className="type-label mb-3">Talking points</h3>
+              <h3 className="type-section-label mb-3">Talking points</h3>
               <ul className="flex flex-col gap-2.5">
                 {callScript.talkingPoints.map((point, i) =>
                   isPairedPoint(point) ? (
@@ -232,16 +228,16 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
                       className="grid grid-cols-1 overflow-hidden rounded-card border border-border sm:grid-cols-2"
                     >
                       <div className="bg-secondary p-4">
-                        <h4 className="type-label mb-1.5 text-[11px] tracking-[0.1em]">They said</h4>
-                        <p className="text-[14px] italic leading-relaxed text-card-foreground">
+                        <h4 className="type-eyebrow mb-1.5">They said</h4>
+                        <p className="type-body italic">
                           &ldquo;{point.said}&rdquo;
                         </p>
                       </div>
                       <div className="p-4">
-                        <h4 className="type-label mb-1.5 text-[11px] tracking-[0.1em] text-success">
+                        <h4 className="type-eyebrow mb-1.5 text-brand-text">
                           Your angle
                         </h4>
-                        <p className="text-[14px] leading-relaxed text-card-foreground">
+                        <p className="type-body">
                           {point.angle}
                         </p>
                       </div>
@@ -250,10 +246,10 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
                     // Extracted before points carried a quote, so there is no
                     // left-hand side to render.
                     <li key={i} className="flex gap-3 px-1 py-1.5">
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-control border border-border bg-secondary text-xs font-semibold text-muted-foreground">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-control border border-border bg-secondary font-archivo text-micro font-semibold text-muted-foreground">
                         {i + 1}
                       </span>
-                      <p className="text-[14px] leading-relaxed text-card-foreground">
+                      <p className="type-body">
                         {point.angle}
                       </p>
                     </li>
@@ -268,11 +264,11 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
       {/* Signals */}
       {signals.length > 0 && (
         <section className="rounded-card border border-border bg-card p-5">
-          <h2 className="type-label mb-4">Signals</h2>
+          <h2 className="type-section-label mb-4">Signals</h2>
           <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {signals.map((signal) => (
               <div key={signal.label} className="flex flex-col gap-1">
-                <dt className="text-xs font-semibold uppercase tracking-wide text-faint">
+                <dt className="type-table-head">
                   {signal.label}
                 </dt>
                 <dd className="text-sm leading-relaxed text-card-foreground">{signal.value}</dd>
@@ -286,13 +282,13 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
           worth reaching for when a rep doubts one of those derivations. */}
       {messages.length > 0 && (
         <details className="rounded-card border border-border bg-card p-5">
-          <summary className="type-label cursor-pointer list-none hover:text-card-foreground">
+          <summary className="focus-ring type-section-label cursor-pointer list-none rounded-control hover:text-card-foreground">
             Full transcript ({messages.length} messages)
           </summary>
           <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
             {messages.map((m, i) => (
               <div key={i} className="flex flex-col gap-0.5">
-                <span className="text-xs font-semibold uppercase tracking-wide text-faint">
+                <span className="type-table-head">
                   {m.role === "assistant" ? "Interviewer" : "Respondent"}
                 </span>
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-card-foreground">
@@ -307,7 +303,7 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
       {/* Status */}
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-card border border-border bg-card p-5">
         <div className="flex flex-col gap-0.5">
-          <h2 className="type-label">Status</h2>
+          <h2 className="type-section-label">Status</h2>
           {source && <p className="type-meta">Source: {source}</p>}
         </div>
         <StatusControl responseId={responseId} initialStatus={status} />
@@ -326,6 +322,6 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
               : null
         }
       />
-    </div>
+    </PageShell>
   );
 }

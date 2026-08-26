@@ -67,7 +67,7 @@ export function LoginForm({ notice = null }: { notice?: string | null }) {
           labelAccessory={
             <Link
               href="/admin/forgot-password"
-              className="text-[13px] text-[#6f6757] underline underline-offset-[3px]"
+              className="focus-ring type-body-sm rounded-control text-muted-foreground underline underline-offset-[3px]"
             >
               Forgot your password?
             </Link>

@@ -31,7 +31,7 @@ export function ScoreMeter({
     <div className="flex flex-col rounded-card border border-border bg-card p-5">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="type-label">{label}</span>
+          <span className="type-section-label">{label}</span>
           {badge}
         </div>
         <div className="shrink-0 tabular-nums">
@@ -47,14 +47,14 @@ export function ScoreMeter({
       </div>
 
       <div
-        className="h-1.5 overflow-hidden rounded-full bg-secondary"
+        className="h-1.5 overflow-hidden rounded-pill bg-secondary"
         // The bar is a redundant view of the number right beside it, so it is
         // decorative to a screen reader rather than a second announcement.
         aria-hidden="true"
       >
         <div
           className={cn(
-            "h-full rounded-full",
+            "h-full rounded-pill",
             tone === "lead" ? "bg-success" : "bg-warning",
             !hasScore && "hidden"
           )}

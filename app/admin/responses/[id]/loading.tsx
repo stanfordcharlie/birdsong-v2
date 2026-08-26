@@ -1,6 +1,7 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageShell } from "@/components/admin/ui";
 import { Card, CardContent } from "@/components/ui/card";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useFlybyGate } from "@/components/useLoadingGate";
@@ -21,12 +22,12 @@ export default function ResponseDetailLoading() {
   // link, identity row, the two score meters, at a glance, call script) so
   // the real page lands in place rather than reflowing under the reader.
   return (
-    <div className="admin-container flex flex-col gap-4">
+    <PageShell>
       <Skeleton className="h-4 w-40" />
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Skeleton className="h-14 w-14 rounded-full" />
+          <Skeleton className="h-14 w-14 rounded-pill" />
           <div className="flex flex-col gap-2">
             <Skeleton className="h-7 w-52" />
             <Skeleton className="h-3.5 w-64" />
@@ -43,7 +44,7 @@ export default function ResponseDetailLoading() {
                 <Skeleton className="h-3.5 w-24" />
                 <Skeleton className="h-6 w-12" />
               </div>
-              <Skeleton className="h-1.5 w-full rounded-full" />
+              <Skeleton className="h-1.5 w-full rounded-pill" />
               <Skeleton className="h-4 w-5/6" />
             </CardContent>
           </Card>
@@ -56,9 +57,9 @@ export default function ResponseDetailLoading() {
           <Skeleton className="h-5 w-full" />
           <Skeleton className="h-5 w-4/5" />
           <div className="mt-1 flex flex-wrap gap-2">
-            <Skeleton className="h-7 w-52 rounded-full" />
-            <Skeleton className="h-7 w-44 rounded-full" />
-            <Skeleton className="h-7 w-48 rounded-full" />
+            <Skeleton className="h-7 w-52 rounded-pill" />
+            <Skeleton className="h-7 w-44 rounded-pill" />
+            <Skeleton className="h-7 w-48 rounded-pill" />
           </div>
         </CardContent>
       </Card>
@@ -72,6 +73,6 @@ export default function ResponseDetailLoading() {
           <Skeleton className="h-20 w-full rounded-card" />
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }

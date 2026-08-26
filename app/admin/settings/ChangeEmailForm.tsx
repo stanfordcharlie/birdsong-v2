@@ -43,7 +43,7 @@ export function ChangeEmailForm() {
           required
         />
       </label>
-      <p className="text-xs text-muted-foreground">
+      <p className="type-body-sm text-muted-foreground">
         Supabase sends a confirmation email to both your current and new address. The
         change only takes effect once you confirm it.
       </p>
