@@ -1556,7 +1556,11 @@ select {
    and animation-duration, so Tailwind drops it silently and the spring
    would quietly fall back to the default 150ms. The hover is keyed off the
    whole user row (.ws-user-row) so hovering the name or chevron springs the
-   star as well; under reduced motion it simply holds its resting tilt. */
+   mark as well; under reduced motion it simply holds its resting tilt.
+
+   .ws-star is now on the Birdsong mark rather than the clipped periwinkle
+   star it was named for; the class name is kept so the keyframes and the
+   hover selector below do not have to change. */
 @keyframes ws-ping {
   from {
     transform: scale(1);

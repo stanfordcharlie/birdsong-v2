@@ -78,7 +78,7 @@ function ChevronIcon() {
       height="13"
       viewBox="0 0 16 16"
       fill="none"
-      className="shrink-0 text-[rgba(243,236,223,0.45)]"
+      className="shrink-0 text-sidebar-muted/50"
     >
       <path d="M5 6l3-3 3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M5 10l3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -86,21 +86,21 @@ function ChevronIcon() {
   );
 }
 
-// Eight-point star, drawn purely by clipping a flat periwinkle square — no
-// SVG, no image, no initial. Kept as a clip-path (rather than an inline SVG)
-// so the hover spring below animates the element's own transform.
-const STAR_CLIP =
-  "polygon(50% 0%, 61% 26%, 87% 13%, 74% 39%, 100% 50%, 74% 61%, 87% 87%, 61% 74%, 50% 100%, 39% 74%, 13% 87%, 26% 61%, 0% 50%, 26% 39%, 13% 13%, 39% 26%)";
-
-// The resting tilt and the hover spring both live in globals.css under
-// .ws-star / .ws-user-row:hover — see the comment there for why they aren't
-// Tailwind utilities.
-function StarAvatar() {
+// The account avatar. It was an eight-point star clipped out of a flat
+// periwinkle (#8ea4e8) that appears nowhere else in the product and is not
+// the Birdsong mark; the real mark was already sitting 200px above it at the
+// top of this same rail. The resting tilt and hover spring live in
+// globals.css under .ws-star / .ws-user-row:hover — see the note there for
+// why they are not Tailwind utilities.
+function AccountAvatar() {
   return (
-    <span
+    <Image
+      src="/birdsong_logo_mark_v2.svg"
+      alt=""
       aria-hidden
-      style={{ clipPath: STAR_CLIP }}
-      className="ws-star block h-9 w-9 shrink-0 bg-[#8ea4e8]"
+      width={36}
+      height={36}
+      className="ws-star block h-9 w-9 shrink-0 rounded-control bg-sidebar-plate/10 p-1"
     />
   );
 }
@@ -220,7 +220,7 @@ export function AdminSidebar({
             className="block shrink-0 rounded-control"
           />
           {!collapsed && (
-            <span className="font-spectral text-[21px] font-semibold tracking-[-0.01em] text-sidebar-active-foreground">
+            <span className="font-spectral text-wordmark font-semibold text-sidebar-active-foreground">
               Birdsong
             </span>
           )}
@@ -230,14 +230,14 @@ export function AdminSidebar({
           onClick={toggleCollapsed}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           title={`${collapsed ? "Expand" : "Collapse"} sidebar (⌘B)`}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-sidebar-foreground transition-colors duration-[130ms] ease-in-out hover:bg-sidebar-accent hover:text-sidebar-active-foreground"
+          className="focus-visible:ring-offset-sidebar flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-sidebar-foreground transition-colors duration-[130ms] ease-in-out hover:bg-sidebar-accent hover:text-sidebar-active-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-active-foreground focus-visible:ring-offset-2"
         >
           <CollapseIcon collapsed={collapsed} />
         </button>
       </div>
 
       {!collapsed && (
-        <div className="mb-2.5 px-4 text-[11px] font-semibold uppercase tracking-[0.12em] text-[hsl(0_0%_42%)]">
+        <div className="type-eyebrow mb-2.5 px-4 text-sidebar-label">
           Workspace
         </div>
       )}
@@ -258,7 +258,8 @@ export function AdminSidebar({
               href={item.href}
               aria-label={collapsed ? item.label : undefined}
               className={cn(
-                "group relative flex items-center rounded-control text-[15px] font-medium tracking-[-0.005em] transition-colors duration-[130ms] ease-in-out",
+                "group relative flex items-center rounded-control font-archivo text-nav font-medium transition-colors duration-[130ms] ease-in-out",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-active-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
                 collapsed ? "h-10 w-10 justify-center" : "gap-[13px] px-3 py-[11px]",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-active-foreground"
@@ -268,7 +269,7 @@ export function AdminSidebar({
               {isActive && (
                 <span
                   className={cn(
-                    "absolute inset-y-[9px] w-[3px] rounded-[0_3px_3px_0] bg-indigo-chip",
+                    "absolute inset-y-[9px] w-[3px] rounded-r-control bg-brand-live",
                     collapsed ? "left-[-18px]" : "left-[-22px]"
                   )}
                 />
@@ -303,7 +304,7 @@ export function AdminSidebar({
           className={
             collapsed
               ? undefined
-              : "rounded-[16px] border border-[rgba(255,253,247,0.09)] bg-[rgba(255,253,247,0.05)] p-[5px] shadow-[0_10px_24px_rgba(0,0,0,0.22)]"
+              : "rounded-card border border-sidebar-plate/10 bg-sidebar-plate/[0.05] p-1.5 shadow-card"
           }
         >
           {/* Only worth a line once there's more than one: at 0 or 1 the
@@ -316,13 +317,13 @@ export function AdminSidebar({
                   that scales out and fades — the solid dot underneath stays
                   put so the status never reads as flickering. */}
               <span className="relative block h-[7px] w-[7px] shrink-0">
-                <span className="ws-ping absolute inset-0 rounded-full bg-[#8fbf7a]" />
-                <span className="absolute inset-0 rounded-full bg-[#8fbf7a]" />
+                <span className="ws-ping absolute inset-0 rounded-pill bg-brand-live" />
+                <span className="absolute inset-0 rounded-pill bg-brand-live" />
               </span>
-              <span className="whitespace-nowrap text-[11.5px] font-semibold text-[rgba(243,236,223,0.62)]">
+              <span className="whitespace-nowrap text-micro font-semibold text-sidebar-muted">
                 Listening · {liveSurveyCount} live
               </span>
-              <span className="ws-note ml-auto text-[12px] leading-none text-[#e9a674]" aria-hidden>
+              <span className="ws-note ml-auto text-count leading-none text-sidebar-muted" aria-hidden>
                 ♪
               </span>
             </div>
@@ -336,22 +337,23 @@ export function AdminSidebar({
             aria-label={collapsed ? `Account menu for ${userName ?? "Account"}` : "Account menu"}
             className={cn(
               "ws-user-row flex items-center text-left transition-colors duration-[130ms] ease-in-out",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-active-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
               collapsed
                 ? "h-10 w-10 justify-center rounded-control hover:bg-sidebar-accent"
-                : "w-full gap-2.5 rounded-[12px] bg-[rgba(255,253,247,0.04)] p-2 hover:bg-[rgba(255,253,247,0.07)]",
+                : "w-full gap-2.5 rounded-control bg-sidebar-plate/[0.04] p-2 hover:bg-sidebar-plate/[0.07]",
               // While the menu is open the row holds its hover fill, so the
               // plate reads as the thing the popover belongs to.
-              accountOpen && (collapsed ? "bg-sidebar-accent" : "bg-[rgba(255,253,247,0.07)]")
+              accountOpen && (collapsed ? "bg-sidebar-accent" : "bg-sidebar-plate/[0.07]")
             )}
           >
-            <StarAvatar />
+            <AccountAvatar />
             {!collapsed && (
               <>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-spectral text-[13.5px] font-semibold text-[#f6f0e2]">
+                  <span className="block truncate font-spectral text-control font-semibold text-sidebar-active-foreground">
                     {userName ?? "Account"}
                   </span>
-                  <span className="block whitespace-nowrap text-[11.5px] text-[rgba(243,236,223,0.45)]">
+                  <span className="block whitespace-nowrap text-micro text-sidebar-muted/50">
                     Admin
                   </span>
                 </span>
@@ -383,11 +385,11 @@ export function AdminSidebar({
             href="/admin/settings"
             role="menuitem"
             onClick={() => setAccountOpen(false)}
-            className="block rounded-control px-3 py-3 text-sm text-card-foreground transition-colors hover:bg-secondary"
+            className="focus-ring block rounded-control px-3 py-3 font-archivo text-sm text-card-foreground transition-colors hover:bg-secondary"
           >
             Settings
           </Link>
-          <SignOutButton className="block w-full rounded-control px-3 py-3 text-left text-card-foreground transition-colors hover:bg-secondary hover:text-card-foreground" />
+          <SignOutButton className="focus-ring block w-full rounded-control px-3 py-3 text-left font-archivo text-sm text-card-foreground transition-colors hover:bg-secondary hover:text-card-foreground" />
         </div>
       </div>
     </aside>

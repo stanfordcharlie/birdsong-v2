@@ -120,6 +120,9 @@ const config: Config = {
           accent: "hsl(var(--ds-sidebar-accent) / <alpha-value>)",
           border: "hsl(var(--ds-sidebar-border) / <alpha-value>)",
           ring: "hsl(var(--ds-sidebar-ring) / <alpha-value>)",
+          plate: "hsl(var(--ds-sidebar-plate) / <alpha-value>)",
+          label: "hsl(var(--ds-sidebar-label) / <alpha-value>)",
+          muted: "hsl(var(--ds-sidebar-muted) / <alpha-value>)",
         },
 
         // Marketing landing pages (design_handoff_landing_pages_full) — a
@@ -182,6 +185,9 @@ const config: Config = {
         count: ["12px", { lineHeight: "1.2" }],
         control: ["13px", { lineHeight: "1.2" }],
         "display-sm": ["28px", { lineHeight: "1.2", letterSpacing: "-0.01em" }],
+        // Sidebar-only: the wordmark and the nav item label.
+        wordmark: ["21px", { lineHeight: "1.2", letterSpacing: "-0.01em" }],
+        nav: ["15px", { lineHeight: "1.2", letterSpacing: "-0.005em" }],
       },
       fontFamily: {
         // Global body default. Marketing pages (out of scope for the
