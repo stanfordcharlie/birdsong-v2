@@ -73,6 +73,23 @@ const config: Config = {
         ring: "hsl(var(--ds-ring) / <alpha-value>)",
         chip: "hsl(var(--ds-chip) / <alpha-value>)",
 
+        // Admin design system, unified pass (app/globals.css). `accent` above
+        // is a legacy alias for the neutral grey chip fill and is NOT this —
+        // these three are the real accent, formalised from the green that was
+        // already in use across admin without ever being a token.
+        brand: {
+          DEFAULT: "hsl(var(--ds-accent) / <alpha-value>)",
+          weak: "hsl(var(--ds-accent-weak) / <alpha-value>)",
+          text: "hsl(var(--ds-accent-text) / <alpha-value>)",
+          live: "hsl(var(--ds-accent-live) / <alpha-value>)",
+        },
+        cover: {
+          1: "hsl(var(--ds-cover-1) / <alpha-value>)",
+          2: "hsl(var(--ds-cover-2) / <alpha-value>)",
+          3: "hsl(var(--ds-cover-3) / <alpha-value>)",
+        },
+        focus: "hsl(var(--ds-focus) / <alpha-value>)",
+
         // Respondent survey theme (app/globals.css `.survey-theme`). Only the
         // survey route sets that class, so these resolve to nothing anywhere
         // else and cannot leak into admin or marketing.
@@ -146,6 +163,14 @@ const config: Config = {
       borderRadius: {
         card: "var(--ds-radius-card)",
         control: "var(--ds-radius-control)",
+        pill: "var(--ds-radius-pill)",
+      },
+      boxShadow: {
+        // The one admin card elevation. No page defines its own.
+        card: "var(--ds-shadow-card)",
+      },
+      maxWidth: {
+        container: "var(--ds-container-max)",
       },
       fontFamily: {
         // Global body default. Marketing pages (out of scope for the

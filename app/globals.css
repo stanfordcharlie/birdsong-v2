@@ -75,6 +75,80 @@
 
   --ds-radius-card: 0.75rem;    /* 12px */
   --ds-radius-control: 0.5rem;  /* 8px */
+  --ds-radius-pill: 999px;
+
+  /* --- Admin design system, unified pass -----------------------------------
+     This block is the single source of truth for the admin surface. DESIGN.md
+     mirrors it in prose; where the two disagree, this file wins.
+
+     Nothing below is a new cascade: it extends the --ds-* set above rather
+     than living in its own file, because tailwind.config.ts maps every
+     Tailwind colour name onto these vars and a second file would double-define
+     --ds-border and silently fork the palette.
+
+     Fonts are NOT declared here. The faces already exist in lib/fonts.ts and
+     are wired through tailwind.config.ts as font-serif / font-archivo; these
+     aliases name the ROLES so a component never has to know which face plays
+     which part. The body face is Archivo, not Inter — Inter is the global
+     default that marketing still uses, and admin overrides it at AdminShell. */
+
+  --font-display: var(--font-young-serif);
+  --font-body: var(--font-archivo);
+
+  /* Layout. One container for every admin page. No page overrides it, and no
+     page adds a second inset: a page that needs a narrower measure constrains
+     the BLOCK inside it, never the container, so every H1 on every admin page
+     starts at the identical x coordinate. */
+  --ds-container-max: 1140px;
+  --ds-container-pad-x: 2rem;   /* 32px, matches AdminShell's existing p-8 */
+  --ds-container-pad-y: 3.5rem; /* 56px from viewport top to the eyebrow */
+
+  /* Base unit 8. These are the only allowed steps. */
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 24px;
+  --ds-space-6: 32px;
+  --ds-space-7: 40px;
+  --ds-space-8: 56px;
+  --ds-space-9: 72px;
+
+  /* Vertical rhythm: header to first content block, and between blocks. */
+  --ds-rhythm-header: var(--ds-space-6); /* 32 */
+  --ds-rhythm-block: var(--ds-space-7);  /* 40 */
+
+  /* Accent. Green was being used across admin for score bars, status dots and
+     count pills without ever being a token — it existed only as --ds-success,
+     which is documented as status-only. Formalised here as the accent so the
+     two stop drifting apart. --ds-success keeps its own meaning for genuine
+     status (live / archived / error) and happens to share the hue. */
+  --ds-accent: 139 25% 30%;        /* #3a6046 */
+  --ds-accent-weak: 92 28% 90%;    /* #e4ecdd — tinted fill */
+  --ds-accent-text: 139 26% 23%;   /* #2c4a36 — 7.4:1 on accent-weak */
+
+  /* The live dot. Replaces the raw #8fbf7a that appeared in five files and
+     was never a token. #8fbf7a is 1.9:1 on the card surface, which is below
+     any legible threshold for a 7px mark carrying real state, so it is not
+     kept. The Live board's separate indigo dot maps here too, so "live" is
+     one colour across the whole surface rather than three. */
+  --ds-accent-live: 139 25% 30%;   /* #3a6046 */
+
+  /* Survey card covers. Exactly three, assigned by survey id hash. Flat
+     fills, not gradients: the six invented per-card gradients included a tan
+     and a sand, and beige and cream are banned. Drawn from the neutral and
+     accent families so a cover can never out-shout the status pill sitting
+     on it. */
+  --ds-cover-1: 92 28% 90%;        /* #e4ecdd, accent-weak */
+  --ds-cover-2: 48 12% 92%;        /* #edece8, chip */
+  --ds-cover-3: 205 17% 89%;       /* #dfe6ea, cool neutral */
+
+  /* One focus treatment for the whole surface. Applied as a 2px ring at 2px
+     offset. An outline is never removed without this replacing it. */
+  --ds-focus: 24 10% 10%;
+
+  /* One card shadow. No page defines its own. */
+  --ds-shadow-card: 0 4px 14px rgba(28, 25, 23, 0.06);
 }
 
 /* --- Marketing landing pages (design_handoff_landing_pages_full) ---
@@ -233,25 +307,58 @@ select {
 }
 
 /* --- Admin typography roles (DESIGN.md "Typography roles") ---
-   Pages reference these roles, not raw sizes. Serif (Young Serif) is
-   page-title only — every other piece of admin text is Archivo on this
-   fixed scale. Component layer, so a plain utility at the call site can
-   still override a single property (e.g. a differently-colored label). */
+   Pages reference these roles, not raw sizes. Young Serif is page-title only —
+   every other piece of admin text is Archivo on this fixed scale. Component
+   layer, so a plain utility at the call site can still override a single
+   property (e.g. a differently-colored label).
+
+   `.type-eyebrow` and `.type-section-label` are deliberately two roles, not
+   one. A single `.type-label` was doing both jobs, which is why the label over
+   an H1 and the label over a card section rendered identically and neither
+   read as subordinate to the other. */
 @layer components {
-  .type-page-title {
-    @apply font-serif text-[40px] font-normal leading-[1.1] tracking-[-0.01em] text-card-foreground;
+  .type-eyebrow {
+    @apply font-archivo text-[12px] font-semibold uppercase leading-[1.2] tracking-[0.08em] text-muted-foreground;
   }
-  .type-label {
-    @apply font-archivo text-[13px] font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+  .type-page-title {
+    @apply font-serif text-[44px] font-normal leading-[1.05] tracking-[-0.02em] text-card-foreground;
+  }
+  .type-subhead {
+    @apply max-w-[52ch] font-archivo text-[17px] font-normal leading-[1.5] text-muted-foreground;
+  }
+  .type-section-label {
+    @apply font-archivo text-[13px] font-semibold uppercase leading-[1.2] tracking-[0.06em] text-muted-foreground;
+  }
+  .type-table-head {
+    @apply font-archivo text-[12px] font-semibold uppercase leading-[1.2] tracking-[0.06em] text-muted-foreground;
+  }
+  /* Tabular numerals are part of the role, not a call-site choice: a column
+     of proportional figures does not line up, which is the whole point of a
+     metric. */
+  .type-metric-value {
+    @apply font-archivo text-[32px] font-medium leading-[1.1] tabular-nums text-card-foreground;
+  }
+  .type-metric-label {
+    @apply font-archivo text-[14px] font-normal leading-[1.4] text-muted-foreground;
   }
   .type-heading {
     @apply font-archivo text-[17px] font-semibold tracking-[-0.01em] text-card-foreground;
   }
   .type-body {
-    @apply font-archivo text-[15px] font-normal leading-[1.6] text-card-foreground;
+    @apply font-archivo text-[15px] font-normal leading-[1.55] text-card-foreground;
+  }
+  .type-body-sm {
+    @apply font-archivo text-[13px] font-normal leading-[1.5] text-card-foreground;
   }
   .type-meta {
     @apply font-archivo text-[13px] font-normal text-muted-foreground;
+  }
+
+  /* Retained only so the not-yet-migrated admin routes keep rendering during
+     the page-by-page refactor. Aliases .type-section-label. Delete once the
+     last page is migrated — grep for `type-label` before removing. */
+  .type-label {
+    @apply type-section-label;
   }
 
   /* Legal pages (/terms, /privacy) prose. No typography plugin in this
@@ -281,14 +388,40 @@ select {
     @apply font-semibold text-landing-ink;
   }
 
-  /* Shared admin content containers (DESIGN.md "Layout containers").
-     AdminShell wraps pages in p-8 (32px); the container's own pt-6 brings
-     the top offset to 56px from viewport top to the eyebrow label. */
+  /* THE admin container, singular (DESIGN.md "Layout containers"). Consumed
+     through the PageShell primitive; no page applies it directly.
+
+     There used to be two, a 920px and a 1140px, which is why Company profile,
+     Settings, Response detail and Live detail sat visibly further inset than
+     Home, Leads, Surveys and Live. The narrow one is gone. A page that needs
+     a tighter measure for readability constrains the BLOCK inside it (see
+     .admin-measure), never the container, so every admin H1 lands on the same
+     x coordinate.
+
+     AdminShell wraps pages in p-8 (32px); this pt-6 brings the top offset to
+     56px from viewport top to the eyebrow. */
   .admin-container {
-    @apply mx-auto w-full max-w-[920px] pt-6;
+    @apply mx-auto w-full max-w-[var(--ds-container-max)] pt-6;
   }
+
+  /* Retained only so the not-yet-migrated admin routes keep rendering during
+     the page-by-page refactor. Now identical to .admin-container — the 920px
+     variant it used to be is what this pass removes. Delete once the last
+     page is migrated; grep for `admin-container-wide` before removing. */
   .admin-container-wide {
-    @apply mx-auto w-full max-w-[1140px] pt-6;
+    @apply admin-container;
+  }
+
+  /* The inner measure for form and prose blocks: long lines are hard to read
+     regardless of how wide the page is. Applied to a block, never to a page. */
+  .admin-measure {
+    @apply w-full max-w-[720px];
+  }
+
+  /* One focus treatment, applied wherever a default outline is suppressed.
+     Never remove an outline without adding this. */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ds-focus))] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--ds-page-background))];
   }
 }
 
