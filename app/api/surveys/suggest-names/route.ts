@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveOrg, orgErrorResponse, requireOrgPermission } from "@/lib/org";
 import { suggestSurveyNames } from "@/lib/survey-onboarding/suggest";
 import type { ExtractedSurveyDetails } from "@/lib/survey-onboarding/types";
 
@@ -18,6 +19,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
+  try {
+    await requireOrgPermission("study:create");
+  } catch (err) {
+    return orgErrorResponse(err);
+  }
+
   let body: { details?: ExtractedSurveyDetails };
   try {
     body = await request.json();
@@ -29,11 +36,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "details is required" }, { status: 400 });
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("industry")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const org = await getActiveOrg();
+  const { data: profile } = org
+    ? await supabase.from("profiles").select("industry").eq("org_id", org.orgId).maybeSingle()
+    : { data: null };
 
   try {
     const titles = await suggestSurveyNames(body.details, profile?.industry ?? null);

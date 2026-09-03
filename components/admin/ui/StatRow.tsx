@@ -4,47 +4,44 @@ import { EMPTY_VALUE } from "@/lib/format";
 
 export type Stat = {
   label: string;
-  /** Already formatted. Pass EMPTY_VALUE for "not known yet". */
+  /**
+   * A number, a percentage or a duration, already formatted. Pass EMPTY_VALUE
+   * for "not known yet". Never a title, a name or a sentence: a named winner
+   * belongs in a list row, not a stat cell.
+   */
   value: React.ReactNode;
-  /** Optional trailing note: a delta, a unit, a share. Never the value itself. */
-  hint?: React.ReactNode;
-  /** Makes the cell a link. Only use it when there is somewhere specific to go. */
+  /** One short line beneath the number: a delta, a qualifier. Neutral by default. */
+  delta?: React.ReactNode;
+  /** Makes the cell a link. Only when there is somewhere specific to go. */
   href?: string;
 };
 
 /**
- * One stat layout for every admin page.
+ * One stat layout for every admin page: a joined, ruled bar of cells.
  *
- * The surface previously carried four: a joined segmented bar (Home), three
- * detached cards with their own chrome (Surveys), detached button-cards with
- * progress bars (Leads), and a bare three-column grid with no card at all
- * (Survey detail). This is the joined bar, applied everywhere.
+ * Each cell is one vertical stack. Label in the micro size, muted; the number
+ * in the metric role; an optional delta beneath it. Nothing sits inline
+ * beside the number, so every value shares a baseline with its neighbours.
+ * Vertical padding matches the content: the cell is exactly label, number,
+ * optional delta, plus one spacing step above and below.
  *
- * Why the bar and not the detached cards:
- *
- * - It is the only one that survives a variable stat count without leaving a
- *   hole. Surveys hid its third card and Home collapsed its report card, both
- *   working around a fixed grid; the bar just has fewer cells.
- * - At 1140px, three detached cards give each stat ~350px of width to hold a
- *   32px numeral, which is most of why Surveys and Leads read as different
- *   products sitting next to each other.
- * - Borders do the dividing rather than gaps, so it reads as one ruled object
- *   rather than as three things that happen to be adjacent.
+ * Four stats maximum per page. A stat derivable from another in the same row
+ * is cut, not shown twice.
  *
  * Stacked on narrow screens the rule runs horizontally; from `sm` up it flips
  * to vertical hairlines between columns.
  */
 const CELL =
-  "flex flex-1 flex-col gap-1.5 border-t border-chip px-5 py-4 first:border-t-0 sm:border-l sm:border-t-0 sm:first:border-l-0";
+  "flex min-w-0 flex-1 flex-col gap-0.5 border-t border-border px-4 py-3 first:border-t-0 sm:border-l sm:border-t-0 sm:first:border-l-0";
 
 function CellBody({ stat }: { stat: Stat }) {
   return (
     <>
-      <span className="type-metric-label">{stat.label}</span>
-      <span className="flex items-baseline gap-1.5">
-        <span className="type-metric-value">{stat.value ?? EMPTY_VALUE}</span>
-        {stat.hint && <span className="type-body-sm text-muted-foreground">{stat.hint}</span>}
-      </span>
+      <span className="font-archivo text-micro text-muted-foreground">{stat.label}</span>
+      <span className="type-metric-value">{stat.value ?? EMPTY_VALUE}</span>
+      {stat.delta && (
+        <span className="font-archivo text-micro tabular-nums text-muted-foreground">{stat.delta}</span>
+      )}
     </>
   );
 }
@@ -55,7 +52,7 @@ export function StatRow({ stats, className }: { stats: Stat[]; className?: strin
   return (
     <div
       className={cn(
-        "flex flex-col overflow-hidden rounded-card border border-border bg-card shadow-card sm:flex-row",
+        "flex flex-col overflow-hidden rounded-card border border-border bg-card sm:flex-row",
         className
       )}
     >

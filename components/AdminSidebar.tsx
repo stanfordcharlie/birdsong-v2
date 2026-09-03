@@ -20,28 +20,6 @@ function HomeIcon() {
   );
 }
 
-// Broadcast arcs around a filled center, same 19px / 1.4px stroke language
-// as the rest of the set.
-function LiveIcon() {
-  return (
-    <svg width="19" height="19" viewBox="0 0 18 18" fill="none" className="shrink-0">
-      <circle cx="9" cy="9" r="1.7" fill="currentColor" />
-      <path
-        d="M5.6 5.6a4.8 4.8 0 000 6.8M12.4 12.4a4.8 4.8 0 000-6.8"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M3.3 3.3a8 8 0 000 11.4M14.7 14.7a8 8 0 000-11.4"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 function LeadsIcon() {
   return (
     <svg width="19" height="19" viewBox="0 0 18 18" fill="none" className="shrink-0">
@@ -62,46 +40,52 @@ function SurveysIcon() {
   );
 }
 
-function CompanyProfileIcon() {
-  return (
-    <svg width="19" height="19" viewBox="0 0 18 18" fill="none" className="shrink-0">
-      <rect x="3.5" y="4.5" width="11" height="11" rx="1.2" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M6.5 4.5V3a1 1 0 011-1h3a1 1 0 011 1v1.5M6.3 8h5.4M6.3 11h3.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function ChevronIcon() {
+// One caret, not an up/down stepper: the row opens a menu, it does not step
+// through values. Points down at rest, flips up while the menu is open.
+// 45% at rest, 80% on hover — keyed off the row (group) so hovering the name
+// or the avatar lifts it too, not just the glyph itself.
+function ChevronIcon({ open }: { open: boolean }) {
   return (
     <svg
-      width="13"
-      height="13"
+      width="12"
+      height="12"
       viewBox="0 0 16 16"
       fill="none"
-      className="shrink-0 text-sidebar-muted/50"
+      className={cn(
+        "shrink-0 text-sidebar-muted opacity-45 transition-[transform,opacity] duration-200 ease-in-out group-hover:opacity-80",
+        open && "rotate-180"
+      )}
     >
-      <path d="M5 6l3-3 3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5 10l3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 6.5l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-// The account avatar. It was an eight-point star clipped out of a flat
-// periwinkle (#8ea4e8) that appears nowhere else in the product and is not
-// the Birdsong mark; the real mark was already sitting 200px above it at the
-// top of this same rail. The resting tilt and hover spring live in
-// globals.css under .ws-star / .ws-user-row:hover — see the note there for
-// why they are not Tailwind utilities.
-function AccountAvatar() {
+// "Charlie Cohen" -> "CC", "Charlie" -> "CH". Derived from the same string
+// the row displays, so the tile can never disagree with the name beside it
+// and never comes out blank.
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+// The account avatar: a 30px indigo squircle carrying the initials. Never
+// the logo mark — that identifies the product rather than the person whose
+// name sits beside it, and a dark tile on a near-black rail reads as a
+// smudge. The fill is the one saturated colour on the sidebar for exactly
+// that reason, but muted (#5f6bab, not the old #8ea4e8 circle) so it stops
+// being the loudest thing on a dark rail. Same 30px / rounded-control
+// geometry as the logo mark at the top of the rail, so the two agree.
+function AccountAvatar({ name }: { name: string }) {
   return (
-    <Image
-      src="/birdsong_logo_mark_v2.svg"
-      alt=""
+    <span
       aria-hidden
-      width={36}
-      height={36}
-      className="ws-star block h-9 w-9 shrink-0 rounded-control bg-sidebar-plate/10 p-1"
-    />
+      className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-control bg-sidebar-avatar font-archivo text-micro font-semibold text-sidebar-avatar-foreground"
+    >
+      {initialsOf(name)}
+    </span>
   );
 }
 
@@ -121,21 +105,22 @@ function CollapseIcon({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+// Live is not a nav destination: it is reached from the Leads page, and
+// the Leads item stays lit while you are on it.
 const NAV_ITEMS = [
-  { href: "/admin", label: "Home", icon: HomeIcon },
-  { href: "/admin/live", label: "Live", icon: LiveIcon },
-  { href: "/admin/leads", label: "Leads", icon: LeadsIcon },
-  { href: "/admin/surveys", label: "Surveys", icon: SurveysIcon },
-  { href: "/admin/profile", label: "Company profile", icon: CompanyProfileIcon },
+  { href: "/admin", label: "Home", icon: HomeIcon, also: [] as string[] },
+  { href: "/admin/leads", label: "Leads", icon: LeadsIcon, also: ["/admin/live"] },
+  { href: "/admin/surveys", label: "Projects", icon: SurveysIcon, also: [] as string[] },
 ];
 
 export function AdminSidebar({
   userName,
-  liveSurveyCount,
+  userRole,
   initialCollapsed,
 }: {
   userName: string | null;
-  liveSurveyCount: number;
+  /** The person's role in the organization, already a display label. */
+  userRole: string | null;
   initialCollapsed: boolean;
 }) {
   const pathname = usePathname();
@@ -250,7 +235,9 @@ export function AdminSidebar({
           const isActive =
             item.href === "/admin"
               ? pathname === "/admin"
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
+              : [item.href, ...item.also].some(
+                  (href) => pathname === href || pathname.startsWith(`${href}/`)
+                );
           const Icon = item.icon;
           return (
             <Link
@@ -286,82 +273,72 @@ export function AdminSidebar({
         })}
       </nav>
 
-      {/* Workspace plate. Pinned to the rail's bottom (mt-auto), it holds the
-          account row, which toggles a small menu with Settings and Sign out
-          (outside click and Escape dismiss it) — those two have to live
-          somewhere, and the main nav doesn't include them. A "Listening · N
-          live" status line sits above it when, and only when, two or more
-          surveys are live.
+      {/* The account row. Pinned to the rail's bottom (mt-auto), it toggles a
+          menu with Company profile, Settings and Sign out (outside click and
+          Escape dismiss it) — those three have to live somewhere, and the
+          main nav doesn't include them. Company profile sits here rather than
+          in the nav because it is account-scoped setup you visit
+          occasionally, not one of the four workspace destinations you move
+          between.
 
-          Collapsed rail: the plate collapses to the bare star button. 64px
-          is too narrow for the status line, and a 5px-padded card around a
-          lone 36px avatar reads as chrome rather than structure. */}
+          One quiet plate, no divider: a full-width rule across the rail read
+          as a seam cutting the panel in half. The plate's own edge
+          (--ds-sidebar-plate at 6%) separates the footer from the nav on its
+          own, and its 3% fill lifts to 6% on hover and while the menu is
+          open.
+
+          Width budget, 240px of rail: 16px rail padding x2, 10px plate
+          padding x2, 1px border x2, 30px avatar, 10px gap, 12px chevron
+          leaves ~124px for the name, and "Charlie Cohen" needs ~86px at
+          12.5px Archivo 600.
+
+          Collapsed rail: 64px fits only the avatar, so the text and chevron
+          drop and the plate shrinks to a square. */}
       <div
         ref={accountRef}
+        // px-4 expanded, matching the nav above rather than the spec's 12px:
+        // our rail is 240px, not the 228px the spec was drawn against, so the
+        // plate lines up with the nav pills. The extra 12px of rail more than
+        // covers the wider padding in the name's width budget.
         className={cn("group relative mb-1.5 mt-auto", collapsed ? "px-3" : "px-4")}
       >
-        <div
-          className={
-            collapsed
-              ? undefined
-              : "rounded-card border border-sidebar-plate/10 bg-sidebar-plate/[0.05] p-1.5 shadow-card"
-          }
-        >
-          {/* Only worth a line once there's more than one: at 0 or 1 the
-              count tells you nothing you can't see on the surveys page, and
-              a permanent "1 live" reads as chrome. It earns its place when
-              several are running at once and the number is actually news. */}
-          {!collapsed && liveSurveyCount >= 2 && (
-            <div className="flex items-center gap-2 px-[11px] pb-[7px] pt-2">
-              {/* The ping is a second, absolutely stacked copy of the dot
-                  that scales out and fades — the solid dot underneath stays
-                  put so the status never reads as flickering. */}
-              <span className="relative block h-[7px] w-[7px] shrink-0">
-                <span className="ws-ping absolute inset-0 rounded-pill bg-brand-live" />
-                <span className="absolute inset-0 rounded-pill bg-brand-live" />
-              </span>
-              <span className="whitespace-nowrap text-micro font-semibold text-sidebar-muted">
-                Listening · {liveSurveyCount} live
-              </span>
-              <span className="ws-note ml-auto text-count leading-none text-sidebar-muted" aria-hidden>
-                ♪
-              </span>
-            </div>
+        <button
+          type="button"
+          onClick={() => setAccountOpen((prev) => !prev)}
+          aria-haspopup="menu"
+          aria-expanded={accountOpen}
+          aria-label={collapsed ? `Account menu for ${userName ?? "Account"}` : "Account menu"}
+          className={cn(
+            // transition-colors carries its own 150ms; an arbitrary
+            // duration-[140ms] would be silently dropped, because
+            // tailwindcss-animate claims duration-* for animation-duration.
+            "flex items-center rounded-account border border-sidebar-plate/[0.06] bg-sidebar-plate/[0.03] text-left transition-colors hover:bg-sidebar-plate/[0.06]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-active-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
+            collapsed ? "h-10 w-10 justify-center" : "w-full gap-2.5 px-2.5 py-2",
+            accountOpen && "bg-sidebar-plate/[0.06]"
           )}
-
-          <button
-            type="button"
-            onClick={() => setAccountOpen((prev) => !prev)}
-            aria-haspopup="menu"
-            aria-expanded={accountOpen}
-            aria-label={collapsed ? `Account menu for ${userName ?? "Account"}` : "Account menu"}
-            className={cn(
-              "ws-user-row flex items-center text-left transition-colors duration-[130ms] ease-in-out",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-active-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
-              collapsed
-                ? "h-10 w-10 justify-center rounded-control hover:bg-sidebar-accent"
-                : "w-full gap-2.5 rounded-control bg-sidebar-plate/[0.04] p-2 hover:bg-sidebar-plate/[0.07]",
-              // While the menu is open the row holds its hover fill, so the
-              // plate reads as the thing the popover belongs to.
-              accountOpen && (collapsed ? "bg-sidebar-accent" : "bg-sidebar-plate/[0.07]")
-            )}
-          >
-            <AccountAvatar />
-            {!collapsed && (
-              <>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-spectral text-control font-semibold text-sidebar-active-foreground">
-                    {userName ?? "Account"}
-                  </span>
-                  <span className="block whitespace-nowrap text-micro text-sidebar-muted/50">
-                    Admin
-                  </span>
+        >
+          <AccountAvatar name={userName ?? "Account"} />
+          {!collapsed && (
+            <>
+              {/* Archivo, not Spectral: a serif at 13.5px in a 240px rail
+                  read oversized and soft beside the sans nav above it.
+                  12.5px/600 for the name, 10.5px/500 at 38% for the role — a
+                  tight two-line block the height of the avatar beside it.
+                  Archivo rather than the handoff's Inter because admin's body
+                  sans is Archivo; see DESIGN.md. */}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-archivo text-account font-semibold text-sidebar-active-foreground">
+                  {userName ?? "Account"}
                 </span>
-                <ChevronIcon />
-              </>
-            )}
-          </button>
-        </div>
+                <span className="mt-0.5 block whitespace-nowrap font-archivo text-role font-medium text-sidebar-muted/[0.38]">
+                  {userRole ?? "Admin"}
+                </span>
+              </span>
+              <ChevronIcon open={accountOpen} />
+            </>
+          )}
+        </button>
 
         {collapsed && !accountOpen && (
           <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-control border border-border bg-card px-2.5 py-1.5 text-sm text-card-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
@@ -377,10 +354,19 @@ export function AdminSidebar({
           role="menu"
           className={cn(
             "absolute z-50 rounded-card border border-border bg-card p-1.5 shadow-lg transition-opacity duration-150",
-            collapsed ? "bottom-0 left-full ml-2 w-48" : "bottom-full left-2 right-2 mb-1.5",
+            // Expanded: aligned to the plate's edges (px-4), not to the rail.
+            collapsed ? "bottom-0 left-full ml-2 w-48" : "bottom-full left-4 right-4 mb-1.5",
             accountOpen ? "opacity-100" : "pointer-events-none opacity-0"
           )}
         >
+          <Link
+            href="/admin/profile"
+            role="menuitem"
+            onClick={() => setAccountOpen(false)}
+            className="focus-ring block rounded-control px-3 py-3 font-archivo text-sm text-card-foreground transition-colors hover:bg-secondary"
+          >
+            Company profile
+          </Link>
           <Link
             href="/admin/settings"
             role="menuitem"
@@ -388,6 +374,14 @@ export function AdminSidebar({
             className="focus-ring block rounded-control px-3 py-3 font-archivo text-sm text-card-foreground transition-colors hover:bg-secondary"
           >
             Settings
+          </Link>
+          <Link
+            href="/admin/settings/team"
+            role="menuitem"
+            onClick={() => setAccountOpen(false)}
+            className="focus-ring block rounded-control px-3 py-3 font-archivo text-sm text-card-foreground transition-colors hover:bg-secondary"
+          >
+            Team
           </Link>
           <SignOutButton className="focus-ring block w-full rounded-control px-3 py-3 text-left font-archivo text-sm text-card-foreground transition-colors hover:bg-secondary hover:text-card-foreground" />
         </div>

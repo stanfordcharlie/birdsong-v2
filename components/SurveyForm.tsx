@@ -77,7 +77,12 @@ const EMPTY_VALUES: SurveyFormValues = {
 };
 
 type SurveyFormProps =
-  | { mode: "create" }
+  | {
+      mode: "create";
+      // The organization the new study belongs to. Only create needs it:
+      // edit is keyed by surveyId and scoped by RLS.
+      orgId: string;
+    }
   | {
       mode: "edit";
       surveyId: string;
@@ -322,7 +327,7 @@ export function SurveyForm(props: SurveyFormProps) {
               .single()
           : await supabase
               .from("surveys")
-              .insert({ ...payload, slug: candidateSlug, user_id: user.id })
+              .insert({ ...payload, slug: candidateSlug, user_id: user.id, org_id: props.orgId })
               .select("id")
               .single();
 
@@ -633,7 +638,7 @@ export function SurveyForm(props: SurveyFormProps) {
         {/* Right column: conversational setup, or the fields it generates. */}
         <div className="flex flex-col gap-3 rounded-control border border-border p-3">
           <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-card-foreground">Survey details</h3>
+            <h3 className="text-sm font-semibold text-card-foreground">Study details</h3>
             <p className="text-xs text-muted-foreground">
               Research theme, target audience, tone, question count, and the question guide.
             </p>
@@ -759,7 +764,7 @@ export function SurveyForm(props: SurveyFormProps) {
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={loading || showDetailsChat}>
           {loading && showSaveLoader && <BirdLoader size={18} label={false} />}
-          {loading ? "Saving..." : isEdit ? "Save changes" : "Create survey"}
+          {loading ? "Saving..." : isEdit ? "Save changes" : "Create study"}
         </Button>
         {saved && <span className="text-sm text-muted-foreground">Saved.</span>}
       </div>

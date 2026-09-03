@@ -5,12 +5,14 @@ import { LandingPageShell } from "@/components/marketing/LandingPageShell";
 import { LandingNav } from "@/components/marketing/LandingNav";
 import { Hero } from "@/components/marketing/Hero";
 import { MetricsBand } from "@/components/marketing/MetricsBand";
+import { ResearchSection } from "@/components/marketing/ResearchSection";
 import { SequenceSection } from "@/components/marketing/SequenceSection";
 import { ProofSection } from "@/components/marketing/ProofSection";
 import { FaqSection } from "@/components/marketing/FaqSection";
 import { CrossAudienceBanner } from "@/components/marketing/CrossAudienceBanner";
 import { LandingCta } from "@/components/marketing/LandingCta";
 import { LandingFooter } from "@/components/marketing/LandingFooter";
+import { listPublicReports } from "@/lib/reports/public";
 
 // This is the primary indexed page for the domain, so metadata here (not
 // the generic fallback in app/layout.tsx) is what search/social previews
@@ -62,6 +64,11 @@ export default async function RootPage({
     redirect("/admin");
   }
 
+  // The three most recent public studies, for the proof band under the
+  // metrics. Empty until something publishes, and ResearchSection renders
+  // nothing in that case.
+  const recentResearch = (await listPublicReports()).slice(0, 3);
+
   return (
     <LandingPageShell>
       <LandingNav
@@ -107,6 +114,7 @@ export default async function RootPage({
           },
         ]}
       />
+      <ResearchSection reports={recentResearch} />
       <SequenceSection
         headline="From first note to booked demo"
         intro="Three steps, one owner. Birdsong recruits the audience, runs the interviews and scores the outcome. Your team only shows up for the demo."

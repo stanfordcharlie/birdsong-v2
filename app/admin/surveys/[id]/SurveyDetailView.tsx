@@ -1,20 +1,23 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   Badge,
   Button,
   Card,
+  CollapsibleSection,
   DataTable,
   PageHeader,
   PageShell,
+  RelativeTime,
   StatRow,
   type Column,
 } from "@/components/admin/ui";
-import { formatPercent } from "@/lib/format";
+import { EMPTY_VALUE, formatPercent } from "@/lib/format";
 import { SurveyForm, type SurveyFormValues } from "@/components/SurveyForm";
 import { ReportSection, type SurveyReportRow } from "./ReportSection";
-import { cn } from "@/lib/utils";
+import { ResponsesTable, type ResponseTableRow } from "./ResponsesTable";
 
 export type SourceBreakdownRow = {
   source: string;
@@ -30,6 +33,7 @@ export type RespondentChip = {
 export type SurveyDetailData = {
   id: string;
   status: string;
+  archived: boolean;
   title: string;
   externalTitle: string;
   slug: string;
@@ -39,6 +43,7 @@ export type SurveyDetailData = {
   numQuestions: string;
   questionGuide: string;
   respondentChips: RespondentChip[];
+  publishPublic: boolean;
 };
 
 // The AI-generated question_guide is one free-text brief, not a structured
@@ -54,75 +59,104 @@ function parseQuestionGuide(text: string): string[] {
     .filter(Boolean);
 }
 
-function CopyIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="9" y="9" width="13" height="13" rx="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
+/** Same sentence, different column. Trimmed and case-folded before comparing. */
+function saysTheSameThing(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
 const SOURCE_COLUMNS: Column<SourceBreakdownRow>[] = [
   { key: "source", header: "Source", cell: (row) => <span className="font-medium">{row.source}</span> },
-  { key: "starts", header: "Starts", align: "right", width: "110px", cell: (row) => row.starts },
-  { key: "completions", header: "Completions", align: "right", width: "130px", cell: (row) => row.completions },
+  { key: "starts", header: "Starts", align: "right", width: "sm", cell: (row) => row.starts },
+  { key: "completions", header: "Completions", align: "right", width: "md", cell: (row) => row.completions },
 ];
 
-function SectionHeader({
-  title,
-  onEdit,
+function SectionHeader({ title }: { title: string }) {
+  return <h2 className="type-eyebrow mb-2">{title}</h2>;
+}
+
+/**
+ * The quiet "Edit" in a setup section's header. Ghost is the system's bare
+ * text action — no border, no fill, so it does not read as a second primary
+ * button sitting inside a disclosure row.
+ */
+function EditAction({ onClick }: { onClick: () => void }) {
+  return (
+    <Button type="button" variant="ghost" size="sm" className="px-0" onClick={onClick}>
+      Edit
+    </Button>
+  );
+}
+
+/**
+ * One h-9 row in a setup section's body. The question list used to spend
+ * most of its height on padding and a full-width rule; this drops the
+ * rules, because a numbered list is already a list.
+ */
+function SetupRow({
+  marker,
+  trailing,
+  label,
 }: {
-  title: string;
-  onEdit?: () => void;
+  /** The fixed left column: a number, or nothing. */
+  marker?: React.ReactNode;
+  trailing?: React.ReactNode;
+  label: string;
 }) {
   return (
-    <div className="mb-3.5 flex items-baseline justify-between gap-6">
-      <h2 className="type-section-label">{title}</h2>
-      {onEdit && (
-        <Button type="button" variant="secondary" size="sm" onClick={onEdit}>
-          Edit
-        </Button>
+    <div className="flex h-9 items-center gap-4">
+      {marker !== undefined && (
+        <span className="w-8 shrink-0 font-archivo text-count tabular-nums text-muted-foreground">
+          {marker}
+        </span>
       )}
+      {/* Truncated rather than wrapped: the row rhythm is the point, and the
+          full text is one hover (or one click through to Edit) away. */}
+      <span className="type-body min-w-0 flex-1 truncate" title={label}>
+        {label}
+      </span>
+      {trailing}
     </div>
   );
 }
 
 export function SurveyDetailView({
   survey,
+  responses,
   responseCount,
-  qualifiedCount,
+  inProgressCount,
+  worthACallCount,
   completionRate,
+  lastResponseAt,
   initialValues,
   latestReport,
   completedInterviewCount,
   sourceBreakdown,
+  permissions,
 }: {
   survey: SurveyDetailData;
+  responses: ResponseTableRow[];
+  /** Completed responses. In-progress interviews are counted separately. */
   responseCount: number;
-  qualifiedCount: number;
+  inProgressCount: number;
+  worthACallCount: number;
   completionRate: number | null;
+  lastResponseAt: string | null;
   initialValues: SurveyFormValues;
   latestReport: SurveyReportRow | null;
   completedInterviewCount: number;
   // Null when there's nothing to compare yet (every response so far is
   // "Direct", or they're all from the same tagged source).
   sourceBreakdown: SourceBreakdownRow[] | null;
+  // From can() on the server. False hides the affordance; the routes and RLS
+  // behind each one refuse regardless.
+  permissions: { edit: boolean; generateReport: boolean; publishReport: boolean };
 }) {
   const [editing, setEditing] = useState(false);
+  const editAction = permissions.edit ? <EditAction onClick={() => setEditing(true)} /> : undefined;
   const [shareCopied, setShareCopied] = useState(false);
-  const [urlCopied, setUrlCopied] = useState(false);
   const [surveyUrl, setSurveyUrl] = useState(`/survey/${survey.slug}`);
   const questions = parseQuestionGuide(survey.questionGuide);
-  const isLive = survey.status === "live";
+  const statusLabel = survey.archived ? "Archived" : survey.status === "live" ? "Live" : "Draft";
 
   // Starts as a relative path so the server- and client-rendered markup
   // match, then upgrades to the full URL once we know the origin.
@@ -136,18 +170,12 @@ export function SurveyDetailView({
     setTimeout(() => setShareCopied(false), 1500);
   }
 
-  async function handleCopyUrl() {
-    await navigator.clipboard.writeText(surveyUrl);
-    setUrlCopied(true);
-    setTimeout(() => setUrlCopied(false), 2000);
-  }
-
   if (editing) {
     return (
       <PageShell>
         <Card padding="flush">
           <div className="flex items-center justify-between border-b border-border p-6 pb-4">
-            <h2 className="type-section-label">Edit survey</h2>
+            <h2 className="type-section-label">Edit study</h2>
             <Button type="button" variant="secondary" size="sm" onClick={() => setEditing(false)}>
               Cancel
             </Button>
@@ -165,166 +193,176 @@ export function SurveyDetailView({
     );
   }
 
+  // The one line under the H1: the public name, when it differs from the
+  // internal one. The seeded study sets external_title to its title verbatim,
+  // so anything that only repeats the H1 is dropped rather than printed twice.
+  const meta = [survey.externalTitle]
+    .map((value) => value.trim())
+    .find((value) => value && !saysTheSameThing(value, survey.title));
+
+  const audienceText = [
+    survey.topic.trim(),
+    survey.targetAudience.trim() ? `Targeting ${survey.targetAudience.trim()}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const questionCount = questions.length || Number(survey.numQuestions) || 0;
+  const optionalFieldCount = survey.respondentChips.length;
+
   return (
     <PageShell>
       <PageHeader
         className="bs-rise-1"
-        eyebrow="Surveys"
-        title={survey.title}
-        badge={<Badge variant={isLive ? "live" : "draft"}>{isLive ? "Live" : "Draft"}</Badge>}
-        subtitle={
-          <>
-            {survey.externalTitle && <span className="block">{survey.externalTitle}</span>}
-            <span className="mt-2 flex items-center gap-1.5">
-              <span className="min-w-0 flex-1 truncate">{surveyUrl}</span>
-              <button
-                type="button"
-                onClick={handleCopyUrl}
-                aria-label="Copy survey URL"
-                className="focus-ring flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-secondary hover:text-card-foreground"
-              >
-                {urlCopied ? <CheckIcon /> : <CopyIcon />}
-              </button>
-            </span>
-          </>
+        eyebrow={
+          <Link
+            href="/admin/surveys"
+            className="focus-ring rounded-control transition-colors hover:text-card-foreground"
+          >
+            Projects
+          </Link>
         }
+        title={survey.title}
+        // Status once: a neutral badge beside the title, not also a dot in
+        // the eyebrow and a tinted fill.
+        badge={<Badge variant="count">{statusLabel}</Badge>}
+        meta={meta}
         actions={
           <>
+            <Button type="button" onClick={handleShare}>
+              <span aria-live="polite">{shareCopied ? "Copied" : "Copy link"}</span>
+            </Button>
             {/* ?test=1: owner-verified server-side; lets the admin run the
                 interview (even on a draft) without creating a real lead,
-                firing the email, or skewing stats. The Share link below
-                stays the clean respondent URL. */}
+                firing the email, or skewing stats. The copied link stays the
+                clean respondent URL. */}
             <Button type="button" variant="secondary" asChild>
               <a href={`/survey/${survey.slug}?test=1`} target="_blank" rel="noreferrer">
                 Preview interview
               </a>
             </Button>
-            <Button type="button" onClick={handleShare}>
-              {shareCopied ? "Copied!" : "Share link"}
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setEditing(true)}>
-              Edit
-            </Button>
           </>
         }
       />
 
-      <div className="bs-rise-2 mb-10">
+      <div className="flex flex-col gap-8">
         <StatRow
+          className="bs-rise-2"
           stats={[
-            { label: "Responses", value: responseCount },
-            { label: "Qualified leads", value: qualifiedCount },
-            { label: "Completion rate", value: formatPercent(completionRate === null ? null : completionRate / 100) },
+            {
+              label: "Responses",
+              value: responseCount,
+              delta: inProgressCount > 0 ? `${inProgressCount} in progress` : undefined,
+            },
+            { label: "Worth a call", value: worthACallCount },
+            {
+              label: "Completion rate",
+              value: formatPercent(completionRate === null ? null : completionRate / 100),
+            },
+            {
+              label: "Last response",
+              value: lastResponseAt ? <RelativeTime date={lastResponseAt} /> : EMPTY_VALUE,
+            },
           ]}
         />
-        {responseCount === 0 && (
-          <p className="type-body-sm mt-4 text-faint">
-            Stats fill in as interviews complete. Share your link to get the first ones in.
-          </p>
-        )}
-      </div>
 
-      {sourceBreakdown && (
-        <div className="mb-10">
-          <SectionHeader title="Sources" />
-          <p className="type-body-sm mb-3.5 text-faint">
-            Starts and completions by <code className="type-code text-faint">?src=</code> on the shared
-            link. Untagged traffic shows as Direct.
-          </p>
+        <ResponsesTable responses={responses} />
+
+        <section>
+          <SectionHeader title="Setup" />
           <Card padding="flush">
+            <div className="px-6">
+              <CollapsibleSection
+                title="Audience and goal"
+                summary={audienceText || "Not set"}
+                action={editAction}
+              >
+                <p className="admin-measure type-body">{audienceText || "Not set."}</p>
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="Questions"
+                // The count is a hard total, follow-ups included; the
+                // interviewer decides where to spend them.
+                summary={`${questionCount} ${questionCount === 1 ? "question" : "questions"}, follow-ups included`}
+                action={editAction}
+              >
+                {questions.length === 0 ? (
+                  <p className="type-body text-muted-foreground">No questions yet.</p>
+                ) : (
+                  <div className="flex flex-col">
+                    {questions.map((question, i) => (
+                      <SetupRow
+                        key={i}
+                        marker={String(i + 1).padStart(2, "0")}
+                        label={question}
+                      />
+                    ))}
+                  </div>
+                )}
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="Respondent info"
+                summary={
+                  optionalFieldCount === 0
+                    ? "Name and email only"
+                    : `Name and email, plus ${optionalFieldCount} optional ${
+                        optionalFieldCount === 1 ? "field" : "fields"
+                      }`
+                }
+                action={editAction}
+              >
+                <div className="flex flex-col">
+                  {[
+                    { label: "Name", required: true },
+                    { label: "Email", required: true },
+                    ...survey.respondentChips,
+                  ].map((field) => (
+                    <SetupRow
+                      key={field.label}
+                      label={field.label}
+                      trailing={
+                        <Badge variant={field.required ? "outline" : "count"} size="sm">
+                          {field.required ? "Required" : "Optional"}
+                        </Badge>
+                      }
+                    />
+                  ))}
+                </div>
+              </CollapsibleSection>
+            </div>
+          </Card>
+        </section>
+
+        {sourceBreakdown && (
+          <section>
+            <SectionHeader title="Sources" />
             <DataTable
               columns={SOURCE_COLUMNS}
               rows={sourceBreakdown}
               rowKey={(row) => row.source}
-              empty={{ title: "No tagged traffic yet" }}
+              density="compact"
+              empty={{ title: "No tagged traffic yet." }}
             />
-          </Card>
-        </div>
-      )}
-
-      <div className="bs-rise-3 mb-10">
-        <SectionHeader title="Audience & goal" onEdit={() => setEditing(true)} />
-        <p className="admin-measure type-body">
-          {survey.topic || "No topic set yet."}
-          {survey.targetAudience && (
-            <>
-              {" "}
-              Targeting <strong className="font-semibold">{survey.targetAudience}</strong>.
-            </>
-          )}
-        </p>
-      </div>
-
-      <div className="bs-rise-4 mb-10">
-        <SectionHeader title="Questions" onEdit={() => setEditing(true)} />
-        <p className="type-body-sm mb-2 text-faint">
-          The interviewer asks up to 1 follow-up per question, in your brand voice.
-        </p>
-        {questions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No question guide yet.</p>
-        ) : (
-          <div className="flex flex-col">
-            {questions.map((question, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "flex gap-6 py-[18px]",
-                  i < questions.length - 1 && "border-b border-chip"
-                )}
-              >
-                <span className="type-body-sm min-w-[26px] font-semibold text-faint">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span className="type-body">{question}</span>
-              </div>
-            ))}
-          </div>
+            {/* States the one rule the table cannot show: what Direct means. */}
+            <p className="type-body-sm mt-2 text-faint">
+              By <code className="type-code text-faint">?src=</code> on the shared link. Untagged
+              traffic is Direct.
+            </p>
+          </section>
         )}
+
+        <ReportSection
+          surveyId={survey.id}
+          surveySlug={survey.slug}
+          initialReport={latestReport}
+          initialPublishPublic={survey.publishPublic}
+          completedInterviewCount={completedInterviewCount}
+          canGenerate={permissions.generateReport}
+          canPublish={permissions.publishReport}
+        />
       </div>
-
-      <div className="bs-rise-5 mb-10">
-        <SectionHeader title="Qualification" />
-        <p className="admin-measure type-body mb-4">
-          Qualification is a judgment call, not an automatic rule: review a response&apos;s transcript and lead score,
-          then mark it <strong className="font-semibold">Qualified</strong> from its detail page.
-        </p>
-        <div className="admin-measure flex items-center gap-6 rounded-card border border-border bg-card px-5 py-4">
-          <span className="type-body flex-1 font-medium">Try the interview yourself</span>
-          <Button asChild variant="ghost" size="sm">
-            <a href={`/survey/${survey.slug}?test=1`} target="_blank" rel="noreferrer">
-            Open respondent view
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="5" y1="12" x2="19" y2="12" />
-              <polyline points="12 5 19 12 12 19" />
-            </svg>
-            </a>
-          </Button>
-        </div>
-      </div>
-
-      <ReportSection
-        surveyId={survey.id}
-        initialReport={latestReport}
-        completedInterviewCount={completedInterviewCount}
-      />
-
-      {survey.respondentChips.length > 0 && (
-        <div className="bs-rise-6 mb-10">
-          <SectionHeader title="Respondent info collected" onEdit={() => setEditing(true)} />
-          <div className="flex flex-wrap gap-2">
-            {survey.respondentChips.map((chip) => (
-              <div
-                key={chip.label}
-                className="flex items-center gap-1.5 rounded-pill bg-chip px-3 py-1.5 font-archivo text-sm text-card-foreground"
-              >
-                {chip.label}
-                {chip.required && <span className="text-micro font-semibold text-muted-foreground">required</span>}
-              </div>
-            ))}
-          </div>
-          <p className="type-body-sm mt-2 text-muted-foreground">Name and email always collected.</p>
-        </div>
-      )}
     </PageShell>
   );
 }

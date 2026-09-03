@@ -3,51 +3,52 @@ import { cn } from "@/lib/utils";
 /**
  * The page masthead. Owns the header layout and the action alignment.
  *
- * Every admin page's header is this component, so the eyebrow, the H1 and the
- * actions cannot drift apart again. Three things it enforces:
+ * Title row first, with the actions optically centred on the title; then one
+ * optional meta line. The whole block stays under the height of two stat
+ * cells, which is what keeps the first content block above the fold.
  *
- * - The eyebrow is a section name matching the sidebar nav label. It is not a
- *   live status readout (Surveys used to put "3 LIVE RIGHT NOW" here) and not
- *   a different word from the nav item that reached the page (Company profile
- *   used to say "SETTINGS").
+ * - `eyebrow` is for detail pages only, where it names the parent object
+ *   (usually as a link back to the list). Top-level pages pass none: the
+ *   sidebar already states the location. Settings and Company profile are
+ *   the exception, because neither has a nav item, so both carry "Account".
+ * - `meta` is one line of fact: a count, a date, a parent name, a constraint.
+ *   Not a sentence about the situation.
+ * - `subtitle` survives for the one or two pages that need a sentence. Most
+ *   pages should not pass it.
  * - No H1 carries a terminal period.
- * - The subhead measure is 52ch, set by the role, so the same sentence wraps
- *   identically on every page.
- *
- * `badge` is the count treatment that sits beside the title; anything that is
- * a live readout belongs there rather than in the eyebrow.
  */
 export function PageHeader({
   eyebrow,
   title,
   badge,
+  meta,
   subtitle,
   actions,
   className,
 }: {
-  eyebrow: string;
+  eyebrow?: React.ReactNode;
   title: string;
   badge?: React.ReactNode;
+  meta?: React.ReactNode;
   subtitle?: React.ReactNode;
   actions?: React.ReactNode;
   className?: string;
 }) {
   return (
-    <header className={cn("mb-8 flex flex-col gap-2", className)}>
-      <p className="type-eyebrow">{eyebrow}</p>
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-10">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Stripped rather than asserted: a title passed in with a period
-                would otherwise reintroduce the one inconsistency this role
-                exists to prevent. */}
-            <h1 className="type-page-title">{title.replace(/\.$/, "")}</h1>
-            {badge}
-          </div>
-          {subtitle && <div className="type-subhead mt-3">{subtitle}</div>}
+    <header className={cn("mb-8 flex flex-col gap-1", className)}>
+      {eyebrow && <p className="type-eyebrow">{eyebrow}</p>}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          {/* Stripped rather than asserted: a title passed in with a period
+              would otherwise reintroduce the one inconsistency this role
+              exists to prevent. */}
+          <h1 className="type-page-title">{title.replace(/\.$/, "")}</h1>
+          {badge}
         </div>
-        {actions && <div className="flex shrink-0 items-center gap-3 sm:pt-2">{actions}</div>}
+        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>
+      {meta && <div className="type-meta">{meta}</div>}
+      {subtitle && <div className="type-subhead mt-1">{subtitle}</div>}
     </header>
   );
 }

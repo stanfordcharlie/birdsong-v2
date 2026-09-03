@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { orgErrorResponse, requireOrgPermission } from "@/lib/org";
 
 // PATCH /api/surveys/[id]
 // Body: { action: "archive" | "unarchive" }
 // Archive/unarchive is reversible: just sets or clears archived_at. Cookie
-// session only, and ownership is an explicit filter on every query (same
-// reasoning as the report route: surveys_public_read means RLS alone won't
-// hide other owners' surveys), so a survey that isn't the caller's 404s
-// indistinguishably from one that doesn't exist. Never touches responses.
+// session only, and the organization is an explicit filter on every query
+// (same reasoning as the report route: surveys_public_read means RLS alone
+// won't hide other organizations' surveys), so a survey that isn't the
+// caller's org's 404s indistinguishably from one that doesn't exist. Never
+// touches responses.
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -17,6 +19,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+
+  let orgId: string;
+  try {
+    ({ orgId } = await requireOrgPermission("study:edit"));
+  } catch (err) {
+    return orgErrorResponse(err);
   }
 
   let body: { action?: string };
@@ -32,9 +41,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { data: survey, error: surveyError } = await supabase
     .from("surveys")
-    .select("id, user_id")
+    .select("id")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("org_id", orgId)
     .maybeSingle();
 
   if (surveyError) {
@@ -49,7 +58,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .from("surveys")
     .update({ archived_at: body.action === "archive" ? new Date().toISOString() : null })
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("org_id", orgId)
     .select("id, archived_at")
     .single();
 
@@ -79,11 +88,18 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
+  let orgId: string;
+  try {
+    ({ orgId } = await requireOrgPermission("study:delete"));
+  } catch (err) {
+    return orgErrorResponse(err);
+  }
+
   const { data: survey, error: surveyError } = await supabase
     .from("surveys")
-    .select("id, user_id")
+    .select("id")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("org_id", orgId)
     .maybeSingle();
 
   if (surveyError) {
@@ -115,7 +131,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     .from("surveys")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("org_id", orgId);
 
   if (deleteError) {
     console.error("[surveys/[id] DELETE] delete failed:", deleteError);

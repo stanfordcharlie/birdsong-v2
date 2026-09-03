@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/admin/ui";
 import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate } from "@/components/useLoadingGate";
 
@@ -27,7 +27,7 @@ export function SlackNotificationsForm({ initialUrl }: { initialUrl: string | nu
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save");
-      setSaveState({ ok: true, message: url.trim() ? "Saved." : "Slack notifications disabled." });
+      setSaveState({ ok: true, message: url.trim() ? "Saved." : "Slack notifications off." });
     } catch (err) {
       setSaveState({ ok: false, message: err instanceof Error ? err.message : "Something went wrong" });
     } finally {
@@ -46,7 +46,7 @@ export function SlackNotificationsForm({ initialUrl }: { initialUrl: string | nu
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send test notification");
-      setTestState({ ok: true, message: "Test notification sent. Check your Slack channel." });
+      setTestState({ ok: true, message: "Test sent." });
     } catch (err) {
       setTestState({ ok: false, message: err instanceof Error ? err.message : "Something went wrong" });
     } finally {
@@ -55,9 +55,9 @@ export function SlackNotificationsForm({ initialUrl }: { initialUrl: string | nu
   }
 
   return (
-    <form onSubmit={handleSave} className="flex flex-col gap-4">
+    <form onSubmit={handleSave} className="flex flex-col gap-3">
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-card-foreground">Slack webhook URL</span>
+        <span className="type-body-sm font-medium">Slack webhook URL</span>
         <Input
           type="url"
           placeholder="https://hooks.slack.com/services/..."
@@ -65,38 +65,39 @@ export function SlackNotificationsForm({ initialUrl }: { initialUrl: string | nu
           onChange={(e) => setUrl(e.target.value)}
         />
       </label>
+      {/* The one rule: blank turns notifications off. The guide link is how
+          a URL is obtained. */}
       <p className="type-body-sm text-muted-foreground">
-        Create an incoming webhook for the channel you want notified, then paste its URL here. See{" "}
+        Leave blank to turn notifications off.{" "}
         <a
           href="https://api.slack.com/messaging/webhooks"
           target="_blank"
           rel="noreferrer"
           className="focus-ring rounded-control underline"
         >
-          Slack&apos;s incoming webhooks guide
+          Slack webhooks guide
         </a>
-        . Leave blank to turn Slack notifications off.
       </p>
 
       {saveState && (
-        <p className={`text-sm ${saveState.ok ? "text-muted-foreground" : "text-destructive"}`}>
+        <p className={saveState.ok ? "type-body-sm text-muted-foreground" : "type-body-sm text-destructive"}>
           {saveState.message}
         </p>
       )}
       {testState && (
-        <p className={`text-sm ${testState.ok ? "text-muted-foreground" : "text-destructive"}`}>
+        <p className={testState.ok ? "type-body-sm text-muted-foreground" : "type-body-sm text-destructive"}>
           {testState.message}
         </p>
       )}
 
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={saving}>
+      <div className="flex items-center gap-2">
+        <Button type="submit" variant="secondary" size="sm" disabled={saving}>
           {saving && showSaveLoader && <BirdLoader size={18} label={false} />}
-          {saving ? "Saving..." : "Save"}
+          {saving ? "Saving" : "Save"}
         </Button>
-        <Button type="button" variant="secondary" onClick={handleTest} disabled={testing || !url.trim()}>
+        <Button type="button" variant="ghost" size="sm" onClick={handleTest} disabled={testing || !url.trim()}>
           {testing && showTestLoader && <BirdLoader size={18} label={false} />}
-          {testing ? "Sending..." : "Send test notification"}
+          {testing ? "Sending" : "Send test"}
         </Button>
       </div>
     </form>

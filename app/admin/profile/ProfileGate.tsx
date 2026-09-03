@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CompanyProfileSetupFlow } from "./CompanyProfileSetupFlow";
 import { CompanyProfileView, type CompanyProfileValues } from "./CompanyProfileView";
 import { AiFillFlow } from "./AiFillFlow";
+import { EmptyState, PageHeader, PageShell } from "@/components/admin/ui";
 import { PASTE_EXTRACTION_FIELDS } from "@/lib/profile-onboarding/company-profile-fields";
 
 type AiFillResult = {
@@ -44,10 +45,20 @@ function buildThinNote(draftedKeys: Set<string>): string {
 }
 
 export function ProfileGate({
+  orgId,
+  readOnly = false,
   hasExistingData,
   initialValues,
   setupInitialData,
 }: {
+  // The organization whose profile this is. Every write below goes through
+  // the browser client under RLS, and the row is keyed by org, so the
+  // server page resolves it once and the client components carry it.
+  orgId: string;
+  // From can(role, "profile:edit") on the server. A member reads the
+  // profile as it is; the setup wizard, AI fill and every edit control are
+  // for owners and admins.
+  readOnly?: boolean;
   hasExistingData: boolean;
   initialValues: CompanyProfileValues;
   setupInitialData: Record<string, string>;
@@ -63,6 +74,26 @@ export function ProfileGate({
     setMode("gate");
   }
 
+  if (readOnly) {
+    if (!hasExistingData) {
+      return (
+        <PageShell>
+          <PageHeader eyebrow="Account" title="Company profile" />
+          <EmptyState title="No company profile yet. An owner or admin can set one up." />
+        </PageShell>
+      );
+    }
+    return (
+      <CompanyProfileView
+        orgId={orgId}
+        readOnly
+        initialValues={initialValues}
+        onFactoryReset={() => router.refresh()}
+        onStartAiFill={() => undefined}
+      />
+    );
+  }
+
   if (mode === "ai-fill") {
     return <AiFillFlow onCancel={() => setMode("gate")} onExtracted={handleExtracted} />;
   }
@@ -70,6 +101,7 @@ export function ProfileGate({
   if (!hasExistingData || aiFillResult) {
     return (
       <CompanyProfileSetupFlow
+        orgId={orgId}
         initialData={aiFillResult ? aiFillResult.mergedData : setupInitialData}
         aiDraftedKeys={aiFillResult?.draftedKeys}
         startAtStep={aiFillResult ? 0 : undefined}
@@ -86,6 +118,7 @@ export function ProfileGate({
 
   return (
     <CompanyProfileView
+      orgId={orgId}
       initialValues={initialValues}
       justFinishedSetup={justFinishedSetup}
       onFactoryReset={() => router.refresh()}

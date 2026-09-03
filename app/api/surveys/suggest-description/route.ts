@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { orgErrorResponse, requireOrgPermission } from "@/lib/org";
 import { suggestSurveyDescription } from "@/lib/survey-onboarding/suggest";
 import type { ExtractedSurveyDetails } from "@/lib/survey-onboarding/types";
 
@@ -17,6 +18,12 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+
+  try {
+    await requireOrgPermission("study:create");
+  } catch (err) {
+    return orgErrorResponse(err);
   }
 
   let body: { details?: ExtractedSurveyDetails; externalTitle?: string };

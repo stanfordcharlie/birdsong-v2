@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button, type ButtonProps } from "@/components/ui/button";
+import { Button, type AdminButtonProps } from "@/components/admin/ui";
 
-// Two of these sit on the response detail page (the header's primary action
-// and the call-script card's own quieter one), copying the same text. They
-// hold their own "Copied" state rather than sharing one, so the label
-// confirms the button you actually pressed.
+// The call script card's Copy button, and the only copy control on the page:
+// the header used to carry a second one copying the identical payload.
+// Imports the admin Button per DESIGN.md's import boundary, since this renders
+// only inside /admin.
 export function CopyScriptButton({
   text,
   label = "Copy",
@@ -15,8 +15,8 @@ export function CopyScriptButton({
 }: {
   text: string;
   label?: string;
-  variant?: ButtonProps["variant"];
-  size?: ButtonProps["size"];
+  variant?: AdminButtonProps["variant"];
+  size?: AdminButtonProps["size"];
 }) {
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

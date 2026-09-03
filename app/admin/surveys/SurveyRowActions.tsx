@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 function OverflowIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="5" r="1.9" fill="currentColor" stroke="none" />
       <circle cx="12" cy="12" r="1.9" fill="currentColor" stroke="none" />
       <circle cx="12" cy="19" r="1.9" fill="currentColor" stroke="none" />
@@ -19,6 +19,12 @@ function OverflowIcon() {
 }
 
 const MENU_WIDTH = 190;
+
+// What the permanent-delete dialog asks you to type. Was the study's internal
+// name, which meant copying a long title by hand to delete a study you had
+// already picked from a menu — friction that landed on the wrong axis, since
+// re-typing a title proves patience rather than intent.
+const DELETE_CONFIRM_WORD = "delete";
 
 // Row-level overflow menu for the surveys list: archive/unarchive (both
 // reversible, just toggle archived_at) and permanent delete (irreversible,
@@ -66,9 +72,16 @@ export function SurveyRowActions({
 
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [confirmName, setConfirmName] = useState("");
+  const [confirmText, setConfirmText] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Case-insensitive and trimmed: the gate exists to make deleting deliberate,
+  // not to make it fiddly, and a rejected "Delete" or a trailing space reads as
+  // the dialog being broken rather than as a safety rail. Which study is being
+  // deleted is still named in the description above the field, so the
+  // deliberateness comes from reading that, not from retyping it.
+  const deleteConfirmed = confirmText.trim().toLowerCase() === DELETE_CONFIRM_WORD;
 
   function openMenu() {
     const rect = triggerRef.current?.getBoundingClientRect();
@@ -172,9 +185,9 @@ export function SurveyRowActions({
         type="button"
         aria-haspopup="menu"
         aria-expanded={menuOpen}
-        aria-label="Survey actions"
+        aria-label="Study actions"
         onClick={() => (menuOpen ? setMenuOpen(false) : openMenu())}
-        className="focus-ring flex h-9 w-9 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-secondary hover:text-card-foreground"
+        className="focus-ring flex h-8 w-8 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-secondary hover:text-card-foreground"
       >
         <OverflowIcon />
       </button>
@@ -196,7 +209,7 @@ export function SurveyRowActions({
                 title={
                   status === "live"
                     ? undefined
-                    : "This link starts working once the survey is live"
+                    : "The link works once the study is live"
                 }
                 className="focus-ring block w-full rounded-control px-3 py-2 text-left font-archivo text-sm text-card-foreground transition-colors hover:bg-secondary"
               >
@@ -240,7 +253,7 @@ export function SurveyRowActions({
                 onClick={() => {
                   setMenuOpen(false);
                   setError(null);
-                  setConfirmName("");
+                  setConfirmText("");
                   setDeleteDialogOpen(true);
                 }}
                 className="focus-ring block w-full rounded-control px-3 py-2 text-left font-archivo text-sm text-destructive transition-colors hover:bg-destructive/10"
@@ -255,8 +268,8 @@ export function SurveyRowActions({
       <Dialog
         open={archiveDialogOpen}
         onClose={() => !pending && setArchiveDialogOpen(false)}
-        title="Archive this survey?"
-        description={`"${internalName}" will be hidden from your default surveys list and stop accepting new responses. Existing responses stay exactly where they are, and you can unarchive it any time.`}
+        title="Archive this study?"
+        description={`"${internalName}" leaves the default list and stops accepting responses. Existing responses are kept. Unarchive at any time.`}
       >
         <div className="flex flex-col gap-3">
           {error && <p className="type-body text-destructive">{error}</p>}
@@ -274,17 +287,17 @@ export function SurveyRowActions({
       <Dialog
         open={deleteDialogOpen}
         onClose={() => !pending && setDeleteDialogOpen(false)}
-        title="Delete this survey permanently?"
-        description={`This can't be undone. Type the internal name to confirm: "${internalName}"`}
+        title="Delete this study permanently?"
+        description={`This cannot be undone. "${internalName}" and its responses are deleted. Type "delete" to confirm.`}
       >
         <div className="flex flex-col gap-3">
           <Input
             type="text"
-            value={confirmName}
-            onChange={(e) => setConfirmName(e.target.value)}
-            placeholder={internalName}
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder={DELETE_CONFIRM_WORD}
             autoFocus
-            className={cn(confirmName && confirmName !== internalName && "border-destructive")}
+            className={cn(confirmText && !deleteConfirmed && "border-destructive")}
           />
           {error && <p className="type-body text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
@@ -295,7 +308,7 @@ export function SurveyRowActions({
               type="button"
               variant="destructive"
               onClick={deleteSurvey}
-              disabled={pending || confirmName !== internalName}
+              disabled={pending || !deleteConfirmed}
             >
               {pending ? "Deleting..." : "Delete permanently"}
             </Button>

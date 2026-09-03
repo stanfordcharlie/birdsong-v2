@@ -72,17 +72,32 @@
   --ds-sidebar-accent: 0 0% 15%;        /* #262626 — hover/active nav fill */
   --ds-sidebar-border: 0 0% 20%;        /* #333333 */
   --ds-sidebar-ring: 0 0% 20%;
-  /* The workspace plate at the rail's foot. These replace six rgba literals
-     that were the only place admin still wrote colour outside the token set.
-     --ds-sidebar-plate is consumed at low alpha (bg-sidebar-plate/[0.05]),
-     which is why it is plain white rather than a pre-mixed grey: mixing it
-     here would stop the same token serving both the fill and the border. */
-  --ds-sidebar-plate: 0 0% 100%;        /* #ffffff, used at 4-10% alpha */
+  /* The account row at the rail's foot. These replace six rgba literals that
+     were the only place admin still wrote colour outside the token set.
+     --ds-sidebar-plate is consumed at low alpha (the 6% plate edge, the 3%
+     plate fill, the 6% hover fill), which is why it is an unmixed near-white
+     rather than a pre-mixed grey: mixing it here would stop the same token
+     serving both the fill and the rule. Warm, not pure white, so the rail's
+     one light accent carries the same cream cast as the rest of the
+     product. */
+  --ds-sidebar-plate: 45 100% 98.4%;    /* #fffdf7, used at 3-6% alpha */
   --ds-sidebar-label: 0 0% 42%;         /* #6b6b6b — the "Workspace" label */
-  --ds-sidebar-muted: 40 25% 82%;       /* #d8d2c4 — plate secondary text */
+  --ds-sidebar-muted: 39 45.5% 91.4%;   /* #f3ecdf — the role line, at 38% */
+  /* The account avatar. Deliberately the one saturated colour on the rail:
+     initials need a fill that separates them from a near-black sidebar, and
+     a dark tile on a dark ground reads as a smudge. This restores the
+     periwinkle an earlier pass removed for being off-palette — it is back on
+     purpose and only here, now muted from #8ea4e8 to #5f6bab so the one
+     saturated tile stops out-shouting the rail it sits on. See the DESIGN.md
+     changelog. */
+  --ds-sidebar-avatar: 230.5 31.1% 52.2%;  /* #5f6bab */
+  --ds-sidebar-avatar-foreground: 45 100% 98.4%; /* #fffdf7 */
 
   --ds-radius-card: 0.75rem;    /* 12px */
   --ds-radius-control: 0.5rem;  /* 8px */
+  /* Account row only. Sits between control and card because the row is wider
+     and shorter than a control but is not a card. */
+  --ds-radius-account: 0.6875rem; /* 11px */
   --ds-radius-pill: 999px;
 
   /* --- Admin design system, unified pass -----------------------------------
@@ -109,7 +124,7 @@
      starts at the identical x coordinate. */
   --ds-container-max: 1140px;
   --ds-container-pad-x: 2rem;   /* 32px, matches AdminShell's existing p-8 */
-  --ds-container-pad-y: 3.5rem; /* 56px from viewport top to the eyebrow */
+  --ds-container-pad-y: 2rem;   /* 32px from viewport top to the page title, down from 56 */
 
   /* Base unit 8. These are the only allowed steps. */
   --ds-space-1: 4px;
@@ -142,14 +157,8 @@
      one colour across the whole surface rather than three. */
   --ds-accent-live: 139 25% 30%;   /* #3a6046 */
 
-  /* Survey card covers. Exactly three, assigned by survey id hash. Flat
-     fills, not gradients: the six invented per-card gradients included a tan
-     and a sand, and beige and cream are banned. Drawn from the neutral and
-     accent families so a cover can never out-shout the status pill sitting
-     on it. */
-  --ds-cover-1: 92 28% 90%;        /* #e4ecdd, accent-weak */
-  --ds-cover-2: 48 12% 92%;        /* #edece8, chip */
-  --ds-cover-3: 205 17% 89%;       /* #dfe6ea, cool neutral */
+  /* 2026-09-02: --ds-cover-1/2/3 removed. The study list is a table now and
+     nothing else painted a cover. */
 
   /* One focus treatment for the whole surface. Applied as a 2px ring at 2px
      offset. An outline is never removed without this replacing it. */
@@ -330,8 +339,10 @@ select {
   .type-eyebrow {
     @apply font-archivo text-[12px] font-semibold uppercase leading-[1.2] tracking-[0.08em] text-muted-foreground;
   }
+  /* 30px, down from 44. If this is ever reverted, this is the only line to
+     change. */
   .type-page-title {
-    @apply font-serif text-[44px] font-normal leading-[1.05] tracking-[-0.02em] text-card-foreground;
+    @apply font-serif text-[30px] font-normal leading-[1.15] tracking-[-0.015em] text-card-foreground;
   }
   .type-subhead {
     @apply max-w-[52ch] font-archivo text-[17px] font-normal leading-[1.5] text-muted-foreground;
@@ -346,7 +357,7 @@ select {
      of proportional figures does not line up, which is the whole point of a
      metric. */
   .type-metric-value {
-    @apply font-archivo text-[32px] font-medium leading-[1.1] tabular-nums text-card-foreground;
+    @apply font-archivo text-[24px] font-medium leading-[1.1] tabular-nums text-card-foreground;
   }
   .type-metric-label {
     @apply font-archivo text-[14px] font-normal leading-[1.4] text-muted-foreground;
@@ -367,6 +378,14 @@ select {
      fragments. The one place admin leaves the Archivo scale. */
   .type-code {
     @apply font-mono text-[13px] leading-[1.5] text-card-foreground;
+  }
+
+  /* 2026-09-02: the two numeric control sizes carry tabular figures, so a
+     column of counts lines up. tailwind.config.ts owns the size; this owns
+     the figure variant, because fontSize tuples cannot express it. */
+  .text-count,
+  .text-control {
+    font-variant-numeric: tabular-nums;
   }
 
   /* Retained only so the not-yet-migrated admin routes keep rendering during
@@ -413,10 +432,11 @@ select {
      .admin-measure), never the container, so every admin H1 lands on the same
      x coordinate.
 
-     AdminShell wraps pages in p-8 (32px); this pt-6 brings the top offset to
-     56px from viewport top to the eyebrow. */
+     AdminShell wraps pages in p-8, which is the whole of
+     --ds-container-pad-y (32px) from viewport top to the page title; the
+     container adds nothing on top. */
   .admin-container {
-    @apply mx-auto w-full max-w-[var(--ds-container-max)] pt-6;
+    @apply mx-auto w-full max-w-[var(--ds-container-max)];
   }
 
   /* Retained only so the not-yet-migrated admin routes keep rendering during
@@ -1552,34 +1572,16 @@ select {
   }
 }
 
-/* --- Admin sidebar workspace plate (components/AdminSidebar.tsx) ---
-   Two ambient loops on the status row: the listening dot's twin pings
-   outward, and the music note bobs. Both keyframes are declared here but
-   only bound to their classes under prefers-reduced-motion: no-preference
-   (the same pattern the animations above use), so reduced-motion users get
-   the plate with a plain static dot and note.
+/* --- Ambient music-note bob (app/admin/HomeSections.tsx) ---
+   Bound to its class only under prefers-reduced-motion: no-preference (the
+   same pattern the animations above use), so reduced-motion users get a
+   static note.
 
-   The star avatar's tilt and hover spring live here too rather than as
-   Tailwind utilities: `duration-[250ms]` is ambiguous between transition-
-   and animation-duration, so Tailwind drops it silently and the spring
-   would quietly fall back to the default 150ms. The hover is keyed off the
-   whole user row (.ws-user-row) so hovering the name or chevron springs the
-   mark as well; under reduced motion it simply holds its resting tilt.
-
-   .ws-star is now on the Birdsong mark rather than the clipped periwinkle
-   star it was named for; the class name is kept so the keyframes and the
-   hover selector below do not have to change. */
-@keyframes ws-ping {
-  from {
-    transform: scale(1);
-    opacity: 0.7;
-  }
-  to {
-    transform: scale(2.6);
-    opacity: 0;
-  }
-}
-
+   Three siblings used to live here and are all gone, with nothing left
+   referencing them: .ws-star and .ws-user-row (a resting tilt and hover
+   spring on the sidebar's image avatar, now initials), and .ws-ping (the
+   listening dot's outward pulse, removed with the sidebar's
+   "Listening · N live" row). */
 @keyframes ws-note-bob {
   0%,
   100% {
@@ -1590,21 +1592,8 @@ select {
   }
 }
 
-.ws-star {
-  transform: rotate(-6deg);
-}
-
 @media (prefers-reduced-motion: no-preference) {
-  .ws-ping {
-    animation: ws-ping 2.4s ease-out infinite;
-  }
   .ws-note {
     animation: ws-note-bob 3.2s ease-in-out infinite;
-  }
-  .ws-star {
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  .ws-user-row:hover .ws-star {
-    transform: rotate(8deg) scale(1.08);
   }
 }

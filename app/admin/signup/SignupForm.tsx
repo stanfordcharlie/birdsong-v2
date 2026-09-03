@@ -2,11 +2,9 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { logLoginEvent } from "@/lib/auth-events";
 import { AuthScreen, AuthField, AuthPasswordField, AuthError, AuthSubmit } from "@/components/auth/AuthScreen";
 
-export function SignupForm() {
+export function SignupForm({ inviteToken = null }: { inviteToken?: string | null }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -19,27 +17,36 @@ export function SignupForm() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/admin`,
-        // Stored on the auth.users row itself (not the profiles table),
-        // so it's available immediately after signup even before a
-        // profiles row exists — read back via user.user_metadata
-        // wherever the admin's own name is displayed (see lib/user-name.ts).
-        data: {
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-        },
-      },
-    });
-    if (error) {
+    // Server-side rather than supabase.auth.signUp from the browser: the
+    // route runs the same signUp call, then creates the new account's
+    // organization with the service role in the same request (see
+    // app/api/auth/signup/route.ts). The name fields are stored on the
+    // auth.users row itself, read back via user.user_metadata wherever the
+    // admin's own name is displayed (see lib/user-name.ts).
+    let result: { session?: boolean; next?: string; error?: string } = {};
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          // An invited signup skips the personal organization and lands on
+          // the invite's accept page instead (see the route).
+          inviteToken,
+        }),
+      });
+      result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || "Signup failed");
+      }
+    } catch (err) {
       // Some auth failures surface with a useless stringified message
       // (e.g. "{}" when Supabase's confirmation-email send 500s) — show a
       // human sentence instead of raw JSON in those cases.
-      const raw = error.message?.trim();
+      const raw = err instanceof Error ? err.message.trim() : "";
       setError(
         raw && raw !== "{}" && !raw.startsWith("{")
           ? raw
@@ -48,12 +55,12 @@ export function SignupForm() {
       setLoading(false);
       return;
     }
-    if (data.session && data.user) {
+    if (result.session) {
       // Only reachable if email confirmation is disabled on this project;
-      // signUp already returned an active session, no confirmation step
-      // needed. The signup itself is logged server-side via a DB trigger.
-      await logLoginEvent(supabase, data.user.id, data.user.email ?? null);
-      window.location.assign("/admin");
+      // the route already has an active session and set its cookies, no
+      // confirmation step needed. The signup itself is logged server-side
+      // via a DB trigger.
+      window.location.assign(result.next || "/admin");
       return;
     }
     setCheckEmail(true);
@@ -88,7 +95,10 @@ export function SignupForm() {
       belowCard={
         <>
           Already have an account?{" "}
-          <Link href="/admin/login" className="font-semibold underline underline-offset-[3px]">
+          <Link
+            href={inviteToken ? `/admin/login?invite=${encodeURIComponent(inviteToken)}` : "/admin/login"}
+            className="font-semibold underline underline-offset-[3px]"
+          >
             Log in
           </Link>
         </>

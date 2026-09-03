@@ -8,7 +8,7 @@ import {
   KICKOFF_MESSAGE,
   CLOSING_MESSAGE,
   COMPLETE_TOKEN,
-  MAX_EXCHANGES,
+  questionBudgetFor,
 } from "@/lib/interview-prompt";
 import { extractInterviewInsights } from "@/lib/interview/extract";
 import { runCompanyFitScoring } from "@/lib/interview/company-fit";
@@ -138,22 +138,23 @@ export async function POST(request: Request) {
   const history = (response.messages as unknown as InterviewMessage[] | null) ?? [];
   const updatedHistory: InterviewMessage[] = [...history, { role: "user", content: message }];
 
-  // The exchange count is enforced here rather than trusted to the model:
-  // it's a hard limit, so we stop calling Claude for new questions once hit
-  // instead of relying on the system prompt alone.
+  // The question budget is enforced here rather than trusted to the model:
+  // the respondent has been shown "N of N", so once they have answered the
+  // Nth question the interview is over whether or not Claude would have
+  // asked another. No call to Claude is made on this path.
   const exchangeCount = updatedHistory.filter((m) => m.role === "user").length;
-  if (exchangeCount >= MAX_EXCHANGES) {
+  if (exchangeCount >= questionBudgetFor(survey.num_questions)) {
     return completeInterview(supabase, response_id, updatedHistory, survey, response);
   }
 
-  // Survey owner's company profile (what they sell, target ICP, value
-  // prop), used to keep the interview anchored to the company's actual
-  // product surface area instead of drifting wherever the respondent's
-  // last answer leads.
+  // The sponsoring organization's company profile (what they sell, target
+  // ICP, value prop), used to keep the interview anchored to the company's
+  // actual product surface area instead of drifting wherever the
+  // respondent's last answer leads. By org, not by the survey's creator.
   const { data: profile } = await supabase
     .from("profiles")
     .select("what_we_sell, target_icp, value_prop")
-    .eq("user_id", survey.user_id)
+    .eq("org_id", survey.org_id)
     .maybeSingle();
 
   const anthropic = getAnthropicClient();
@@ -166,8 +167,8 @@ export async function POST(request: Request) {
       name: response.respondent_name,
       customFieldValues: (response.custom_field_values as Record<string, unknown> | null) ?? {},
     },
-    // User turns only. The prompt's pacing line and its MAX_EXCHANGES
-    // ceiling both read from this one counter, so they always agree.
+    // User turns only. The prompt's "N of total" line reads from this one
+    // counter, the same one the budget check above uses, so they agree.
     exchangeCount,
   });
 
@@ -316,7 +317,13 @@ async function completeInterview(
     waitUntil(
       runCompanyFitScoring({
         responseId,
-        sponsorUserId: survey.user_id,
+        // runCompanyFitScoring (lib/interview, untouched) looks the sponsor
+        // profile up by profiles.user_id. That row is the organization's
+        // single profile, so its user_id is resolved from org_id here and
+        // handed over; the survey's creator is only the fallback for an org
+        // that has no profile row yet (the lookup then finds nothing, same
+        // as before).
+        sponsorUserId: await sponsorProfileUserId(supabase, survey),
         company: { name: respondentCompanyName, domain: respondentEmailDomain },
       })
     );
@@ -327,6 +334,17 @@ async function completeInterview(
     message: CLOSING_MESSAGE,
     complete: true,
   });
+}
+
+// The user_id of the organization's profile row (the key the company-fit
+// agent reads the sponsor profile by), falling back to the survey's creator.
+async function sponsorProfileUserId(supabase: AdminClient, survey: Survey): Promise<string> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("user_id")
+    .eq("org_id", survey.org_id)
+    .maybeSingle();
+  return data?.user_id ?? survey.user_id;
 }
 
 // Runs after the respondent has already been told the interview is over.
@@ -366,13 +384,14 @@ async function extractAndNotify({
   completedAt: string;
 }) {
   try {
-    // Survey owner's company profile (what they sell, target ICP, value
-    // prop), used here to keep the lead score and call script anchored to
-    // fit against this sponsor's actual product, not generic friction.
+    // The sponsoring organization's company profile (what they sell, target
+    // ICP, value prop), used here to keep the lead score and call script
+    // anchored to fit against this sponsor's actual product, not generic
+    // friction. Also carries the org's Slack webhook.
     const { data: profile } = await supabase
       .from("profiles")
       .select("what_we_sell, target_icp, value_prop, slack_webhook_url")
-      .eq("user_id", survey.user_id)
+      .eq("org_id", survey.org_id)
       .maybeSingle();
 
     const { painPoints, leadScore, fitReason, summary, callScript, signals } = await extractInterviewInsights(
@@ -446,6 +465,11 @@ async function extractAndNotify({
 
     // Best-effort, wrapped independently: a failed email must not take the
     // Slack notification down with it.
+    //
+    // Recipient is still the survey's creator (surveys.user_id), deliberately:
+    // routing lead alerts to a whole team is a separate decision. The lookup
+    // is by auth user id, so it keeps working whoever else in the org can
+    // now see the study.
     try {
       const { data: ownerData } = await supabase.auth.admin.getUserById(survey.user_id);
       const ownerEmail = ownerData?.user?.email;

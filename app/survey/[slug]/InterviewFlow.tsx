@@ -95,10 +95,11 @@ const CHIP_AUTO_SUBMIT_DELAY_MS = 260;
 // interviewer's existing evasive-answer handling can react to normally.
 const SKIP_MESSAGE_CONTENT = "I'd rather not answer that one.";
 
-// Display target for the chat progress bar and "X of Y" counter. The real
-// per-survey num_questions is an internal field that must never reach the
-// respondent's browser, so the respondent UI shows progress against this
-// fixed value instead (computeProgressPercent handles running past it).
+// The chat progress bar and "X of Y" counter read the survey's real question
+// count (the questionCount prop, the same number the welcome screen quotes).
+// The server enforces that count as a hard total, so the counter is a
+// promise the interview keeps: "8 of 8" is the last question. This fallback
+// only covers a survey with no count set, and matches the prompt's default.
 const DEFAULT_TARGET_QUESTION_COUNT = 8;
 
 // Rough minutes-per-question used only to render the welcome screen's time
@@ -212,37 +213,19 @@ const DOTS_FADE_MS = 150;
 // until they've paused typing for this long.
 const TYPING_PAUSE_MS = 10000;
 
-// num_questions is a loose guideline the model is explicitly allowed to run
-// longer than, so progress can't just hard-cap at 90% once answered reaches
-// target: that plateaus visibly (looks "stuck") for the many surveys that
-// run past their nominal question count. Past the guideline, keep creeping
-// up with diminishing returns instead of flatlining, and never claim 100%
-// short of the interview actually completing.
+// The share of the interview that is answered. The total is a hard cap
+// enforced by the server, so this is a plain fraction: the bar reaches 100%
+// only on the completion screen, when every question has been answered.
 function computeProgressPercent(answered: number, target: number): number {
-  if (answered < target) {
-    return Math.round((answered / target) * 90);
-  }
-  const overage = answered - target;
-  return Math.min(90 + Math.round(9 * (overage / (overage + target))), 99);
+  if (target <= 0) return 0;
+  return Math.min(100, Math.round((answered / target) * 100));
 }
 
-// Which question number to show against that same target. The counter and
-// the progress bar are fed the same two numbers, so it needs the same
-// running-past-the-target handling: `answered + 1` raw renders "11 of 8".
-//
-// The overshoot is the normal case, not a rare one. `target` counts topics
-// (num_questions is "cover around N distinct topics"), while `answered`
-// counts the respondent's turns, and the interviewer is allowed one
-// follow-up per topic, so a full interview can legitimately run to roughly
-// twice the target. Widening the denominator to that ceiling instead would
-// make every interview that wraps up on time read as abandoned partway.
-//
-// So it holds at the target rather than counting past it: the last stretch
-// of a long interview reads "8 of 8" while the bar creeps 90 to 99%, which
-// says "nearly done" without ever promising a total the interview is about
-// to overshoot or claiming completion before it happens.
+// The question currently on screen. `answered` can equal `target` only on
+// the completion screen (which does not render this), and an early wrap-up
+// leaves it below; the clamp is belt and braces against a stale count.
 function displayedQuestionNumber(answered: number, target: number): number {
-  return Math.min(answered + 1, target);
+  return Math.min(answered + 1, Math.max(1, target));
 }
 
 function TopProgressLine({ answered, target }: { answered: number; target: number }) {
@@ -1807,12 +1790,9 @@ export function InterviewFlow({
   const answeredCount = messages.filter((m) => m.role === "user").length;
   const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant")?.content ?? "";
   const questionText = lastAssistantMessage;
-  // Drives only the progress bar and the "X of Y" counter, both of which are
-  // deliberately loose. The real per-survey num_questions is an internal
-  // field that must not reach the browser, so this is a fixed display target,
-  // not the actual planned count (computeProgressPercent already handles the
-  // interview running past it).
-  const targetQuestionCount = DEFAULT_TARGET_QUESTION_COUNT;
+  // Drives the progress bar and the "X of Y" counter. The same count the
+  // welcome screen quotes and the server enforces, so all three agree.
+  const targetQuestionCount = questionCount ?? DEFAULT_TARGET_QUESTION_COUNT;
   const hasAnswer = answer.trim().length > 0;
   // A restored question was already on screen before the reload, so replaying
   // its entrance would animate in something the respondent has been reading

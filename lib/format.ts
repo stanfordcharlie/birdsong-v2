@@ -80,6 +80,35 @@ export function formatDate(input: string | number | Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+/**
+ * Day and month, no year. For a stamp sitting next to something that is
+ * obviously recent (a report generated from the current response set), where
+ * the year is noise rather than information.
+ */
+export function formatDayMonth(input: string | number | Date): string {
+  const date = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(date.getTime())) return EMPTY_VALUE;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+/**
+ * Date and time, no seconds. The tooltip half of `RelativeTime`: admin's
+ * visible timestamps are all relative, so this is where the exact value
+ * lives. Seconds are dropped because nothing in admin is a stopwatch, and a
+ * trailing `:07` reads as precision the number does not have.
+ */
+export function formatAbsolute(input: string | number | Date): string {
+  const date = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(date.getTime())) return EMPTY_VALUE;
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 /** Renders a 0-1 ratio as a whole percent, or the empty glyph when unknown. */
 export function formatPercent(ratio: number | null | undefined): string {
   if (ratio === null || ratio === undefined || Number.isNaN(ratio)) return EMPTY_VALUE;

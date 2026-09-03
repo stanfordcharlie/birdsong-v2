@@ -3,6 +3,7 @@ import { PageHeader, PageShell } from "@/components/admin/ui";
 import {
   Buttons,
   Colors,
+  DataTableStates,
   Elevation,
   FocusDemo,
   FontSteps,
@@ -29,6 +30,7 @@ const CONTENTS = [
   ["color", "Color"],
   ["buttons", "Buttons"],
   ["primitives", "Primitives"],
+  ["datatable", "DataTable states"],
   ["spacing", "Spacing"],
   ["radius", "Radius"],
   ["elevation", "Elevation"],
@@ -42,14 +44,12 @@ export default async function StyleguidePage() {
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Reference"
         title="Styleguide"
-        subtitle={
+        meta={
           <>
             Every token and primitive the admin surface is built from.{" "}
-            <code className="type-code">app/globals.css</code> is the single source of truth; this
-            page renders it, and DESIGN.md describes it in prose. Copy the token from here rather
-            than deriving a new value.
+            <code className="type-code text-muted-foreground">app/globals.css</code> is the source
+            of truth; DESIGN.md mirrors it.
           </>
         }
       />
@@ -65,7 +65,7 @@ export default async function StyleguidePage() {
       <Section
         id="type"
         title="Type scale"
-        note="Pages reference these roles, never a raw size. Young Serif is page-title only; everything else is Archivo. Eyebrow and section label are two roles rather than one, so the label over an H1 and the label over a card section do not render identically."
+        note="Pages reference these roles, never a raw size. Young Serif is page-title only; everything else is Archivo."
       >
         <TypeScale />
       </Section>
@@ -73,23 +73,19 @@ export default async function StyleguidePage() {
       <Section
         id="font-steps"
         title="Named font sizes"
-        note="For controls, which need a size without also inheriting a colour and a line height. A primitive uses these instead of writing a raw px value."
+        note="For controls, which need a size without a colour and a line height. count and control carry tabular figures."
       >
         <FontSteps />
       </Section>
 
-      <Section
-        id="color"
-        title="Color"
-        note="Beige and cream are banned. Green is a real token now (accent), not an informal reuse of the status colour it used to borrow."
-      >
+      <Section id="color" title="Color" note="No beige, cream, tan or gradient. Accent appears at most once per visible region.">
         <Colors />
       </Section>
 
       <Section
         id="buttons"
         title="Buttons"
-        note="Three variants, one shape. Every button is a pill. A bare text link that navigates is a ghost button, not an anchor styled at the call site. Hover and focus columns apply the classes those states produce, since a static render cannot trigger them; tab through the table to check the live ring matches."
+        note="Three variants, one shape. Hover and focus columns apply the classes those states produce; tab through the table to check the live ring."
       >
         <Buttons />
       </Section>
@@ -100,6 +96,14 @@ export default async function StyleguidePage() {
         note="components/admin/ui. Admin imports from here; respondent and marketing import from components/ui; neither side edits the other's copy."
       >
         <Primitives />
+      </Section>
+
+      <Section
+        id="datatable"
+        title="DataTable states"
+        note="Density, alignment, truncation, sorting, the row link and the empty state, on one table. Every admin table is this component with different columns."
+      >
+        <DataTableStates />
       </Section>
 
       <Section id="spacing" title="Spacing">

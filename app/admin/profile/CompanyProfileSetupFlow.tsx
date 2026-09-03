@@ -199,6 +199,7 @@ function computeInitialStep(data: Record<string, string>): number {
 }
 
 export function CompanyProfileSetupFlow({
+  orgId,
   initialData,
   onDone,
   onRequestAiFill,
@@ -206,6 +207,9 @@ export function CompanyProfileSetupFlow({
   startAtStep,
   thinResultNote,
 }: {
+  // The organization whose profile row is being edited. Writes are keyed by
+  // org_id (one profile per org), not by the signed-in user.
+  orgId: string;
   initialData: Record<string, string>;
   onDone: () => void;
   // Entry point for the "fill this out with your AI" flow, shown on the
@@ -240,14 +244,6 @@ export function CompanyProfileSetupFlow({
 
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const saveNoteTimer = useRef<ReturnType<typeof setTimeout>>();
-  const userIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      userIdRef.current = user?.id ?? null;
-    });
-  }, []);
 
   // Flush any pending debounced saves on unmount so a field edited right
   // before navigating away isn't lost to a cancelled timer.
@@ -260,13 +256,12 @@ export function CompanyProfileSetupFlow({
   function scheduleSave(field: FieldDef, value: string) {
     clearTimeout(saveTimers.current[field.key]);
     saveTimers.current[field.key] = setTimeout(async () => {
-      if (!userIdRef.current) return;
       const supabase = createClient();
       const payload = { [field.column]: value || null } as ProfileUpdate;
       const { error } = await supabase
         .from("profiles")
         .update(payload)
-        .eq("user_id", userIdRef.current);
+        .eq("org_id", orgId);
       if (error) {
         setSaveError(`Couldn't save "${field.label || field.column}": ${error.message}`);
       } else {
@@ -293,7 +288,6 @@ export function CompanyProfileSetupFlow({
   async function flushAll() {
     Object.values(saveTimers.current).forEach(clearTimeout);
     saveTimers.current = {};
-    if (!userIdRef.current) return;
     const payload: Record<string, string | null> = {};
     for (const stepDef of STEPS) {
       for (const field of stepDef.fields ?? []) {
@@ -304,7 +298,7 @@ export function CompanyProfileSetupFlow({
     await supabase
       .from("profiles")
       .update(payload as ProfileUpdate)
-      .eq("user_id", userIdRef.current);
+      .eq("org_id", orgId);
   }
 
   function goTo(index: number) {
@@ -334,12 +328,11 @@ export function CompanyProfileSetupFlow({
     setFinishing(true);
     try {
       await flushAll();
-      if (!userIdRef.current) throw new Error("Not signed in.");
       const supabase = createClient();
       const { error } = await supabase
         .from("profiles")
         .update({ onboarding_completed_at: new Date().toISOString() })
-        .eq("user_id", userIdRef.current);
+        .eq("org_id", orgId);
       if (error) throw error;
       onDone();
     } catch (err) {

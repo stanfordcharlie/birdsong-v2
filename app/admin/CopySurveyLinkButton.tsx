@@ -46,14 +46,14 @@ export function CopySurveyLinkButton({
   slug,
   title,
   variant = "icon",
-  label = "Copy a survey link",
+  label = "Copy study link",
 }: {
   slug: string;
   title: string;
   // "icon" is the square button that sits at the end of a survey row.
-  // "text" is the masthead's plain action next to the New survey pill, and
-  // "button" is the quiet state's bordered one — same copy behaviour and the
-  // same copied-confirmation in all three, only the shell differs.
+  // "text" is a plain ghost action, and "button" is the quiet state's
+  // bordered one. Same copy behaviour and the same copied-confirmation in
+  // all three, only the shell differs.
   variant?: "icon" | "text" | "button";
   label?: string;
 }) {

@@ -1,4 +1,5 @@
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { can, requireActiveOrg } from "@/lib/org";
 import { ProfileGate } from "./ProfileGate";
 
 export default async function ProfilePage() {
@@ -8,17 +9,23 @@ export default async function ProfilePage() {
   if (!user) {
     return null;
   }
+  const { orgId, role } = await requireActiveOrg();
+  const readOnly = !can(role, "profile:edit");
 
+  // One company profile per organization, read by org rather than by the
+  // signed-in user so every member sees the same row.
   let { data: profile } = await supabase
     .from("profiles")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("org_id", orgId)
     .maybeSingle();
 
-  if (!profile) {
+  if (!profile && !readOnly) {
+    // user_id records who created the row; org_id is what scopes it. RLS
+    // only lets owners/admins insert, and a member never tries.
     const { data: created, error } = await supabase
       .from("profiles")
-      .insert({ user_id: user.id })
+      .insert({ user_id: user.id, org_id: orgId })
       .select("*")
       .single();
     if (!error) {
@@ -34,6 +41,8 @@ export default async function ProfilePage() {
 
   return (
     <ProfileGate
+      orgId={orgId}
+      readOnly={readOnly}
       hasExistingData={hasExistingData}
       initialValues={{
         companyName: profile?.company_name ?? "",

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge, PageHeader, PageShell } from "@/components/admin/ui";
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import { formatRelativeTime } from "@/lib/format";
+import { Badge, Button, PageHeader, PageShell, RelativeTime } from "@/components/admin/ui";
+import { createClient } from "@/lib/supabase/server";
+import { requireActiveOrg } from "@/lib/org";
 import type { InterviewMessage } from "@/lib/interview/types";
 import { LiveTranscript } from "./LiveTranscript";
 
@@ -13,17 +13,15 @@ import { LiveTranscript } from "./LiveTranscript";
 export default async function LiveResponsePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const user = await getCurrentUser();
+  await requireActiveOrg();
 
-  // Cookie-authenticated client, so responses_owner_all (RLS) is what scopes
-  // this row to the signed-in owner. The explicit user_id filter on top
-  // matches the leads page idiom, and it is the same predicate Realtime
-  // re-evaluates for the subscription in LiveTranscript.
+  // Cookie-authenticated client, so the org-member read policy on responses
+  // is what scopes this row to the caller's organization. It is the same
+  // predicate Realtime re-evaluates for the subscription in LiveTranscript.
   const { data: response } = await supabase
     .from("responses")
     .select("id, respondent_name, respondent_email, messages, completed, created_at, is_test, surveys(title)")
     .eq("id", id)
-    .eq("user_id", user?.id ?? "")
     .maybeSingle();
 
   // Also the not-yours case: RLS returns no row rather than an error, and a
@@ -37,19 +35,23 @@ export default async function LiveResponsePage({ params }: { params: Promise<{ i
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Live"
+        eyebrow={
+          <Link href="/admin/live" className="focus-ring rounded-control hover:text-card-foreground">
+            Live
+          </Link>
+        }
         title={response.respondent_name || "Anonymous respondent"}
         badge={
           <>
             {response.is_test && <Badge variant="warning">Test</Badge>}
-            {response.completed && <Badge variant="live">Finished</Badge>}
+            {response.completed && <Badge variant="count">Finished</Badge>}
           </>
         }
-        subtitle={
-          <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-            <span>{response.surveys?.title ?? "Unknown survey"}</span>
+        meta={
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span>{response.surveys?.title ?? "Unknown study"}</span>
             <span aria-hidden>·</span>
-            <span suppressHydrationWarning>Started {formatRelativeTime(response.created_at)}</span>
+            <RelativeTime date={response.created_at} prefix="started" />
             {response.respondent_email && (
               <>
                 <span aria-hidden>·</span>
@@ -58,6 +60,13 @@ export default async function LiveResponsePage({ params }: { params: Promise<{ i
             )}
           </span>
         }
+        actions={
+          response.completed ? (
+            <Button asChild variant="secondary" size="sm">
+              <Link href={`/admin/responses/${response.id}`}>Open response</Link>
+            </Button>
+          ) : undefined
+        }
       />
 
       <LiveTranscript
@@ -65,15 +74,6 @@ export default async function LiveResponsePage({ params }: { params: Promise<{ i
         initialMessages={messages}
         initialCompleted={response.completed}
       />
-
-      {response.completed && (
-        <p className="type-body mt-4 text-muted-foreground">
-          <Link href={`/admin/responses/${response.id}`} className="focus-ring rounded-control underline">
-            Open the full response
-          </Link>{" "}
-          for the score, pain points, and call script.
-        </p>
-      )}
     </PageShell>
   );
 }

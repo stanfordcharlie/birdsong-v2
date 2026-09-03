@@ -12,7 +12,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 export default async function AdminLoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; invite?: string }>;
 }) {
   const supabase = await createClient();
   const {
@@ -22,12 +22,17 @@ export default async function AdminLoginPage({
   // Already signed in — showing the login form again would be pointless
   // (and confusing coming from a stray "Log In" link), so bounce them
   // straight into the app instead.
+  const { error, invite } = await searchParams;
+  // An invite link sends people here with its token; after login they go
+  // back to the accept page. Validated to the token alphabet so it can only
+  // ever become a path segment under /invite.
+  const inviteToken = invite && /^[A-Za-z0-9_-]{16,200}$/.test(invite) ? invite : null;
+
   if (user) {
-    redirect("/");
+    redirect(inviteToken ? `/invite/${inviteToken}` : "/");
   }
 
-  const { error } = await searchParams;
   const notice = error ? ERROR_MESSAGES[error] ?? null : null;
 
-  return <LoginForm notice={notice} />;
+  return <LoginForm notice={notice} inviteToken={inviteToken} />;
 }

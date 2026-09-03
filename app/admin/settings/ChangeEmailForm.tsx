@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/admin/ui";
 import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate } from "@/components/useLoadingGate";
 
@@ -33,28 +33,21 @@ export function ChangeEmailForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-card-foreground">New email</span>
-        <Input
-          type="email"
-          value={newEmail}
-          onChange={(e) => setNewEmail(e.target.value)}
-          required
-        />
+        <span className="type-body-sm font-medium">New email</span>
+        <Input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} required />
       </label>
+      {/* The downstream effect: nothing changes until both inboxes confirm. */}
       <p className="type-body-sm text-muted-foreground">
-        Supabase sends a confirmation email to both your current and new address. The
-        change only takes effect once you confirm it.
+        A confirmation is sent to both addresses. The change applies once confirmed.
       </p>
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      {success && (
-        <p className="text-sm text-muted-foreground">Check your inbox to confirm the change.</p>
-      )}
+      {error && <p className="type-body-sm text-destructive">{error}</p>}
+      {success && <p className="type-body-sm text-muted-foreground">Confirmation sent.</p>}
       <div>
-        <Button type="submit" disabled={loading || !newEmail.trim()}>
+        <Button type="submit" variant="secondary" size="sm" disabled={loading || !newEmail.trim()}>
           {loading && showLoader && <BirdLoader size={18} label={false} />}
-          {loading ? "Sending..." : "Update email"}
+          {loading ? "Sending" : "Update email"}
         </Button>
       </div>
     </form>

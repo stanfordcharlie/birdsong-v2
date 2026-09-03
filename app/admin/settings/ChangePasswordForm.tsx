@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PasswordInput } from "@/components/PasswordInput";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/admin/ui";
 import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate } from "@/components/useLoadingGate";
 
@@ -21,7 +21,7 @@ export function ChangePasswordForm() {
     setSuccess(false);
 
     if (newPassword !== confirmPassword) {
-      setError("Those passwords do not match.");
+      setError("Passwords do not match.");
       return;
     }
 
@@ -41,26 +41,26 @@ export function ChangePasswordForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-card-foreground">New password</span>
+        <span className="type-body-sm font-medium">New password</span>
         <PasswordInput value={newPassword} onChange={setNewPassword} required minLength={6} />
       </label>
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-card-foreground">Confirm new password</span>
-        <PasswordInput
-          value={confirmPassword}
-          onChange={setConfirmPassword}
-          required
-          minLength={6}
-        />
+        <span className="type-body-sm font-medium">Confirm new password</span>
+        <PasswordInput value={confirmPassword} onChange={setConfirmPassword} required minLength={6} />
       </label>
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      {success && <p className="text-sm text-muted-foreground">Password updated.</p>}
+      {error && <p className="type-body-sm text-destructive">{error}</p>}
+      {success && <p className="type-body-sm text-muted-foreground">Password updated.</p>}
       <div>
-        <Button type="submit" disabled={loading || !newPassword || !confirmPassword}>
+        <Button
+          type="submit"
+          variant="secondary"
+          size="sm"
+          disabled={loading || !newPassword || !confirmPassword}
+        >
           {loading && showLoader && <BirdLoader size={18} label={false} />}
-          {loading ? "Updating..." : "Update password"}
+          {loading ? "Updating" : "Update password"}
         </Button>
       </div>
     </form>

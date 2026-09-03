@@ -1,10 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { Button, Card, EmptyState, FilterTabs, SearchInput } from "@/components/admin/ui";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DataTable,
+  FilterTabs,
+  RelativeTime,
+  SearchInput,
+  StatusDot,
+  useTableSort,
+  type Column,
+} from "@/components/admin/ui";
+import { EMPTY_VALUE } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { SurveyCard } from "./SurveyCard";
+import { SurveyRowActions } from "./SurveyRowActions";
 import { SurveyBulkActionsBar } from "./SurveyBulkActionsBar";
 
 export type SurveyListItem = {
@@ -12,14 +21,10 @@ export type SurveyListItem = {
   title: string;
   slug: string;
   status: string;
-  /** survey.num_questions — the target topic count, null on older rows. */
+  /** survey.num_questions, the target topic count, null on older rows. */
   questionCount: number | null;
   responseCount: number;
-  /** Seven daily counts, oldest first, for the card's sparkline. */
-  responsesByDay: number[];
   lastResponseAt: string | null;
-  /** Newest answerers first, capped server-side, for the card's avatars. */
-  recentRespondents: string[];
   createdAt: string;
   archivedAt: string | null;
 };
@@ -33,11 +38,11 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "archived", label: "Archived" },
 ];
 
-// Shared by the tab counts and the grid so a tab can never promise a number
-// the grid then contradicts.
+// Shared by the tab counts and the table so a tab can never promise a number
+// the table then contradicts.
 function matchesStatus(survey: SurveyListItem, filter: StatusFilter): boolean {
   const isArchived = survey.archivedAt !== null;
-  // "All", "Live" and "Draft" all exclude archived surveys — archived only
+  // "All", "Live" and "Draft" all exclude archived surveys; archived only
   // ever shows up under its own tab.
   if (filter === "archived") return isArchived;
   if (isArchived) return false;
@@ -46,13 +51,23 @@ function matchesStatus(survey: SurveyListItem, filter: StatusFilter): boolean {
   return true;
 }
 
+function statusLabel(survey: SurveyListItem): string {
+  if (survey.archivedAt !== null) return "Archived";
+  return survey.status === "live" ? "Live" : "Draft";
+}
+
 export function SurveysList({
   surveys,
   initialStatusFilter = "all",
+  canManage = true,
 }: {
   surveys: SurveyListItem[];
-  // Deep-link from the admin home's "Live surveys" stat, e.g. ?status=live.
+  // Deep-link from the admin home, e.g. ?status=live.
   initialStatusFilter?: StatusFilter;
+  // From can(role, "study:edit"/"study:delete") on the server. False hides
+  // the row menu, the selection checkboxes and the bulk bar: a member reads
+  // the list and opens studies, nothing more.
+  canManage?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
@@ -80,7 +95,7 @@ export function SurveysList({
 
   // Switching tabs changes what "archived" even means for the selection
   // (Live vs. Archived have opposite bulk actions), so a stale selection
-  // carried across tabs would be confusing — clear it on tab change.
+  // carried across tabs would be confusing: clear it on tab change.
   useEffect(() => {
     setSelectedIds(new Set());
   }, [statusFilter]);
@@ -100,8 +115,6 @@ export function SurveysList({
     [filtered, selectedIds]
   );
 
-  const allFilteredSelected = filtered.length > 0 && filtered.every((s) => selectedIds.has(s.id));
-
   function toggleOne(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -111,107 +124,149 @@ export function SurveysList({
     });
   }
 
-  function toggleAllFiltered() {
-    setSelectedIds((prev) => {
-      if (allFilteredSelected) {
-        const next = new Set(prev);
-        for (const s of filtered) next.delete(s.id);
-        return next;
-      }
-      const next = new Set(prev);
-      for (const s of filtered) next.add(s.id);
-      return next;
-    });
-  }
+  // Columns are built inside the component because the checkbox cell closes
+  // over the selection state. The kebab keeps its own pointer events under
+  // the row link (DataTable), as does the checkbox.
+  const selectColumn: Column<SurveyListItem> = {
+    key: "select",
+    header: <span className="sr-only">Select</span>,
+    width: "xxs",
+    cell: (survey) => (
+      <span className="flex items-center">
+        <Checkbox
+          checked={selectedIds.has(survey.id)}
+          onChange={() => toggleOne(survey.id)}
+          aria-label={`Select ${survey.title}`}
+        />
+      </span>
+    ),
+  };
+
+  const actionsColumn: Column<SurveyListItem> = {
+    key: "actions",
+    header: <span className="sr-only">Actions</span>,
+    align: "right",
+    width: "xs",
+    cell: (survey) => (
+      <SurveyRowActions
+        surveyId={survey.id}
+        internalName={survey.title}
+        slug={survey.slug}
+        status={survey.status}
+        archivedAt={survey.archivedAt}
+        responseCount={survey.responseCount}
+      />
+    ),
+  };
+
+  const columns: Column<SurveyListItem>[] = [
+    ...(canManage ? [selectColumn] : []),
+    {
+      key: "title",
+      header: "Title",
+      width: 0.4,
+      truncate: true,
+      rowLabel: true,
+      title: (survey) => survey.title,
+      cell: (survey) => <span className="font-medium">{survey.title}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      width: "md",
+      cell: (survey) => (
+        <span className="inline-flex items-center gap-2 whitespace-nowrap">
+          <StatusDot live={survey.archivedAt === null && survey.status === "live"} />
+          <span className="text-muted-foreground">{statusLabel(survey)}</span>
+        </span>
+      ),
+    },
+    {
+      key: "questions",
+      header: "Questions",
+      align: "right",
+      width: "sm",
+      cell: (survey) => survey.questionCount ?? EMPTY_VALUE,
+    },
+    {
+      key: "responses",
+      header: "Responses",
+      align: "right",
+      width: "sm",
+      sortable: true,
+      sortValue: (survey) => survey.responseCount,
+      cell: (survey) => survey.responseCount,
+    },
+    {
+      key: "last",
+      header: "Last activity",
+      align: "right",
+      width: "md",
+      sortable: true,
+      sortValue: (survey) => (survey.lastResponseAt ? new Date(survey.lastResponseAt).getTime() : null),
+      cell: (survey) =>
+        survey.lastResponseAt ? (
+          <RelativeTime date={survey.lastResponseAt} align="right" className="text-muted-foreground" />
+        ) : (
+          <span className="text-muted-foreground">{EMPTY_VALUE}</span>
+        ),
+    },
+    ...(canManage ? [actionsColumn] : []),
+  ];
+
+  const { rows, sort, onSort } = useTableSort(filtered, columns);
 
   if (surveys.length === 0) {
-    return (
-      <Card padding="flush">
-        <EmptyState
-          title="No surveys yet"
-          description="Create one and Wren starts interviewing the moment you share the link. Every completed conversation comes back scored, with a call script ready."
-          action={
-            <Button asChild>
-              <Link href="/admin/surveys/new">Create your first survey</Link>
-            </Button>
-          }
-        />
-      </Card>
-    );
+    return <p className="type-body text-muted-foreground">No studies yet.</p>;
   }
 
   return (
-    // No gap on the column: the bulk-bar slot between the controls and the
-    // table owns its own bottom margin so it can collapse to nothing (see
-    // below). Everything else spaces itself with explicit margins.
     <div className="flex flex-col">
-      <div className="mb-5 flex flex-wrap items-center gap-3">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <FilterTabs
-          label="Filter surveys by status"
+          label="Filter studies by status"
           tabs={FILTERS.map((f) => ({ ...f, count: statusCounts[f.value] }))}
           value={statusFilter}
           onChange={setStatusFilter}
         />
-
         <SearchInput
           value={query}
           onChange={setQuery}
-          placeholder="Search surveys"
-          label="Search surveys by name"
+          placeholder="Search studies"
+          label="Search studies by name"
         />
-
-        <div className="ml-auto flex items-center gap-4">
-          {filtered.length > 0 && (
-            <Button type="button" variant="ghost" size="sm" onClick={toggleAllFiltered}>
-              {allFilteredSelected ? "Clear selection" : "Select all"}
-            </Button>
-          )}
-          <span className="type-body-sm whitespace-nowrap text-faint">{filtered.length} shown</span>
-        </div>
       </div>
 
-      {/* Always mounted — never conditionally added/removed — so the bar
-          animates in and out instead of popping. Reserving its full height
-          while nothing is selected would be a permanent empty band under
-          the controls, which is the state this page is in almost all the
-          time, so the slot collapses to zero instead: the 0fr/1fr row is
-          what makes that a smooth open/close rather than a hard reflow, and
-          the bottom margin rides along so the gap collapses with it.
-          overflow-hidden clips the bar mid-transition; its dialogs portal to
-          document.body, so they're never caught by it. */}
+      {/* Selection state appears only once a row is checked. Always mounted so
+          the bar animates in and out instead of popping; the slot collapses
+          to zero height while nothing is selected. Its dialogs portal to
+          document.body, so overflow-hidden never clips them. */}
       <div
         className={cn(
           "grid transition-[grid-template-rows,opacity,margin-bottom] duration-200 ease-out motion-reduce:transition-none",
-          selectedSurveys.length > 0
-            ? "mb-5 grid-rows-[1fr] opacity-100"
+          canManage && selectedSurveys.length > 0
+            ? "mb-3 grid-rows-[1fr] opacity-100"
             : "pointer-events-none mb-0 grid-rows-[0fr] opacity-0"
         )}
-        aria-hidden={selectedSurveys.length === 0}
+        aria-hidden={!canManage || selectedSurveys.length === 0}
       >
         <div className="overflow-hidden">
-          <SurveyBulkActionsBar selected={selectedSurveys} onDone={() => setSelectedIds(new Set())} />
+          {canManage && (
+            <SurveyBulkActionsBar selected={selectedSurveys} onDone={() => setSelectedIds(new Set())} />
+          )}
         </div>
       </div>
 
-      {filtered.length === 0 ? (
-        <Card padding="flush">
-          <EmptyState
-            title="No surveys match your search"
-            description="Try a different name, or clear the filters above."
-          />
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((survey) => (
-            <SurveyCard
-              key={survey.id}
-              survey={survey}
-              selected={selectedIds.has(survey.id)}
-              onToggleSelect={() => toggleOne(survey.id)}
-            />
-          ))}
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(survey) => survey.id}
+        rowHref={(survey) => `/admin/surveys/${survey.id}`}
+        layout="fixed"
+        sort={sort}
+        onSort={onSort}
+        empty={{ title: "No studies match." }}
+      />
     </div>
   );
 }

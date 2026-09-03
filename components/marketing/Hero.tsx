@@ -69,7 +69,18 @@ export function Hero({
         </span>
       </div>
 
-      <div className="relative mx-auto grid min-h-[calc(100vh-200px)] max-w-[1480px] grid-cols-[1.02fr_1fr] items-center gap-[76px] lp-stack:min-h-0 lp-stack:grid-cols-1 lp-stack:gap-14">
+      {/* The 240px subtrahend is the chrome this grid shares the viewport
+          with, measured rather than estimated: 82px of nav (16px pt-4 plus a
+          66px pill), this section's 56px pt-14, and its 84px pb. At 200px the
+          grid asked for more height than was left, so on a tall window the
+          hero overran the fold by ~38px.
+
+          This floor only governs on tall windows. Below roughly 870px the
+          left column (630px) is taller and sets the row height instead, which
+          is why this value is not what fixes the clipped sticker: see the
+          self-start note on the card column. Anything added above or below
+          this grid has to be added here too. */}
+      <div className="relative mx-auto grid min-h-[calc(100vh-240px)] max-w-[1480px] grid-cols-[1.02fr_1fr] items-center gap-[76px] lp-stack:min-h-0 lp-stack:grid-cols-1 lp-stack:gap-14">
         <div>
           {statusSticker ? (
             <div data-reveal className="mb-[26px]">
@@ -204,7 +215,16 @@ export function Hero({
           )}
         </div>
 
-        <div data-reveal style={{ transitionDelay: "0.22s" }} className="relative">
+        {/* self-start, not the grid's default centring. The left column is the
+            taller of the two (630px against the card's 434px), so it sets the
+            row height and the card gets centred inside the leftover 196px,
+            which pushed it ~97px down the page. The "chirp!" sticker hangs
+            26px below the card, so that offset put its bottom at 689px from
+            the top of the document no matter how short the window was, and it
+            was cut off on any viewport under ~690px. Aligning the card to the
+            top of the row lifts the sticker to 591px. Below lp-stack the grid
+            is a single column, where this has no effect. */}
+        <div data-reveal style={{ transitionDelay: "0.22s" }} className="relative self-start">
           <div className="motion-safe:animate-[lp-floaty_8s_ease-in-out_infinite]">
             <Starburst
               label="chirp!"

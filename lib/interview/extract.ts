@@ -237,7 +237,22 @@ export async function extractInterviewInsights(
   const system = buildExtractionSystemPrompt(companyProfile);
   const requestParams: Anthropic.MessageCreateParamsNonStreaming = {
     model: INTERVIEW_MODEL,
-    max_tokens: 1024,
+    // Was 1024, which a real interview came within 100 tokens of exhausting: a
+    // 19-exchange transcript surfacing 6 pain points spends ~924 here. Past
+    // roughly 7 pain points the tool call is cut off partway through
+    // pain_points, so summary and call_script are never emitted, extractToolInput
+    // rejects the shape, and the retry below fails identically because
+    // truncation is deterministic. The result is a silent fall through to
+    // FALLBACK_INSIGHTS (lead_score 5, no pain points, no call script) on
+    // precisely the richest interviews — the hottest leads, which are the ones
+    // that surface the most. A milder version of the same overrun leaves the
+    // score and pain points intact but truncates at the call_script boundary,
+    // which is where empty openers on otherwise well-scored rows come from.
+    //
+    // This is a ceiling, not a spend commitment: output tokens are billed as
+    // generated, so raising it costs nothing on the interviews that already
+    // fit and only stops the ones that don't from being discarded.
+    max_tokens: 2048,
     system,
     messages: [{ role: "user", content: transcriptToText(messages) }],
     tools: [INSIGHTS_TOOL],

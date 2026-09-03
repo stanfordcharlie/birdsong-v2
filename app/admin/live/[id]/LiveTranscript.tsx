@@ -5,7 +5,6 @@ import type { InterviewMessage } from "@/lib/interview/types";
 import { renderWithBold } from "@/lib/chat/render-with-bold";
 import { createClient } from "@/lib/supabase/client";
 import { StatusDot } from "@/components/admin/ui";
-import { cn } from "@/lib/utils";
 
 // Read-only. There is no composer, no send path, and no write of any kind on
 // this page: it subscribes to the response row and renders whatever the
@@ -29,6 +28,13 @@ function parseMessages(value: unknown): InterviewMessage[] | null {
     parsed.push({ role: message.role, content: message.content });
   }
   return parsed;
+}
+
+function statusLabel(completed: boolean, connection: ConnectionState): string {
+  if (completed) return "Finished";
+  if (connection === "live") return "Live";
+  if (connection === "error") return "Connection lost. Reload to reconnect.";
+  return "Connecting";
 }
 
 export function LiveTranscript({
@@ -55,8 +61,7 @@ export function LiveTranscript({
       // with, so the admin's access token has to be on it before the
       // subscription starts. supabase-js normally does this off the auth
       // state change, but that can land after this effect runs, and a socket
-      // still holding the anon key would silently receive nothing (RLS
-      // rejects it, exactly as it should) and look like a broken feed.
+      // still holding the anon key would silently receive nothing.
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -73,8 +78,7 @@ export function LiveTranscript({
             schema: "public",
             table: "responses",
             // Server-side filter, so this socket only ever carries the one
-            // row being watched. RLS still applies on top: an admin can only
-            // receive a row that responses_owner_all already lets them read.
+            // row being watched. RLS still applies on top.
             filter: `id=eq.${responseId}`,
           },
           (payload) => {
@@ -82,8 +86,7 @@ export function LiveTranscript({
             const next = parseMessages(row.messages);
             // Every turn rewrites the whole array, so a change is a
             // replacement rather than an append. A payload that fails to
-            // parse leaves the last good transcript on screen instead of
-            // blanking it.
+            // parse leaves the last good transcript on screen.
             if (next) setMessages(next);
             if (typeof row.completed === "boolean") setCompleted(row.completed);
           }
@@ -118,57 +121,34 @@ export function LiveTranscript({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2">
         <StatusDot live={connection === "live" && !completed} pulse />
-        <span className="type-body text-muted-foreground">
-          {completed
-            ? "This interview has finished. The transcript below is final."
-            : connection === "live"
-              ? "Watching live. New answers appear as they are given."
-              : connection === "error"
-                ? "Live connection lost. Reload the page to reconnect."
-                : "Connecting"}
-        </span>
+        <span className="type-meta">{statusLabel(completed, connection)}</span>
       </div>
 
-      {/* The bubbles used to copy the respondent interview's editorial palette
-          verbatim, so an admin saw roughly what the respondent saw. That
-          brought a cream ground with it, which this design pass bans, and an
-          admin page painting itself from a second surface's colours is the
-          drift the pass exists to remove. The shape of the conversation (the
-          asymmetric tails, the left/right split, the accent on the
-          respondent's own words) is what carries the resemblance; it now does
-          so in admin tokens. */}
-      <div
-        ref={scrollRef}
-        className="max-h-[62vh] overflow-y-auto rounded-card border border-border bg-secondary p-5 sm:p-7"
-      >
+      {/* A transcript, not a chat mock-up: no filled ground, no bubbles. A
+          left hairline rule frames the thread and each turn is a label and
+          its text. */}
+      <div ref={scrollRef} className="admin-measure max-h-[62vh] overflow-y-auto border-l border-border pl-4">
         {messages.length === 0 ? (
-          <p className="type-body py-8 text-center text-muted-foreground">
-            No questions yet. The first one appears here as soon as the interview starts.
-          </p>
+          <p className="type-body text-muted-foreground">No questions yet.</p>
         ) : (
-          <div className="mx-auto flex w-full max-w-[600px] flex-col gap-3.5 text-left">
+          <div className="flex flex-col gap-4">
             {messages.map((message, i) => {
               const isInterviewer = message.role === "assistant";
               return (
-                <div
-                  key={i}
-                  className={cn(
-                    "type-body whitespace-pre-wrap break-words",
-                    isInterviewer
-                      ? "max-w-[86%] self-start rounded-card rounded-bl-[5px] border border-border bg-card px-5 py-3.5 shadow-card"
-                      : "max-w-[78%] self-end rounded-card rounded-br-[5px] bg-brand px-4 py-3 text-primary-foreground"
-                  )}
-                >
-                  {isInterviewer ? renderWithBold(message.content) : message.content}
+                <div key={i} className="flex flex-col gap-1">
+                  <span className="type-eyebrow">{isInterviewer ? "Interviewer" : "Respondent"}</span>
+                  <p className="type-body whitespace-pre-wrap break-words">
+                    {isInterviewer ? renderWithBold(message.content) : message.content}
+                  </p>
                 </div>
               );
             })}
 
             {!completed && lastRole !== null && (
-              <p className="type-eyebrow mt-1 self-center text-faint">
-                {lastRole === "assistant" ? "WAITING ON THEIR ANSWER" : "WRITING THE NEXT QUESTION"}
+              <p className="type-meta">
+                {lastRole === "assistant" ? "Waiting for their answer" : "Writing the next question"}
               </p>
             )}
           </div>

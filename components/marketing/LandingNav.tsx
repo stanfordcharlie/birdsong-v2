@@ -12,14 +12,27 @@ import { BirdMark } from "./BirdMark";
 // app, not the prototype.
 export function LandingNav({
   crossLink,
+  // Off a landing page there is no #top anchor, so the wordmark goes home.
+  homeHref = "#top",
   // "The handoff" is an in-page jump to QueueSection's #queue anchor, and
   // /customer-success still renders that section while / no longer does. The
   // link is switched off per page rather than deleted here, so the page that
   // still has the section keeps a working way to reach it.
   hasQueueSection = true,
+  // Same switch for the "#how" anchor. The research library reuses this nav
+  // but has no in-page sections, so both anchors are off there rather than
+  // rendering links that scroll nowhere.
+  hasHowSection = true,
+  // The research library is an editorial surface: the report is the point,
+  // and a row of product links beside it competes with the reading. Renders
+  // the wordmark alone.
+  variant = "full",
 }: {
   crossLink: { label: string; href: string };
+  homeHref?: string;
   hasQueueSection?: boolean;
+  hasHowSection?: boolean;
+  variant?: "full" | "minimal";
 }) {
   return (
     <nav
@@ -33,7 +46,7 @@ export function LandingNav({
           shadows on the nav capsule"); the brief wins, so the capsule stays
           hard-shadowed at both sizes. */}
       <div className="lp-navpill flex items-center justify-between gap-6 rounded-full border-2 border-landing-ink bg-[rgba(255,254,250,0.92)] py-[9px] pl-6 pr-[11px] shadow-[4px_4px_0_var(--lp-ink)] backdrop-blur-[18px] group-data-[scrolled=1]/nav:bg-[rgba(255,254,250,0.97)] group-data-[scrolled=1]/nav:py-2 group-data-[scrolled=1]/nav:pl-[22px] group-data-[scrolled=1]/nav:pr-2.5 group-data-[scrolled=1]/nav:shadow-[6px_6px_0_var(--lp-ink)] lp-nav:pl-5">
-        <Link href="#top" className="flex items-center gap-[11px]">
+        <Link href={homeHref} className="flex items-center gap-[11px]">
           <BirdMark className="shrink-0 motion-safe:animate-[lp-bob_7s_ease_infinite]" />
           <span className="font-bricolage text-[23px] font-bold tracking-[-0.03em]">Birdsong</span>
         </Link>
@@ -41,28 +54,35 @@ export function LandingNav({
             the pill on phones, so they're hidden here entirely rather than
             collapsed into a menu — the primary CTA stays, and the group's
             gap tightens so the pill hugs just the logo and button. */}
-        <div className="flex items-center gap-[34px] text-[14.5px] font-medium lp-nav:gap-3">
-          <Link href={crossLink.href} className="lp-undl text-landing-muted lp-nav:hidden">
-            {crossLink.label}
-          </Link>
-          <Link href="#how" className="lp-undl text-landing-muted lp-nav:hidden">
-            How it works
-          </Link>
-          {hasQueueSection && (
-            <Link href="#queue" className="lp-undl text-landing-muted lp-nav:hidden">
-              The handoff
+        {variant === "full" && (
+          <div className="flex items-center gap-[34px] text-[14.5px] font-medium lp-nav:gap-3">
+            <Link href={crossLink.href} className="lp-undl text-landing-muted lp-nav:hidden">
+              {crossLink.label}
             </Link>
-          )}
-          <Link href="/admin/login" className="lp-undl text-landing-muted lp-nav:hidden">
-            Log in
-          </Link>
-          <Link
-            href="/admin/signup"
-            className="rounded-full bg-landing-ink px-[22px] py-[11px] font-bold text-landing-bg"
-          >
-            Get started
-          </Link>
-        </div>
+            {hasHowSection && (
+              <Link href="#how" className="lp-undl text-landing-muted lp-nav:hidden">
+                How it works
+              </Link>
+            )}
+            <Link href="/reports" className="lp-undl text-landing-muted lp-nav:hidden">
+              Research
+            </Link>
+            {hasQueueSection && (
+              <Link href="#queue" className="lp-undl text-landing-muted lp-nav:hidden">
+                The handoff
+              </Link>
+            )}
+            <Link href="/admin/login" className="lp-undl text-landing-muted lp-nav:hidden">
+              Log in
+            </Link>
+            <Link
+              href="/admin/signup"
+              className="rounded-full bg-landing-ink px-[22px] py-[11px] font-bold text-landing-bg"
+            >
+              Get started
+            </Link>
+          </div>
+        )}
       </div>
     </nav>
   );

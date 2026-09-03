@@ -8,7 +8,7 @@ function SearchIcon() {
       aria-hidden
       viewBox="0 0 20 20"
       fill="none"
-      className="pointer-events-none absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-faint"
+      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
     >
       <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.6" />
       <path d="M13.2 13.2L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -32,7 +32,7 @@ export function SearchInput({
   className?: string;
 }) {
   return (
-    <div className={cn("relative max-w-[300px] flex-1 basis-[220px]", className)}>
+    <div className={cn("relative max-w-xs flex-1 basis-56", className)}>
       <SearchIcon />
       <input
         type="text"

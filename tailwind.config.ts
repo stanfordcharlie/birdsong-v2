@@ -83,11 +83,6 @@ const config: Config = {
           text: "hsl(var(--ds-accent-text) / <alpha-value>)",
           live: "hsl(var(--ds-accent-live) / <alpha-value>)",
         },
-        cover: {
-          1: "hsl(var(--ds-cover-1) / <alpha-value>)",
-          2: "hsl(var(--ds-cover-2) / <alpha-value>)",
-          3: "hsl(var(--ds-cover-3) / <alpha-value>)",
-        },
         focus: "hsl(var(--ds-focus) / <alpha-value>)",
 
         // Respondent survey theme (app/globals.css `.survey-theme`). Only the
@@ -123,6 +118,8 @@ const config: Config = {
           plate: "hsl(var(--ds-sidebar-plate) / <alpha-value>)",
           label: "hsl(var(--ds-sidebar-label) / <alpha-value>)",
           muted: "hsl(var(--ds-sidebar-muted) / <alpha-value>)",
+          avatar: "hsl(var(--ds-sidebar-avatar) / <alpha-value>)",
+          "avatar-foreground": "hsl(var(--ds-sidebar-avatar-foreground) / <alpha-value>)",
         },
 
         // Marketing landing pages (design_handoff_landing_pages_full) — a
@@ -166,6 +163,7 @@ const config: Config = {
       borderRadius: {
         card: "var(--ds-radius-card)",
         control: "var(--ds-radius-control)",
+        account: "var(--ds-radius-account)",
         pill: "var(--ds-radius-pill)",
       },
       boxShadow: {
@@ -185,9 +183,13 @@ const config: Config = {
         count: ["12px", { lineHeight: "1.2" }],
         control: ["13px", { lineHeight: "1.2" }],
         "display-sm": ["28px", { lineHeight: "1.2", letterSpacing: "-0.01em" }],
-        // Sidebar-only: the wordmark and the nav item label.
+        // Sidebar-only: the wordmark, the nav item label, and the two lines
+        // of the account row. `account` and `role` are half-pixel steps
+        // because the row has a hard 228px width budget — see AdminSidebar.
         wordmark: ["21px", { lineHeight: "1.2", letterSpacing: "-0.01em" }],
         nav: ["15px", { lineHeight: "1.2", letterSpacing: "-0.005em" }],
+        account: ["12.5px", { lineHeight: "1.2" }],
+        role: ["10.5px", { lineHeight: "1.2" }],
       },
       fontFamily: {
         // Global body default. Marketing pages (out of scope for the
