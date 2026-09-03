@@ -91,7 +91,7 @@ describe("syncResponseToHubSpot", () => {
 
     const result = await syncResponseToHubSpot(input({ supabase: db.client }));
 
-    expect(result).toEqual({ status: "synced", contactId: "contact-1", dealId: "deal-1" });
+    expect(result).toEqual({ status: "synced", contactId: "contact-1", dealId: "deal-1", advancedTo: null });
     expect(db.updates).toHaveLength(1);
     expect(db.updates[0].id).toBe("response-1");
     expect(db.updates[0].values).toMatchObject({
@@ -107,7 +107,7 @@ describe("syncResponseToHubSpot", () => {
 
     const result = await syncResponseToHubSpot(input({ supabase: db.client, leadScore: 4 }));
 
-    expect(result).toEqual({ status: "synced", contactId: "contact-1", dealId: null });
+    expect(result).toEqual({ status: "synced", contactId: "contact-1", dealId: null, advancedTo: null });
     expect(db.updates[0].values.hubspot_deal_id).toBeNull();
   });
 

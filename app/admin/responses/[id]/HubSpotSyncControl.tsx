@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/admin/ui";
 import { formatRelativeTime } from "@/lib/format";
 
 // Manual retry for the HubSpot sync that already runs by itself when an
@@ -23,6 +24,7 @@ export function HubSpotSyncControl({
   /** Set when the response cannot be synced at all (test run, unfinished). */
   disabledReason?: string | null;
 }) {
+  const router = useRouter();
   const [syncedAt, setSyncedAt] = useState(initialSyncedAt);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +37,9 @@ export function HubSpotSyncControl({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || data.reason || "Failed to sync to HubSpot");
       setSyncedAt(typeof data.syncedAt === "string" ? data.syncedAt : new Date().toISOString());
+      // The push wrote to the activity trail and may have advanced the lead
+      // (lib/hubspot-sync.ts); the workflow panel below re-reads both.
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -43,20 +48,22 @@ export function HubSpotSyncControl({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 pb-2">
+    // Sits in the page header's action group, so it carries no padding of its
+    // own; the header owns the spacing around it.
+    <div className="flex flex-wrap items-center gap-2">
       <Button
         type="button"
         variant="secondary"
         onClick={handleSync}
         disabled={loading || Boolean(disabledReason)}
       >
-        {loading ? "Syncing..." : syncedAt ? "Re-sync to HubSpot" : "Sync to HubSpot"}
+        {loading ? "Syncing" : "Sync to HubSpot"}
       </Button>
       {error ? (
         <span className="type-body-sm text-destructive">{error}</span>
       ) : (
         <span className="type-meta">
-          {disabledReason ?? (syncedAt ? `Synced ${formatRelativeTime(syncedAt)}.` : "Not synced yet.")}
+          {disabledReason ?? (syncedAt ? `Synced ${formatRelativeTime(syncedAt)}` : "Not synced")}
         </span>
       )}
     </div>

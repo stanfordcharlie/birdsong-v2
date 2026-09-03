@@ -6,7 +6,13 @@ import { createClient } from "@/lib/supabase/client";
 import { logLoginEvent } from "@/lib/auth-events";
 import { AuthScreen, AuthField, AuthPasswordField, AuthError, AuthSubmit } from "@/components/auth/AuthScreen";
 
-export function LoginForm({ notice = null }: { notice?: string | null }) {
+export function LoginForm({
+  notice = null,
+  inviteToken = null,
+}: {
+  notice?: string | null;
+  inviteToken?: string | null;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   // Seeded from a server-provided notice (e.g. an expired confirmation link
@@ -16,6 +22,7 @@ export function LoginForm({ notice = null }: { notice?: string | null }) {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setError(null);
     setLoading(true);
     const supabase = createClient();
@@ -29,7 +36,8 @@ export function LoginForm({ notice = null }: { notice?: string | null }) {
       await logLoginEvent(supabase, data.user.id, data.user.email ?? null);
     }
     // Full navigation so middleware re-reads the freshly set auth cookies.
-    window.location.assign("/admin");
+    // An invited login returns to the invite's accept page.
+    window.location.assign(inviteToken ? `/invite/${inviteToken}` : "/admin");
   }
 
   return (
@@ -39,7 +47,10 @@ export function LoginForm({ notice = null }: { notice?: string | null }) {
       belowCard={
         <>
           New to Birdsong?{" "}
-          <Link href="/admin/signup" className="font-semibold underline underline-offset-[3px]">
+          <Link
+            href={inviteToken ? `/admin/signup?invite=${encodeURIComponent(inviteToken)}` : "/admin/signup"}
+            className="font-semibold underline underline-offset-[3px]"
+          >
             Create an account
           </Link>
         </>
@@ -64,6 +75,16 @@ export function LoginForm({ notice = null }: { notice?: string | null }) {
           value={password}
           onChange={setPassword}
           required
+          // Enter in the password field submits explicitly. The browser's
+          // implicit submission (click the form's submit button) is what
+          // Enter normally does, but that click is easy for an autofill
+          // dropdown or an extension to intercept; requestSubmit() goes
+          // straight to the form and still runs validation.
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            e.currentTarget.form?.requestSubmit();
+          }}
           labelAccessory={
             <Link
               href="/admin/forgot-password"

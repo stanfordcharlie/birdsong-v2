@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { orgErrorResponse, requireOrgPermission } from "@/lib/org";
 import { parseCallScript } from "@/lib/interview/call-script";
 import { selectRespondentCompanyName } from "@/lib/lead-content";
 import { syncResponseToHubSpot } from "@/lib/hubspot-sync";
@@ -25,6 +26,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+
+  try {
+    await requireOrgPermission("response:pushToCrm");
+  } catch (err) {
+    return orgErrorResponse(err);
   }
 
   const { data: response, error } = await supabase
@@ -84,6 +91,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     // ran, which for a date-granularity property is almost always the same
     // day, and never wrong by more than one.
     completedAt: response.created_at,
+    // A person is pushing this one, so the push goes on the trail under
+    // their name and picks the lead up for them (lib/hubspot-sync.ts).
+    actor: { userId: user.id },
   });
 
   if (result.status === "failed") {
@@ -97,6 +107,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     status: "synced",
     contactId: result.contactId,
     dealId: result.dealId,
+    advancedTo: result.advancedTo,
     syncedAt: new Date().toISOString(),
   });
 }

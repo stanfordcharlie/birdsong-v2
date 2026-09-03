@@ -1,20 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Badge,
   Button,
-  Card,
   DataTable,
   FilterTabs,
-  PageHeader,
+  RelativeTime,
+  ScoreBadge,
   SearchInput,
+  StatRow,
+  useTableSort,
   type Column,
 } from "@/components/admin/ui";
-import { StatusControl } from "@/components/StatusControl";
+import { LeadStatusBadge } from "@/components/admin/LeadStatusBadge";
 import { SurveyFilterCards, type SurveyCard } from "./SurveyFilterCards";
-import { EMPTY_VALUE, formatRelativeTime } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { EMPTY_VALUE } from "@/lib/format";
+import { isWorthACall, WORTH_A_CALL_SCORE_MIN } from "@/lib/leads";
+import { isClosedStatus, type LeadStatus } from "@/lib/leads/state";
+import { assignLead, claimLead, unassignLead, type LeadActionResult } from "@/lib/leads/actions";
 
 export type LeadItem = {
   id: string;
@@ -26,179 +31,148 @@ export type LeadItem = {
   /** Whether the survey behind this lead is still collecting responses. */
   surveyIsLive: boolean;
   leadScore: number | null;
-  // Company fit (lib/interview/company-fit.ts) — independent of leadScore.
+  // Company fit (lib/interview/company-fit.ts), independent of leadScore.
   // fitConfidence: "high" | "medium" | "low" | "unavailable" | null (null =
   // not yet scored). fitScore is null when unavailable or not yet scored.
   fitScore: number | null;
   fitConfidence: string | null;
   fitReasoning: string | null;
-  status: string;
+  leadStatus: LeadStatus;
+  assignedTo: string | null;
+  assigneeName: string | null;
+  lastActivityAt: string;
   topPainPoint: string | null;
   createdAt: string;
   isTest: boolean;
   source: string | null;
 };
 
-// Which column the queue is sorted by. "default" keeps the server's order
-// (lead_score desc, then newest). Score and Fit are click-to-sort.
-type SortColumn = "default" | "score" | "fit";
+export type QueueMember = { id: string; name: string };
 
-type StatusFilter = "all" | "new" | "contacted" | "qualified" | "not_a_fit";
+export type QueuePermissions = {
+  claim: boolean;
+  assignOthers: boolean;
+};
 
-const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "new", label: "New" },
-  { value: "contacted", label: "Contacted" },
-  { value: "qualified", label: "Qualified" },
-  { value: "not_a_fit", label: "Not a fit" },
-];
+const QUEUE_TABS = ["all", "unworked", "mine", "contacted", "meetings", "closed"] as const;
+export type QueueTab = (typeof QUEUE_TABS)[number];
 
-// Same select styling as StatusControl / SurveyForm's native selects.
+export function isQueueTab(value: unknown): value is QueueTab {
+  return typeof value === "string" && (QUEUE_TABS as readonly string[]).includes(value);
+}
+
+const TAB_LABELS: Record<QueueTab, string> = {
+  all: "All",
+  unworked: "Unworked",
+  mine: "Mine",
+  contacted: "Contacted",
+  meetings: "Meetings",
+  closed: "Closed",
+};
+
+// One sentence per tab, each naming the situation it is actually in. "No
+// leads yet" and "Nothing assigned to you" are different problems with
+// different fixes, so they must not share a line.
+const TAB_EMPTY: Record<QueueTab, string> = {
+  all: "No leads yet. Completed interviews land here.",
+  unworked: "Nothing waiting. Every lead has been picked up.",
+  mine: "Nothing assigned to you. Claim a lead from Unworked to start working it.",
+  contacted: "No leads have been contacted yet.",
+  meetings: "No meetings booked yet.",
+  closed: "No leads have been closed yet.",
+};
+
+function tabMatches(lead: LeadItem, tab: QueueTab, me: string): boolean {
+  switch (tab) {
+    case "all":
+      return true;
+    case "unworked":
+      return lead.leadStatus === "new";
+    case "mine":
+      return lead.assignedTo !== null && lead.assignedTo === me;
+    case "contacted":
+      return lead.leadStatus === "contacted";
+    case "meetings":
+      return lead.leadStatus === "meeting_booked";
+    case "closed":
+      return isClosedStatus(lead.leadStatus);
+  }
+}
+
+// Same select styling as the team settings' native selects, at the in-row
+// size the queue's status select used to take.
 const SELECT_CLASSES =
   "focus-ring flex h-9 rounded-control border border-input bg-card px-3 py-2 font-archivo text-sm text-card-foreground";
+const ROW_SELECT_CLASSES =
+  "focus-ring flex h-8 max-w-full rounded-pill border border-border bg-card px-3 font-archivo text-control text-card-foreground disabled:cursor-not-allowed disabled:opacity-50";
 
-// Avatar initials, same derivation as the admin home's activity feed.
-function initialsOf(name: string | null): string {
-  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return EMPTY_VALUE;
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
+// The sources select doubles as the data-source switch. "Include test
+// responses" used to be a third chip sitting beside the two lead filters,
+// which made a question about which rows exist look like a question about
+// which leads are hot.
+const TEST_SOURCE_VALUE = "__include_test__";
 
-// A 1-10 score read as a short bar plus the number. The bar is what makes a
-// column of scores scannable without reading any of them; the number is what
-// you check once the bar has pointed you at a row.
-//
-// `tone="lead"` colours the fill by band so hot leads carry green down the
-// column. Fit stays neutral in every band — two green columns side by side
-// and neither one reads as the signal.
-function ScoreMeter({ score, tone }: { score: number; tone: "lead" | "fit" }) {
-  const hot = tone === "lead" && score >= HOT_SCORE_MIN;
-  const mid = tone === "lead" && score >= 5;
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span aria-hidden className="h-[4px] w-[26px] overflow-hidden rounded-pill bg-chip">
-        <span
-          className={cn(
-            "block h-full rounded-pill",
-            hot ? "bg-brand" : mid ? "bg-muted-foreground" : "bg-faint"
-          )}
-          style={{ width: `${Math.max(0, Math.min(score, 10)) * 10}%` }}
-        />
-      </span>
-      <span
-        className={cn(
-          "type-body-sm font-semibold tabular-nums",
-          hot ? "text-brand" : "text-card-foreground"
-        )}
-      >
-        {score}
-      </span>
-    </span>
-  );
-}
-
-function SortHeader({
-  label,
-  active,
-  dir,
-  onClick,
-  title,
-}: {
-  label: string;
-  active: boolean;
-  dir: "desc" | "asc";
-  onClick: () => void;
-  title?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className="focus-ring inline-flex items-center gap-1 rounded-control font-[inherit] text-inherit hover:text-card-foreground"
-    >
-      {label}
-      <span aria-hidden="true" className="text-micro text-muted-foreground">
-        {active ? (dir === "desc" ? "▼" : "▲") : "↕"}
-      </span>
-    </button>
-  );
-}
-
-const HOT_SCORE_MIN = 7;
 // Fit uses the same threshold and the same banding as the lead score, so the
 // two columns read consistently and the "Fit 7+" filter mirrors "Score 7+".
 const HOT_FIT_MIN = 7;
 
 export function LeadsQueue({
   items,
-  initialStatusFilter = "all",
+  members,
+  currentUserId,
+  permissions,
+  initialTab,
 }: {
   items: LeadItem[];
-  // Deep-link from the admin home's "New leads awaiting contact" stat, e.g.
-  // ?status=new. Any value that isn't a recognized filter falls back to "all".
-  initialStatusFilter?: StatusFilter;
+  /** The org's members, for the assign-to control and the assignee column. */
+  members: QueueMember[];
+  currentUserId: string;
+  permissions: QueuePermissions;
+  /** Decided on the server: Mine when the rep holds anything, else Unworked. */
+  initialTab: QueueTab;
 }) {
-  // Local copy so inline status changes (StatusControl's optimistic update)
-  // are reflected in the rows the filters below operate on.
+  const router = useRouter();
+  // Local copy so a claim or assignment is reflected in the row the moment
+  // the action returns, ahead of the server re-render router.refresh asks for.
   const [leads, setLeads] = useState(items);
+  useEffect(() => setLeads(items), [items]);
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
-  // null = the "All surveys" card. Driven by SurveyFilterCards above the
+  const [tab, setTab] = useState<QueueTab>(initialTab);
+  // null = the "All studies" chip. Driven by SurveyFilterCards above the
   // queue, which replaced the toolbar's survey <select>.
   const [surveyFilter, setSurveyFilter] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [hotOnly, setHotOnly] = useState(false);
   const [fitHotOnly, setFitHotOnly] = useState(false);
   const [showTest, setShowTest] = useState(false);
-  const [sortColumn, setSortColumn] = useState<SortColumn>("default");
-  const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
-
-  // Click a sortable header: first click sorts that column descending, a
-  // second click flips to ascending, a third returns to the default order.
-  function toggleSort(column: Exclude<SortColumn, "default">) {
-    if (sortColumn !== column) {
-      setSortColumn(column);
-      setSortDir("desc");
-    } else if (sortDir === "desc") {
-      setSortDir("asc");
-    } else {
-      setSortColumn("default");
-      setSortDir("desc");
-    }
-  }
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // "All" is the no-filter choice, so clicking it also releases the Score 7+
   // and Fit 7+ toggles sitting beside it. Without that, All can be lit up
   // while two narrowing toggles are still on and the queue reads as empty
-  // for no visible reason. Every other status is a narrowing choice and
-  // leaves the toggles exactly as they were.
-  function selectStatus(value: StatusFilter) {
-    setStatusFilter(value);
+  // for no visible reason. Every other tab is a narrowing choice and leaves
+  // the toggles exactly as they were.
+  function selectTab(value: QueueTab) {
+    setTab(value);
     if (value === "all") {
       setHotOnly(false);
       setFitHotOnly(false);
     }
   }
 
-  // Everything the cards and the tabs count is measured against this set:
-  // every lead the user can currently see, before any of the narrowing
-  // filters. Only the test toggle applies, because a hidden test row
-  // shouldn't be counted in a number sitting next to visible rows.
+  // Everything the chips, the stats and the tabs count is measured against
+  // this set: every lead the user can currently see, before any of the
+  // narrowing filters. Only the test toggle applies, because a hidden test
+  // row shouldn't be counted in a number sitting next to visible rows.
   const visibleLeads = useMemo(
     () => (showTest ? leads : leads.filter((lead) => !lead.isTest)),
     [leads, showTest]
   );
 
-  // A lead is worth a call at 7+ and still untouched — the same cutoff the
-  // admin home, the Slack notification and the HubSpot deal threshold use.
-  const worthACall = (lead: LeadItem) =>
-    (lead.leadScore ?? 0) >= HOT_SCORE_MIN && lead.status === "new";
-
   // Only surveys that actually have completed responses can produce rows, so
-  // the cards are derived from the rows themselves rather than from the
-  // survey list — a survey nobody has finished has nothing to show here.
+  // the chips are derived from the rows themselves rather than from the
+  // survey list: a survey nobody has finished has nothing to show here.
   const surveyCards = useMemo<SurveyCard[]>(() => {
     const bySurvey = new Map<string, SurveyCard>();
     for (const lead of visibleLeads) {
@@ -209,39 +183,45 @@ export function LeadsQueue({
           title: lead.surveyTitle,
           leadCount: 0,
           worthACall: 0,
-          share: 0,
           isLive: lead.surveyIsLive,
         };
         bySurvey.set(lead.surveyId, card);
       }
       card.leadCount += 1;
-      if (worthACall(lead)) card.worthACall += 1;
+      if (isWorthACall({ leadScore: lead.leadScore, status: lead.leadStatus })) card.worthACall += 1;
     }
 
-    const total = visibleLeads.length;
-    const cards = Array.from(bySurvey.values())
-      // Most leads first: the survey producing the most pipeline is the one
-      // worth landing on, and it keeps the row's order stable as statuses
-      // change underneath it (which worth-a-call ordering would not).
-      .sort((a, b) => b.leadCount - a.leadCount)
-      .map((card) => ({ ...card, share: total > 0 ? card.leadCount / total : 0 }));
+    // Most leads first: the survey producing the most pipeline is the one
+    // worth landing on, and it keeps the row's order stable as statuses
+    // change underneath it (which worth-a-call ordering would not).
+    const cards = Array.from(bySurvey.values()).sort((a, b) => b.leadCount - a.leadCount);
 
     return [
       {
         id: null,
-        title: "All surveys",
-        leadCount: total,
-        worthACall: visibleLeads.filter(worthACall).length,
-        share: 1,
-        // Green while anything is still collecting.
+        title: "All studies",
+        leadCount: visibleLeads.length,
+        worthACall: visibleLeads.filter((lead) =>
+          isWorthACall({ leadScore: lead.leadScore, status: lead.leadStatus })
+        ).length,
+        // Live while anything is still collecting.
         isLive: cards.some((card) => card.isLive),
       },
       ...cards,
     ];
   }, [visibleLeads]);
 
-  // The survey card is the outermost filter: the header count, the subline and
-  // every status tab count all restate whatever it has selected.
+  // A selected study that has since disappeared from the cards (archived,
+  // or its last lead switched to test) would leave the queue scoped to
+  // nothing. Fall back to the all-studies view instead of an empty state.
+  useEffect(() => {
+    if (surveyFilter !== null && !surveyCards.some((card) => card.id === surveyFilter)) {
+      setSurveyFilter(null);
+    }
+  }, [surveyCards, surveyFilter]);
+
+  // The study chip is the outermost filter: the stats and every tab count
+  // restate whatever it has selected.
   const scopedLeads = useMemo(
     () =>
       surveyFilter === null
@@ -250,28 +230,32 @@ export function LeadsQueue({
     [visibleLeads, surveyFilter]
   );
 
-  const statusCounts = useMemo(() => {
-    const counts: Record<StatusFilter, number> = {
-      all: scopedLeads.length,
-      new: 0,
-      contacted: 0,
-      qualified: 0,
-      not_a_fit: 0,
-    };
+  const tabCounts = useMemo(() => {
+    const counts = Object.fromEntries(QUEUE_TABS.map((t) => [t, 0])) as Record<QueueTab, number>;
     for (const lead of scopedLeads) {
-      if (lead.status in counts) counts[lead.status as StatusFilter] += 1;
+      for (const t of QUEUE_TABS) {
+        if (tabMatches(lead, t, currentUserId)) counts[t] += 1;
+      }
     }
     return counts;
-  }, [scopedLeads]);
+  }, [scopedLeads, currentUserId]);
 
-  const awaitingReply = useMemo(
-    () => scopedLeads.filter(worthACall).length,
-    [scopedLeads]
-  );
+  const stats = useMemo(() => {
+    const byStatus = (status: LeadStatus) =>
+      scopedLeads.filter((lead) => lead.leadStatus === status).length;
+    return [
+      { label: "Unworked", value: byStatus("new") },
+      { label: "Assigned to me", value: tabCounts.mine },
+      { label: "Contacted", value: byStatus("contacted") },
+      { label: "Meetings booked", value: byStatus("meeting_booked") },
+      { label: "Qualified", value: byStatus("qualified") },
+    ];
+  }, [scopedLeads, tabCounts.mine]);
 
   // Distinct, non-null source values actually present in this user's data.
-  // Most accounts won't have any ?src= traffic yet, so the whole control
-  // (not just an empty option list) is hidden until at least one exists.
+  // Most accounts won't have any ?src= traffic yet, so the source options are
+  // hidden until at least one exists, but the select itself stays, because
+  // it now also carries the include-test-responses switch.
   const sourceOptions = useMemo(() => {
     const seen = new Set<string>();
     for (const lead of items) {
@@ -280,16 +264,12 @@ export function LeadsQueue({
     return Array.from(seen).sort();
   }, [items]);
 
-  function handleStatusChange(leadId: string, status: string) {
-    setLeads((prev) => prev.map((lead) => (lead.id === leadId ? { ...lead, status } : lead)));
-  }
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const rows = scopedLeads.filter((lead) => {
-      if (statusFilter !== "all" && lead.status !== statusFilter) return false;
+    return scopedLeads.filter((lead) => {
+      if (!tabMatches(lead, tab, currentUserId)) return false;
       if (sourceFilter !== "all" && lead.source !== sourceFilter) return false;
-      if (hotOnly && (lead.leadScore ?? 0) < HOT_SCORE_MIN) return false;
+      if (hotOnly && (lead.leadScore ?? 0) < WORTH_A_CALL_SCORE_MIN) return false;
       if (fitHotOnly && (lead.fitScore ?? 0) < HOT_FIT_MIN) return false;
       if (
         q &&
@@ -299,169 +279,256 @@ export function LeadsQueue({
       }
       return true;
     });
+  }, [scopedLeads, query, tab, currentUserId, sourceFilter, hotOnly, fitHotOnly]);
 
-    if (sortColumn === "default") return rows;
-    // Nulls (unscored / no fit) always sort to the bottom regardless of
-    // direction, so an asc sort surfaces the lowest real score, not blanks.
-    const value = (lead: LeadItem) => (sortColumn === "score" ? lead.leadScore : lead.fitScore);
-    return [...rows].sort((a, b) => {
-      const av = value(a);
-      const bv = value(b);
-      if (av === null && bv === null) return 0;
-      if (av === null) return 1;
-      if (bv === null) return -1;
-      return sortDir === "desc" ? bv - av : av - bv;
-    });
-  }, [scopedLeads, query, statusFilter, sourceFilter, hotOnly, fitHotOnly, sortColumn, sortDir]);
+  // One action in flight at a time per row. The row updates from the
+  // action's own result, then the page re-renders from the server so the
+  // trail, the stats and every other tab agree with it.
+  async function runAction(leadId: string, action: () => Promise<LeadActionResult>) {
+    setActionError(null);
+    setPendingId(leadId);
+    try {
+      const result = await action();
+      if (!result.ok) {
+        setActionError(result.error);
+        return;
+      }
+      setLeads((prev) =>
+        prev.map((lead) =>
+          lead.id === leadId
+            ? {
+                ...lead,
+                leadStatus: result.status,
+                assignedTo: result.assignedTo,
+                assigneeName: result.assigneeName,
+                lastActivityAt: new Date().toISOString(),
+              }
+            : lead
+        )
+      );
+      router.refresh();
+    } finally {
+      setPendingId(null);
+    }
+  }
 
-  // Built here rather than at module scope so the sortable headers can close
-  // over the current sort state, and so the Source column can drop out
-  // entirely when this account has no tagged traffic.
+  function handleAssignSelect(lead: LeadItem, value: string) {
+    if (value === "") return runAction(lead.id, () => unassignLead(lead.id));
+    if (value === currentUserId) return runAction(lead.id, () => claimLead(lead.id));
+    return runAction(lead.id, () => assignLead(lead.id, value));
+  }
+
+  // A column that is the same dash on every row is not a column. Fit is shown
+  // only once something in scope has actually been scored for it (it was
+  // seventeen dashes on this account), and Study goes away the moment a
+  // single study card is selected, because the study is already the context.
+  //
+  // Measured against the study scope rather than the fully filtered rows on
+  // purpose: keying it off the filtered set lets the Fit 7+ toggle empty the
+  // table, hide the Fit column, and take its own off-switch with it.
+  const showFitColumn = scopedLeads.some((lead) => lead.fitScore !== null);
+  const showStudyColumn = surveyFilter === null;
+  const showActionColumn = permissions.claim || permissions.assignOthers;
+
+  const studyColumn: Column<LeadItem> = {
+    key: "survey",
+    header: "Study",
+    width: 0.14,
+    truncate: true,
+    title: (lead) => lead.surveyTitle,
+    cell: (lead) => <span className="text-muted-foreground">{lead.surveyTitle}</span>,
+  };
+
+  const fitColumn: Column<LeadItem> = {
+    key: "fit",
+    header: "Fit",
+    align: "center",
+    width: "xs",
+    sortable: true,
+    sortValue: (lead) => lead.fitScore,
+    cell: (lead) => (
+      <span
+        title={
+          lead.fitConfidence === "unavailable"
+            ? "Company fit research was unavailable."
+            : (lead.fitReasoning ?? undefined)
+        }
+      >
+        <ScoreBadge score={lead.fitScore} />
+      </span>
+    ),
+  };
+
+  // The documented pattern for an interactive cell inside a linked row: the
+  // control keeps its pointer events (DataTable) and the click stops here.
+  // See the DataTable entry on /admin/styleguide.
+  const actionColumn: Column<LeadItem> = {
+    key: "assign",
+    header: "Assign",
+    width: "lg",
+    cell: (lead) => {
+      const pending = pendingId === lead.id;
+      return (
+        <span
+          className="flex items-center gap-2"
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          {permissions.claim && !lead.assignedTo && (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={pending}
+              onClick={() => runAction(lead.id, () => claimLead(lead.id))}
+            >
+              {pending ? "Claiming" : "Claim"}
+            </Button>
+          )}
+          {permissions.assignOthers && (
+            <select
+              value={lead.assignedTo ?? ""}
+              disabled={pending}
+              onChange={(event) => handleAssignSelect(lead, event.target.value)}
+              aria-label={`Assign ${lead.name || "this lead"} to a teammate`}
+              className={ROW_SELECT_CLASSES}
+            >
+              <option value="">Unassigned</option>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.id === currentUserId ? "Me" : member.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </span>
+      );
+    },
+  };
+
   const columns: Column<LeadItem>[] = [
     {
       key: "name",
-      header: "Name",
+      header: "Respondent",
+      width: showStudyColumn ? 0.18 : 0.26,
+      truncate: true,
+      title: (lead) => lead.name ?? undefined,
       cell: (lead) => (
-        <span className="flex items-center gap-3">
-          <span
-            aria-hidden
-            className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-pill bg-brand-weak font-archivo text-micro font-bold text-brand-text"
-          >
-            {initialsOf(lead.name)}
-          </span>
-          <span className="font-medium">{lead.name || EMPTY_VALUE}</span>
-          {lead.isTest && <Badge variant="warning" size="sm">Test</Badge>}
+        <span className="whitespace-nowrap">
+          <span className="align-middle font-medium">{lead.name || EMPTY_VALUE}</span>
+          {lead.isTest && (
+            <Badge variant="warning" size="sm" className="ml-2 align-middle">
+              Test
+            </Badge>
+          )}
         </span>
       ),
     },
-    { key: "company", header: "Company", cell: (lead) => <span className="text-muted-foreground">{lead.company || EMPTY_VALUE}</span> },
-    { key: "survey", header: "Survey", cell: (lead) => <span className="text-muted-foreground">{lead.surveyTitle}</span> },
-    ...(sourceOptions.length > 0
-      ? [{ key: "source", header: "Source", cell: (lead: LeadItem) => <span className="text-muted-foreground">{lead.source || EMPTY_VALUE}</span> }]
-      : []),
+    {
+      key: "company",
+      header: "Company",
+      width: showStudyColumn ? 0.14 : 0.2,
+      truncate: true,
+      title: (lead) => lead.company ?? undefined,
+      cell: (lead) => (
+        <span className="text-muted-foreground">{lead.company || EMPTY_VALUE}</span>
+      ),
+    },
+    ...(showStudyColumn ? [studyColumn] : []),
     {
       key: "score",
-      header: <SortHeader label="Score" active={sortColumn === "score"} dir={sortDir} onClick={() => toggleSort("score")} />,
-      ariaSort: sortColumn === "score" ? (sortDir === "desc" ? "descending" : "ascending") : "none",
-      width: "110px",
-      cell: (lead) =>
-        lead.leadScore === null ? (
-          <span className="text-muted-foreground">{EMPTY_VALUE}</span>
-        ) : (
-          <ScoreMeter score={lead.leadScore} tone="lead" />
-        ),
+      header: "Score",
+      align: "center",
+      width: "xs",
+      sortable: true,
+      sortValue: (lead) => lead.leadScore,
+      cell: (lead) => <ScoreBadge score={lead.leadScore} />,
     },
-    {
-      key: "fit",
-      header: (
-        <SortHeader
-          label="Fit"
-          active={sortColumn === "fit"}
-          dir={sortDir}
-          onClick={() => toggleSort("fit")}
-          title="Company fit: how well this company matches your ICP, scored separately from lead score."
-        />
-      ),
-      ariaSort: sortColumn === "fit" ? (sortDir === "desc" ? "descending" : "ascending") : "none",
-      width: "150px",
-      cell: (lead) =>
-        lead.fitConfidence === "unavailable" ? (
-          <span className="text-muted-foreground" title="Company fit research was unavailable.">
-            {EMPTY_VALUE}
-          </span>
-        ) : lead.fitScore !== null ? (
-          <span className="inline-flex items-center gap-1.5" title={lead.fitReasoning ?? undefined}>
-            <ScoreMeter score={lead.fitScore} tone="fit" />
-            {lead.fitConfidence === "low" && (
-              <span className="text-micro text-muted-foreground" title="Limited data, low-confidence estimate.">
-                limited data
-              </span>
-            )}
-          </span>
-        ) : (
-          <span className="text-muted-foreground" title="Not yet scored.">
-            {EMPTY_VALUE}
-          </span>
-        ),
-    },
+    ...(showFitColumn ? [fitColumn] : []),
     {
       key: "status",
       header: "Status",
-      cell: (lead) => (
-        <StatusControl
-          responseId={lead.id}
-          initialStatus={lead.status}
-          onStatusChange={(status) => handleStatusChange(lead.id, status)}
-        />
-      ),
+      width: "md",
+      cell: (lead) => <LeadStatusBadge status={lead.leadStatus} size="sm" />,
     },
     {
-      key: "signal",
-      header: "Signal",
+      key: "assignee",
+      header: "Assignee",
+      width: 0.12,
+      truncate: true,
+      title: (lead) => lead.assigneeName ?? undefined,
       cell: (lead) => (
-        <span className="block max-w-[260px] truncate text-muted-foreground" title={lead.topPainPoint ?? undefined}>
-          {lead.topPainPoint || EMPTY_VALUE}
+        <span className={lead.assigneeName ? undefined : "text-muted-foreground"}>
+          {lead.assignedTo === currentUserId ? "Me" : (lead.assigneeName ?? EMPTY_VALUE)}
         </span>
       ),
     },
     {
-      key: "completed",
-      header: "Completed",
+      key: "activity",
+      header: "Last activity",
       align: "right",
-      width: "116px",
-      // suppressHydrationWarning: relative time is computed from Date.now(),
-      // which can differ between the server render and hydration across a
-      // minute boundary.
+      // md, not sm: the header is sortable, and its chevron plus the
+      // uppercase tracked label does not fit in the smaller step.
+      width: "md",
+      sortable: true,
+      sortValue: (lead) => new Date(lead.lastActivityAt).getTime(),
       cell: (lead) => (
-        <span className="text-muted-foreground" suppressHydrationWarning>
-          {formatRelativeTime(lead.createdAt)}
-        </span>
+        <RelativeTime date={lead.lastActivityAt} align="right" className="text-muted-foreground" />
       ),
     },
+    ...(showActionColumn ? [actionColumn] : []),
   ];
+
+  // The server hands rows back score-desc, then most recently touched, which
+  // is the order this queue is meant to be worked in, so the default sort is
+  // no sort.
+  const { rows, sort, onSort } = useTableSort(filtered, columns);
+
+  // The tab's own sentence when the tab is genuinely empty; the filter
+  // sentence when it is the search or a toggle that emptied it.
+  const emptyTitle = tabCounts[tab] === 0 ? TAB_EMPTY[tab] : "No leads match these filters.";
 
   return (
     <>
-      {/* The count chip and the subline both restate the selected survey card,
-          which is why the masthead lives in here rather than on the server
-          page. It still renders the shared PageHeader. */}
-      <PageHeader
-        eyebrow="Leads"
-        title="Your lead queue"
-        badge={<Badge variant="count">{statusCounts.all}</Badge>}
-        subtitle={
-          awaitingReply === 0
-            ? "Nobody is waiting on a reply right now."
-            : `${awaitingReply} scored ${HOT_SCORE_MIN} or higher and ${
-                awaitingReply === 1 ? "has" : "have"
-              } not heard back yet.`
-        }
-      />
+      <StatRow stats={stats} className="mb-6" />
 
-      <div className="mb-5">
+      <div className="mb-4">
         <SurveyFilterCards cards={surveyCards} selectedId={surveyFilter} onSelect={setSurveyFilter} />
       </div>
 
-      <div className="mb-5 flex flex-wrap items-center gap-3">
+      {/* One toolbar row: which leads (tabs) on the left, search, source and
+          the two narrowing toggles on the right. Wraps below the container
+          width rather than reserving a second row of chrome. */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <FilterTabs
-          label="Filter leads by status"
-          tabs={STATUS_FILTERS.map((f) => ({ ...f, count: statusCounts[f.value] }))}
-          value={statusFilter}
-          onChange={selectStatus}
+          label="Filter leads by stage"
+          tabs={QUEUE_TABS.map((value) => ({ value, label: TAB_LABELS[value], count: tabCounts[value] }))}
+          value={tab}
+          onChange={selectTab}
         />
 
-        <SearchInput
-          value={query}
-          onChange={setQuery}
-          placeholder="Name, company, keyword"
-          label="Search leads by name, email, or company"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchInput
+            value={query}
+            onChange={setQuery}
+            placeholder="Name, email, company"
+            label="Search leads by name, email, or company"
+            className="w-64 max-w-none flex-none"
+          />
 
-        {sourceOptions.length > 0 && (
           <select
-            value={sourceFilter}
-            onChange={(e) => setSourceFilter(e.target.value)}
-            aria-label="Filter by source"
+            value={showTest ? TEST_SOURCE_VALUE : sourceFilter}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === TEST_SOURCE_VALUE) {
+                setShowTest(true);
+                setSourceFilter("all");
+                return;
+              }
+              setShowTest(false);
+              setSourceFilter(value);
+            }}
+            aria-label="Choose which responses the queue reads from"
             className={SELECT_CLASSES}
           >
             <option value="all">All sources</option>
@@ -470,44 +537,50 @@ export function LeadsQueue({
                 {source}
               </option>
             ))}
+            <option value={TEST_SOURCE_VALUE}>Include test responses</option>
           </select>
-        )}
 
-        {/* Kept as explicit toggles rather than folded into a generic
-            "+ Filter" menu: all three already work, and hiding working
-            filters behind a menu would cost function for nothing. */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {[
-            { label: `Score ${HOT_SCORE_MIN}+`, on: hotOnly, toggle: () => setHotOnly((p) => !p) },
-            { label: `Fit ${HOT_FIT_MIN}+`, on: fitHotOnly, toggle: () => setFitHotOnly((p) => !p) },
-            { label: "Show test", on: showTest, toggle: () => setShowTest((p) => !p) },
-          ].map((chip) => (
+          <Button
+            type="button"
+            size="sm"
+            variant={hotOnly ? "primary" : "secondary"}
+            onClick={() => setHotOnly((p) => !p)}
+            aria-pressed={hotOnly}
+          >
+            Score {WORTH_A_CALL_SCORE_MIN}+
+          </Button>
+          {/* Only offered when at least one row in view has a fit score. A
+              filter for a value nothing has is a dead control. */}
+          {showFitColumn && (
             <Button
-              key={chip.label}
               type="button"
               size="sm"
-              variant={chip.on ? "primary" : "secondary"}
-              onClick={chip.toggle}
-              aria-pressed={chip.on}
+              variant={fitHotOnly ? "primary" : "secondary"}
+              onClick={() => setFitHotOnly((p) => !p)}
+              aria-pressed={fitHotOnly}
             >
-              {chip.label}
+              Fit {HOT_FIT_MIN}+
             </Button>
-          ))}
+          )}
         </div>
       </div>
 
-      <Card padding="flush">
-        <DataTable
-          columns={columns}
-          rows={filtered}
-          rowKey={(lead) => lead.id}
-          rowHref={(lead) => `/admin/responses/${lead.id}`}
-          empty={{
-            title: "No leads match your filters",
-            description: "Try a different search, or clear the filters above.",
-          }}
-        />
-      </Card>
+      {actionError && (
+        <p role="alert" className="type-body-sm mb-3 text-destructive">
+          {actionError}
+        </p>
+      )}
+
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(lead) => lead.id}
+        rowHref={(lead) => `/admin/responses/${lead.id}`}
+        layout="fixed"
+        sort={sort}
+        onSort={onSort}
+        empty={{ title: emptyTitle }}
+      />
     </>
   );
 }
