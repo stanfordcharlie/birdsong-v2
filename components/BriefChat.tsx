@@ -17,6 +17,46 @@ export type BriefResult = {
   transcript: BriefMessage[];
 };
 
+// --- Response reading --------------------------------------------------------
+//
+// The brief routes answer with JSON on every path they control, including
+// failures ({ error, code, requestId }). A body that is not JSON means the
+// request never reached the route (a platform error page, a proxy), and a
+// fetch that rejects means it never left the browser. Each of those reads
+// differently to the person, so they are told apart here rather than all
+// collapsing into one sentence.
+
+const NETWORK_FAILURE = "Couldn't reach Birdsong. Check your connection and try again.";
+
+async function readJson(res: Response): Promise<Record<string, unknown> | null> {
+  let text = "";
+  try {
+    text = await res.text();
+  } catch {
+    return null;
+  }
+  if (!text) return null;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The server's own sentence when it sent one, with its request id; a status-bearing fallback otherwise. */
+function failureMessage(res: Response, data: Record<string, unknown> | null, fallback: string): string {
+  const serverMessage = typeof data?.error === "string" && data.error.trim() ? data.error.trim() : null;
+  const requestId = typeof data?.requestId === "string" && data.requestId ? data.requestId : null;
+  const base = serverMessage ?? `${fallback} (HTTP ${res.status}).`;
+  return requestId ? `${base} Request ${requestId}.` : base;
+}
+
+function isNetworkFailure(err: unknown): boolean {
+  // fetch rejects with a TypeError when the request never completed.
+  return err instanceof TypeError;
+}
+
 /**
  * The brief chat: a short conversational intake that replaces authoring a
  * question guide by hand.
@@ -89,19 +129,36 @@ export function BriefChat({
     setPendingBrief(brief);
     setDrafting(true);
     setError(null);
+    let res: Response;
     try {
-      const res = await fetch("/api/surveys/brief/guide", {
+      res = await fetch("/api/surveys/brief/guide", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ brief }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't draft the guide");
-      onGenerated({ brief, guide: data.guide, report: data.report, transcript });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't draft the guide");
+      setError(isNetworkFailure(err) ? NETWORK_FAILURE : "Couldn't draft the guide. Try again.");
       setDrafting(false);
+      return;
     }
+
+    const data = await readJson(res);
+    if (!res.ok) {
+      setError(failureMessage(res, data, "Couldn't draft the guide"));
+      setDrafting(false);
+      return;
+    }
+    if (!data || typeof data.guide !== "object" || data.guide === null) {
+      setError(failureMessage(res, data, "The guide came back empty"));
+      setDrafting(false);
+      return;
+    }
+    onGenerated({
+      brief,
+      guide: data.guide as StructuredGuide,
+      report: data.report as CriticReport,
+      transcript,
+    });
   }
 
   async function submitAnswer() {
@@ -112,35 +169,68 @@ export function BriefChat({
     // even if the reader had scrolled up to re-read something.
     pinnedToBottomRef.current = true;
 
-    const next: BriefMessage[] = [...messages, { role: "user", content: answer }];
+    const sent = answer;
+    const next: BriefMessage[] = [...messages, { role: "user", content: sent }];
     setMessages(next);
     setAnswer("");
     setLoading(true);
 
+    // A turn that did not land is taken back out of the thread and put back
+    // in the composer, so the person can send it again (or fix it) without
+    // retyping, and the transcript never carries a question nobody answered.
+    function restore(message: string) {
+      setMessages(messages);
+      setAnswer(sent);
+      setError(message);
+      setLoading(false);
+    }
+
+    let res: Response;
     try {
-      const res = await fetch("/api/surveys/brief/continue", {
+      res = await fetch("/api/surveys/brief/continue", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: next, known }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Something went wrong");
-
-      if (data.complete) {
-        const closing: BriefMessage = { role: "assistant", content: data.closing };
-        const transcript = [...next, closing];
-        setMessages(transcript);
-        setLoading(false);
-        await draftGuide(data.brief, transcript);
-        return;
-      }
-
-      setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
+      restore(isNetworkFailure(err) ? NETWORK_FAILURE : "Something went wrong sending that. Try again.");
+      return;
     }
+
+    const data = await readJson(res);
+
+    // Case 1: the request failed. The server's sentence and request id when
+    // it sent them, the HTTP status when it did not.
+    if (!res.ok) {
+      restore(failureMessage(res, data, "That message didn't go through"));
+      return;
+    }
+
+    // Case 3: the brief is complete. The closing line is the assistant's
+    // last word, and drafting starts without asking.
+    if (data?.complete === true) {
+      const closingText =
+        typeof data.closing === "string" && data.closing.trim()
+          ? data.closing
+          : "That's what I need. Drafting the research guide now.";
+      const closing: BriefMessage = { role: "assistant", content: closingText };
+      const transcript = [...next, closing];
+      setMessages(transcript);
+      setLoading(false);
+      await draftGuide(data.brief as ExtractedBrief, transcript);
+      return;
+    }
+
+    // Case 2: a 200 with nothing to show. Distinct from a failure: the
+    // request worked and the model simply said nothing usable.
+    const reply = typeof data?.message === "string" ? data.message.trim() : "";
+    if (!reply) {
+      restore(failureMessage(res, data, "The model returned no text. Try sending that again"));
+      return;
+    }
+
+    setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+    setLoading(false);
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {

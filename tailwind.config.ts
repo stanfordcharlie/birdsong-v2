@@ -20,6 +20,13 @@ const config: Config = {
         "lp-stack": { max: "1080px" },
         "lp-nav": { max: "920px" },
         "lp-mobile": { max: "760px" },
+        // Respondent question screen (app/survey/[slug]): height tiers that
+        // compact the column so a short laptop window still fits the whole
+        // screen without scrolling. Raw media queries, since Tailwind screens
+        // are width-based by default. Listed after the width screens so a
+        // `short:sm:` rule is emitted after, and wins over, its `sm:` base.
+        short: { raw: "(max-height: 820px)" },
+        xshort: { raw: "(max-height: 700px)" },
       },
       colors: {
         // Legacy tokens, left as-is — see app/globals.css for why.
@@ -72,6 +79,8 @@ const config: Config = {
         input: "hsl(var(--ds-input) / <alpha-value>)",
         ring: "hsl(var(--ds-ring) / <alpha-value>)",
         chip: "hsl(var(--ds-chip) / <alpha-value>)",
+        // A sunk panel inside a card (Home's transcript preview).
+        surface: "hsl(var(--ds-surface) / <alpha-value>)",
 
         // Admin design system, unified pass (app/globals.css). `accent` above
         // is a legacy alias for the neutral grey chip fill and is NOT this —

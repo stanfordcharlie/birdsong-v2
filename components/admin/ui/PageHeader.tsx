@@ -16,6 +16,9 @@ import { cn } from "@/lib/utils";
  * - `subtitle` survives for the one or two pages that need a sentence. Most
  *   pages should not pass it.
  * - No H1 carries a terminal period.
+ * - `title` is a string on every page but Home, whose greeting carries the
+ *   time of day from the visitor's clock (a client component). A string is
+ *   still stripped of a terminal period; a node is rendered as given.
  */
 export function PageHeader({
   eyebrow,
@@ -27,7 +30,7 @@ export function PageHeader({
   className,
 }: {
   eyebrow?: React.ReactNode;
-  title: string;
+  title: React.ReactNode;
   badge?: React.ReactNode;
   meta?: React.ReactNode;
   subtitle?: React.ReactNode;
@@ -42,7 +45,7 @@ export function PageHeader({
           {/* Stripped rather than asserted: a title passed in with a period
               would otherwise reintroduce the one inconsistency this role
               exists to prevent. */}
-          <h1 className="type-page-title">{title.replace(/\.$/, "")}</h1>
+          <h1 className="type-page-title">{typeof title === "string" ? title.replace(/\.$/, "") : title}</h1>
           {badge}
         </div>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}

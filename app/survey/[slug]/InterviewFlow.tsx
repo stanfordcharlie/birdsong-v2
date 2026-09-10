@@ -15,13 +15,14 @@ import {
   parseActiveSession,
   serializeActiveSession,
 } from "@/lib/interview/active-session";
-import { Badge } from "@/components/ui/badge";
 import { PerchedBird } from "@/components/marketing/PerchedBird";
 import { SurveyThemeToggle } from "./SurveyTheme";
+import { AmbientBackdrop, Footer, PillArrow, PoweredBy, TestModeBadge, WelcomeBird } from "./SurveyChrome";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate, useFlybyGate } from "@/components/useLoadingGate";
 import { renderWithBold } from "@/lib/chat/render-with-bold";
+import { questionSegments, splitQuestion, stripBold } from "@/lib/interview/split-question";
 import { useSurveyPresence } from "@/lib/presence/use-survey-presence";
 import { newsreader, bricolage } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
@@ -58,7 +59,6 @@ type Stage = "welcome" | "intro" | "chat" | "complete";
 // reintroduce raw hex here: a literal will not switch, and a single one is
 // enough to make a themed screen look broken.
 const SURVEY_GROUND = "hsl(var(--sv-ground))";
-const CARD_SHADOW = "var(--sv-shadow-soft)";
 
 // The dark pill, matching "Let's get started" exactly (see the welcome CTA).
 const PILL_BUTTON =
@@ -69,7 +69,7 @@ const RESPONDENT_BUBBLE =
 
 const FIELD_LABEL_CLASSES = "text-[13px] font-semibold text-survey-muted";
 // Same surface the welcome screen's interviewer card uses (survey-surface on
-// a survey-border hairline with CARD_SHADOW), just at input proportions.
+// a survey-border hairline with --sv-shadow-soft), just at input proportions.
 //
 // text-base (16px) is load-bearing on iOS, not just a type choice: Safari
 // auto-zooms the whole page on focus for any input under 16px and never
@@ -84,11 +84,6 @@ const INTRO_BIRD_NOTES = [
   { glyph: "♪", top: "-7px", left: "41px", fontSize: "18px", delaySeconds: 0 },
   { glyph: "♫", top: "2px", left: "50px", fontSize: "14px", delaySeconds: 1.1 },
 ];
-
-// Ship chip auto-submit behind a flag per the handoff ("fallback is today's
-// prefill-the-composer behavior") — flip to false to fall back.
-const INSTANT_CHIP_SUBMIT = true;
-const CHIP_AUTO_SUBMIT_DELAY_MS = 260;
 
 // No skip sentinel exists in the interview prompt/model (out of scope to
 // add one here), so Skip sends a plain, natural-reading reply the
@@ -197,12 +192,6 @@ function useKeyboardInset() {
 type QuestionReveal = "pop" | "fade" | "none";
 const QUESTION_REVEAL: QuestionReveal = "pop";
 
-const QUESTION_REVEAL_CLASS: Record<QuestionReveal, string> = {
-  pop: "q-reveal-pop",
-  fade: "q-reveal-fade",
-  none: "",
-};
-
 // How long the typing dots take to fade out before the question lands —
 // keep in sync with TypingDots' motion-safe:duration-150.
 const DOTS_FADE_MS = 150;
@@ -213,31 +202,11 @@ const DOTS_FADE_MS = 150;
 // until they've paused typing for this long.
 const TYPING_PAUSE_MS = 10000;
 
-// The share of the interview that is answered. The total is a hard cap
-// enforced by the server, so this is a plain fraction: the bar reaches 100%
-// only on the completion screen, when every question has been answered.
-function computeProgressPercent(answered: number, target: number): number {
-  if (target <= 0) return 0;
-  return Math.min(100, Math.round((answered / target) * 100));
-}
-
 // The question currently on screen. `answered` can equal `target` only on
 // the completion screen (which does not render this), and an early wrap-up
 // leaves it below; the clamp is belt and braces against a stale count.
 function displayedQuestionNumber(answered: number, target: number): number {
   return Math.min(answered + 1, Math.max(1, target));
-}
-
-function TopProgressLine({ answered, target }: { answered: number; target: number }) {
-  const percent = computeProgressPercent(answered, target);
-  return (
-    <div aria-hidden="true" className="fixed inset-x-0 top-0 z-30 h-1 bg-survey-ink/[0.08]">
-      <div
-        className="h-full rounded-r-sm bg-survey-accent transition-[width] duration-[450ms] ease-[cubic-bezier(.4,0,.2,1)]"
-        style={{ width: `${percent}%` }}
-      />
-    </div>
-  );
 }
 
 // Respondents are one-and-done: a survey they've already finished should
@@ -246,97 +215,6 @@ function TopProgressLine({ answered, target }: { answered: number; target: numbe
 // state, is what makes that stick across a full page reload.
 function completionStorageKey(surveyId: string) {
   return `birdsong-survey-complete:${surveyId}`;
-}
-
-function TestModeBadge({ isTest }: { isTest: boolean }) {
-  if (!isTest) return null;
-  return (
-    <div className="fixed right-4 top-4 z-20">
-      <Badge variant="warning">Test mode</Badge>
-    </div>
-  );
-}
-
-// The Birdsong mascot as used across the welcome screen
-// (design_handoff_survey_welcome). Same 48x44 path as the marketing BirdMark,
-// but the welcome renders it at three sizes with different fills (ink body +
-// eggshell eye in the cluster; eggshell body on the ink interviewer avatar;
-// ink body in the footer), so it's inlined here with explicit fills rather
-// than routed through BirdMark's landing-token fills.
-function WelcomeBird({
-  width,
-  height,
-  fill,
-  eyeFill,
-  className,
-}: {
-  width: number;
-  height: number;
-  fill: string;
-  eyeFill?: string;
-  className?: string;
-}) {
-  return (
-    <svg width={width} height={height} viewBox="0 0 48 44" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M10 40 L19.5 28.5 C11.5 27.5 5.5 21.5 5.5 13.5 C5.5 9.5 7.5 5.5 10.5 4.5 C11.5 10.5 16.5 13.5 22.5 13.5 C31.5 13.5 38.5 19.5 38.5 27.5 C38.5 29 38.2 30.4 37.6 31.8 L44.5 34.5 L36.5 35 C33.5 38.5 28.5 40.5 23 40.5 L14.5 40.5 Z"
-        fill={fill}
-      />
-      {eyeFill && <circle cx="33" cy="25.5" r="1.8" fill={eyeFill} />}
-    </svg>
-  );
-}
-
-// The welcome screen's decorative ambient layer, lifted verbatim (two top
-// radial washes, two blurred drifting blobs, three drifting note glyphs) so
-// the intro and chat stages sit on the same ground rather than their own
-// warm wash. Purely decorative, aria-hidden, and pointer-events-none, so it
-// never sits between the respondent and a field. Needs a `relative` parent.
-function AmbientBackdrop() {
-  return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-0 overflow-hidden"
-      style={{
-        background:
-          "radial-gradient(760px 420px at 24% -8%, var(--sv-tint-accent), transparent 60%), radial-gradient(760px 420px at 76% -10%, var(--sv-tint-info), transparent 60%)",
-      }}
-    >
-      <div
-        className="sw-blob-a absolute left-[6%] top-[-80px] h-[300px] w-[300px] rounded-full"
-        style={{ background: "hsl(var(--sv-accent-bg))", opacity: 0.5, filter: "blur(70px)" }}
-      />
-      <div
-        className="sw-blob-b absolute right-[5%] top-[-60px] h-[280px] w-[280px] rounded-full"
-        style={{ background: "hsl(var(--sv-info-bg))", opacity: 0.55, filter: "blur(70px)" }}
-      />
-      <span className="sw-bgnote-a absolute left-[14%] top-[14%] text-[20px]" style={{ color: "hsl(var(--sv-accent))", opacity: 0.4 }}>
-        &#9834;
-      </span>
-      <span className="sw-bgnote-b absolute right-[18%] top-[10%] text-[17px]" style={{ color: "hsl(var(--sv-info))", opacity: 0.4 }}>
-        &#9835;
-      </span>
-      <span className="sw-bgnote-c absolute right-[9%] top-[64%] text-[15px]" style={{ color: "hsl(var(--sv-faint))", opacity: 0.45 }}>
-        &#9834;
-      </span>
-    </div>
-  );
-}
-
-// The arrow inside the welcome CTA, so every dark pill in the flow carries
-// the same one.
-function PillArrow() {
-  return (
-    <svg width="20" height="12" viewBox="0 0 22 12" fill="none" aria-hidden="true">
-      <path
-        d="M1 6h18m0 0l-4-4.5M19 6l-4 4.5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
 }
 
 // Live name/email validation tick (intro only): pops in via the `pop`
@@ -525,10 +403,6 @@ export function InterviewFlow({
   // Enter-to-advance can focus "whichever field is next" without hardcoding
   // which optional fields this particular survey has enabled.
   const fieldRefs = useRef<Array<HTMLInputElement | null>>([]);
-  // Pending chip auto-submit timer, so a second chip tap, manual typing, or
-  // an explicit send/skip can all cancel a still-pending one and avoid a
-  // double-send.
-  const chipSubmitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Guards the test-mode auto-start against React's double-invoked mount
   // effects in development, which would otherwise open two interviews (and
   // create two response rows) on every preview.
@@ -556,7 +430,6 @@ export function InterviewFlow({
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      if (chipSubmitTimeoutRef.current) clearTimeout(chipSubmitTimeoutRef.current);
     };
   }, []);
 
@@ -722,13 +595,6 @@ export function InterviewFlow({
       const idleMs = Date.now() - lastKeystrokeAtRef.current;
       if (idleMs >= TYPING_PAUSE_MS) return;
       await wait(TYPING_PAUSE_MS - idleMs);
-    }
-  }
-
-  function clearPendingChipSubmit() {
-    if (chipSubmitTimeoutRef.current) {
-      clearTimeout(chipSubmitTimeoutRef.current);
-      chipSubmitTimeoutRef.current = null;
     }
   }
 
@@ -934,7 +800,6 @@ export function InterviewFlow({
 
   async function submitAnswerContent(content: string) {
     if (!content.trim() || !responseId || loading) return;
-    clearPendingChipSubmit();
     setError(null);
     // Typing a fresh answer instead of retrying replaces the failed one
     // rather than letting both exist — simpler to reason about than
@@ -952,12 +817,6 @@ export function InterviewFlow({
     setMessages(updatedMessages);
     setAnswer("");
     setChips([]);
-    // The textarea's height is grown via direct DOM mutation as the
-    // respondent types (see onChange below), so clearing the React state
-    // alone doesn't shrink it back down; reset it explicitly.
-    if (answerInputRef.current) {
-      answerInputRef.current.style.height = "auto";
-    }
     // The keystrokes that just composed this answer shouldn't count as
     // "still typing" against the next reveal's pause check — without this
     // reset, every send looks stalled for a full TYPING_PAUSE_MS because
@@ -968,8 +827,17 @@ export function InterviewFlow({
     await sendMessage(content, updatedMessages);
   }
 
+  // What Continue (and Enter) actually sends. A picked chip and typed text
+  // can coexist: the chip is the short answer, the text is the elaboration,
+  // and the interviewer should see both. Empty when neither is present, which
+  // submitAnswerContent treats as nothing to send.
+  function composeAnswer(): string {
+    const chip = pickedChipIndex !== null ? chips[pickedChipIndex] : null;
+    return [chip, answer.trim()].filter(Boolean).join("\n");
+  }
+
   async function submitAnswer() {
-    await submitAnswerContent(answer);
+    await submitAnswerContent(composeAnswer());
   }
 
   // Resends the exact content of the last failed message. Doesn't touch
@@ -991,31 +859,15 @@ export function InterviewFlow({
 
   function handleSkip() {
     if (!responseId || loading) return;
-    clearPendingChipSubmit();
     submitAnswerContent(SKIP_MESSAGE_CONTENT);
   }
 
-  // Selecting a chip fills the composer and, unless the fallback flag is
-  // off, auto-submits it after a brief flash so the tap itself reads as the
-  // answer. Any later chip tap, manual typing, explicit send, or skip
-  // cancels a still-pending timer (see clearPendingChipSubmit call sites)
-  // so at most one submission for this turn ever goes out.
-  function handleChipTap(index: number, chipText: string) {
-    clearPendingChipSubmit();
-    setAnswer(chipText);
-    setPickedChipIndex(index);
-    if (!INSTANT_CHIP_SUBMIT) {
-      const el = answerInputRef.current;
-      if (el) {
-        el.focus();
-        requestAnimationFrame(() => el.setSelectionRange(el.value.length, el.value.length));
-      }
-      return;
-    }
-    chipSubmitTimeoutRef.current = setTimeout(() => {
-      chipSubmitTimeoutRef.current = null;
-      submitAnswerContent(chipText);
-    }, CHIP_AUTO_SUBMIT_DELAY_MS);
+  // Chips are a single-select toggle: tapping one picks it, tapping the
+  // picked one clears it. Nothing is sent until Send (or Enter), and the
+  // answer box is left alone so a respondent can add to a chip in their own
+  // words.
+  function handleChipTap(index: number) {
+    setPickedChipIndex((prev) => (prev === index ? null : index));
   }
 
   // Plain Enter sends (Cmd/Ctrl+Enter falls under the same check, since
@@ -1074,34 +926,7 @@ export function InterviewFlow({
         <TestModeBadge isTest={isTest} />
         <SurveyThemeToggle offsetForBadge={isTest} />
 
-        {/* Decorative ambient layer: two top radial washes, two blurred
-            drifting color blobs, three drifting note glyphs. aria-hidden. */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 overflow-hidden"
-          style={{
-            background:
-              "radial-gradient(760px 420px at 24% -8%, var(--sv-tint-accent), transparent 60%), radial-gradient(760px 420px at 76% -10%, var(--sv-tint-info), transparent 60%)",
-          }}
-        >
-          <div
-            className="sw-blob-a absolute left-[6%] top-[-80px] h-[300px] w-[300px] rounded-full"
-            style={{ background: "hsl(var(--sv-accent-bg))", opacity: 0.5, filter: "blur(70px)" }}
-          />
-          <div
-            className="sw-blob-b absolute right-[5%] top-[-60px] h-[280px] w-[280px] rounded-full"
-            style={{ background: "hsl(var(--sv-info-bg))", opacity: 0.55, filter: "blur(70px)" }}
-          />
-          <span className="sw-bgnote-a absolute left-[14%] top-[14%] text-[20px]" style={{ color: "hsl(var(--sv-accent))", opacity: 0.4 }}>
-            &#9834;
-          </span>
-          <span className="sw-bgnote-b absolute right-[18%] top-[10%] text-[17px]" style={{ color: "hsl(var(--sv-info))", opacity: 0.4 }}>
-            &#9835;
-          </span>
-          <span className="sw-bgnote-c absolute right-[9%] top-[64%] text-[15px]" style={{ color: "hsl(var(--sv-faint))", opacity: 0.45 }}>
-            &#9834;
-          </span>
-        </div>
+        <AmbientBackdrop />
 
         <main className="relative flex flex-1 items-center justify-center px-5 pb-6 pt-8 sm:px-8 sm:pb-8 sm:pt-12">
           <div className="flex w-full max-w-[640px] flex-col items-center text-center">
@@ -1260,11 +1085,7 @@ export function InterviewFlow({
           className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-6 pt-5"
           style={{ "--sw-delay": "0.4s" } as React.CSSProperties}
         >
-          <span className="text-[13.5px] text-survey-faint">Powered by</span>
-          <a href="/" className="inline-flex items-center gap-[7px]">
-            <WelcomeBird width={17} height={15} fill="hsl(var(--sv-ink))" />
-            <span className="font-bricolage text-[15px] font-bold text-survey-ink">Birdsong</span>
-          </a>
+          <PoweredBy />
         </footer>
       </div>
     );
@@ -1603,33 +1424,7 @@ export function InterviewFlow({
         <TestModeBadge isTest={isTest} />
         <SurveyThemeToggle offsetForBadge={isTest} />
 
-        {/* Decorative ambient layer, identical to the welcome screen. */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 overflow-hidden"
-          style={{
-            background:
-              "radial-gradient(760px 420px at 24% -8%, var(--sv-tint-accent), transparent 60%), radial-gradient(760px 420px at 76% -10%, var(--sv-tint-info), transparent 60%)",
-          }}
-        >
-          <div
-            className="sw-blob-a absolute left-[6%] top-[-80px] h-[300px] w-[300px] rounded-full"
-            style={{ background: "hsl(var(--sv-accent-bg))", opacity: 0.5, filter: "blur(70px)" }}
-          />
-          <div
-            className="sw-blob-b absolute right-[5%] top-[-60px] h-[280px] w-[280px] rounded-full"
-            style={{ background: "hsl(var(--sv-info-bg))", opacity: 0.55, filter: "blur(70px)" }}
-          />
-          <span className="sw-bgnote-a absolute left-[14%] top-[12%] text-[20px]" style={{ color: "hsl(var(--sv-accent))", opacity: 0.4 }}>
-            &#9834;
-          </span>
-          <span className="sw-bgnote-b absolute right-[18%] top-[9%] text-[17px]" style={{ color: "hsl(var(--sv-info))", opacity: 0.4 }}>
-            &#9835;
-          </span>
-          <span className="sw-bgnote-c absolute right-[9%] top-[58%] text-[15px]" style={{ color: "hsl(var(--sv-faint))", opacity: 0.45 }}>
-            &#9834;
-          </span>
-        </div>
+        <AmbientBackdrop />
 
         <main className="relative flex flex-1 items-center justify-center px-5 pb-10 pt-14 sm:px-8 sm:pb-12 sm:pt-20">
           <div className="flex w-full max-w-[640px] flex-col items-center text-center">
@@ -1777,35 +1572,40 @@ export function InterviewFlow({
           className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-[34px] pt-[26px]"
           style={{ "--sw-delay": "0.34s" } as React.CSSProperties}
         >
-          <span className="text-[13.5px] text-survey-faint">Powered by</span>
-          <a href="/" className="inline-flex items-center gap-[7px]">
-            <WelcomeBird width={17} height={15} fill="hsl(var(--sv-ink))" />
-            <span className="font-bricolage text-[15px] font-bold text-survey-ink">Birdsong</span>
-          </a>
+          <PoweredBy />
         </footer>
       </div>
     );
   }
 
+  // Question screen (design_handoff_survey_question). One column, no logo:
+  // progress pills, the interviewer speaking from a bubble, quick-answer
+  // chips, a two-row answer box, then Send / Skip. Every
+  // value (colours, radii, shadows, easings) is the handoff's, routed through
+  // the --sv-* tokens so the dark theme still holds.
   const answeredCount = messages.filter((m) => m.role === "user").length;
   const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant")?.content ?? "";
-  const questionText = lastAssistantMessage;
-  // Drives the progress bar and the "X of Y" counter. The same count the
+  // Drives the progress pills and the "X of Y" counter. The same count the
   // welcome screen quotes and the server enforces, so all three agree.
   const targetQuestionCount = questionCount ?? DEFAULT_TARGET_QUESTION_COUNT;
-  const hasAnswer = answer.trim().length > 0;
+  const currentQuestionNumber = displayedQuestionNumber(answeredCount, targetQuestionCount);
+  const hasAnswer = pickedChipIndex !== null || answer.trim().length > 0;
   // A restored question was already on screen before the reload, so replaying
   // its entrance would animate in something the respondent has been reading
   // for a while. Suppressed for that first render only; the moment they
   // answer, messages.length moves past the restored count and every
   // subsequent question reveals normally.
   const isRestoredRender = restoredMessageCount !== null && messages.length === restoredMessageCount;
-  const questionRevealClass = isRestoredRender
-    ? QUESTION_REVEAL_CLASS.none
-    : QUESTION_REVEAL_CLASS[QUESTION_REVEAL];
-  // Same auto-grow heuristic as the design reference: line count plus a
-  // rough characters-per-line estimate, not actual DOM measurement.
-  const draftRows = Math.min(6, Math.max(2, answer.split("\n").length + Math.floor(answer.length / 70)));
+  // Staggered entrance: opacity 0 -> 1, translateY(14px -> 0), .6s on the
+  // reveal easing, delayed per block (0 / .06 / .18 / .24 / .3 / .4s).
+  // globals.css gates the animation on prefers-reduced-motion.
+  const reveal = (delaySeconds: number): { className?: string; style?: React.CSSProperties } =>
+    isRestoredRender
+      ? {}
+      : { className: "sq-rev", style: { "--sq-delay": `${delaySeconds}s` } as React.CSSProperties };
+
+  const { lead, question } = splitQuestion(lastAssistantMessage);
+  const segments = questionSegments(question);
 
   return (
     <div
@@ -1822,27 +1622,37 @@ export function InterviewFlow({
       }
     >
       <AmbientBackdrop />
-      <TopProgressLine answered={answeredCount} target={targetQuestionCount} />
       <TestModeBadge isTest={isTest} />
-        <SurveyThemeToggle offsetForBadge={isTest} />
+      <SurveyThemeToggle offsetForBadge={isTest} />
 
+      {/* On phones the fixed theme toggle (and, for an owner preview, the
+          test-mode pill above it) sits in the top-right corner where the
+          progress label would be, so the stage starts below them. From sm up
+          the column is centred with room on both sides and the handoff's
+          24px top padding applies. */}
       <div
         ref={stageRef}
-        className="survey-stage relative flex flex-1 items-center justify-center px-5 py-8 sm:px-6 sm:py-16"
+        className={cn(
+          "survey-stage relative flex flex-1 justify-center px-5 pb-3 sm:px-8 sm:pt-6 short:pb-2 short:sm:pt-4",
+          isTest ? "pt-[104px]" : "pt-[64px]"
+        )}
       >
-        <div className="w-full max-w-[640px]">
+        {/* my-auto rather than items-center on the stage: auto margins
+            center the column when there's room and collapse to 0 when it
+            overflows, so a scrolling stage starts at the top of the
+            question instead of clipping it. */}
+        <div className="my-auto flex w-full max-w-[680px] flex-col">
           {/* Hidden live regions, always mounted (a live region only fires
               if it exists before its content changes). Two separate regions
               on purpose: the question region's content is derived from
-              `messages`, which updates exactly once per question — when the
-              finished question is appended in revealAssistantMessage — so
-              each question is announced once, in full, regardless of the
-              visual entrance animation. The status region handles transient
-              state (typing, send failure); it flips to "" when the question
-              lands, and an empty update announces nothing. Politeness is
-              deliberate — no assertive interruptions anywhere. */}
+              `messages`, which updates exactly once per question, so each
+              question is announced once, in full, regardless of the visual
+              entrance. The status region handles transient state (typing,
+              send failure); it flips to "" when the question lands, and an
+              empty update announces nothing. Politeness is deliberate: no
+              assertive interruptions anywhere. */}
           <div aria-live="polite" aria-atomic="true" className="sr-only">
-            {lastAssistantMessage.replace(/\*\*/g, "")}
+            {stripBold(lastAssistantMessage)}
           </div>
           <div role="status" className="sr-only">
             {isTyping
@@ -1852,184 +1662,211 @@ export function InterviewFlow({
                 : ""}
           </div>
 
-          {isTyping ? (
-            showBirdLoader && (
+          {/* Progress. Mounted once for the whole chat stage (not keyed on
+              the question) so the pills transition between states with the
+              spring rather than remounting. */}
+          <div
+            className={cn("mb-6 flex items-center gap-3.5 short:mb-4 xshort:mb-3", reveal(0).className)} style={reveal(0).style}
+            role="progressbar"
+            aria-valuemin={1}
+            aria-valuemax={targetQuestionCount}
+            aria-valuenow={currentQuestionNumber}
+            aria-label={`Question ${currentQuestionNumber} of ${targetQuestionCount}`}
+          >
+            <div aria-hidden="true" className="flex h-1.5 flex-1 gap-[5px]">
+              {Array.from({ length: targetQuestionCount }, (_, k) => (
+                <div
+                  key={k}
+                  className="sq-pip flex-1 rounded-[3px] bg-survey-border"
+                  data-state={k < currentQuestionNumber - 1 ? "done" : k === currentQuestionNumber - 1 ? "now" : "todo"}
+                />
+              ))}
+            </div>
+            <div className="whitespace-nowrap text-[13.5px] font-semibold tabular-nums text-survey-muted">
+              {currentQuestionNumber} of {targetQuestionCount}
+            </div>
+          </div>
+
+          {/* Keyed on messages.length so the staggered entrance replays once
+              per new question. The key changes only when a message is
+              appended, never mid-animation, so the reveal can't double-fire.
+              While the interviewer is "typing" the same block shows the
+              avatar and an empty bubble carrying the loader, so the layout
+              holds its shape between questions. */}
+          <div key={messages.length} className="flex flex-col">
+            <div className={cn("mb-4 flex items-start gap-3.5 short:mb-3 xshort:mb-2.5", reveal(0.06).className)} style={reveal(0.06).style}>
               <div
                 aria-hidden="true"
-                className={cn(
-                  "py-2 motion-safe:transition-opacity motion-safe:duration-150",
-                  dotsLeaving && "opacity-0"
-                )}
+                className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-survey-ink"
+                style={{ boxShadow: "var(--sv-shadow-avatar)" }}
               >
-                <BirdLoader />
-              </div>
-            )
-          ) : (
-            // Keyed on messages.length so the entrance replays once per new
-            // question — the key changes only when a message is appended,
-            // never mid-animation, so the reveal can't double-fire.
-            <div key={messages.length} className={questionRevealClass}>
-              <div className="mb-1 flex items-center justify-end">
-                <span className="text-[13.5px] tabular-nums text-survey-faint">
-                  {displayedQuestionNumber(answeredCount, targetQuestionCount)} of{" "}
-                  {targetQuestionCount}
+                <WelcomeBird width={24} height={22} fill="hsl(var(--sv-ground))" className="sw-bird" />
+                <span
+                  className="sq-avatar-note absolute right-[-6px] top-[-10px] text-[15px]"
+                  style={{ color: "hsl(var(--sv-accent))", opacity: 0 }}
+                >
+                  &#9834;
                 </span>
               </div>
-
-              {/* 32px is a lot of vertical run for a long question on a
-                  380px-tall visible box — at phone widths it alone can push
-                  the composer off screen. Scaling to 23px buys back roughly
-                  a line and a half without touching the desktop size. The
-                  bolded-phrase underline treatment is unchanged; only
-                  underline-offset tightens with the smaller type. */}
-              {/* Welcome-screen heading type (Bricolage 700, -0.025em). The
-                  leading stays looser than the welcome title's 1.05: this is
-                  a multi-line question, not a two-line display headline. */}
-              <h1 className="text-pretty mb-5 break-words font-bricolage text-[23px] font-bold leading-[1.25] tracking-[-0.025em] [&_strong]:font-bold [&_strong]:not-italic [&_strong]:underline [&_strong]:decoration-survey-accent [&_strong]:decoration-2 [&_strong]:underline-offset-[4px] sm:mb-[26px] sm:text-[32px] sm:leading-[1.2] sm:[&_strong]:underline-offset-[5px]">
-                {renderWithBold(questionText)}
-              </h1>
-
-              {failedMessage && (
-                <div className="mb-5 flex flex-col items-end gap-1.5">
-                  <div className={cn(RESPONDENT_BUBBLE, "opacity-60")}>{failedMessage}</div>
-                  <div className="flex items-center gap-2 text-xs text-survey-danger">
-                    <span>Failed to send</span>
-                    <button
-                      type="button"
-                      onClick={retrySend}
-                      disabled={loading}
-                      aria-label="Retry sending your answer"
-                      className="inline-flex min-h-[44px] touch-manipulation items-center px-2 font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-survey-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:opacity-80"
-                    >
-                      {loading ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          {showRetryLoader && <BirdLoader size={18} label={false} />}
-                          Retrying…
-                        </span>
-                      ) : (
-                        "Retry"
+              <div className="min-w-0 flex-1">
+                <div
+                  className="rounded-[4px_22px_22px_22px] border border-survey-border bg-survey-surface px-6 pb-5 pt-[18px] short:pb-4 short:pt-3.5 xshort:px-5 xshort:pb-3.5 xshort:pt-3"
+                  style={{ boxShadow: "var(--sv-shadow-speech)" }}
+                >
+                  {isTyping ? (
+                    <div
+                      aria-hidden="true"
+                      className={cn(
+                        "flex min-h-[40px] items-center motion-safe:transition-opacity motion-safe:duration-150",
+                        dotsLeaving && "opacity-0"
                       )}
-                    </button>
-                  </div>
+                    >
+                      {showBirdLoader && <BirdLoader />}
+                    </div>
+                  ) : (
+                    <>
+                      {lead && (
+                        <div className="text-pretty mb-2.5 text-[16px] leading-[1.55] text-survey-muted short:mb-2 short:text-[15px] xshort:text-[14px] xshort:leading-[1.5]">
+                          {stripBold(lead)}
+                        </div>
+                      )}
+                      <h1 className="m-0 text-balance break-words font-bricolage text-[24px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[28px] short:sm:text-[24px] xshort:sm:text-[22px]">
+                        {segments.pre}
+                        {segments.highlight && <span className="sq-mark">{segments.highlight}</span>}
+                        {segments.post}
+                      </h1>
+                    </>
+                  )}
                 </div>
-              )}
+              </div>
+            </div>
 
-              <form onSubmit={handleSend} className="flex flex-col gap-[18px]">
-                {chips.length > 0 && (
-                  // Wrap, not horizontal scroll: a scroller hides options
-                  // off the right edge (the respondent has to discover them)
-                  // and its swipe gesture competes with scrolling the stage
-                  // when the keyboard is up. Wrapping keeps every suggestion
-                  // visible and thumb-reachable; the cost is vertical space,
-                  // which the smaller mobile question type just bought back.
-                  <div className="flex flex-wrap gap-2.5">
-                    {chips.map((chip, i) => {
-                      const picked = pickedChipIndex === i;
-                      return (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => handleChipTap(i, chip)}
-                          aria-label={`Suggested reply: ${chip}`}
-                          aria-pressed={picked}
-                          className={cn(
-                            // Same card surface as the welcome screen's
-                            // interviewer bubble, at pill proportions; picked
-                            // resolves to the dark pill.
-                            "min-h-[44px] touch-manipulation break-words rounded-full border px-[18px] py-[11px] text-left text-[15px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-survey-accent focus-visible:ring-offset-2",
-                            picked
-                              ? "border-survey-ink bg-survey-ink text-survey-ground"
-                              : "border-survey-border bg-survey-surface text-survey-ink active:scale-[.97] [@media(hover:hover)]:hover:border-survey-accent [@media(hover:hover)]:hover:text-survey-accent"
-                          )}
-                          style={picked ? undefined : { boxShadow: CARD_SHADOW }}
-                        >
-                          {chip}
-                        </button>
-                      );
-                    })}
+            {!isTyping && (
+              <>
+                {failedMessage && (
+                  <div className="mb-5 flex flex-col items-end gap-1.5">
+                    <div className={cn(RESPONDENT_BUBBLE, "opacity-60")}>{failedMessage}</div>
+                    <div className="flex items-center gap-2 text-xs text-survey-danger">
+                      <span>Failed to send</span>
+                      <button
+                        type="button"
+                        onClick={retrySend}
+                        disabled={loading}
+                        aria-label="Retry sending your answer"
+                        className="inline-flex min-h-[44px] touch-manipulation items-center px-2 font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-survey-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:opacity-80"
+                      >
+                        {loading ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            {showRetryLoader && <BirdLoader size={18} label={false} />}
+                            Retrying…
+                          </span>
+                        ) : (
+                          "Retry"
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                <textarea
-                  ref={answerInputRef}
-                  aria-label="Your answer"
-                  placeholder="…or type it your own way"
-                  value={answer}
-                  onChange={(e) => {
-                    setAnswer(e.target.value);
-                    lastKeystrokeAtRef.current = Date.now();
-                    setChips((prev) => (prev.length > 0 ? [] : prev));
-                    setPickedChipIndex(null);
-                    clearPendingChipSubmit();
-                  }}
-                  onKeyDown={handleAnswerKeyDown}
-                  rows={draftRows}
-                  disabled={loading}
-                  enterKeyHint="send"
-                  // max-h caps the auto-grow at ~4 of its 6 rows on phones and
-                  // scrolls past that: a 6-row box plus the keyboard leaves
-                  // no room for the question or Continue on a 380px-tall
-                  // visible area. sm:max-h-none keeps the full 6-row growth
-                  // on desktop.
-                  // Deliberately the welcome screen's interviewer-card
-                  // treatment (18px radius, survey-surface on survey-border, CARD_SHADOW,
-                  // 16.5px/1.6): the respondent writes into the same kind of
-                  // card the interviewer speaks from.
-                  className="max-h-[136px] w-full touch-manipulation resize-none overflow-y-auto rounded-[18px] border border-survey-border bg-survey-surface px-[26px] py-4 text-[16.5px] leading-[1.6] text-survey-ink placeholder:text-survey-faint focus:border-survey-muted focus:outline-none focus:ring-[3px] focus:ring-survey-ink/[0.07] disabled:cursor-not-allowed disabled:opacity-60 sm:max-h-none"
-                  style={{ boxShadow: CARD_SHADOW }}
-                />
+                <form onSubmit={handleSend} className="flex flex-col">
+                  {chips.length > 0 && (
+                    // Wrap, not horizontal scroll: a scroller hides options
+                    // off the right edge and its swipe competes with
+                    // scrolling the stage when the keyboard is up.
+                    <div className={cn("mb-3 short:mb-2.5", reveal(0.18).className)} style={reveal(0.18).style}>
+                      <div className="flex flex-wrap gap-2.5 short:gap-2">
+                        {chips.map((chip, i) => {
+                          const picked = pickedChipIndex === i;
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => handleChipTap(i)}
+                              disabled={loading}
+                              aria-label={`Quick answer: ${chip}`}
+                              aria-pressed={picked}
+                              className="sq-chip inline-flex min-h-[44px] touch-manipulation items-center break-words rounded-full border-[1.5px] border-survey-border bg-survey-surface px-5 py-3 text-left text-[15.5px] font-medium text-survey-ink short:min-h-[40px] short:px-4 short:py-2.5 xshort:min-h-[36px] xshort:py-2 xshort:text-[15px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-survey-accent focus-visible:ring-offset-2 focus-visible:ring-offset-survey-ground disabled:cursor-not-allowed"
+                            >
+                              <span className="sq-tick" aria-hidden="true">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                  <path
+                                    d="M2.5 7.5l3 3 6-6.5"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              </span>
+                              {chip}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                  <button
-                    type="submit"
-                    disabled={!hasAnswer || loading}
-                    className={cn(PILL_BUTTON, "flex")}
-                  >
-                    Continue <PillArrow />
-                  </button>
-                  {/* Describes physical keys the phone keyboard doesn't have;
-                      enterKeyHint="send" on the textarea is the mobile
-                      equivalent affordance. */}
-                  <span className="hidden text-[13.5px] text-survey-faint sm:inline">
-                    Enter ↵ to send · Shift+Enter for a new line
-                  </span>
-                  <span className="flex-1" />
-                  <button
-                    type="button"
-                    onClick={handleSkip}
-                    disabled={loading}
-                    className="flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-full px-3 text-[13.5px] text-survey-faint transition-colors disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:text-survey-muted"
-                  >
-                    Skip
-                  </button>
-                </div>
-              </form>
-              {error && <p className="mt-3 text-sm text-survey-danger">{error}</p>}
-            </div>
-          )}
+                  <div className={cn("relative mb-3 short:mb-2.5", reveal(0.24).className)} style={reveal(0.24).style}>
+                    <textarea
+                      ref={answerInputRef}
+                      aria-label="Your answer"
+                      placeholder={chips.length > 0 ? "Or type your own answer" : "Type your answer"}
+                      value={answer}
+                      onChange={(e) => {
+                        setAnswer(e.target.value);
+                        lastKeystrokeAtRef.current = Date.now();
+                      }}
+                      onKeyDown={handleAnswerKeyDown}
+                      rows={2}
+                      disabled={loading}
+                      enterKeyHint="send"
+                      // Two rows, scrolling past that: the handoff's fixed
+                      // height is what keeps the whole screen inside 100vh.
+                      // text-[17px] also clears iOS Safari's 16px auto-zoom
+                      // threshold.
+                      className="block w-full touch-manipulation resize-none overflow-y-auto rounded-[20px] border-[1.5px] border-survey-border bg-survey-surface px-[22px] pb-[34px] pt-4 text-[17px] leading-[1.55] text-survey-ink short:pb-[26px] short:pt-3 short:text-[16px] xshort:pb-[22px] xshort:pt-2.5 [transition:border-color_0.2s_ease,box-shadow_0.2s_ease] placeholder:text-survey-faint focus:border-survey-ink focus:outline-none focus:ring-4 focus:ring-survey-ink/[0.08] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
+                      style={{ boxShadow: "var(--sv-shadow-soft)" }}
+                    />
+                    {answer.length > 0 && (
+                      <div aria-hidden="true" className="pointer-events-none absolute bottom-3.5 right-[18px] text-[12.5px] tabular-nums text-survey-faint short:bottom-2.5 xshort:bottom-2">
+                        {answer.length} chars
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={cn("flex flex-wrap items-center gap-x-[18px] gap-y-3", reveal(0.3).className)} style={reveal(0.3).style}>
+                    <button
+                      type="submit"
+                      disabled={!hasAnswer || loading}
+                      className={cn(
+                        "inline-flex touch-manipulation items-center gap-3 rounded-full px-7 py-4 text-[16.5px] font-semibold short:py-3 short:text-[16px] xshort:px-6 xshort:py-2.5 [transition:transform_0.25s_ease,box-shadow_0.25s_ease,background-color_0.25s_ease,color_0.25s_ease] motion-reduce:transition-none",
+                        hasAnswer
+                          ? "bg-survey-ink text-survey-ground active:translate-y-0 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[var(--sv-shadow-press)]"
+                          : "cursor-not-allowed bg-survey-border text-survey-muted",
+                        loading && "cursor-not-allowed opacity-60"
+                      )}
+                    >
+                      Send
+                      <PillArrow />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSkip}
+                      disabled={loading}
+                      className="ml-auto flex min-h-[44px] touch-manipulation items-center text-[14px] text-survey-muted underline [text-underline-offset:3px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:text-survey-ink"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </form>
+                {error && <p className="mt-3 text-sm text-survey-danger">{error}</p>}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      <Footer />
-    </div>
-  );
-}
-
-function Footer() {
-  return (
-    // Bottom-most element in every stage, so it owns clearing the iPhone
-    // home indicator for the whole flow. When the keyboard is up this is
-    // hidden (globals.css) and the clearance goes with it — correct, since
-    // the keyboard is covering that strip anyway.
-    //
-    // Same lockup as the welcome and completion screens' own footers: 13.5px
-    // muted "Powered by", the bird mark, then the Bricolage wordmark in ink.
-    <div className="survey-footer relative flex items-center justify-center gap-2.5 px-8 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
-      <span className="text-[13.5px] text-survey-faint">Powered by</span>
-      <a href="/" className="inline-flex items-center gap-[7px]">
-        <WelcomeBird width={17} height={15} fill="hsl(var(--sv-ink))" />
-        <span className="font-bricolage text-[15px] font-bold text-survey-ink">Birdsong</span>
-      </a>
+      <Footer className={reveal(0.4).className} style={reveal(0.4).style} />
     </div>
   );
 }

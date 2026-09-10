@@ -5,7 +5,8 @@ import { listMembers } from "@/lib/org-team";
 import { fetchLeadQueue } from "@/lib/lead-queue";
 import { Button, EmptyState, PageHeader, PageShell } from "@/components/admin/ui";
 import { EMPTY_VALUE } from "@/lib/format";
-import { LeadsQueue, isQueueTab, type LeadItem, type QueueTab } from "./LeadsQueue";
+import { LeadsQueue, type LeadItem } from "./LeadsQueue";
+import { isQueueTab, type QueueTab } from "./queue-tabs";
 
 export default async function LeadsPage({
   searchParams,

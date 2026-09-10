@@ -20,6 +20,7 @@ import { EMPTY_VALUE } from "@/lib/format";
 import { isWorthACall, WORTH_A_CALL_SCORE_MIN } from "@/lib/leads";
 import { isClosedStatus, type LeadStatus } from "@/lib/leads/state";
 import { assignLead, claimLead, unassignLead, type LeadActionResult } from "@/lib/leads/actions";
+import { QUEUE_TABS, type QueueTab } from "./queue-tabs";
 
 export type LeadItem = {
   id: string;
@@ -53,13 +54,6 @@ export type QueuePermissions = {
   claim: boolean;
   assignOthers: boolean;
 };
-
-const QUEUE_TABS = ["all", "unworked", "mine", "contacted", "meetings", "closed"] as const;
-export type QueueTab = (typeof QUEUE_TABS)[number];
-
-export function isQueueTab(value: unknown): value is QueueTab {
-  return typeof value === "string" && (QUEUE_TABS as readonly string[]).includes(value);
-}
 
 const TAB_LABELS: Record<QueueTab, string> = {
   all: "All",

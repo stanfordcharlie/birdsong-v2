@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getActiveOrg } from "@/lib/org";
 import { AdminChrome } from "@/components/AdminChrome";
+import { SearchShortcut } from "@/components/admin/SearchShortcut";
 import { userFullName } from "@/lib/user-name";
 
 export default async function AdminLayout({
@@ -32,6 +33,8 @@ export default async function AdminLayout({
 
   return (
     <AdminChrome userName={displayName} userRole={roleLabel} sidebarCollapsed={sidebarCollapsed}>
+      {/* ⌘K on every signed-in admin route; not on the auth screens. */}
+      {user && <SearchShortcut />}
       {children}
     </AdminChrome>
   );

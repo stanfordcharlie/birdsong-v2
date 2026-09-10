@@ -39,6 +39,11 @@
   --ds-primary-foreground: 50 23% 95%; /* #f5f4ef cream text on ink */
 
   --ds-secondary: 48 12% 92%;          /* #edece8, same as --ds-chip */
+  /* 2026-09-05: a sunk panel inside a card. Same value as the page canvas,
+     so a panel on a white card reads as a window onto the page rather than a
+     tinted fill. Used by Home's transcript preview; nothing else. Neutral by
+     construction: it cannot drift toward cream because it is the canvas. */
+  --ds-surface: 60 7% 97%;             /* #f8f8f7 */
   --ds-secondary-foreground: 24 10% 10%;
 
   --ds-muted: 48 12% 92%;
@@ -262,6 +267,11 @@
   --sv-drop-mascot: 0 4px 10px rgba(38, 32, 25, 0.14);
   --sv-tint-accent: rgba(58, 96, 70, 0.09);
   --sv-tint-info: rgba(84, 116, 158, 0.09);
+  /* Question screen (design_handoff_survey_question): the interviewer
+     avatar, its speech bubble, and a chip on hover. */
+  --sv-shadow-avatar: 0 6px 14px rgba(38, 32, 25, 0.16);
+  --sv-shadow-speech: 0 6px 18px rgba(38, 32, 25, 0.06);
+  --sv-shadow-chip-hover: 0 8px 18px rgba(38, 32, 25, 0.1);
 }
 
 /* Dark is opt-in only: the survey always opens in light, whatever the
@@ -287,6 +297,9 @@
   --sv-drop-mascot: 0 4px 10px rgba(0, 0, 0, 0.5);
   --sv-tint-accent: rgba(143, 191, 122, 0.1);
   --sv-tint-info: rgba(147, 179, 218, 0.1);
+  --sv-shadow-avatar: 0 6px 14px rgba(0, 0, 0, 0.5);
+  --sv-shadow-speech: 0 6px 18px rgba(0, 0, 0, 0.4);
+  --sv-shadow-chip-hover: 0 8px 18px rgba(0, 0, 0, 0.45);
 }
 
 /* Keeps the browser's own chrome (form controls, scrollbars, the overscroll
@@ -660,18 +673,6 @@ select {
     animation: bs-rise 0.5s ease-out both;
   }
 
-  /* Respondent interview question reveal (InterviewFlow's QUESTION_REVEAL
-     config: "pop" | "fade" | "none"). Played once per question on the
-     block's single mount; `both` fill means the animation ends exactly at
-     the resting state — no terminal jump. Outside this media query the
-     resting state is fully visible, so reduced-motion users (and the
-     "none" mode, which applies no class) get an instant render. */
-  .q-reveal-pop {
-    animation: q-reveal-pop 0.3s ease-out both;
-  }
-  .q-reveal-fade {
-    animation: q-reveal-fade 0.2s ease-out both;
-  }
 
   /* Survey respondent intro (design_handoff_survey_respondent) — its own
      shorter rise distance (10px vs bs-rise's 16px) and tighter stagger
@@ -1300,26 +1301,6 @@ select {
   }
 }
 
-/* Question reveal keyframes (see .q-reveal-* above). */
-@keyframes q-reveal-pop {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-@keyframes q-reveal-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 /* Survey respondent intro's live validation checkmarks (name/email) —
    pop in via scale, cancelled outright under reduced motion by the
    motion-reduce:animate-none utility at each call site rather than a
@@ -1395,6 +1376,30 @@ select {
    room on a 380px-tall visible box. */
 .survey-viewport[data-keyboard="open"] .survey-footer {
   display: none;
+}
+
+/* Desktop (fine pointer, ≥640px): the question screen is a fixed-height
+   column, never a scrolling page. The stage takes any overflow internally,
+   with the footer pinned below it — so a window that's a little short of
+   the composer + footer shows a scrollable stage, not a page that nudges
+   the "Powered by" line into view. Mobile keeps the min-height page
+   (page scroll collapses the address bar; internal scroll doesn't), and
+   the keyboard-open rules above already do the same capping there. */
+@media (hover: hover) and (pointer: fine) and (min-width: 640px) {
+  .survey-viewport:has(> .survey-stage) {
+    min-height: 0;
+    height: 100vh;
+    overflow: hidden;
+  }
+  @supports (height: 100dvh) {
+    .survey-viewport:has(> .survey-stage) {
+      height: 100dvh;
+    }
+  }
+  .survey-stage {
+    min-height: 0;
+    overflow-y: auto;
+  }
 }
 
 /* Touch: no lingering tap flash, and no hover skin left stuck on a chip
@@ -1569,6 +1574,104 @@ select {
      the transcript is reopened. */
   .sw-bubble {
     animation: sw-bubble 0.5s ease var(--sw-bubble-delay, 0s) backwards;
+  }
+}
+
+/* --- Survey question screen (design_handoff_survey_question) ---
+   The per-question screen in app/survey/[slug]/InterviewFlow.tsx. Reveal,
+   idle loops and the avatar note run only under prefers-reduced-motion:
+   no-preference; every element's resting state is its final frame. The
+   state transitions on the pills and chips are gated the same way, so a
+   reduced-motion respondent sees state changes land instantly. */
+@keyframes sq-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Progress pill. todo is the resting background set at the call site;
+   done and now are stamped via data-state. */
+.sq-pip[data-state="done"] {
+  background: hsl(var(--sv-accent));
+}
+.sq-pip[data-state="now"] {
+  background: hsl(var(--sv-ink));
+  transform: scaleY(1.6);
+}
+
+/* Quick-answer chip. Picked is aria-pressed, which is also what a screen
+   reader announces, so there is one source of truth for the state. */
+.sq-chip[aria-pressed="true"] {
+  background: hsl(var(--sv-ink));
+  color: hsl(var(--sv-ground));
+  border-color: hsl(var(--sv-ink));
+}
+/* The check that slides in from zero width on the picked chip. */
+.sq-tick {
+  display: inline-flex;
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+.sq-chip[aria-pressed="true"] .sq-tick {
+  width: 14px;
+  opacity: 1;
+  margin-right: 6px;
+}
+
+/* Marker highlight on the question's key phrase: butter behind the lower
+   third of the x-height, like a highlighter pen. */
+.sq-mark {
+  background: linear-gradient(
+    transparent 58%,
+    hsl(var(--sv-butter)) 58%,
+    hsl(var(--sv-butter)) 94%,
+    transparent 94%
+  );
+  padding: 0 3px;
+  margin: 0 -3px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sq-rev {
+    animation: sq-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: var(--sq-delay, 0s);
+  }
+  .sq-pip {
+    transition:
+      background-color 0.35s ease,
+      transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .sq-chip {
+    transition:
+      transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+      background-color 0.18s ease,
+      color 0.18s ease,
+      border-color 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+  .sq-tick {
+    transition:
+      width 0.2s ease,
+      opacity 0.2s ease,
+      margin 0.2s ease;
+  }
+  @media (hover: hover) {
+    .sq-chip:not(:disabled):hover {
+      transform: translateY(-2px) rotate(-1deg);
+      box-shadow: var(--sv-shadow-chip-hover);
+    }
+  }
+  /* The occasional note popping off the interviewer avatar. Same 7s loop
+     as the welcome cluster's first note. */
+  .sq-avatar-note {
+    animation: sw-note-a 7s ease infinite;
   }
 }
 

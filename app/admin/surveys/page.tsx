@@ -1,12 +1,17 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { can, requireActiveOrg } from "@/lib/org";
-import { Button, PageHeader, PageShell } from "@/components/admin/ui";
+import { WORTH_A_CALL_SCORE_MIN } from "@/lib/leads";
+import { Button, PageHeader, PageShell, StatusDot } from "@/components/admin/ui";
+import { ExportStudiesButton } from "./ExportStudiesButton";
 import { SurveysList, type SurveyListItem } from "./SurveysList";
-import { SurveyStats, type SurveyStatsData } from "./SurveyStats";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const WEEK_DAYS = 7;
+// How many slices each card's activity row divides a study's lifetime into.
+const ACTIVITY_BARS = 32;
+
+function plural(count: number, noun: string, pluralNoun = `${noun}s`): string {
+  return `${count} ${count === 1 ? noun : pluralNoun}`;
+}
 
 export default async function AdminDashboardPage({
   searchParams,
@@ -39,84 +44,102 @@ export default async function AdminDashboardPage({
   const { data: responseRows } = surveyIds.length
     ? await supabase
         .from("responses")
-        .select("survey_id, created_at, completed")
+        .select("survey_id, created_at, completed, lead_score")
         .in("survey_id", surveyIds)
         .eq("is_test", false)
         .order("created_at", { ascending: false })
-    : { data: [] as { survey_id: string; created_at: string; completed: boolean }[] };
+    : {
+        data: [] as { survey_id: string; created_at: string; completed: boolean; lead_score: number | null }[],
+      };
 
   const rows = responseRows ?? [];
   const now = Date.now();
 
-  const counts = new Map<string, number>();
-  const lastAt = new Map<string, string>();
-
+  const bySurvey = new Map<string, typeof rows>();
   for (const row of rows) {
-    counts.set(row.survey_id, (counts.get(row.survey_id) ?? 0) + 1);
-    // Rows arrive newest-first, so the first sighting of a survey is its
-    // most recent response.
-    if (!lastAt.has(row.survey_id)) lastAt.set(row.survey_id, row.created_at);
+    const list = bySurvey.get(row.survey_id);
+    if (list) list.push(row);
+    else bySurvey.set(row.survey_id, [row]);
   }
 
-  const items: SurveyListItem[] = (surveys ?? []).map((survey) => ({
-    id: survey.id,
-    title: survey.title,
-    slug: survey.slug,
-    status: survey.status,
-    questionCount: survey.num_questions,
-    responseCount: counts.get(survey.id) ?? 0,
-    lastResponseAt: lastAt.get(survey.id) ?? null,
-    createdAt: survey.created_at,
-    archivedAt: survey.archived_at,
-  }));
+  const items: SurveyListItem[] = (surveys ?? []).map((survey) => {
+    const own = bySurvey.get(survey.id) ?? [];
+    // Rows arrive newest-first, so the first one is the latest response.
+    const lastResponseAt = own[0]?.created_at ?? null;
 
-  // --- Stats --------------------------------------------------------------
+    // The activity row: the study's lifetime cut into equal slices, one
+    // response tally per slice. Derived from the created_at values already
+    // fetched for the counts, so it costs no extra query.
+    const start = new Date(survey.created_at).getTime();
+    const span = Math.max(1, now - start);
+    const activity = new Array<number>(ACTIVITY_BARS).fill(0);
+    for (const row of own) {
+      const at = new Date(row.created_at).getTime();
+      const slice = Math.min(ACTIVITY_BARS - 1, Math.max(0, Math.floor(((at - start) / span) * ACTIVITY_BARS)));
+      activity[slice] += 1;
+    }
 
-  const weekAgo = now - WEEK_DAYS * DAY_MS;
-  const priorWeekAgo = now - 2 * WEEK_DAYS * DAY_MS;
-  let thisWeek = 0;
-  let priorWeek = 0;
-  for (const row of rows) {
-    const at = new Date(row.created_at).getTime();
-    if (at >= weekAgo) thisWeek += 1;
-    else if (at >= priorWeekAgo) priorWeek += 1;
-  }
+    return {
+      id: survey.id,
+      title: survey.title,
+      slug: survey.slug,
+      status: survey.status,
+      questionCount: survey.num_questions,
+      responseCount: own.length,
+      completedCount: own.filter((r) => r.completed).length,
+      qualifiedCount: own.filter((r) => r.completed && (r.lead_score ?? 0) >= WORTH_A_CALL_SCORE_MIN).length,
+      lastResponseAt,
+      activity,
+      createdAt: survey.created_at,
+      archivedAt: survey.archived_at,
+    };
+  });
 
-  const completed = rows.filter((r) => r.completed).length;
-
-  const stats: SurveyStatsData = {
-    responsesThisWeek: thisWeek,
-    // Null rather than a fabricated 0% or +100% when there is no prior week
-    // to compare against: a delta needs both halves to mean anything.
-    weekDelta: priorWeek > 0 ? (thisWeek - priorWeek) / priorWeek : null,
-    responsesTotal: rows.length,
-    completionRate: rows.length > 0 ? completed / rows.length : null,
-  };
+  // The header's one line of fact. Live and draft count only what is not
+  // archived; the total is everything the account holds, like the All tab.
+  const liveCount = items.filter((s) => s.archivedAt === null && s.status === "live").length;
+  const draftCount = items.filter((s) => s.archivedAt === null && s.status !== "live").length;
+  const newStudyHref = canCreateStudy ? "/admin/surveys/new" : null;
 
   return (
     <PageShell>
       <PageHeader
         title="Projects"
-        actions={
-          canCreateStudy ? (
-            <Button asChild>
-              <Link href="/admin/surveys/new">New study</Link>
-            </Button>
+        meta={
+          items.length > 0 ? (
+            <span className="inline-flex flex-wrap items-center gap-x-2">
+              <span>{plural(items.length, "study", "studies")}</span>
+              <span aria-hidden>·</span>
+              <span className="inline-flex items-center gap-1.5">
+                <StatusDot live />
+                {liveCount} live
+              </span>
+              <span aria-hidden>·</span>
+              <span>{plural(draftCount, "draft")}</span>
+            </span>
           ) : undefined
+        }
+        actions={
+          <>
+            <ExportStudiesButton surveys={items} />
+            {newStudyHref && (
+              <Button asChild>
+                <Link href={newStudyHref}>New study</Link>
+              </Button>
+            )}
+          </>
         }
       />
 
       {error && <p className="type-body text-destructive">{error.message}</p>}
 
       {!error && (
-        <div className="flex flex-col gap-8">
-          {items.length > 0 && <SurveyStats stats={stats} />}
-          <SurveysList
-            surveys={items}
-            initialStatusFilter={initialStatusFilter}
-            canManage={canManageStudies}
-          />
-        </div>
+        <SurveysList
+          surveys={items}
+          initialStatusFilter={initialStatusFilter}
+          canManage={canManageStudies}
+          newStudyHref={newStudyHref}
+        />
       )}
     </PageShell>
   );

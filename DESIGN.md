@@ -170,6 +170,7 @@ reads.
 | `--ds-card` | `#ffffff` | `bg-card` | Every card and table surface |
 | `--ds-chip` | `#edece8` | `bg-chip` | Neutral chip fill, the code block, the segmented control track |
 | `--ds-secondary` | `#edece8` | `bg-secondary` | Row hover only. No quote block or transcript carries a fill |
+| `--ds-surface` | `#f8f8f7` | `bg-surface` | A sunk panel inside a card: Home's transcript preview. Same value as the canvas, so it is a window onto the page, not a tint |
 | `--ds-border` | `#e7e5e4` | `border-border` | Card outlines, table row rules, section rules, the left rule on a quote |
 
 ### Ink
@@ -408,6 +409,18 @@ Comments are not copy. The rule governs user-visible prose.
 Newest first. One line each, dated. A decision lands here when a future session would
 otherwise have to re-litigate it.
 
+- **2026-09-05** — **Home answers "what should I do now", in this order: greeting, composer,
+  the most active study, what needs attention, the launch checklist.** Rebuilt from a
+  Claude Design comp taken as information architecture only; every shape is an existing
+  primitive. The greeting is the H1 through `PageHeader`, which now accepts a node so the
+  time of day can come from the visitor's clock. The composer is a launcher (a `Card`
+  holding one input and a primary button that navigate to study creation), not a chat
+  thread. The transcript preview is a `--ds-surface` panel with left/right bubbles, the
+  one transcript in admin that carries a fill, because it previews the respondent's screen
+  rather than reading as a transcript; the Live and Response pages keep the hairline rule.
+  The earlier serif hero roles and `StatRow`'s ruled variant from the same day are gone.
+  Invited counts, study close dates and bounced invites have no data behind them and are
+  not rendered; the checklist derives its state from data rather than persisting it.
 - **2026-09-02** — **The study list is a `DataTable`, not a card grid.** The covers carried one
   status pill across roughly 150px of tinted fill in three hues that meant nothing, the
   sparkline read as a broken graphic, and the avatar cluster belonged on the detail page.

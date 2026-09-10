@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cn } from "@/lib/utils";
 import { LandingPageShell } from "@/components/marketing/LandingPageShell";
 import { LandingFooter } from "@/components/marketing/LandingFooter";
 import { PainPointChart } from "@/components/research/PainPointChart";
@@ -66,6 +67,17 @@ export async function generateMetadata({
       description: report.dek,
     },
   };
+}
+
+// Titles are generated from the survey brief and run anywhere from a few
+// words to a full sentence. One display size can't serve both: 80px on a
+// 110-character title is six lines and the whole first viewport. Step the
+// size down by length so long titles stay a headline, not a wall.
+function heroTitleSize(title: string) {
+  const n = title.length;
+  if (n <= 48) return "text-[clamp(44px,5.6vw,80px)]";
+  if (n <= 80) return "text-[clamp(38px,4.4vw,62px)]";
+  return "text-[clamp(32px,3.4vw,48px)]";
 }
 
 export default async function ReportPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -164,30 +176,25 @@ export default async function ReportPage({ params }: { params: Promise<{ slug: s
               {formatPublishMonth(report.publishedAt)}
             </span>
           </div>
-          <h1 className="m-0 mt-8 text-balance font-bricolage text-[clamp(44px,5.6vw,80px)] font-bold leading-[0.98] tracking-[-0.04em] text-landing-ink">
+          <h1
+            className={cn(
+              "m-0 mt-8 text-balance font-bricolage font-bold leading-[1.02] tracking-[-0.04em] text-landing-ink",
+              heroTitleSize(report.title)
+            )}
+          >
             {report.title}
           </h1>
           <p className="m-0 mt-8 max-w-[56ch] text-pretty font-spectral text-[clamp(21px,2vw,27px)] leading-[1.45] text-landing-ink">
             {report.dek}
           </p>
-          <p className="m-0 mt-6 max-w-[62ch] text-[17.5px] leading-[1.65] text-landing-ink-soft">
+          {/* No call-to-action row: the header nav already links Methodology
+              and the page is a scroll read, so a "read the findings" button
+              only pointed at the next section. The methodology line closes
+              the hero, with the header's own bottom padding as the gap to
+              the stats band. */}
+          <p className="m-0 mt-8 max-w-[62ch] text-[17.5px] leading-[1.65] text-landing-ink-soft">
             {report.methodology}
           </p>
-          <div className="mt-10 flex flex-wrap items-center gap-4">
-            <a
-              href={`#${findingsSection?.id ?? summarySection.id}`}
-              className="lp-hard-cta inline-flex items-center gap-3 rounded-full border-2 border-landing-ink bg-landing-green-deep px-7 py-4 text-[17px] font-bold text-landing-bg no-underline shadow-[4px_4px_0_var(--lp-ink)]"
-            >
-              Read the findings
-              <span aria-hidden>&rarr;</span>
-            </a>
-            <a
-              href="#methodology"
-              className="lp-hard-cta inline-flex items-center rounded-full border-2 border-landing-ink bg-landing-surface px-7 py-4 text-[17px] font-bold text-landing-ink no-underline shadow-[4px_4px_0_var(--lp-ink)]"
-            >
-              Methodology
-            </a>
-          </div>
         </div>
 
         <StudyProfile rows={profileRows} headline={report.headline} />
