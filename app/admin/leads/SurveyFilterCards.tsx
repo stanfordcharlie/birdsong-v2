@@ -1,14 +1,12 @@
 "use client";
 
-import { StatusDot } from "@/components/admin/ui";
 import { cn } from "@/lib/utils";
 
 // The study selector for the lead queue: one chip per study above the
 // queue, replacing a <select> that hid how many leads each study produced
-// and how many are still waiting on someone. Each chip carries the live dot,
-// the title, the lead count, and beneath it the worth-a-call count. The share
-// meter this used to draw is gone: a bar under a count is a second reading
-// of the count.
+// and how many are still waiting on someone. Each chip carries the title, the
+// lead count, and beneath it the worth-a-call count. The share meter this used
+// to draw is gone: a bar under a count is a second reading of the count.
 //
 // "All studies" is the same chip with the totals in it, so clearing the
 // filter is one click on the same row rather than a separate control.
@@ -19,7 +17,6 @@ export type SurveyCard = {
   title: string;
   leadCount: number;
   worthACall: number;
-  isLive: boolean;
 };
 
 export function SurveyFilterCards({
@@ -60,7 +57,6 @@ export function SurveyFilterCards({
             )}
           >
             <span className="flex items-center gap-2">
-              <StatusDot live={card.isLive} />
               <span className="type-body-sm truncate font-semibold">{card.title}</span>
               <span className="ml-auto shrink-0 font-archivo text-count text-muted-foreground">
                 {card.leadCount}

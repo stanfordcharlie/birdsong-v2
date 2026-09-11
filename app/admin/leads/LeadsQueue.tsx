@@ -29,8 +29,6 @@ export type LeadItem = {
   company: string | null;
   surveyId: string;
   surveyTitle: string;
-  /** Whether the survey behind this lead is still collecting responses. */
-  surveyIsLive: boolean;
   leadScore: number | null;
   // Company fit (lib/interview/company-fit.ts), independent of leadScore.
   // fitConfidence: "high" | "medium" | "low" | "unavailable" | null (null =
@@ -177,7 +175,6 @@ export function LeadsQueue({
           title: lead.surveyTitle,
           leadCount: 0,
           worthACall: 0,
-          isLive: lead.surveyIsLive,
         };
         bySurvey.set(lead.surveyId, card);
       }
@@ -198,8 +195,6 @@ export function LeadsQueue({
         worthACall: visibleLeads.filter((lead) =>
           isWorthACall({ leadScore: lead.leadScore, status: lead.leadStatus })
         ).length,
-        // Live while anything is still collecting.
-        isLive: cards.some((card) => card.isLive),
       },
       ...cards,
     ];

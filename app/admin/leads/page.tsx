@@ -62,7 +62,6 @@ export default async function LeadsPage({
       surveyTitle: r.surveys?.title ?? EMPTY_VALUE,
       // Drives the live dot on the study filters above the queue. Anything
       // that isn't "live" (draft, closed, archived) reads as not collecting.
-      surveyIsLive: r.surveys?.status === "live",
       leadScore: r.lead_score,
       fitScore: fit?.score ?? null,
       fitConfidence: typeof fit?.confidence === "string" ? fit.confidence : null,
