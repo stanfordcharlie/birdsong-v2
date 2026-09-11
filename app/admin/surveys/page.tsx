@@ -2,16 +2,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { can, requireActiveOrg } from "@/lib/org";
 import { WORTH_A_CALL_SCORE_MIN } from "@/lib/leads";
-import { Button, PageHeader, PageShell, StatusDot } from "@/components/admin/ui";
+import { Button, PageHeader, PageShell } from "@/components/admin/ui";
 import { ExportStudiesButton } from "./ExportStudiesButton";
 import { SurveysList, type SurveyListItem } from "./SurveysList";
 
 // How many slices each card's activity row divides a study's lifetime into.
 const ACTIVITY_BARS = 32;
-
-function plural(count: number, noun: string, pluralNoun = `${noun}s`): string {
-  return `${count} ${count === 1 ? noun : pluralNoun}`;
-}
 
 export default async function AdminDashboardPage({
   searchParams,
@@ -95,30 +91,12 @@ export default async function AdminDashboardPage({
     };
   });
 
-  // The header's one line of fact. Live and draft count only what is not
-  // archived; the total is everything the account holds, like the All tab.
-  const liveCount = items.filter((s) => s.archivedAt === null && s.status === "live").length;
-  const draftCount = items.filter((s) => s.archivedAt === null && s.status !== "live").length;
   const newStudyHref = canCreateStudy ? "/admin/surveys/new" : null;
 
   return (
     <PageShell>
       <PageHeader
         title="Projects"
-        meta={
-          items.length > 0 ? (
-            <span className="inline-flex flex-wrap items-center gap-x-2">
-              <span>{plural(items.length, "study", "studies")}</span>
-              <span aria-hidden>·</span>
-              <span className="inline-flex items-center gap-1.5">
-                <StatusDot live />
-                {liveCount} live
-              </span>
-              <span aria-hidden>·</span>
-              <span>{plural(draftCount, "draft")}</span>
-            </span>
-          ) : undefined
-        }
         actions={
           <>
             <ExportStudiesButton surveys={items} />
