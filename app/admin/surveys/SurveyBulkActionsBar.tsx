@@ -64,7 +64,7 @@ export function SurveyBulkActionsBar({
     if (failures.length > 0) {
       setError(
         failures.length === results.length
-          ? failures[0].error || "That didn't work."
+          ? failures[0].error || "Something went wrong."
           : `${results.length - failures.length} of ${results.length} succeeded. Failed: ${failures
               .map((f) => f.title)
               .join(", ")}`
@@ -83,12 +83,12 @@ export function SurveyBulkActionsBar({
     <>
       <div className="flex items-center gap-3 rounded-card border border-primary/30 bg-primary/[0.06] px-4 py-2.5">
         <span className="text-sm font-medium text-card-foreground">
-          {count} survey{count === 1 ? "" : "s"} selected
+          {count} selected
         </span>
         <div className="ml-auto flex items-center gap-2">
           {/* Editing is inherently per-survey (there's no single form for
               settings across multiple surveys at once), so this only shows
-              up when the selection is exactly one row — a shortcut to that
+              up when the selection is exactly one row, a shortcut to that
               row's detail page, same destination as clicking it directly. */}
           {count === 1 && (
             <Button type="button" variant="secondary" size="sm" asChild>
@@ -117,7 +117,7 @@ export function SurveyBulkActionsBar({
           {/* Span carries the tooltip, not the button: a disabled button
               doesn't receive hover/mouse events in most browsers, so a
               title set directly on it would never actually show. */}
-          <span title={canDeleteAll ? undefined : "Some selected surveys have responses; archive instead."}>
+          <span title={canDeleteAll ? undefined : "Some selected studies have responses; archive instead."}>
             <Button
               type="button"
               variant="destructive"
@@ -142,8 +142,8 @@ export function SurveyBulkActionsBar({
       <Dialog
         open={archiveDialogOpen}
         onClose={() => !pending && setArchiveDialogOpen(false)}
-        title={`Archive ${count} survey${count === 1 ? "" : "s"}?`}
-        description="They'll be hidden from your default surveys list and stop accepting new responses. Existing responses stay exactly where they are, and you can unarchive any time."
+        title={`Archive ${count} stud${count === 1 ? "y" : "ies"}?`}
+        description="Archived studies leave the default list and stop accepting responses. Existing responses are kept. Unarchive at any time."
       >
         <div className="flex flex-col gap-3">
           {error && <p className="text-sm text-destructive">{error}</p>}
@@ -161,8 +161,8 @@ export function SurveyBulkActionsBar({
       <Dialog
         open={deleteDialogOpen}
         onClose={() => !pending && setDeleteDialogOpen(false)}
-        title={`Delete ${count} survey${count === 1 ? "" : "s"} permanently?`}
-        description={`This can't be undone: ${selected.map((s) => s.title).join(", ")}. Type ${DELETE_CONFIRM_WORD} to confirm.`}
+        title={`Delete ${count} stud${count === 1 ? "y" : "ies"} permanently?`}
+        description={`This cannot be undone: ${selected.map((s) => s.title).join(", ")}. Type ${DELETE_CONFIRM_WORD} to confirm.`}
       >
         <div className="flex flex-col gap-3">
           <Input

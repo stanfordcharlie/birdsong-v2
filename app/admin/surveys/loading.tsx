@@ -1,52 +1,32 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PageShell } from "@/components/admin/ui";
 
+// Mirrors the Projects page: title with its meta line and two actions, the
+// tab row with the search field, then the two-column card grid.
 export default function SurveysLoading() {
   return (
-    <div className="admin-container-wide flex flex-col gap-7">
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-4 w-16" />
-        <Skeleton className="h-10 w-64" />
+    <PageShell>
+      <div className="mb-8 flex items-center justify-between gap-6">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-9 w-32" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-10 w-24 rounded-pill" />
+          <Skeleton className="h-10 w-28 rounded-pill" />
+        </div>
       </div>
-
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-9 max-w-[320px] flex-1 rounded-control" />
-        <Skeleton className="h-9 w-14 rounded-control" />
-        <Skeleton className="h-9 w-14 rounded-control" />
-        <Skeleton className="ml-auto h-9 w-28 rounded-control" />
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between gap-3">
+          <Skeleton className="h-9 w-64 rounded-control" />
+          <Skeleton className="h-9 w-72 rounded-control" />
+        </div>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-56 w-full rounded-card" />
+          ))}
+        </div>
       </div>
-
-      <Card className="overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Internal name</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Responses</TableHead>
-              <TableHead>Created</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <TableRow key={i}>
-                <TableCell>
-                  <Skeleton className="h-4 w-40" />
-                </TableCell>
-                <TableCell>
-                  <Skeleton className="h-5 w-14 rounded-full" />
-                </TableCell>
-                <TableCell>
-                  <Skeleton className="h-4 w-10" />
-                </TableCell>
-                <TableCell>
-                  <Skeleton className="h-4 w-24" />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Card>
-    </div>
+    </PageShell>
   );
 }

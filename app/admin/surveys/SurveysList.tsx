@@ -1,27 +1,35 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  FilterTabs,
+  RelativeTime,
+  SearchInput,
+  StatusDot,
+} from "@/components/admin/ui";
+import { EMPTY_VALUE, formatDate, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { SurveyCard } from "./SurveyCard";
-import { SurveyBulkActionsBar } from "./SurveyBulkActionsBar";
+import { SurveyRowActions } from "./SurveyRowActions";
 
 export type SurveyListItem = {
   id: string;
   title: string;
   slug: string;
   status: string;
-  /** survey.num_questions — the target topic count, null on older rows. */
+  /** survey.num_questions, the target topic count, null on older rows. */
   questionCount: number | null;
   responseCount: number;
-  /** Seven daily counts, oldest first, for the card's sparkline. */
-  responsesByDay: number[];
+  completedCount: number;
+  /** Completed and scored at or above the worth-a-call line. */
+  qualifiedCount: number;
   lastResponseAt: string | null;
-  /** Newest answerers first, capped server-side, for the card's avatars. */
-  recentRespondents: string[];
+  /** Responses per equal slice of the study's lifetime, oldest first. */
+  activity: number[];
   createdAt: string;
   archivedAt: string | null;
 };
@@ -39,26 +47,162 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
 // the grid then contradicts.
 function matchesStatus(survey: SurveyListItem, filter: StatusFilter): boolean {
   const isArchived = survey.archivedAt !== null;
-  // "All", "Live" and "Draft" all exclude archived surveys — archived only
-  // ever shows up under its own tab.
+  // "Live" and "Draft" exclude archived studies; "All" is everything the
+  // account holds, which is the number the page header also states.
   if (filter === "archived") return isArchived;
+  if (filter === "all") return true;
   if (isArchived) return false;
   if (filter === "live") return survey.status === "live";
-  if (filter === "draft") return survey.status !== "live";
-  return true;
+  return survey.status !== "live";
+}
+
+type Status = "live" | "draft" | "archived";
+
+function statusOf(survey: SurveyListItem): Status {
+  if (survey.archivedAt !== null) return "archived";
+  return survey.status === "live" ? "live" : "draft";
+}
+
+function StatusBadge({ status }: { status: Status }) {
+  if (status === "live") {
+    return (
+      <Badge variant="live">
+        <StatusDot live />
+        Live
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant={status === "draft" ? "draft" : "outline"}>
+      {status === "draft" ? "Draft" : "Archived"}
+    </Badge>
+  );
+}
+
+// Response volume across the study's lifetime, one bar per slice. A study
+// with nothing to show draws the same row at the baseline so every card has
+// the same anatomy and the grid keeps its rhythm.
+function ActivityBars({ activity, live }: { activity: number[]; live: boolean }) {
+  const max = Math.max(0, ...activity);
+  return (
+    <div aria-hidden className="flex h-4 items-end gap-1">
+      {activity.map((count, i) => {
+        const ratio = max > 0 ? count / max : 0;
+        return (
+          <span
+            key={i}
+            className={cn(
+              "w-1.5 flex-none rounded-pill",
+              count > 0 ? (live ? "bg-brand-live" : "bg-faint") : "bg-border"
+            )}
+            style={{ height: `${Math.max(12.5, ratio * 100)}%` }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function plural(count: number, noun: string): string {
+  return `${count} ${count === 1 ? noun : `${noun}s`}`;
+}
+
+function StudyCard({ survey, canManage }: { survey: SurveyListItem; canManage: boolean }) {
+  const status = statusOf(survey);
+  const completion = survey.responseCount > 0 ? survey.completedCount / survey.responseCount : null;
+
+  return (
+    <Card interactive className="relative flex flex-col gap-5">
+      <div className="flex flex-col gap-1">
+        <div className="flex items-start justify-between gap-3">
+          {/* The title is the card's link, stretched over the whole card;
+              the actions menu sits above it so its clicks stay its own. */}
+          <h2 className="type-heading min-w-0">
+            <Link
+              href={`/admin/surveys/${survey.id}`}
+              className="focus-ring rounded-control after:absolute after:inset-0 after:rounded-card"
+            >
+              {survey.title}
+            </Link>
+          </h2>
+          <div className="relative z-10 flex shrink-0 items-center gap-1">
+            <StatusBadge status={status} />
+            {canManage && (
+              <SurveyRowActions
+                surveyId={survey.id}
+                internalName={survey.title}
+                slug={survey.slug}
+                status={survey.status}
+                archivedAt={survey.archivedAt}
+                responseCount={survey.responseCount}
+              />
+            )}
+          </div>
+        </div>
+        <p className="type-meta">
+          {survey.questionCount !== null ? plural(survey.questionCount, "question") : EMPTY_VALUE}
+          {" · "}created {formatDate(survey.createdAt)}
+        </p>
+      </div>
+
+      <dl className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+        <div className="flex items-baseline gap-1.5">
+          <dd className="type-metric-value">{survey.responseCount}</dd>
+          <dt className="type-meta">responses</dt>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <dd className="font-archivo text-sm font-semibold tabular-nums">
+            {completion === null ? EMPTY_VALUE : formatPercent(completion)}
+          </dd>
+          <dt className="type-meta">completion</dt>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <dd
+            className={cn(
+              "font-archivo text-sm font-semibold tabular-nums",
+              survey.qualifiedCount > 0 && "text-brand-text"
+            )}
+          >
+            {survey.qualifiedCount}
+          </dd>
+          <dt className="type-meta">qualified</dt>
+        </div>
+      </dl>
+
+      <ActivityBars activity={survey.activity} live={status === "live"} />
+
+      <p className="type-meta">
+        {survey.lastResponseAt ? (
+          <>
+            Last response <RelativeTime date={survey.lastResponseAt} />
+          </>
+        ) : status === "draft" ? (
+          "Not sent yet"
+        ) : (
+          "No responses yet"
+        )}
+      </p>
+    </Card>
+  );
 }
 
 export function SurveysList({
   surveys,
   initialStatusFilter = "all",
+  canManage = true,
+  newStudyHref,
 }: {
   surveys: SurveyListItem[];
-  // Deep-link from the admin home's "Live surveys" stat, e.g. ?status=live.
+  // Deep-link from the admin home, e.g. ?status=live.
   initialStatusFilter?: StatusFilter;
+  // From can(role, "study:edit"/"study:delete") on the server. False hides
+  // the per-study menu: a member reads the list and opens studies.
+  canManage?: boolean;
+  /** Where the empty state sends someone; null hides its action. */
+  newStudyHref: string | null;
 }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -70,7 +214,7 @@ export function SurveysList({
   }, [surveys, query, statusFilter]);
 
   // Tab counts ignore the search box: they describe what the account holds,
-  // and a tab reading "Live 0" mid-search would look like the surveys went
+  // and a tab reading "Live 0" mid-search would look like the studies went
   // away rather than like the query not matching them.
   const statusCounts = useMemo(() => {
     const counts = {} as Record<StatusFilter, number>;
@@ -80,172 +224,50 @@ export function SurveysList({
     return counts;
   }, [surveys]);
 
-  // Switching tabs changes what "archived" even means for the selection
-  // (Live vs. Archived have opposite bulk actions), so a stale selection
-  // carried across tabs would be confusing — clear it on tab change.
-  useEffect(() => {
-    setSelectedIds(new Set());
-  }, [statusFilter]);
-
-  // Prunes ids that disappeared from the underlying data (e.g. a bulk
-  // delete just removed them) so the bulk bar's count/actions never
-  // reference a survey that's gone.
-  useEffect(() => {
-    setSelectedIds((prev) => {
-      const next = new Set(Array.from(prev).filter((id) => surveys.some((s) => s.id === id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [surveys]);
-
-  const selectedSurveys = useMemo(
-    () => filtered.filter((s) => selectedIds.has(s.id)),
-    [filtered, selectedIds]
-  );
-
-  const allFilteredSelected = filtered.length > 0 && filtered.every((s) => selectedIds.has(s.id));
-
-  function toggleOne(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleAllFiltered() {
-    setSelectedIds((prev) => {
-      if (allFilteredSelected) {
-        const next = new Set(prev);
-        for (const s of filtered) next.delete(s.id);
-        return next;
-      }
-      const next = new Set(prev);
-      for (const s of filtered) next.add(s.id);
-      return next;
-    });
-  }
-
   if (surveys.length === 0) {
     return (
-      <Card className="flex flex-col items-start gap-3 p-8">
-        <p className="text-sm text-card-foreground">
-          No surveys yet. Create one and Wren starts interviewing the moment you share the link —
-          every completed conversation comes back scored, with a call script ready.
-        </p>
-        <Button asChild>
-          <Link href="/admin/surveys/new">Create your first survey</Link>
-        </Button>
-      </Card>
+      <EmptyState
+        className="py-2"
+        title="No studies yet. Start one and Birdsong runs the interviews."
+        action={
+          newStudyHref ? (
+            <Button asChild>
+              <Link href={newStudyHref}>New study</Link>
+            </Button>
+          ) : undefined
+        }
+      />
     );
   }
 
   return (
-    // No gap on the column: the bulk-bar slot between the controls and the
-    // table owns its own bottom margin so it can collapse to nothing (see
-    // below). Everything else spaces itself with explicit margins.
-    <div className="flex flex-col">
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        {/* One segmented track rather than separate bordered chips: these
-            are a single either/or choice, and the counts make the shape of
-            the account readable without opening each tab. */}
-        <div className="flex items-center gap-0.5 rounded-control bg-chip p-1">
-          {FILTERS.map((filter) => {
-            const active = statusFilter === filter.value;
-            return (
-              <button
-                key={filter.value}
-                type="button"
-                onClick={() => setStatusFilter(filter.value)}
-                aria-pressed={active}
-                className={cn(
-                  "flex h-7 items-center gap-1.5 rounded-[7px] px-2.5 text-[13px] font-medium transition-colors",
-                  active
-                    ? "bg-card text-card-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-card-foreground"
-                )}
-              >
-                {filter.label}
-                <span className={cn("text-[12px]", active ? "text-muted-foreground" : "text-faint")}>
-                  {statusCounts[filter.value]}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="relative max-w-[300px] flex-1 basis-[220px]">
-          <svg
-            aria-hidden
-            viewBox="0 0 20 20"
-            fill="none"
-            className="pointer-events-none absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-faint"
-          >
-            <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.6" />
-            <path d="M13.2 13.2L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-          <Input
-            type="text"
-            placeholder="Search surveys"
-            aria-label="Search surveys by name"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        <div className="ml-auto flex items-center gap-4">
-          {filtered.length > 0 && (
-            <button
-              type="button"
-              onClick={toggleAllFiltered}
-              className="text-[12.5px] font-medium text-muted-foreground transition-colors hover:text-card-foreground"
-            >
-              {allFilteredSelected ? "Clear selection" : "Select all"}
-            </button>
-          )}
-          <span className="whitespace-nowrap text-[12.5px] text-faint">{filtered.length} shown</span>
-        </div>
-      </div>
-
-      {/* Always mounted — never conditionally added/removed — so the bar
-          animates in and out instead of popping. Reserving its full height
-          while nothing is selected would be a permanent empty band under
-          the controls, which is the state this page is in almost all the
-          time, so the slot collapses to zero instead: the 0fr/1fr row is
-          what makes that a smooth open/close rather than a hard reflow, and
-          the bottom margin rides along so the gap collapses with it.
-          overflow-hidden clips the bar mid-transition; its dialogs portal to
-          document.body, so they're never caught by it. */}
-      <div
-        className={cn(
-          "grid transition-[grid-template-rows,opacity,margin-bottom] duration-200 ease-out motion-reduce:transition-none",
-          selectedSurveys.length > 0
-            ? "mb-5 grid-rows-[1fr] opacity-100"
-            : "pointer-events-none mb-0 grid-rows-[0fr] opacity-0"
-        )}
-        aria-hidden={selectedSurveys.length === 0}
-      >
-        <div className="overflow-hidden">
-          <SurveyBulkActionsBar selected={selectedSurveys} onDone={() => setSelectedIds(new Set())} />
-        </div>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FilterTabs
+          label="Filter studies by status"
+          tabs={FILTERS.map((f) => ({ ...f, count: statusCounts[f.value] }))}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
+        <SearchInput
+          value={query}
+          onChange={setQuery}
+          placeholder="Search studies"
+          label="Search studies by name"
+          className="sm:w-72 sm:flex-none"
+        />
       </div>
 
       {filtered.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted-foreground">
-          No surveys match your search.
-        </Card>
+        <EmptyState className="py-2" title="No studies match." />
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {filtered.map((survey) => (
-            <SurveyCard
-              key={survey.id}
-              survey={survey}
-              selected={selectedIds.has(survey.id)}
-              onToggleSelect={() => toggleOne(survey.id)}
-            />
+            <li key={survey.id} className="min-w-0">
+              <StudyCard survey={survey} canManage={canManage} />
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

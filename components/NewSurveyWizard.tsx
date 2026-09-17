@@ -10,12 +10,15 @@ import {
   type CustomRespondentFieldDef,
 } from "@/lib/surveys/respondent-fields";
 import { slugify, randomSlugSuffix } from "@/lib/surveys/slugify";
-import { SurveyOnboardingChat } from "@/components/SurveyOnboardingChat";
-import type { ExtractedSurveyDetails } from "@/lib/survey-onboarding/types";
+import { BriefChat, type BriefResult } from "@/components/BriefChat";
+import { GuideReview } from "@/components/GuideReview";
+import { renderGuideToText, type StructuredGuide } from "@/lib/surveys/guide";
+import type { ExtractedBrief } from "@/lib/brief/types";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { bricolage } from "@/lib/fonts";
 import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate } from "@/components/useLoadingGate";
 import { cn } from "@/lib/utils";
@@ -28,16 +31,26 @@ import { cn } from "@/lib/utils";
 // from it (see the effect below), just at its new position.
 const STEP_INTERNAL_NAME = 0;
 const STEP_SPONSOR = 1;
-const STEP_DETAILS = 2;
-const STEP_GIFT_CARD = 3;
-const STEP_RESPONDENT_INFO = 4;
-const STEP_EXTERNAL_NAME = 5;
-const STEP_SLUG = 6;
-const STEP_PUBLIC_DESCRIPTION = 7;
-const STEP_REVIEW = 8;
-const TOTAL_STEPS = 9;
+// The brief chat, which replaces authoring a question guide by hand.
+const STEP_BRIEF = 2;
+// Reviewing and editing the guide it generated. Generation happens at the
+// end of the brief; this step is where the admin decides anything about it.
+const STEP_GUIDE = 3;
+const STEP_GIFT_CARD = 4;
+const STEP_RESPONDENT_INFO = 5;
+const STEP_EXTERNAL_NAME = 6;
+const STEP_SLUG = 7;
+const STEP_PUBLIC_DESCRIPTION = 8;
+const STEP_REVIEW = 9;
+const TOTAL_STEPS = 10;
 
 const invalidBorder = "border-destructive focus-visible:ring-destructive";
+
+// The brief chat no longer asks for tone or question count: the guide's
+// theme count IS the question count, and a peer-level research register is
+// the only one the moderator prompt is written for. Both remain editable on
+// the study afterwards through SurveyForm.
+const DEFAULT_TONE = "Conversational";
 
 function StepShell({
   label,
@@ -96,6 +109,181 @@ function StepFooter({ onNext, nextLabel = "OK" }: { onNext: () => void; nextLabe
         {nextLabel}
       </Button>
       <span className="text-xs text-muted-foreground">press Enter ↵</span>
+    </div>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" className="shrink-0" aria-hidden>
+      <path
+        d="M11.2 2.3l2.5 2.5-7.6 7.6-3 .5.5-3 7.6-7.6z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Two-option segmented control, Optional / Required.
+ *
+ * Written here rather than reusing components/admin/ui/FilterTabs: this
+ * wizard consumes components/ui, and DESIGN.md's import boundary keeps the
+ * two primitive sets from reaching into each other.
+ *
+ * data-row-control marks it as a control that owns its own clicks, so the
+ * surrounding row's click-to-toggle handler leaves it alone.
+ */
+function RequiredToggle({
+  required,
+  onChange,
+  fieldLabel,
+}: {
+  required: boolean;
+  onChange: (required: boolean) => void;
+  fieldLabel: string;
+}) {
+  return (
+    <div
+      data-row-control
+      role="group"
+      aria-label={`Is ${fieldLabel} required?`}
+      className="flex shrink-0 items-center gap-0.5 rounded-control bg-secondary p-0.5"
+    >
+      {[false, true].map((value) => (
+        <button
+          key={String(value)}
+          type="button"
+          aria-pressed={required === value}
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange(value);
+          }}
+          className={cn(
+            "rounded-control px-2 py-0.5 text-xs font-medium transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            required === value
+              ? "bg-card text-card-foreground shadow-sm"
+              : "text-muted-foreground hover:text-card-foreground"
+          )}
+        >
+          {value ? "Required" : "Optional"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * One optional respondent field: one row, one primary control.
+ *
+ * The row is the toggle — clicking anywhere that is not itself a control
+ * includes or excludes the field. The checkbox stays in the markup rather
+ * than being faked with a div, so the row is reachable and announced by a
+ * keyboard and a screen reader.
+ *
+ * The label is plain text at rest. It IS editable and the edited value is
+ * what gets written to surveys.custom_fields, so renaming is kept, just
+ * folded behind the pencil instead of sitting in a permanent text input that
+ * made every row look like a form field.
+ */
+function RespondentFieldRow({
+  label,
+  onLabelChange,
+  included,
+  onIncludedChange,
+  required,
+  onRequiredChange,
+  onEnter,
+  autoFocus,
+}: {
+  label: string;
+  onLabelChange: (label: string) => void;
+  included: boolean;
+  onIncludedChange: (included: boolean) => void;
+  required: boolean;
+  onRequiredChange: (required: boolean) => void;
+  onEnter: (e: KeyboardEvent<HTMLElement>) => void;
+  autoFocus?: boolean;
+}) {
+  const [renaming, setRenaming] = useState(false);
+  const renameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (renaming) renameRef.current?.select();
+  }, [renaming]);
+
+  return (
+    <div
+      onClick={(e) => {
+        if (renaming) return;
+        // Anything marked as its own control handles its own click.
+        if ((e.target as HTMLElement).closest("[data-row-control]")) return;
+        onIncludedChange(!included);
+      }}
+      className={cn(
+        "group flex cursor-pointer items-center gap-2.5 rounded-control border px-3 py-2 transition-colors",
+        included ? "border-border bg-secondary/40" : "border-transparent hover:bg-secondary/40"
+      )}
+    >
+      <input
+        type="checkbox"
+        data-row-control
+        autoFocus={autoFocus}
+        checked={included}
+        onChange={(e) => onIncludedChange(e.target.checked)}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={onEnter}
+        aria-label={`Collect ${label}`}
+        className="accent-primary"
+      />
+
+      {renaming ? (
+        <Input
+          ref={renameRef}
+          data-row-control
+          type="text"
+          value={label}
+          onChange={(e) => onLabelChange(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          onBlur={() => setRenaming(false)}
+          onKeyDown={(e) => {
+            // Enter commits the rename rather than advancing the wizard:
+            // finishing a field name is the nearer intent.
+            if (e.key === "Enter" || e.key === "Escape") {
+              e.preventDefault();
+              setRenaming(false);
+            }
+          }}
+          className="h-7 flex-1 text-sm"
+        />
+      ) : (
+        <>
+          <span className="flex-1 truncate text-sm text-card-foreground">{label}</span>
+          <button
+            type="button"
+            data-row-control
+            onClick={(e) => {
+              e.stopPropagation();
+              setRenaming(true);
+            }}
+            aria-label={`Rename ${label}`}
+            className={cn(
+              "shrink-0 rounded-control p-1 text-muted-foreground opacity-0 transition-opacity",
+              "hover:text-card-foreground focus-visible:opacity-100 focus-visible:outline-none",
+              "focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
+            )}
+          >
+            <PencilIcon />
+          </button>
+        </>
+      )}
+
+      {included && (
+        <RequiredToggle required={required} onChange={onRequiredChange} fieldLabel={label} />
+      )}
     </div>
   );
 }
@@ -236,131 +424,209 @@ function DescriptionSuggestion({
   );
 }
 
-// Live mock of the respondent landing page — the NEW cream respondent UI
-// (design_handoff_create_survey / see app/survey/[slug]/InterviewFlow.tsx
-// for the real thing), so the admin can see what an external name or slug
-// change actually looks like before creating the survey. This is a
-// simplified, stylized preview card, not a literal re-render of
-// InterviewFlow's own (more elaborate) welcome screen — same relationship
-// the previous version of this panel had to the old design. Colors are the
-// respondent-preview cream palette, kept as raw hex to match
-// InterviewFlow.tsx's own precedent (that screen hardcodes these same
-// values rather than routing them through --ds-* tokens, which are a
-// separate, ink-based palette for the rest of the admin).
+/**
+ * The optional respondent fields, in the order the real intake form renders
+ * them. One builder, used both by the preview below and by createSurvey's
+ * payload, so the two cannot drift: previewing a field set that differs from
+ * the one actually written is the bug this replaced.
+ */
+function buildEnabledFieldDefs(args: {
+  collectPhone: boolean;
+  phoneLabel: string;
+  phoneRequired: boolean;
+  collectJobTitle: boolean;
+  jobTitleLabel: string;
+  jobTitleRequired: boolean;
+  collectCompany: boolean;
+  companyLabel: string;
+  companyRequired: boolean;
+}): CustomRespondentFieldDef[] {
+  return [
+    ...(args.collectPhone
+      ? [
+          {
+            key: "phone",
+            label: args.phoneLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.phone,
+            required: args.phoneRequired,
+          },
+        ]
+      : []),
+    ...(args.collectJobTitle
+      ? [
+          {
+            key: "job_title",
+            label: args.jobTitleLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.job_title,
+            required: args.jobTitleRequired,
+          },
+        ]
+      : []),
+    ...(args.collectCompany
+      ? [
+          {
+            key: "company",
+            label: args.companyLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.company,
+            required: args.companyRequired,
+          },
+        ]
+      : []),
+  ];
+}
+
+function PreviewField({ label, placeholder }: { label: string; placeholder: string }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[13px] font-semibold text-survey-ink">{label}</span>
+      <span className="block rounded-[14px] border border-survey-border bg-survey-surface px-4 py-3 text-[15px] text-survey-faint">
+        {placeholder}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Live mock of the respondent intake form (the `intro` stage of
+ * app/survey/[slug]/InterviewFlow.tsx), so the admin can see what a title,
+ * description, slug or field change actually looks like before creating.
+ *
+ * It is scoped `.survey-theme` and paints itself from the respondent --sv-*
+ * tokens rather than copying their values. It used to hold a hand-copied
+ * palette, which had since drifted: the card fill was #f3ecdf against the
+ * real #faf8f1, and that beige (plus a warm radial wash lifted from
+ * LoadingScreen) is what made the preview look like a different product.
+ * Reading the tokens is what stops that happening again. Admin normally must
+ * not reach into --sv-*; this panel is the deliberate exception, because
+ * being a faithful copy of that surface is its entire job.
+ *
+ * Still not a re-render of the real component: it draws the intro stage
+ * only, so the welcome beat that precedes it (gift card starburst, question
+ * count and timing, interviewer bubble, consent line) is not shown. See the
+ * note in the report for what rendering the real component would take.
+ */
 function SurveyPreviewPanel({
   externalTitle,
   slug,
-  giftCardAmount,
+  publicDescription,
+  enabledFields,
+  customFields,
 }: {
   externalTitle: string;
   slug: string;
-  giftCardAmount: string;
+  publicDescription: string;
+  enabledFields: CustomRespondentFieldDef[];
+  customFields: CustomRespondentFieldDef[];
 }) {
   // "-xxxxxx" stands in for the random anti-enumeration suffix that gets
   // appended at creation (see createSurvey) — the real value doesn't exist
   // yet, and previewing without any tail would promise a URL that's never
   // what actually gets created.
-  const previewSlug = `${slugify(slug) || "birdsong-research"}-xxxxxx`;
-  const previewTitle = externalTitle.trim() || "Your survey title";
-  // Real domain, not a placeholder: NEXT_PUBLIC_APP_URL is the same env var
-  // the lead-notification email/Slack links build from (lib/email/lead-notification.ts,
-  // lib/slack/lead-notification.ts), so this preview matches the actual
-  // link a respondent would get.
-  const previewDomain = (process.env.NEXT_PUBLIC_APP_URL || "https://usebirdsong.com")
-    .replace(/^https?:\/\//, "")
-    .replace(/\/+$/, "");
+  const previewSlug = `${slugify(slug) || "your-title"}-xxxxxx`;
+  const previewTitle = externalTitle.trim() || "Your title here";
+
+  // The same origin-on-mount trick SurveyUrl and CopySurveyLinkButton use,
+  // rather than NEXT_PUBLIC_APP_URL: that var is only set in production, so
+  // it silently previewed the wrong host everywhere else. This shows the
+  // exact origin the admin's own copy-link buttons produce.
+  const [origin, setOrigin] = useState("https://www.usebirdsong.com");
+  useEffect(() => setOrigin(window.location.origin), []);
+
+  const optionalFields = [...enabledFields, ...customFields];
+  const jobTitle = optionalFields.find((f) => f.key === "job_title");
+  const company = optionalFields.find((f) => f.key === "company");
+  const sideBySide = Boolean(jobTitle && company);
+  const rest = optionalFields.filter((f) =>
+    sideBySide ? f.key !== "job_title" && f.key !== "company" : true
+  );
+  const fieldLabel = (f: CustomRespondentFieldDef) => (f.required ? `${f.label} *` : f.label);
 
   return (
     <div className="flex h-full flex-col">
       <span className="mb-3.5 text-xs font-semibold uppercase tracking-[0.1em] text-faint">Preview</span>
 
       <div className="flex-none overflow-hidden rounded-card border border-border shadow-[0_8px_24px_rgba(0,0,0,.06)]">
-        <div className="flex items-center gap-[7px] bg-[#f4f4f4] px-3.5 py-[11px]">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#f26558]" />
-          <span className="h-2.5 w-2.5 rounded-full bg-[#f5b52e]" />
-          <span className="h-2.5 w-2.5 rounded-full bg-[#38c25d]" />
-          <div className="ml-1.5 flex-1 truncate rounded-control bg-white px-3 py-1.5 font-mono text-[11.5px] text-[#6b7280]">
-            {previewDomain}/survey/{previewSlug}
+        <div className="flex items-center gap-[7px] bg-secondary px-3.5 py-[11px]">
+          <span className="h-2.5 w-2.5 rounded-full bg-faint/60" />
+          <span className="h-2.5 w-2.5 rounded-full bg-faint/60" />
+          <span className="h-2.5 w-2.5 rounded-full bg-faint/60" />
+          <div className="ml-1.5 flex-1 truncate rounded-control bg-card px-3 py-1.5 font-mono text-[11.5px] text-muted-foreground">
+            {origin}/survey/{previewSlug}
           </div>
         </div>
 
-        <div
-          className="px-9 pb-[34px] pt-[38px]"
-          style={{
-            background:
-              "radial-gradient(120% 80% at 50% -6%, rgba(233,166,116,.22), transparent 58%), #f3ecdf",
-          }}
-        >
-          <div className="mx-auto flex max-w-[400px] flex-col">
-            <div className="mb-3.5 flex items-center gap-2">
-              {giftCardAmount && (
-                <span className="rounded-full bg-success-bg px-[9px] py-1 text-[10.5px] font-bold tracking-[0.04em] text-success">
-                  ${giftCardAmount} GIFT CARD
-                </span>
-              )}
-              <span className="text-[11px] text-[#6f6757]">~10 minutes</span>
-            </div>
-
-            <div className="font-spectral mb-2.5 text-balance text-[25px] font-medium leading-[1.15] tracking-[-0.01em] text-[#262019]">
+        <div className={cn("survey-theme bg-survey-ground px-7 pb-8 pt-9 font-sans", bricolage.variable)}>
+          <div className="mx-auto flex max-w-[420px] flex-col">
+            <h3 className="text-balance font-bricolage text-[27px] font-bold leading-[1.05] tracking-[-0.025em] text-survey-ink">
               {previewTitle}
-            </div>
-            <div className="mb-[22px] text-[12.5px] leading-[1.5] text-[#6f6757]">
-              A few quick questions about how your team handles this today.
+            </h3>
+
+            {publicDescription.trim() && (
+              <p className="mt-4 text-[15px] leading-[1.6] text-survey-muted">{publicDescription}</p>
+            )}
+
+            <div className="mt-7 flex flex-col gap-3">
+              <PreviewField label="Your name" placeholder="First and last" />
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[13px] font-semibold text-survey-ink">Work email</span>
+                <span className="text-[13px] leading-[1.5] text-survey-muted">
+                  This is where we&apos;ll send your gift card and a copy of the report.
+                </span>
+                <span className="block rounded-[14px] border border-survey-border bg-survey-surface px-4 py-3 text-[15px] text-survey-faint">
+                  you@yourcompany.com
+                </span>
+              </div>
+
+              {sideBySide && jobTitle && company && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <PreviewField label={fieldLabel(jobTitle)} placeholder={jobTitle.label} />
+                  <PreviewField label={fieldLabel(company)} placeholder={company.label} />
+                </div>
+              )}
+
+              {rest.map((f) => (
+                <PreviewField key={f.key} label={fieldLabel(f)} placeholder={f.label} />
+              ))}
             </div>
 
-            <div className="flex flex-col gap-2">
-              <div className="rounded-[9px] border border-[#e7ddc9] bg-[#fffdf7] px-3 py-2.5 text-xs text-[#a89d88]">
-                Your name
-              </div>
-              <div className="rounded-[9px] border border-[#e7ddc9] bg-[#fffdf7] px-3 py-2.5 text-xs text-[#a89d88]">
-                Email
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-[9px] border border-[#e7ddc9] bg-[#fffdf7] px-3 py-2.5 text-xs text-[#a89d88]">
-                  Job title
-                </div>
-                <div className="rounded-[9px] border border-[#e7ddc9] bg-[#fffdf7] px-3 py-2.5 text-xs text-[#a89d88]">
-                  Company
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3.5 flex items-center justify-center gap-2 rounded-[9px] bg-[#241f18] p-3 text-[13px] font-semibold text-[#f3ecdf]">
+            <span className="mt-7 inline-flex w-fit items-center gap-3 rounded-full bg-survey-ink px-[26px] py-3.5 text-[16.5px] font-semibold text-survey-ground">
               Start
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <svg width="20" height="12" viewBox="0 0 22 12" fill="none" aria-hidden>
                 <path
-                  d="M2.5 8h11M9 3.5L13.5 8 9 12.5"
+                  d="M1 6h19M15.5 1L20.5 6l-5 5"
                   stroke="currentColor"
-                  strokeWidth="1.7"
+                  strokeWidth="1.6"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
               </svg>
-            </div>
+            </span>
 
-            <div className="mt-4 flex items-center justify-center gap-1.5 text-[10.5px] text-[#a89d88]">
-              <svg width="11" height="11" viewBox="0 0 18 18" fill="none">
+            <div className="mt-8 flex items-center gap-[7px]">
+              <span className="text-[13.5px] text-survey-faint">Powered by</span>
+              <svg width="17" height="15" viewBox="0 0 18 18" fill="none" aria-hidden>
                 <path
                   d="M4 11c0-3.3 2.7-6 6-6 .8 0 1.6.2 2.3.5-.5 2-2 3-3.8 3.2 1.6.5 3.3-.2 4.2-1.3.2.6.3 1.2.3 1.9 0 3-2.4 5.4-5.4 5.4S2 12.7 2 10"
-                  stroke="#a89d88"
+                  stroke="currentColor"
+                  className="text-survey-ink"
                   strokeWidth="1.4"
                   strokeLinejoin="round"
                   strokeLinecap="round"
                 />
-                <circle cx="11.4" cy="7.4" r=".7" fill="#a89d88" />
+                <circle cx="11.4" cy="7.4" r=".7" className="fill-survey-ink" />
               </svg>
-              Powered by Birdsong
+              <span className="font-bricolage text-[15px] font-bold text-survey-ink">Birdsong</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mt-3 text-center text-[12.5px] text-faint">Updates as you type</div>
+      <p className="mt-3 text-center text-[12.5px] text-faint">
+        Updates as you type. Respondents see a welcome screen with the gift card and timing before
+        this form.
+      </p>
     </div>
   );
 }
 
-export function NewSurveyWizard() {
+export function NewSurveyWizard({ orgId }: { orgId: string }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
 
@@ -386,14 +652,36 @@ export function NewSurveyWizard() {
   const [jobTitleRequired, setJobTitleRequired] = useState(false);
   const [companyRequired, setCompanyRequired] = useState(false);
   const [customFields, setCustomFields] = useState<CustomRespondentFieldDef[]>([]);
+
+  // One source of truth for the optional field set: the preview renders it
+  // and createSurvey writes it, so what the admin previewed is exactly what
+  // lands in surveys.custom_fields.
+  const previewEnabledFields = buildEnabledFieldDefs({
+    collectPhone,
+    phoneLabel,
+    phoneRequired,
+    collectJobTitle,
+    jobTitleLabel,
+    jobTitleRequired,
+    collectCompany,
+    companyLabel,
+    companyRequired,
+  });
   const [newCustomFieldLabel, setNewCustomFieldLabel] = useState("");
-  const [newCustomFieldRequired, setNewCustomFieldRequired] = useState(false);
 
   const [titleError, setTitleError] = useState(false);
   const [externalTitleError, setExternalTitleError] = useState(false);
   const [slugError, setSlugError] = useState(false);
 
-  const [extractedDetails, setExtractedDetails] = useState<ExtractedSurveyDetails | null>(null);
+  // The brief chat's output. `brief` is the raw intake, `guide` is the
+  // editable structured guide (seeded from what generation returned, then
+  // owned by the review step), `transcript` is stored on the study so the
+  // guide can be regenerated from the same intake later.
+  const [brief, setBrief] = useState<ExtractedBrief | null>(null);
+  const [guide, setGuide] = useState<StructuredGuide | null>(null);
+  const [briefTranscript, setBriefTranscript] = useState<BriefResult["transcript"] | null>(null);
+  const [regeneratingGuide, setRegeneratingGuide] = useState(false);
+
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const showCreateLoader = useLoadingGate(creating);
@@ -408,8 +696,8 @@ export function NewSurveyWizard() {
   const [descriptionSuggestion, setDescriptionSuggestion] = useState<string | null>(null);
   const [descriptionSuggestionLoading, setDescriptionSuggestionLoading] = useState(false);
 
-  // Chat-to-next-step transition (research guide chat completing into the
-  // gift card step). Reuses CompanyProfileSetupFlow's step-advance transition
+  // Chat-to-next-step transition (the brief chat completing into the guide
+  // review step). Reuses CompanyProfileSetupFlow's step-advance transition
   // (opacity + translateY(8px), 260ms ease-out) rather than inventing a new
   // one; `chatExiting` runs the same motion in reverse for the outgoing chat
   // panel. Scoped to just this one handoff, not every step change, since
@@ -417,22 +705,35 @@ export function NewSurveyWizard() {
   const [chatExiting, setChatExiting] = useState(false);
   const [entering, setEntering] = useState(false);
   const giftCardInputRef = useRef<HTMLInputElement>(null);
-  // Suppresses the effect below during the animated handoff so focus lands
-  // only once the enter transition finishes, not the instant the step mounts.
-  const skipGiftCardAutoFocusRef = useRef(false);
 
+  // The suppress-focus-during-the-handoff ref this used to carry is gone
+  // with the handoff itself: the chat now hands off to the guide review
+  // step, and reaching the gift card step from there is an ordinary step
+  // change with nothing animating over it.
   useEffect(() => {
-    if (step === STEP_GIFT_CARD && !skipGiftCardAutoFocusRef.current) {
-      giftCardInputRef.current?.focus();
-    }
+    if (step === STEP_GIFT_CARD) giftCardInputRef.current?.focus();
   }, [step]);
 
   useEffect(() => {
     if (!slugTouched) setSlug(slugify(externalTitle));
   }, [externalTitle, slugTouched]);
 
+  // The name and description suggestion endpoints were built against the old
+  // extraction shape, which is unchanged. Mapping the brief onto it here
+  // keeps both of those steps working without touching either route.
+  const suggestionDetails =
+    brief && guide
+      ? {
+          topic: guide.recommended_topic || brief.publicTopic,
+          targetIndustry: brief.icpIndustry,
+          targetJobTitle: brief.icpRoles,
+          targetCompanySize: brief.icpCompanyProfile,
+          tone: DEFAULT_TONE,
+        }
+      : null;
+
   async function fetchNameSuggestions() {
-    if (!extractedDetails) return;
+    if (!suggestionDetails) return;
     setNameSuggestionsLoading(true);
     setNameSuggestions(null);
     setPickedSuggestionIndex(-1);
@@ -440,7 +741,7 @@ export function NewSurveyWizard() {
       const res = await fetch("/api/surveys/suggest-names", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ details: extractedDetails }),
+        body: JSON.stringify({ details: suggestionDetails }),
       });
       if (!res.ok) throw new Error("Failed to generate suggestions");
       const data = await res.json();
@@ -455,14 +756,14 @@ export function NewSurveyWizard() {
   }
 
   async function fetchDescriptionSuggestion() {
-    if (!extractedDetails || !externalTitle.trim()) return;
+    if (!suggestionDetails || !externalTitle.trim()) return;
     setDescriptionSuggestionLoading(true);
     setDescriptionSuggestion(null);
     try {
       const res = await fetch("/api/surveys/suggest-description", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ details: extractedDetails, externalTitle }),
+        body: JSON.stringify({ details: suggestionDetails, externalTitle }),
       });
       if (!res.ok) throw new Error("Failed to generate a suggestion");
       const data = await res.json();
@@ -480,14 +781,14 @@ export function NewSurveyWizard() {
   // waits for extractedDetails AND externalTitle, since it's generated from
   // the actual chosen name, which may differ from any name suggestion.
   useEffect(() => {
-    if (step === STEP_EXTERNAL_NAME && !nameSuggestions && !nameSuggestionsLoading && extractedDetails) {
+    if (step === STEP_EXTERNAL_NAME && !nameSuggestions && !nameSuggestionsLoading && suggestionDetails) {
       fetchNameSuggestions();
     }
     if (
       step === STEP_PUBLIC_DESCRIPTION &&
       !descriptionSuggestion &&
       !descriptionSuggestionLoading &&
-      extractedDetails
+      suggestionDetails
     ) {
       fetchDescriptionSuggestion();
     }
@@ -550,9 +851,10 @@ export function NewSurveyWizard() {
       suffix += 1;
     }
 
-    setCustomFields((prev) => [...prev, { key, label, required: newCustomFieldRequired }]);
+    // Optional by default; the row's Optional/Required control adjusts it
+    // after the field exists. Same {key, label, required} shape as before.
+    setCustomFields((prev) => [...prev, { key, label, required: false }]);
     setNewCustomFieldLabel("");
-    setNewCustomFieldRequired(false);
   }
 
   function removeCustomField(key: string) {
@@ -565,7 +867,7 @@ export function NewSurveyWizard() {
     );
   }
 
-  async function createSurvey(extracted: ExtractedSurveyDetails) {
+  async function createSurvey(finalBrief: ExtractedBrief, finalGuide: StructuredGuide) {
     setCreateError(null);
     setCreating(true);
     try {
@@ -575,48 +877,27 @@ export function NewSurveyWizard() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in.");
 
-      const enabledFields: CustomRespondentFieldDef[] = [
-        ...(collectPhone
-          ? [
-              {
-                key: "phone",
-                label: phoneLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.phone,
-                required: phoneRequired,
-              },
-            ]
-          : []),
-        ...(collectJobTitle
-          ? [
-              {
-                key: "job_title",
-                label: jobTitleLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.job_title,
-                required: jobTitleRequired,
-              },
-            ]
-          : []),
-        ...(collectCompany
-          ? [
-              {
-                key: "company",
-                label: companyLabel.trim() || OPTIONAL_RESPONDENT_FIELD_LABELS.company,
-                required: companyRequired,
-              },
-            ]
-          : []),
-      ];
+      const enabledFields = previewEnabledFields;
 
       const payload = {
         title,
         external_title: externalTitle,
         sponsor: sponsor || null,
         public_description: publicDescription || null,
-        topic: extracted.topic || null,
-        target_industry: extracted.targetIndustry || null,
-        target_job_title: extracted.targetJobTitle || null,
-        target_company_size: extracted.targetCompanySize || null,
-        question_guide: extracted.questionGuide || null,
-        tone: extracted.tone || null,
-        num_questions: extracted.numQuestions ? Number(extracted.numQuestions) : null,
+        topic: finalGuide.recommended_topic || finalBrief.publicTopic || null,
+        target_industry: finalBrief.icpIndustry || null,
+        target_job_title: finalBrief.icpRoles || null,
+        target_company_size: finalBrief.icpCompanyProfile || null,
+        // The structured guide is the authored artifact; question_guide is
+        // its text rendering. Both are written, and the text one is still
+        // the only thing the interview runtime reads, unchanged.
+        guide_structured: finalGuide as unknown as Json,
+        question_guide: renderGuideToText(finalGuide) || null,
+        brief_transcript: (briefTranscript ?? []) as unknown as Json,
+        // Captured and stored. Nothing reads it in this build.
+        qualification_criteria: finalBrief.qualificationCriteria || null,
+        tone: DEFAULT_TONE,
+        num_questions: finalGuide.themes.length,
         gift_card_amount: giftCardAmount ? Number(giftCardAmount) : null,
         // Presets stay bare strings; admin-defined fields are {key, label}
         // objects in the same array, see lib/surveys/respondent-fields.ts.
@@ -636,7 +917,10 @@ export function NewSurveyWizard() {
       while (attempt <= 5) {
         const { data, error: dbError } = await supabase
           .from("surveys")
-          .insert({ ...payload, slug: candidateSlug, user_id: user.id })
+          // user_id records who created the study; org_id is what scopes
+          // it, and the surveys insert policy rejects a row whose org the
+          // caller cannot write to.
+          .insert({ ...payload, slug: candidateSlug, user_id: user.id, org_id: orgId })
           .select("id")
           .single();
 
@@ -671,8 +955,28 @@ export function NewSurveyWizard() {
   // is readable, fade the chat out, advance the step (progress bar included),
   // fade the gift card step in, then focus its input once that's settled —
   // never while still animating in.
-  function handleDetailsGenerated(extracted: ExtractedSurveyDetails) {
-    setExtractedDetails(extracted);
+  function handleGuideGenerated(result: BriefResult) {
+    setBrief(result.brief);
+    setGuide(result.guide);
+    setBriefTranscript(result.transcript);
+
+    // The guide's own recommendations seed the later steps rather than
+    // replacing them: the admin can still change any of it, and the external
+    // name step keeps its three alternatives.
+    if (result.guide.recommended_title && !externalTitle.trim()) {
+      setExternalTitle(result.guide.recommended_title);
+    }
+    if (result.guide.recommended_custom_fields.length > 0) {
+      setCustomFields((prev) => {
+        const existing = new Set(prev.map((f) => f.key));
+        return [
+          ...prev,
+          ...result.guide.recommended_custom_fields
+            .filter((f) => !existing.has(f.key))
+            .map((f) => ({ key: f.key, label: f.label, required: false })),
+        ];
+      });
+    }
 
     const prefersReducedMotion =
       typeof window !== "undefined" &&
@@ -683,7 +987,9 @@ export function NewSurveyWizard() {
       return;
     }
 
-    skipGiftCardAutoFocusRef.current = true;
+    // Sequenced so the chat doesn't just vanish: pause so the closing
+    // message is readable, fade the chat out, advance the step (progress bar
+    // included), then fade the guide in.
     window.setTimeout(() => {
       setChatExiting(true);
       window.setTimeout(() => {
@@ -691,16 +997,37 @@ export function NewSurveyWizard() {
         setChatExiting(false);
         setEntering(true);
         requestAnimationFrame(() => requestAnimationFrame(() => setEntering(false)));
-        window.setTimeout(() => {
-          giftCardInputRef.current?.focus();
-          skipGiftCardAutoFocusRef.current = false;
-        }, 260);
       }, 260);
     }, 300);
   }
 
+  /**
+   * Redraft the whole guide from the same brief. The transcript is kept, so
+   * this never means running the chat again.
+   */
+  async function regenerateWholeGuide() {
+    if (!brief) return;
+    setRegeneratingGuide(true);
+    try {
+      const res = await fetch("/api/surveys/brief/guide", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brief }),
+      });
+      const data = await res.json();
+      if (res.ok) setGuide(data.guide);
+    } finally {
+      setRegeneratingGuide(false);
+    }
+  }
+
   const progressPercent = ((step + 1) / TOTAL_STEPS) * 100;
   const showPreview = step === STEP_SLUG || step === STEP_REVIEW;
+  // The guide is four to six theme cards, each with five questions. At the
+  // wizard's usual single-column width every question wraps to three lines
+  // and the guide reads as a wall, so this one step gets the wider column
+  // the preview steps already use.
+  const wideStep = step === STEP_GUIDE;
 
   // Full-bleed two-pane layout (design_handoff_create_survey), cancelling
   // AdminShell's p-8 the same way CompanyProfileSetupFlow does for its own
@@ -784,7 +1111,13 @@ export function NewSurveyWizard() {
         </div>
 
         <div className="flex-[1_1_45%] overflow-auto border-l border-border px-8 py-7">
-          <SurveyPreviewPanel externalTitle={externalTitle} slug={slug} giftCardAmount={giftCardAmount} />
+          <SurveyPreviewPanel
+            externalTitle={externalTitle}
+            slug={slug}
+            publicDescription={publicDescription}
+            enabledFields={previewEnabledFields}
+            customFields={customFields}
+          />
         </div>
       </div>
     );
@@ -793,10 +1126,15 @@ export function NewSurveyWizard() {
   return (
     <div className="admin-container flex flex-col items-center gap-7">
       <div className="flex w-full flex-col gap-2 self-start">
-        <span className="type-label">Surveys</span>
-        <h1 className="type-page-title">New survey</h1>
+        <span className="type-label">Research</span>
+        <h1 className="type-page-title">New study</h1>
       </div>
-      <div className={cn("flex w-full flex-col gap-6", showPreview ? "max-w-3xl" : "max-w-xl")}>
+      <div
+        className={cn(
+          "flex w-full flex-col gap-6",
+          showPreview || wideStep ? "max-w-3xl" : "max-w-xl"
+        )}
+      >
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
           <div
             className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
@@ -849,7 +1187,7 @@ export function NewSurveyWizard() {
             </StepShell>
           )}
 
-          {step === STEP_DETAILS && (
+          {step === STEP_BRIEF && (
             <div className="flex flex-col gap-4">
               <button
                 type="button"
@@ -859,20 +1197,21 @@ export function NewSurveyWizard() {
                 ← Back
               </button>
               <div className="flex flex-col gap-1">
-                <h2 className="text-lg font-semibold text-card-foreground">Survey details</h2>
-                <p className="text-sm text-muted-foreground">
-                  Research theme, target audience, tone, question count, and the question guide.
+                <h2 className="text-lg font-semibold text-card-foreground">The brief</h2>
+                <p className="text-sm leading-[1.5] text-muted-foreground">
+                  A few questions about who you want to hear from and what you want to learn. Then
+                  the research guide gets written for you.
                 </p>
               </div>
 
-              {extractedDetails ? (
+              {brief && guide ? (
                 <div className="flex flex-col gap-4">
                   <div className="rounded-control border border-border bg-secondary/40 p-3 text-sm">
                     <p className="mb-1 font-medium text-card-foreground">
-                      {extractedDetails.topic || "Topic captured"}
+                      {guide.recommended_topic || brief.publicTopic || "Brief captured"}
                     </p>
                     <p className="text-muted-foreground">
-                      {[extractedDetails.targetJobTitle, extractedDetails.targetIndustry, extractedDetails.targetCompanySize]
+                      {[brief.icpRoles, brief.icpIndustry, brief.icpCompanyProfile]
                         .filter(Boolean)
                         .join(" · ") || "Audience captured"}
                     </p>
@@ -887,10 +1226,25 @@ export function NewSurveyWizard() {
                     transform: chatExiting ? "translateY(-8px)" : "translateY(0)",
                   }}
                 >
-                  <SurveyOnboardingChat onComplete={handleDetailsGenerated} />
+                  <BriefChat
+                    known={sponsor.trim() ? { sponsorName: sponsor.trim() } : undefined}
+                    onGenerated={handleGuideGenerated}
+                  />
                 </div>
               )}
             </div>
+          )}
+
+          {step === STEP_GUIDE && guide && brief && (
+            <GuideReview
+              brief={brief}
+              guide={guide}
+              onChange={setGuide}
+              onRegenerateAll={regenerateWholeGuide}
+              regeneratingAll={regeneratingGuide}
+              onBack={goBack}
+              onContinue={goNext}
+            />
           )}
 
           {step === STEP_GIFT_CARD && (
@@ -920,123 +1274,70 @@ export function NewSurveyWizard() {
               footer={<StepFooter onNext={goNext} />}
             >
               <div className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2 text-sm text-card-foreground">
-                    <input
-                      autoFocus
-                      type="checkbox"
-                      checked={collectPhone}
-                      onChange={(e) => setCollectPhone(e.target.checked)}
-                      onKeyDown={(e) => handleEnterKey(e, goNext)}
-                      className="accent-primary"
-                    />
-                    <Input
-                      type="text"
-                      value={phoneLabel}
-                      onChange={(e) => setPhoneLabel(e.target.value)}
-                      onKeyDown={(e) => handleEnterKey(e, goNext)}
-                      className="h-7 flex-1 text-sm"
-                    />
-                    <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        checked={phoneRequired}
-                        onChange={(e) => setPhoneRequired(e.target.checked)}
-                        onKeyDown={(e) => handleEnterKey(e, goNext)}
-                        disabled={!collectPhone}
-                        className="accent-primary"
-                      />
-                      Required
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-card-foreground">
-                    <input
-                      type="checkbox"
-                      checked={collectJobTitle}
-                      onChange={(e) => setCollectJobTitle(e.target.checked)}
-                      onKeyDown={(e) => handleEnterKey(e, goNext)}
-                      className="accent-primary"
-                    />
-                    <Input
-                      type="text"
-                      value={jobTitleLabel}
-                      onChange={(e) => setJobTitleLabel(e.target.value)}
-                      onKeyDown={(e) => handleEnterKey(e, goNext)}
-                      className="h-7 flex-1 text-sm"
-                    />
-                    <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        checked={jobTitleRequired}
-                        onChange={(e) => setJobTitleRequired(e.target.checked)}
-                        onKeyDown={(e) => handleEnterKey(e, goNext)}
-                        disabled={!collectJobTitle}
-                        className="accent-primary"
-                      />
-                      Required
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-card-foreground">
-                    <input
-                      type="checkbox"
-                      checked={collectCompany}
-                      onChange={(e) => setCollectCompany(e.target.checked)}
-                      onKeyDown={(e) => handleEnterKey(e, goNext)}
-                      className="accent-primary"
-                    />
-                    <Input
-                      type="text"
-                      value={companyLabel}
-                      onChange={(e) => setCompanyLabel(e.target.value)}
-                      onKeyDown={(e) => handleEnterKey(e, goNext)}
-                      className="h-7 flex-1 text-sm"
-                    />
-                    <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        checked={companyRequired}
-                        onChange={(e) => setCompanyRequired(e.target.checked)}
-                        onKeyDown={(e) => handleEnterKey(e, goNext)}
-                        disabled={!collectCompany}
-                        className="accent-primary"
-                      />
-                      Required
-                    </label>
-                  </div>
+                <div className="flex flex-col gap-1">
+                  <RespondentFieldRow
+                    autoFocus
+                    label={phoneLabel}
+                    onLabelChange={setPhoneLabel}
+                    included={collectPhone}
+                    onIncludedChange={setCollectPhone}
+                    required={phoneRequired}
+                    onRequiredChange={setPhoneRequired}
+                    onEnter={(e) => handleEnterKey(e, goNext)}
+                  />
+                  <RespondentFieldRow
+                    label={jobTitleLabel}
+                    onLabelChange={setJobTitleLabel}
+                    included={collectJobTitle}
+                    onIncludedChange={setCollectJobTitle}
+                    required={jobTitleRequired}
+                    onRequiredChange={setJobTitleRequired}
+                    onEnter={(e) => handleEnterKey(e, goNext)}
+                  />
+                  <RespondentFieldRow
+                    label={companyLabel}
+                    onLabelChange={setCompanyLabel}
+                    included={collectCompany}
+                    onIncludedChange={setCollectCompany}
+                    required={companyRequired}
+                    onRequiredChange={setCompanyRequired}
+                    onEnter={(e) => handleEnterKey(e, goNext)}
+                  />
                 </div>
 
+                {/* Custom fields are always collected once added — there is
+                    no include/exclude for them, since removing one is the
+                    same action. So the row carries the same Optional /
+                    Required control as the built-ins, plus Remove. */}
                 {customFields.length > 0 && (
-                  <div className="flex flex-col gap-1.5 border-t border-border pt-2">
+                  <div className="flex flex-col gap-1 border-t border-border pt-2">
                     {customFields.map((field) => (
                       <div
                         key={field.key}
-                        className="flex items-center justify-between gap-2 text-sm text-card-foreground"
+                        className="group flex items-center gap-2.5 rounded-control border border-border bg-secondary/40 px-3 py-2"
                       >
-                        <span>{field.label}</span>
-                        <div className="flex items-center gap-3">
-                          <label className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <input
-                              type="checkbox"
-                              checked={field.required === true}
-                              onChange={() => toggleCustomFieldRequired(field.key)}
-                              className="accent-primary"
-                            />
-                            Required
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => removeCustomField(field.key)}
-                            className="text-xs text-muted-foreground hover:text-destructive"
-                            aria-label={`Remove ${field.label}`}
-                          >
-                            Remove
-                          </button>
-                        </div>
+                        <span className="flex-1 truncate text-sm text-card-foreground">{field.label}</span>
+                        <RequiredToggle
+                          required={field.required === true}
+                          onChange={() => toggleCustomFieldRequired(field.key)}
+                          fieldLabel={field.label}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeCustomField(field.key)}
+                          className="shrink-0 rounded-control px-1 text-xs text-muted-foreground transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          aria-label={`Remove ${field.label}`}
+                        >
+                          Remove
+                        </button>
                       </div>
                     ))}
                   </div>
                 )}
 
+                {/* New fields land as Optional; the row's own control changes
+                    that afterwards, which is one less decision at the moment
+                    of typing a name. */}
                 <div className="flex items-center gap-2 border-t border-border pt-2">
                   <Input
                     type="text"
@@ -1051,15 +1352,6 @@ export function NewSurveyWizard() {
                     placeholder="Custom field, e.g. Team size"
                     className="h-8 text-sm"
                   />
-                  <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      checked={newCustomFieldRequired}
-                      onChange={(e) => setNewCustomFieldRequired(e.target.checked)}
-                      className="accent-primary"
-                    />
-                    Required
-                  </label>
                   <Button
                     type="button"
                     variant="secondary"
@@ -1103,7 +1395,7 @@ export function NewSurveyWizard() {
             <StepShell
               label="Public description"
               optional
-              hint="Shown to respondents on the survey landing page. Keep it neutral and research-framed. Never mention selling, pain points, or the sponsor's sales goals."
+              hint="Shown to respondents on the landing page. Keep it neutral and research-framed. Never mention selling, pain points, or the sponsor's sales goals."
               onBack={goBack}
               footer={<StepFooter onNext={goNext} />}
             >
@@ -1148,7 +1440,9 @@ export function NewSurveyWizard() {
                 </div>
                 <div className="flex items-baseline justify-between gap-4">
                   <span className="shrink-0 text-muted-foreground">Topic</span>
-                  <span className="text-right text-card-foreground">{extractedDetails?.topic || "—"}</span>
+                  <span className="text-right text-card-foreground">
+                    {guide?.recommended_topic || brief?.publicTopic || "—"}
+                  </span>
                 </div>
                 <div className="flex items-baseline justify-between gap-4">
                   <span className="shrink-0 text-muted-foreground">Gift card</span>
@@ -1180,16 +1474,22 @@ export function NewSurveyWizard() {
 
               <Button
                 type="button"
-                onClick={() => extractedDetails && createSurvey(extractedDetails)}
-                disabled={creating || !extractedDetails}
+                onClick={() => brief && guide && createSurvey(brief, guide)}
+                disabled={creating || !brief || !guide}
               >
                 {creating && showCreateLoader && <BirdLoader size={18} label={false} />}
-                {creating ? "Creating..." : "Create survey"}
+                {creating ? "Creating..." : "Create study"}
               </Button>
             </div>
           )}
         </div>
-        {showPreview && <SurveyPreviewPanel externalTitle={externalTitle} slug={slug} giftCardAmount={giftCardAmount} />}
+        {showPreview && <SurveyPreviewPanel
+            externalTitle={externalTitle}
+            slug={slug}
+            publicDescription={publicDescription}
+            enabledFields={previewEnabledFields}
+            customFields={customFields}
+          />}
       </div>
       </div>
     </div>

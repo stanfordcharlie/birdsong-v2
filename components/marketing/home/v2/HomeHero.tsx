@@ -17,8 +17,13 @@ export function HomeHero({ bookDemoUrl }: { bookDemoUrl: string }) {
   return (
     <section
       id="top"
-      className="hp-grid-ink relative mx-auto grid max-w-[1200px] grid-cols-1 items-center gap-[16px] px-[24px] pb-[160px] pt-[110px] hp-wide:grid-cols-[minmax(150px,1fr)_minmax(0,3.6fr)_minmax(150px,1fr)]"
+      className="relative mx-auto grid max-w-[1200px] scroll-mt-[96px] grid-cols-1 items-center gap-[16px] px-[24px] pb-[160px] pt-[96px] hp-wide:grid-cols-[minmax(150px,1fr)_minmax(0,3.6fr)_minmax(150px,1fr)]"
     >
+      {/* The rules-grid rides its own layer so its top-edge mask does not also
+          mask the copy and the notes. Masking the section itself would fade
+          out the H1 along with the lines. */}
+      <div aria-hidden className="hp-grid-ink pointer-events-none absolute inset-0" />
+
       <div className="relative hidden h-full min-h-[420px] hp-wide:block">
         <div className="absolute left-0 top-0 rotate-[-8deg] whitespace-nowrap font-hp-hand text-[clamp(22px,2.6vw,36px)] font-semibold leading-none">
           ✓ Qualified
@@ -47,7 +52,7 @@ export function HomeHero({ bookDemoUrl }: { bookDemoUrl: string }) {
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-[28px] px-[8px] text-center">
+      <div className="relative flex flex-col items-center gap-[28px] px-[8px] text-center">
         <div className="inline-flex flex-wrap items-center justify-center gap-[8px] text-[17px] text-hp-body">
           Interview-led pipeline for{" "}
           <span className="inline-flex items-center gap-[6px] font-medium text-hp-green">

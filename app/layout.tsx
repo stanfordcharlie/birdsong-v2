@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "Birdsong",
   description: "AI-moderated survey platform for B2B demand gen.",
   icons: {
-    // Starburst-bird mark (design_handoff_favicon). The PNG tab icons live in
+    // Rounded green tile with the cream bird mark. The PNG tab icons live in
     // public/ and are wired explicitly here. The .ico is not listed: Next
     // auto-emits its own <link> for app/favicon.ico (and serves /favicon.ico
     // for bare browser requests) regardless of this config, so listing it too

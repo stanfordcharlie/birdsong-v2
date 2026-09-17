@@ -142,14 +142,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This survey isn't available" }, { status: 403 });
   }
 
-  // Survey owner's company profile (what they sell, target ICP, value
-  // prop), used to keep the interview anchored to the company's actual
-  // product surface area instead of drifting wherever the respondent's
-  // last answer leads.
+  // The sponsoring organization's company profile (what they sell, target
+  // ICP, value prop), used to keep the interview anchored to the company's
+  // actual product surface area instead of drifting wherever the
+  // respondent's last answer leads. By org, not by the survey's creator: a
+  // study created by a teammate still belongs to the same company.
   const { data: profile } = await supabase
     .from("profiles")
     .select("what_we_sell, target_icp, value_prop")
-    .eq("user_id", survey.user_id)
+    .eq("org_id", survey.org_id)
     .maybeSingle();
 
   const respondent = {

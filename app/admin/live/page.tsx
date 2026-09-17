@@ -1,4 +1,7 @@
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { requireActiveOrg } from "@/lib/org";
+import { PageHeader, PageShell } from "@/components/admin/ui";
 import { LiveBoard, type LiveSurvey } from "./LiveBoard";
 
 // Who is in an interview right now, read entirely from Supabase Realtime
@@ -8,15 +11,16 @@ import { LiveBoard, type LiveSurvey } from "./LiveBoard";
 // since a channel is only joined for a survey this owner actually has.
 export default async function LivePage() {
   const supabase = await createClient();
-  const user = await getCurrentUser();
+  const { orgId } = await requireActiveOrg();
 
-  // Live and unarchived, the same definition the sidebar's "Listening" count
-  // uses. A draft survey has no public link to be answered through, and an
-  // archived one refuses respondents outright, so neither can produce a row.
+  // Live and unarchived. A draft survey has no public link to be answered
+  // through, and an archived one refuses respondents outright, so neither
+  // can produce a row. Explicit org filter: surveys_public_read means RLS
+  // alone would return every organization's surveys.
   const { data: surveys, error } = await supabase
     .from("surveys")
     .select("id, title, slug, num_questions")
-    .eq("user_id", user?.id ?? "")
+    .eq("org_id", orgId)
     .eq("status", "live")
     .is("archived_at", null)
     .order("created_at", { ascending: false });
@@ -29,15 +33,20 @@ export default async function LivePage() {
   }));
 
   return (
-    <div className="admin-container-wide flex flex-col gap-7">
-      <div className="flex flex-col gap-2">
-        <span className="type-label">Live</span>
-        <h1 className="type-page-title">Happening right now</h1>
-      </div>
+    <PageShell>
+      {/* Reached from Leads, not the nav, so the eyebrow names that parent. */}
+      <PageHeader
+        eyebrow={
+          <Link href="/admin/leads" className="focus-ring rounded-control hover:text-card-foreground">
+            Leads
+          </Link>
+        }
+        title="Live"
+      />
 
-      {error && <p className="text-sm text-destructive">{error.message}</p>}
+      {error && <p className="type-body text-destructive">{error.message}</p>}
 
       {!error && <LiveBoard surveys={liveSurveys} />}
-    </div>
+    </PageShell>
   );
 }

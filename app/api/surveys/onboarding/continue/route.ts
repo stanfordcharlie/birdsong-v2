@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveOrg, orgErrorResponse, requireOrgPermission } from "@/lib/org";
 import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
 import {
   ALTERNATION_STANDIN,
@@ -28,6 +29,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
+  try {
+    await requireOrgPermission("study:create");
+  } catch (err) {
+    return orgErrorResponse(err);
+  }
+
   let body: { messages?: SurveyOnboardingMessage[] };
   try {
     body = await request.json();
@@ -42,11 +49,14 @@ export async function POST(request: Request) {
 
   const exchangeCount = messages.filter((m) => m.role === "user").length;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("what_we_sell, target_icp, value_prop")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const org = await getActiveOrg();
+  const { data: profile } = org
+    ? await supabase
+        .from("profiles")
+        .select("what_we_sell, target_icp, value_prop")
+        .eq("org_id", org.orgId)
+        .maybeSingle()
+    : { data: null };
 
   const profileContext: QuestionGuideProfileContext | null = profile
     ? {

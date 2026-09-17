@@ -1,364 +1,316 @@
-import Link from "next/link";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { can, requireActiveOrg } from "@/lib/org";
+import { excludeArchivedStudies } from "@/lib/lead-queue";
+import { WORTH_A_CALL_SCORE_MIN } from "@/lib/leads";
 import { userFirstName } from "@/lib/user-name";
-import { Button } from "@/components/ui/button";
-import { GreetingBlock } from "./GreetingBlock";
-import { CopySurveyLinkButton } from "./CopySurveyLinkButton";
+import { PageHeader, PageShell } from "@/components/admin/ui";
+import { GlobalSearch } from "@/components/admin/GlobalSearch";
+import { TimeOfDayWord } from "./HomeClock";
+import { HomeComposer } from "./HomeLauncher";
 import {
-  ActivityTable,
-  OutListening,
-  PriorityLeads,
-  QuietState,
-  ReportCard,
-  REPORT_INTERVIEW_MINIMUM,
-  WeekStatsStrip,
-  type ActivityEvent,
-  type ListeningSurvey,
-  type PriorityLead,
-  type ReportProgress,
-  type WeekStats,
+  AttentionList,
+  HeroEmpty,
+  HeroStudyCard,
+  LaunchChecklist,
+  ProfileSection,
+  type AttentionItem,
+  type ChecklistItem,
+  type HeroStudy,
+  type ProfileCompletion,
+  type TranscriptPreview,
+  type TranscriptTurn,
 } from "./HomeSections";
 
-// Design reference: design_handoff_admin_home/AdminHome.dc.html. This file is
-// the data layer and the page composition; HomeSections.tsx holds the markup
-// and documents how the handoff's palette maps onto the shipped admin tokens.
-
-// A lead is worth surfacing from 7 up — the same cutoff the Slack notification
-// and the HubSpot deal threshold use, so "qualified" means one thing across
-// the product.
-const QUALIFIED_SCORE_MIN = 7;
+// This file is the data layer and the page composition; HomeSections.tsx
+// holds the markup, HomeLauncher.tsx the composer, GlobalSearch the header
+// search field.
+//
+// Data available today and used here: studies, responses (with their lead
+// score, workflow status and assignment), report drafts, the company profile
+// fields. Not available, so not rendered: invited counts, study close dates,
+// bounced invites. The launch checklist derives its state from the same data
+// rather than persisting anything.
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-// How many rows the activity feed pulls before filtering. It has to over-fetch
-// because a response that was started and abandoned before the first question
-// is not an event anyone wants to read about, so some rows get dropped.
-const ACTIVITY_FETCH_LIMIT = 12;
-const ACTIVITY_ROWS = 4;
+// How many turns of the latest conversation the hero card previews.
+const PREVIEW_TURNS = 4;
 
-type InterviewMessageish = { role?: unknown };
+// The report generator needs three transcripts before it will run
+// (app/api/surveys/[id]/report/route.ts).
+const REPORT_INTERVIEW_MINIMUM = 3;
 
-function initialsOf(name: string | null): string {
-  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "—";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
+// The company profile fields the setup flow collects, in the order it asks
+// for them. Completion is the share of these that are filled in.
+const PROFILE_FIELDS = [
+  { key: "company_name", label: "your company name" },
+  { key: "what_we_sell", label: "what you sell" },
+  { key: "target_icp", label: "who you sell to" },
+  { key: "value_prop", label: "your value proposition" },
+] as const;
 
 function displayName(name: string | null): string {
   return name?.trim() || "Anonymous";
 }
 
-function stringField(values: Record<string, unknown>, ...keys: string[]): string | null {
-  for (const key of keys) {
-    const value = values[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return null;
+function listNames(names: string[], max = 3): string {
+  const shown = names.slice(0, max);
+  const rest = names.length - shown.length;
+  return rest > 0 ? `${shown.join(", ")} and ${rest} more` : shown.join(", ");
 }
 
-// Which question they were on when they stopped: the interviewer asks, the
-// respondent answers, so the count of assistant turns is the number of
-// questions they actually saw.
-function questionsAsked(messages: unknown): number {
-  if (!Array.isArray(messages)) return 0;
-  return (messages as InterviewMessageish[]).filter((m) => m?.role === "assistant").length;
-}
-
-// The subline states what is actually waiting, in the handoff's register:
-// plain, warm, no exclamation.
-function buildSubline(waiting: number, liveSurveyCount: number, everCompleted: number): string {
-  if (waiting === 1) return "One lead finished an interview and hasn’t heard back yet.";
-  if (waiting > 1) return `${waiting} leads finished interviews and none of them have heard back yet.`;
-  if (liveSurveyCount > 0) {
-    return liveSurveyCount === 1
-      ? "One survey is listening. Nothing is waiting on you right now."
-      : `${liveSurveyCount} surveys are listening. Nothing is waiting on you right now.`;
-  }
-  if (everCompleted > 0) return "Nothing is listening at the moment. Set a survey live to start again.";
-  return "Create your first survey and Wren starts interviewing the moment you share the link.";
+function parseTurns(messages: unknown): TranscriptTurn[] {
+  if (!Array.isArray(messages)) return [];
+  return messages.flatMap((m) => {
+    const role = (m as { role?: unknown })?.role;
+    const content = (m as { content?: unknown })?.content;
+    if ((role !== "assistant" && role !== "user") || typeof content !== "string") return [];
+    return [{ role, content }];
+  });
 }
 
 export default async function AdminHomePage() {
   const supabase = await createClient();
-  const user = await getCurrentUser();
+  const [{ orgId, role }, user] = await Promise.all([requireActiveOrg(), getCurrentUser()]);
+  const canCreateStudy = can(role, "study:create");
+  const newStudyHref = canCreateStudy ? "/admin/surveys/new" : "/admin/surveys";
 
-  if (!user) return null;
+  // Four parallel queries. surveys and survey_reports carry an explicit
+  // org_id filter because both tables have a public-read policy, so RLS
+  // alone does not narrow them to this org. responses has no such policy:
+  // its org-member read policy is the whole filter.
+  const [{ data: surveysData }, { data: responsesData }, { data: reportRows }, { data: profile }] =
+    await Promise.all([
+      supabase
+        .from("surveys")
+        .select("id, slug, title, status, created_at")
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("created_at", { ascending: false }),
+      // Archived studies are excluded at the database (lib/lead-queue.ts),
+      // the same rule the lead queue applies, so counts here and there agree.
+      excludeArchivedStudies(
+        supabase
+          .from("responses")
+          .select(
+            "id, survey_id, respondent_name, lead_score, status, assigned_to, completed, created_at, surveys!inner(archived_at)"
+          )
+          .eq("is_test", false)
+      ).order("created_at", { ascending: false }),
+      supabase.from("survey_reports").select("survey_id").eq("org_id", orgId),
+      supabase
+        .from("profiles")
+        .select("company_name, what_we_sell, target_icp, value_prop, contact_name")
+        .eq("org_id", orgId)
+        .maybeSingle(),
+    ]);
 
-  // Five parallel queries, no waterfall between them.
-  //
-  // The responses query deliberately drops the `completed` filter the old
-  // page had: completion rate needs the interviews that were started and
-  // abandoned too, so the filtering happens in JS below where both halves
-  // are available.
-  const [
-    { data: profile },
-    { data: surveysData },
-    { data: responsesData },
-    { data: activityData },
-    { data: reportRows },
-  ] = await Promise.all([
-    supabase.from("profiles").select("contact_name").eq("user_id", user.id).maybeSingle(),
-    supabase
-      .from("surveys")
-      .select("id, slug, title, status, created_at")
-      .eq("user_id", user.id)
-      // Archived surveys are excluded from every stat and list on this page,
-      // matching the surveys list's default view.
-      .is("archived_at", null)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("responses")
-      .select(
-        "id, survey_id, respondent_name, custom_field_values, lead_score, status, pain_points, completed, created_at"
-      )
-      .eq("user_id", user.id)
-      .eq("is_test", false)
-      .order("created_at", { ascending: false }),
-    // Separate and hard-limited because it is the only query that needs
-    // `messages`, a full transcript per row — fetching that column across
-    // every response just to label four activity rows would dwarf the rest
-    // of this page's payload.
-    supabase
-      .from("responses")
-      .select("id, survey_id, respondent_name, lead_score, completed, created_at, messages")
-      .eq("user_id", user.id)
-      .eq("is_test", false)
-      .order("created_at", { ascending: false })
-      .limit(ACTIVITY_FETCH_LIMIT),
-    supabase.from("survey_reports").select("survey_id").eq("user_id", user.id),
-  ]);
-
-  // Company fit lives in its own columns and is fetched separately for the
-  // same reason the leads queue does it: if the response_company_fit
-  // migration has not been applied to this database, this one query errors
-  // and every lead simply renders without a fit score, rather than the whole
-  // page failing.
-  const { data: fitRows } = await supabase
-    .from("responses")
-    .select("id, fit_score")
-    .eq("user_id", user.id)
-    .eq("completed", true);
-  const fitById = new Map((fitRows ?? []).map((r) => [r.id, r.fit_score]));
-
-  const firstName = userFirstName(user, profile?.contact_name);
   const surveys = surveysData ?? [];
   const surveyIds = new Set(surveys.map((s) => s.id));
-  const surveyTitleById = new Map(surveys.map((s) => [s.id, s.title]));
-
-  // A response whose survey has since been archived still exists, but this
-  // page has already dropped that survey — so drop its responses too, and
-  // every stat, count and list stays consistent with what is on screen.
   const responses = (responsesData ?? []).filter((r) => surveyIds.has(r.survey_id));
   const completed = responses.filter((r) => r.completed);
 
-  // --- This week ----------------------------------------------------------
+  const liveSurveys = surveys.filter((s) => s.status === "live");
+  const draftSurveys = surveys.filter((s) => s.status !== "live");
 
-  // Only "interviews completed" is windowed to the week. Completion rate and
-  // average score are quality measures, and over a single quiet week they are
-  // either noise or an em dash — read across every response they are a stable
-  // number that is actually worth putting on the page.
+  // --- The most active study ---------------------------------------------
+
   const weekAgo = Date.now() - WEEK_MS;
-  const completedThisWeek = completed.filter((r) => new Date(r.created_at).getTime() >= weekAgo);
-  const scored = completed.filter((r) => typeof r.lead_score === "number");
-
-  // "Awaiting first contact" is a current-state count, not a seven-day one:
-  // a lead that has been sitting untouched for nine days is exactly the one
-  // this cell exists to nag about.
-  const waitingLeads = completed.filter(
-    (r) => (r.lead_score ?? 0) >= QUALIFIED_SCORE_MIN && (r.status ?? "new") === "new"
-  );
-
-  const stats: WeekStats = {
-    awaiting: waitingLeads.length,
-    completedThisWeek: completedThisWeek.length,
-    completionRate: responses.length > 0 ? completed.length / responses.length : null,
-    averageScore:
-      scored.length > 0
-        ? scored.reduce((sum, r) => sum + (r.lead_score ?? 0), 0) / scored.length
-        : null,
-  };
-
-  // --- Worth a call today -------------------------------------------------
-
-  // waitingLeads already arrives newest-first from the query; sorting by score
-  // on top of that makes the tie-break "most recent of the equally hot ones".
-  const priorityLeads: PriorityLead[] = [...waitingLeads]
-    .sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0))
-    .slice(0, 2)
-    .map((r) => {
-      const customValues = (r.custom_field_values as Record<string, unknown> | null) ?? {};
-      const painPoints = (r.pain_points as unknown as string[] | null) ?? [];
-      return {
-        id: r.id,
-        name: displayName(r.respondent_name),
-        initials: initialsOf(r.respondent_name),
-        role: stringField(customValues, "job_title", "role", "title"),
-        company: stringField(customValues, "company", "derived_company_name"),
-        score: r.lead_score ?? 0,
-        fitScore: fitById.get(r.id) ?? null,
-        // Their own words, verbatim — the top pain point is the same one the
-        // Slack notification and the HubSpot contact quote.
-        quote: typeof painPoints[0] === "string" ? painPoints[0] : null,
-        createdAt: r.created_at,
-      };
-    });
-
-  // --- Out listening ------------------------------------------------------
-
   const startedBySurvey = new Map<string, number>();
+  const startedThisWeekBySurvey = new Map<string, number>();
   const completedBySurvey = new Map<string, number>();
   for (const r of responses) {
     startedBySurvey.set(r.survey_id, (startedBySurvey.get(r.survey_id) ?? 0) + 1);
-    if (r.completed) {
-      completedBySurvey.set(r.survey_id, (completedBySurvey.get(r.survey_id) ?? 0) + 1);
+    if (new Date(r.created_at).getTime() >= weekAgo) {
+      startedThisWeekBySurvey.set(r.survey_id, (startedThisWeekBySurvey.get(r.survey_id) ?? 0) + 1);
+    }
+    if (r.completed) completedBySurvey.set(r.survey_id, (completedBySurvey.get(r.survey_id) ?? 0) + 1);
+  }
+
+  // Most conversations this week, then most ever, then newest. Live only: a
+  // draft has no conversations to be active with.
+  const heroSurvey = [...liveSurveys].sort(
+    (a, b) =>
+      (startedThisWeekBySurvey.get(b.id) ?? 0) - (startedThisWeekBySurvey.get(a.id) ?? 0) ||
+      (startedBySurvey.get(b.id) ?? 0) - (startedBySurvey.get(a.id) ?? 0) ||
+      b.created_at.localeCompare(a.created_at)
+  )[0];
+
+  // The one dependent query: the latest conversation on the hero study, with
+  // its transcript. `messages` is a full transcript per row, so it is fetched
+  // for exactly one row rather than selected above.
+  let preview: TranscriptPreview | null = null;
+  if (heroSurvey && (startedBySurvey.get(heroSurvey.id) ?? 0) > 0) {
+    const { data: latest } = await supabase
+      .from("responses")
+      .select("id, respondent_name, completed, created_at, messages")
+      .eq("survey_id", heroSurvey.id)
+      .eq("is_test", false)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latest) {
+      preview = {
+        responseId: latest.id,
+        respondentName: displayName(latest.respondent_name),
+        completed: latest.completed,
+        createdAt: latest.created_at,
+        turns: parseTurns(latest.messages).slice(-PREVIEW_TURNS),
+      };
     }
   }
 
-  const liveSurveys = surveys.filter((s) => s.status === "live");
-  // Drafts that have never been answered, last and muted — a draft someone
-  // has already responded to is a live survey that got paused, not the
-  // "never launched" row the handoff describes.
-  const neverLaunched = surveys.filter(
-    (s) => s.status !== "live" && (startedBySurvey.get(s.id) ?? 0) === 0
-  );
+  const isWaiting = (r: (typeof responses)[number]) =>
+    r.completed && (r.lead_score ?? 0) >= WORTH_A_CALL_SCORE_MIN && (r.status ?? "new") === "new";
 
-  const listeningSurveys: ListeningSurvey[] = [...liveSurveys, ...neverLaunched].map((s) => {
-    const started = startedBySurvey.get(s.id) ?? 0;
-    const done = completedBySurvey.get(s.id) ?? 0;
-    return {
-      id: s.id,
-      title: s.title,
-      isLive: s.status === "live",
-      completedCount: done,
-      completionRate: started > 0 ? done / started : null,
-    };
-  });
-
-  // --- Industry report ----------------------------------------------------
-
-  // Points at whichever survey is closest to having a report worth reading:
-  // the one with the most completed interviews that has not been reported on
-  // yet. Hidden entirely until at least one interview exists, so it never
-  // shows up as an empty promise on a brand-new account.
-  const reportedSurveyIds = new Set((reportRows ?? []).map((r) => r.survey_id));
-  const reportCandidate = surveys
-    .filter((s) => !reportedSurveyIds.has(s.id) && (completedBySurvey.get(s.id) ?? 0) > 0)
-    .sort((a, b) => (completedBySurvey.get(b.id) ?? 0) - (completedBySurvey.get(a.id) ?? 0))[0];
-
-  const report: ReportProgress | null = reportCandidate
+  const hero: HeroStudy | null = heroSurvey
     ? {
-        surveyId: reportCandidate.id,
-        completedCount: completedBySurvey.get(reportCandidate.id) ?? 0,
-        ready: (completedBySurvey.get(reportCandidate.id) ?? 0) >= REPORT_INTERVIEW_MINIMUM,
+        id: heroSurvey.id,
+        slug: heroSurvey.slug,
+        title: heroSurvey.title,
+        startedCount: startedBySurvey.get(heroSurvey.id) ?? 0,
+        completedCount: completedBySurvey.get(heroSurvey.id) ?? 0,
+        waitingCount: responses.filter((r) => r.survey_id === heroSurvey.id && isWaiting(r)).length,
+        assignedCount: responses.filter((r) => r.survey_id === heroSurvey.id && r.assigned_to !== null).length,
+        preview,
       }
     : null;
 
-  // --- What's been happening ----------------------------------------------
+  // --- Needs your attention -----------------------------------------------
 
-  const events: ActivityEvent[] = (activityData ?? [])
-    .filter((r) => surveyIds.has(r.survey_id))
-    // An interview abandoned before the first question was even asked is not
-    // an event — nothing happened yet.
-    .filter((r) => r.completed || questionsAsked(r.messages) > 0)
-    .slice(0, ACTIVITY_ROWS)
-    .map((r) => ({
-      id: r.id,
-      name: displayName(r.respondent_name),
-      initials: initialsOf(r.respondent_name),
-      what: r.completed
-        ? `Completed ${surveyTitleById.get(r.survey_id) ?? "a survey"}`
-        : `Dropped off at question ${questionsAsked(r.messages)}`,
-      score: r.lead_score,
-      createdAt: r.created_at,
-    }));
+  const waiting = responses.filter(isWaiting);
+  const reportedSurveyIds = new Set((reportRows ?? []).map((r) => r.survey_id));
+  const reportReady = surveys.filter(
+    (s) => !reportedSurveyIds.has(s.id) && (completedBySurvey.get(s.id) ?? 0) >= REPORT_INTERVIEW_MINIMUM
+  );
+  const attention: AttentionItem[] = [];
+  if (waiting.length > 0) {
+    attention.push({
+      id: "waiting",
+      title: `${waiting.length} ${waiting.length === 1 ? "lead is" : "leads are"} waiting to hear from you`,
+      detail: listNames(waiting.map((r) => displayName(r.respondent_name))),
+      href: "/admin/leads?status=new",
+    });
+  }
+  if (reportReady.length > 0) {
+    attention.push({
+      id: "reports",
+      title: `${reportReady.length} report ${reportReady.length === 1 ? "draft is" : "drafts are"} ready`,
+      detail: listNames(reportReady.map((s) => s.title)),
+      href: reportReady.length === 1 ? `/admin/surveys/${reportReady[0].id}` : "/admin/surveys",
+    });
+  }
+  // Drafts only count as attention once something else is live: with
+  // nothing live at all, the hero card already says so.
+  if (liveSurveys.length > 0 && draftSurveys.length > 0) {
+    attention.push({
+      id: "drafts",
+      title: `${draftSurveys.length} ${draftSurveys.length === 1 ? "draft is" : "drafts are"} not live yet`,
+      detail: listNames(draftSurveys.map((s) => s.title)),
+      href: "/admin/surveys",
+    });
+  }
+
+  // --- Company profile ----------------------------------------------------
+
+  const emptyFields = PROFILE_FIELDS.filter((f) => !profile?.[f.key]?.trim());
+  const completion: ProfileCompletion = {
+    filled: PROFILE_FIELDS.length - emptyFields.length,
+    total: PROFILE_FIELDS.length,
+    next: emptyFields[0]?.label ?? null,
+  };
+
+  // --- Before you launch --------------------------------------------------
+
+  const checklist: ChecklistItem[] = [
+    {
+      id: "profile",
+      label: "Complete your company profile",
+      done: emptyFields.length === 0,
+      href: "/admin/profile",
+      action: "Open profile",
+    },
+    {
+      id: "create",
+      label: "Create your first study",
+      done: surveys.length > 0,
+      href: newStudyHref,
+      action: "New study",
+    },
+    {
+      id: "launch",
+      label: "Launch a study",
+      done: liveSurveys.length > 0,
+      href: "/admin/surveys",
+      action: "Open studies",
+    },
+    {
+      id: "respond",
+      label: "Hear from your first respondent",
+      done: completed.length > 0,
+      href: heroSurvey ? `/admin/surveys/${heroSurvey.id}` : "/admin/surveys",
+      action: "Share the link",
+    },
+  ];
 
   // --- Composition --------------------------------------------------------
 
-  const firstLiveSurvey = liveSurveys[0];
-  const subline = buildSubline(waitingLeads.length, liveSurveys.length, completed.length);
+  const firstName = userFirstName(user, profile?.contact_name);
+  const checklistDone = checklist.every((item) => item.done);
 
+  // Home fits the viewport on a desktop rather than scrolling: the page column
+  // is exactly the height left inside AdminShell's padding, the hero row takes
+  // what remains after the header and composer, and the transcript panel
+  // clips under a fade rather than pushing the page taller. Below `lg` the
+  // columns stack and the page scrolls as normal.
   return (
-    <div className="admin-container-wide">
-      {/* Masthead: greeting on the left, the two actions hard right on the
-          same line, and the week's four numbers ruled across underneath —
-          the strip is what separates the masthead from the page, so there is
-          no divider line of its own. */}
-      <div className="mb-[26px]">
-        <div className="mb-[22px] flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between sm:gap-10">
-          <div>
-            {/* GreetingBlock owns the eyebrow and the headline because both
-                depend on the browser's clock, not the server's. */}
-            <GreetingBlock firstName={firstName} />
-            <div className="mt-3 max-w-[46ch] text-[15px] text-muted-foreground">{subline}</div>
-          </div>
-          <div className="flex shrink-0 items-center gap-[18px] sm:pb-1.5">
-            {firstLiveSurvey && (
-              <CopySurveyLinkButton
-                slug={firstLiveSurvey.slug}
-                title={firstLiveSurvey.title}
-                variant="text"
-              />
-            )}
-            <Button
-              asChild
-              className="h-auto rounded-full px-[22px] py-3 text-sm font-semibold transition-[transform,box-shadow,background-color] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(28,25,23,0.22)]"
-            >
-              <Link href="/admin/surveys/new">New survey</Link>
-            </Button>
-          </div>
-        </div>
-        <div className="bs-rise-2">
-          <WeekStatsStrip stats={stats} />
-        </div>
-      </div>
+    <PageShell className="min-h-[calc(100vh-2*var(--ds-container-pad-y))] lg:h-[calc(100vh-2*var(--ds-container-pad-y))]">
+      {/* relative z-10: bs-rise leaves the header with a transform, so it
+          is its own stacking context and the search popover inside it would
+          otherwise paint under the composer and the rail. */}
+      <PageHeader
+        className="bs-rise-1 relative z-10 shrink-0"
+        title={
+          <>
+            Good <TimeOfDayWord />
+            {firstName ? `, ${firstName}` : ""}
+          </>
+        }
+        actions={<GlobalSearch className="hidden w-72 flex-none sm:block" />}
+      />
 
-      {/* Worth a call today, or the quiet state in its place */}
-      <div className="bs-rise-3">
-        {priorityLeads.length > 0 ? (
-          <PriorityLeads leads={priorityLeads} waiting={waitingLeads.length} />
-        ) : (
-          <QuietState
-            liveSurveyCount={liveSurveys.length}
-            copyLinkAction={
-              firstLiveSurvey ? (
-                <CopySurveyLinkButton
-                  slug={firstLiveSurvey.slug}
-                  title={firstLiveSurvey.title}
-                  variant="button"
-                  label="Share a survey link"
-                />
-              ) : (
-                <Button asChild variant="secondary" className="hover:border-faint/50">
-                  <Link href="/admin/surveys/new">Create a survey</Link>
-                </Button>
-              )
-            }
-          />
+      <div className="flex min-h-0 flex-1 flex-col gap-8">
+        <div className="bs-rise-2 shrink-0">
+          <HomeComposer href={newStudyHref} />
+        </div>
+
+        {/* The one row is minmax(0, 1fr), not auto: an auto row sizes to its
+            content, so the hero's max-h-full would resolve against the
+            content instead of the space that is actually left. */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-8 lg:grid-cols-3 lg:grid-rows-[minmax(0,1fr)] lg:items-start">
+          {/* max-h-full is what caps the hero card at the row's height; the
+              card itself shrinks its transcript panel to fit. */}
+          <div className="bs-rise-3 flex min-h-0 max-h-full flex-col lg:col-span-2">
+            {hero ? (
+              <HeroStudyCard study={hero} />
+            ) : (
+              <HeroEmpty draftCount={draftSurveys.length} newStudyHref={newStudyHref} />
+            )}
+          </div>
+          <div className="bs-rise-4 flex flex-col gap-8">
+            <AttentionList items={attention} />
+            <ProfileSection completion={completion} />
+          </div>
+        </div>
+
+        {/* Rendered only while a step is open: an empty wrapper would still
+            claim a gap step at the bottom of the page. */}
+        {!checklistDone && (
+          <div className="bs-rise-5 shrink-0">
+            <LaunchChecklist items={checklist} />
+          </div>
         )}
       </div>
-
-      {/* Out listening + the report card. The report card is hidden until at
-          least one interview exists, so the left card takes the full width on
-          a new account rather than leaving a 340px hole. */}
-      {listeningSurveys.length > 0 && (
-        <div
-          className={
-            report
-              ? "bs-rise-4 mb-[30px] grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_340px]"
-              : "bs-rise-4 mb-[30px]"
-          }
-        >
-          <OutListening surveys={listeningSurveys} />
-          {report && <ReportCard report={report} />}
-        </div>
-      )}
-
-      {events.length > 0 && (
-        <div className="bs-rise-5">
-          <ActivityTable events={events} />
-        </div>
-      )}
-    </div>
+    </PageShell>
   );
 }

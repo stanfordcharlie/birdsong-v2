@@ -99,6 +99,20 @@ const config: Config = {
         input: "hsl(var(--ds-input) / <alpha-value>)",
         ring: "hsl(var(--ds-ring) / <alpha-value>)",
         chip: "hsl(var(--ds-chip) / <alpha-value>)",
+        // A sunk panel inside a card (Home's transcript preview).
+        surface: "hsl(var(--ds-surface) / <alpha-value>)",
+
+        // Admin design system, unified pass (app/globals.css). `accent` above
+        // is a legacy alias for the neutral grey chip fill and is NOT this —
+        // these three are the real accent, formalised from the green that was
+        // already in use across admin without ever being a token.
+        brand: {
+          DEFAULT: "hsl(var(--ds-accent) / <alpha-value>)",
+          weak: "hsl(var(--ds-accent-weak) / <alpha-value>)",
+          text: "hsl(var(--ds-accent-text) / <alpha-value>)",
+          live: "hsl(var(--ds-accent-live) / <alpha-value>)",
+        },
+        focus: "hsl(var(--ds-focus) / <alpha-value>)",
 
         // Respondent survey theme (app/globals.css `.survey-theme`). Only the
         // survey route sets that class, so these resolve to nothing anywhere
@@ -130,6 +144,11 @@ const config: Config = {
           accent: "hsl(var(--ds-sidebar-accent) / <alpha-value>)",
           border: "hsl(var(--ds-sidebar-border) / <alpha-value>)",
           ring: "hsl(var(--ds-sidebar-ring) / <alpha-value>)",
+          plate: "hsl(var(--ds-sidebar-plate) / <alpha-value>)",
+          label: "hsl(var(--ds-sidebar-label) / <alpha-value>)",
+          muted: "hsl(var(--ds-sidebar-muted) / <alpha-value>)",
+          avatar: "hsl(var(--ds-sidebar-avatar) / <alpha-value>)",
+          "avatar-foreground": "hsl(var(--ds-sidebar-avatar-foreground) / <alpha-value>)",
         },
 
         // Marketing landing pages (design_handoff_landing_pages_full) — a
@@ -199,28 +218,28 @@ const config: Config = {
         // above because those tokens are also what the public research
         // report pages render on. See the --hp-* block in app/globals.css.
         hp: {
-          cream: "var(--hp-cream)",
-          card: "var(--hp-card)",
-          tint: "var(--hp-tint)",
-          ink: "var(--hp-ink)",
-          body: "var(--hp-body)",
-          muted: "var(--hp-muted)",
-          faint: "var(--hp-faint)",
+          cream: "rgb(var(--hp-cream) / <alpha-value>)",
+          card: "rgb(var(--hp-card) / <alpha-value>)",
+          tint: "rgb(var(--hp-tint) / <alpha-value>)",
+          ink: "rgb(var(--hp-ink) / <alpha-value>)",
+          body: "rgb(var(--hp-body) / <alpha-value>)",
+          muted: "rgb(var(--hp-muted) / <alpha-value>)",
+          faint: "rgb(var(--hp-faint) / <alpha-value>)",
           line: {
-            DEFAULT: "var(--hp-line)",
-            soft: "var(--hp-line-soft)",
-            faint: "var(--hp-line-faint)",
+            DEFAULT: "rgb(var(--hp-line) / <alpha-value>)",
+            soft: "rgb(var(--hp-line-soft) / <alpha-value>)",
+            faint: "rgb(var(--hp-line-faint) / <alpha-value>)",
           },
           green: {
-            DEFAULT: "var(--hp-green)",
-            pale: "var(--hp-green-pale)",
-            tint: "var(--hp-green-tint)",
-            wash: "var(--hp-green-wash)",
-            line: "var(--hp-green-line)",
+            DEFAULT: "rgb(var(--hp-green) / <alpha-value>)",
+            pale: "rgb(var(--hp-green-pale) / <alpha-value>)",
+            tint: "rgb(var(--hp-green-tint) / <alpha-value>)",
+            wash: "rgb(var(--hp-green-wash) / <alpha-value>)",
+            line: "rgb(var(--hp-green-line) / <alpha-value>)",
           },
-          "note-tan": "var(--hp-note-tan)",
-          "note-yellow": "var(--hp-note-yellow)",
-          bubble: "var(--hp-bubble)",
+          "note-tan": "rgb(var(--hp-note-tan) / <alpha-value>)",
+          "note-yellow": "rgb(var(--hp-note-yellow) / <alpha-value>)",
+          bubble: "rgb(var(--hp-bubble) / <alpha-value>)",
         },
       },
       borderRadius: {

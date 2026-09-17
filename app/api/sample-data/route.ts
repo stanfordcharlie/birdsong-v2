@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { orgErrorResponse, requireOrgPermission } from "@/lib/org";
 import { randomSlugSuffix } from "@/lib/surveys/slugify";
 import { SAMPLE_SURVEY, SAMPLE_RESPONSES } from "@/lib/sample-data";
 import type { Json } from "@/types/database";
@@ -9,9 +10,9 @@ function daysAgoIso(days: number): string {
 }
 
 // POST /api/sample-data
-// Seeds the demo survey + responses for the current user from the
+// Seeds the demo survey + responses for the current organization from the
 // lib/sample-data fixture. Instant and deterministic — no model calls.
-// Idempotent: if the user already has sample data, returns it untouched.
+// Idempotent: if the org already has sample data, returns it untouched.
 export async function POST() {
   const supabase = await createClient();
   const {
@@ -21,10 +22,17 @@ export async function POST() {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
+  let orgId: string;
+  try {
+    ({ orgId } = await requireOrgPermission("study:create"));
+  } catch (err) {
+    return orgErrorResponse(err);
+  }
+
   const { data: existing } = await supabase
     .from("surveys")
     .select("id")
-    .eq("user_id", user.id)
+    .eq("org_id", orgId)
     .eq("is_sample", true)
     .maybeSingle();
 
@@ -42,6 +50,7 @@ export async function POST() {
       is_sample: true,
       slug: `sample-field-ops-${randomSlugSuffix()}`,
       user_id: user.id,
+      org_id: orgId,
     })
     .select("id")
     .single();
@@ -66,6 +75,9 @@ export async function POST() {
     signals: r.signals as unknown as Json,
     // Always test data: excluded from real stats, never emails, never a lead.
     is_test: true,
+    // user_id and org_id are both derived from the survey by the
+    // set_response_user_id / set_response_org_id triggers; this value is
+    // overwritten and only kept for the Insert type.
     user_id: user.id,
     created_at: daysAgoIso(r.daysAgo),
   }));
@@ -79,15 +91,15 @@ export async function POST() {
     return NextResponse.json({ error: responsesError.message }, { status: 500 });
   }
 
-  console.log(`[sample-data] seeded survey ${survey.id} for user ${user.id}`);
+  console.log(`[sample-data] seeded survey ${survey.id} for org ${orgId} (by user ${user.id})`);
   return NextResponse.json({ survey_id: survey.id, already_existed: false });
 }
 
 // DELETE /api/sample-data
-// Removes the current user's sample data. Scoped strictly to is_sample
-// surveys owned by the caller; responses go with them via the existing
-// responses.survey_id ON DELETE CASCADE. Real data is unreachable from
-// this path by construction.
+// Removes the current organization's sample data. Scoped strictly to
+// is_sample surveys owned by the caller's org; responses go with them via
+// the existing responses.survey_id ON DELETE CASCADE. Real data is
+// unreachable from this path by construction.
 export async function DELETE() {
   const supabase = await createClient();
   const {
@@ -97,10 +109,17 @@ export async function DELETE() {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
+  let orgId: string;
+  try {
+    ({ orgId } = await requireOrgPermission("study:delete"));
+  } catch (err) {
+    return orgErrorResponse(err);
+  }
+
   const { data: deleted, error } = await supabase
     .from("surveys")
     .delete()
-    .eq("user_id", user.id)
+    .eq("org_id", orgId)
     .eq("is_sample", true)
     .select("id");
 
@@ -109,6 +128,6 @@ export async function DELETE() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  console.log(`[sample-data] removed ${deleted?.length ?? 0} sample survey(s) for user ${user.id}`);
+  console.log(`[sample-data] removed ${deleted?.length ?? 0} sample survey(s) for org ${orgId}`);
   return NextResponse.json({ removed: deleted?.length ?? 0 });
 }

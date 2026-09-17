@@ -36,8 +36,8 @@ export default function ForgotPasswordPage() {
       <div className="flex min-h-screen items-center justify-center bg-page px-4">
         <Card className="w-full max-w-sm">
           <CardContent className="flex flex-col gap-2 pt-6 text-center">
-            <h1 className="text-xl font-semibold text-card-foreground">Check your email</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="type-heading">Check your email</h1>
+            <p className="type-body text-muted-foreground">
               If an account exists for {email}, we sent a link to reset your password.
             </p>
           </CardContent>

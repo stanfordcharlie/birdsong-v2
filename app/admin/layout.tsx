@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { getActiveOrg } from "@/lib/org";
 import { AdminChrome } from "@/components/AdminChrome";
+import { SearchShortcut } from "@/components/admin/SearchShortcut";
 import { userFullName } from "@/lib/user-name";
 
 export default async function AdminLayout({
@@ -10,38 +12,29 @@ export default async function AdminLayout({
 }) {
   const supabase = await createClient();
   const user = await getCurrentUser();
+  // Null on the bare auth routes (no session), and null for a signed-in
+  // user with no membership, which getActiveOrg logs loudly. The layout
+  // itself must still render either way, so nothing here throws.
+  const org = user ? await getActiveOrg() : null;
 
-  const { data: profile } = user
-    ? await supabase.from("profiles").select("contact_name").eq("user_id", user.id).maybeSingle()
+  // The company profile is the organization's row, one per org.
+  const { data: profile } = org
+    ? await supabase.from("profiles").select("contact_name").eq("org_id", org.orgId).maybeSingle()
     : { data: null };
 
   // userFullName, not userDisplayName: the sidebar plate shows this as a
   // person's name in serif and falls back to "Account" on its own, so an
   // email address there would read as a mistake rather than a fallback.
   const displayName = userFullName(user, profile?.contact_name);
-
-  // Feeds the plate's "Listening · N live" line. Counts what the Surveys
-  // list's Live filter counts — status 'live' and not archived — rather
-  // than status alone, so an archived survey never reads as still
-  // listening. head:true means only the count crosses the wire.
-  const { count: liveSurveyCount } = user
-    ? await supabase
-        .from("surveys")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("status", "live")
-        .is("archived_at", null)
-    : { count: 0 };
+  const roleLabel = org ? org.role.charAt(0).toUpperCase() + org.role.slice(1) : null;
 
   const cookieStore = await cookies();
   const sidebarCollapsed = cookieStore.get("sidebar_collapsed")?.value === "1";
 
   return (
-    <AdminChrome
-      userName={displayName}
-      liveSurveyCount={liveSurveyCount ?? 0}
-      sidebarCollapsed={sidebarCollapsed}
-    >
+    <AdminChrome userName={displayName} userRole={roleLabel} sidebarCollapsed={sidebarCollapsed}>
+      {/* ⌘K on every signed-in admin route; not on the auth screens. */}
+      {user && <SearchShortcut />}
       {children}
     </AdminChrome>
   );

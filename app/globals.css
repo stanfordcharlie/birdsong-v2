@@ -39,6 +39,11 @@
   --ds-primary-foreground: 50 23% 95%; /* #f5f4ef cream text on ink */
 
   --ds-secondary: 48 12% 92%;          /* #edece8, same as --ds-chip */
+  /* 2026-09-05: a sunk panel inside a card. Same value as the page canvas,
+     so a panel on a white card reads as a window onto the page rather than a
+     tinted fill. Used by Home's transcript preview; nothing else. Neutral by
+     construction: it cannot drift toward cream because it is the canvas. */
+  --ds-surface: 60 7% 97%;             /* #f8f8f7 */
   --ds-secondary-foreground: 24 10% 10%;
 
   --ds-muted: 48 12% 92%;
@@ -72,9 +77,102 @@
   --ds-sidebar-accent: 0 0% 15%;        /* #262626 — hover/active nav fill */
   --ds-sidebar-border: 0 0% 20%;        /* #333333 */
   --ds-sidebar-ring: 0 0% 20%;
+  /* The account row at the rail's foot. These replace six rgba literals that
+     were the only place admin still wrote colour outside the token set.
+     --ds-sidebar-plate is consumed at low alpha (the 6% plate edge, the 3%
+     plate fill, the 6% hover fill), which is why it is an unmixed near-white
+     rather than a pre-mixed grey: mixing it here would stop the same token
+     serving both the fill and the rule. Warm, not pure white, so the rail's
+     one light accent carries the same cream cast as the rest of the
+     product. */
+  --ds-sidebar-plate: 45 100% 98.4%;    /* #fffdf7, used at 3-6% alpha */
+  --ds-sidebar-label: 0 0% 42%;         /* #6b6b6b — the "Workspace" label */
+  --ds-sidebar-muted: 39 45.5% 91.4%;   /* #f3ecdf — the role line, at 38% */
+  /* The account avatar. Deliberately the one saturated colour on the rail:
+     initials need a fill that separates them from a near-black sidebar, and
+     a dark tile on a dark ground reads as a smudge. This restores the
+     periwinkle an earlier pass removed for being off-palette — it is back on
+     purpose and only here, now muted from #8ea4e8 to #5f6bab so the one
+     saturated tile stops out-shouting the rail it sits on. See the DESIGN.md
+     changelog. */
+  --ds-sidebar-avatar: 230.5 31.1% 52.2%;  /* #5f6bab */
+  --ds-sidebar-avatar-foreground: 45 100% 98.4%; /* #fffdf7 */
 
   --ds-radius-card: 0.75rem;    /* 12px */
   --ds-radius-control: 0.5rem;  /* 8px */
+  /* Account row only. Sits between control and card because the row is wider
+     and shorter than a control but is not a card. */
+  --ds-radius-account: 0.6875rem; /* 11px */
+  --ds-radius-pill: 999px;
+
+  /* --- Admin design system, unified pass -----------------------------------
+     This block is the single source of truth for the admin surface. DESIGN.md
+     mirrors it in prose; where the two disagree, this file wins.
+
+     Nothing below is a new cascade: it extends the --ds-* set above rather
+     than living in its own file, because tailwind.config.ts maps every
+     Tailwind colour name onto these vars and a second file would double-define
+     --ds-border and silently fork the palette.
+
+     Fonts are NOT declared here. The faces already exist in lib/fonts.ts and
+     are wired through tailwind.config.ts as font-serif / font-archivo; these
+     aliases name the ROLES so a component never has to know which face plays
+     which part. The body face is Archivo, not Inter — Inter is the global
+     default that marketing still uses, and admin overrides it at AdminShell. */
+
+  --font-display: var(--font-young-serif);
+  --font-body: var(--font-archivo);
+
+  /* Layout. One container for every admin page. No page overrides it, and no
+     page adds a second inset: a page that needs a narrower measure constrains
+     the BLOCK inside it, never the container, so every H1 on every admin page
+     starts at the identical x coordinate. */
+  --ds-container-max: 1140px;
+  --ds-container-pad-x: 2rem;   /* 32px, matches AdminShell's existing p-8 */
+  --ds-container-pad-y: 2rem;   /* 32px from viewport top to the page title, down from 56 */
+
+  /* Base unit 8. These are the only allowed steps. */
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 24px;
+  --ds-space-6: 32px;
+  --ds-space-7: 40px;
+  --ds-space-8: 56px;
+  --ds-space-9: 72px;
+
+  /* Vertical rhythm: header to first content block, and between blocks. */
+  --ds-rhythm-header: var(--ds-space-6); /* 32 */
+  --ds-rhythm-block: var(--ds-space-7);  /* 40 */
+
+  /* Accent. Green was being used across admin for score bars, status dots and
+     count pills without ever being a token — it existed only as --ds-success,
+     which is documented as status-only. Formalised here as the accent so the
+     two stop drifting apart. --ds-success keeps its own meaning for genuine
+     status (live / archived / error) and happens to share the hue. */
+  --ds-accent: 139 25% 30%;        /* #3a6046 */
+  --ds-accent-weak: 92 28% 90%;    /* #e4ecdd — tinted fill */
+  --ds-accent-text: 139 26% 23%;   /* #2c4a36 — 7.4:1 on accent-weak */
+
+  /* The live dot. Replaces the raw #8fbf7a that appeared in five files and
+     was never a token. #8fbf7a is 1.9:1 on the card surface, which is below
+     any legible threshold for a 7px mark carrying real state, so it is not
+     kept. The Live board's separate indigo dot maps here too, so "live" is
+     one colour across the whole surface rather than three. */
+  --ds-accent-live: 139 25% 30%;   /* #3a6046 */
+
+  /* 2026-09-02: --ds-cover-1/2/3 removed. The study list is a table now and
+     nothing else painted a cover. */
+
+  /* One focus treatment for the whole surface. Applied as a 2px ring at 2px
+     offset. An outline is never removed without this replacing it. */
+  --ds-focus: 24 10% 10%;
+
+  /* One card shadow, plus its hover step for cards that are themselves links.
+     No page defines its own. */
+  --ds-shadow-card: 0 4px 14px rgba(28, 25, 23, 0.06);
+  --ds-shadow-card-hover: 0 6px 20px rgba(28, 25, 23, 0.09);
 }
 
 /* --- Marketing landing pages (design_handoff_landing_pages_full) ---
@@ -141,34 +239,47 @@
   --ln-green-pale: #cfe0cc;
   --ln-logo-cream: #f5edcb;
 
-  /* Home landing page, v2 direction (design_handoff_birdsong_landing,
+  /* Stored as space-separated R G B channels, not hex, and consumed through
+     `rgb(var(--hp-x) / <alpha-value>)` in tailwind.config.ts. A var holding a
+     hex string cannot take Tailwind's `/opacity` modifier — `bg-hp-cream/[.62]`
+     silently compiles to a fully opaque `var(--hp-cream)` instead. The nav
+     pill's glass and the CTA banner's 70% circles both depend on this.
+
+     Home landing page, v2 direction (design_handoff_birdsong_landing,
      `Birdsong Landing v2.dc.html`). A separate namespace from --ln-* above
      rather than new values for it: --ln-* is shared with the public research
      report pages (app/reports/[slug], components/research/report/*), and the
      v2 palette is close enough to look like a fix and different enough to
      restyle them. `/` is the only surface on --hp-*. */
-  --hp-cream: #f8f4ec;
-  --hp-card: #fbf9f4;
-  --hp-tint: #efe9dc;
+  --hp-cream: 248 244 236;
+  --hp-card: 251 249 244;
+  --hp-tint: 239 233 220;
 
-  --hp-ink: #1b1f1c;
-  --hp-body: #4a4f49;
-  --hp-muted: #6b7069;
-  --hp-faint: #9a9e96;
+  --hp-ink: 27 31 28;
+  --hp-body: 74 79 73;
+  --hp-muted: 107 112 105;
+  --hp-faint: 154 158 150;
 
-  --hp-line: #ddd9cf;
-  --hp-line-soft: #e1ded6;
-  --hp-line-faint: #eeece6;
+  --hp-line: 221 217 207;
+  --hp-line-soft: 225 222 214;
+  --hp-line-faint: 238 236 230;
 
-  --hp-green: #3a6046;
-  --hp-green-pale: #c9dcc6;
-  --hp-green-tint: #eef4ec;
-  --hp-green-wash: #f6faf5;
-  --hp-green-line: #cfe0cc;
+  --hp-green: 58 96 70;
+  --hp-green-pale: 201 220 198;
+  --hp-green-tint: 238 244 236;
+  --hp-green-wash: 246 250 245;
+  --hp-green-line: 207 224 204;
 
-  --hp-note-tan: #d9cfbe;
-  --hp-note-yellow: #f0e2a6;
-  --hp-bubble: #f4f2ec;
+  --hp-note-tan: 217 207 190;
+  --hp-note-yellow: 240 226 166;
+  --hp-bubble: 244 242 236;
+
+  /* Height of the pinned product mock, and of each scroll step beside it, so
+     one step is paired with one panel for a full screen. 144px of reserved
+     chrome = the 96px the nav pill clears at the top + 48px of breathing room
+     at the bottom. Clamped so it stays usable on a short laptop and stops
+     growing on a tall monitor. */
+  --hp-panel: clamp(560px, calc(100vh - 144px), 860px);
 }
 
 /* ---------------------------------------------------------------------------
@@ -226,6 +337,11 @@
   --sv-drop-mascot: 0 4px 10px rgba(38, 32, 25, 0.14);
   --sv-tint-accent: rgba(58, 96, 70, 0.09);
   --sv-tint-info: rgba(84, 116, 158, 0.09);
+  /* Question screen (design_handoff_survey_question): the interviewer
+     avatar, its speech bubble, and a chip on hover. */
+  --sv-shadow-avatar: 0 6px 14px rgba(38, 32, 25, 0.16);
+  --sv-shadow-speech: 0 6px 18px rgba(38, 32, 25, 0.06);
+  --sv-shadow-chip-hover: 0 8px 18px rgba(38, 32, 25, 0.1);
 }
 
 /* Dark is opt-in only: the survey always opens in light, whatever the
@@ -251,6 +367,9 @@
   --sv-drop-mascot: 0 4px 10px rgba(0, 0, 0, 0.5);
   --sv-tint-accent: rgba(143, 191, 122, 0.1);
   --sv-tint-info: rgba(147, 179, 218, 0.1);
+  --sv-shadow-avatar: 0 6px 14px rgba(0, 0, 0, 0.5);
+  --sv-shadow-speech: 0 6px 18px rgba(0, 0, 0, 0.4);
+  --sv-shadow-chip-hover: 0 8px 18px rgba(0, 0, 0, 0.45);
 }
 
 /* Keeps the browser's own chrome (form controls, scrollbars, the overscroll
@@ -290,25 +409,73 @@ select {
 }
 
 /* --- Admin typography roles (DESIGN.md "Typography roles") ---
-   Pages reference these roles, not raw sizes. Serif (Young Serif) is
-   page-title only — every other piece of admin text is Archivo on this
-   fixed scale. Component layer, so a plain utility at the call site can
-   still override a single property (e.g. a differently-colored label). */
+   Pages reference these roles, not raw sizes. Young Serif is page-title only —
+   every other piece of admin text is Archivo on this fixed scale. Component
+   layer, so a plain utility at the call site can still override a single
+   property (e.g. a differently-colored label).
+
+   `.type-eyebrow` and `.type-section-label` are deliberately two roles, not
+   one. A single `.type-label` was doing both jobs, which is why the label over
+   an H1 and the label over a card section rendered identically and neither
+   read as subordinate to the other. */
 @layer components {
-  .type-page-title {
-    @apply font-serif text-[40px] font-normal leading-[1.1] tracking-[-0.01em] text-card-foreground;
+  .type-eyebrow {
+    @apply font-archivo text-[12px] font-semibold uppercase leading-[1.2] tracking-[0.08em] text-muted-foreground;
   }
-  .type-label {
-    @apply font-archivo text-[13px] font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+  /* 30px, down from 44. If this is ever reverted, this is the only line to
+     change. */
+  .type-page-title {
+    @apply font-serif text-[30px] font-normal leading-[1.15] tracking-[-0.015em] text-card-foreground;
+  }
+  .type-subhead {
+    @apply max-w-[52ch] font-archivo text-[17px] font-normal leading-[1.5] text-muted-foreground;
+  }
+  .type-section-label {
+    @apply font-archivo text-[13px] font-semibold uppercase leading-[1.2] tracking-[0.06em] text-muted-foreground;
+  }
+  .type-table-head {
+    @apply font-archivo text-[12px] font-semibold uppercase leading-[1.2] tracking-[0.06em] text-muted-foreground;
+  }
+  /* Tabular numerals are part of the role, not a call-site choice: a column
+     of proportional figures does not line up, which is the whole point of a
+     metric. */
+  .type-metric-value {
+    @apply font-archivo text-[24px] font-medium leading-[1.1] tabular-nums text-card-foreground;
+  }
+  .type-metric-label {
+    @apply font-archivo text-[14px] font-normal leading-[1.4] text-muted-foreground;
   }
   .type-heading {
     @apply font-archivo text-[17px] font-semibold tracking-[-0.01em] text-card-foreground;
   }
   .type-body {
-    @apply font-archivo text-[15px] font-normal leading-[1.6] text-card-foreground;
+    @apply font-archivo text-[15px] font-normal leading-[1.55] text-card-foreground;
+  }
+  .type-body-sm {
+    @apply font-archivo text-[13px] font-normal leading-[1.5] text-card-foreground;
   }
   .type-meta {
     @apply font-archivo text-[13px] font-normal text-muted-foreground;
+  }
+  /* Monospace blocks: the copyable AI prompt, the paste box, inline ?src=
+     fragments. The one place admin leaves the Archivo scale. */
+  .type-code {
+    @apply font-mono text-[13px] leading-[1.5] text-card-foreground;
+  }
+
+  /* 2026-09-02: the two numeric control sizes carry tabular figures, so a
+     column of counts lines up. tailwind.config.ts owns the size; this owns
+     the figure variant, because fontSize tuples cannot express it. */
+  .text-count,
+  .text-control {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Retained only so the not-yet-migrated admin routes keep rendering during
+     the page-by-page refactor. Aliases .type-section-label. Delete once the
+     last page is migrated — grep for `type-label` before removing. */
+  .type-label {
+    @apply type-section-label;
   }
 
   /* Legal pages (/terms, /privacy) prose. No typography plugin in this
@@ -338,14 +505,41 @@ select {
     @apply font-semibold text-landing-ink;
   }
 
-  /* Shared admin content containers (DESIGN.md "Layout containers").
-     AdminShell wraps pages in p-8 (32px); the container's own pt-6 brings
-     the top offset to 56px from viewport top to the eyebrow label. */
+  /* THE admin container, singular (DESIGN.md "Layout containers"). Consumed
+     through the PageShell primitive; no page applies it directly.
+
+     There used to be two, a 920px and a 1140px, which is why Company profile,
+     Settings, Response detail and Live detail sat visibly further inset than
+     Home, Leads, Surveys and Live. The narrow one is gone. A page that needs
+     a tighter measure for readability constrains the BLOCK inside it (see
+     .admin-measure), never the container, so every admin H1 lands on the same
+     x coordinate.
+
+     AdminShell wraps pages in p-8, which is the whole of
+     --ds-container-pad-y (32px) from viewport top to the page title; the
+     container adds nothing on top. */
   .admin-container {
-    @apply mx-auto w-full max-w-[920px] pt-6;
+    @apply mx-auto w-full max-w-[var(--ds-container-max)];
   }
+
+  /* Retained only so the not-yet-migrated admin routes keep rendering during
+     the page-by-page refactor. Now identical to .admin-container — the 920px
+     variant it used to be is what this pass removes. Delete once the last
+     page is migrated; grep for `admin-container-wide` before removing. */
   .admin-container-wide {
-    @apply mx-auto w-full max-w-[1140px] pt-6;
+    @apply admin-container;
+  }
+
+  /* The inner measure for form and prose blocks: long lines are hard to read
+     regardless of how wide the page is. Applied to a block, never to a page. */
+  .admin-measure {
+    @apply w-full max-w-[720px];
+  }
+
+  /* One focus treatment, applied wherever a default outline is suppressed.
+     Never remove an outline without adding this. */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ds-focus))] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--ds-page-background))];
   }
 }
 
@@ -549,18 +743,6 @@ select {
     animation: bs-rise 0.5s ease-out both;
   }
 
-  /* Respondent interview question reveal (InterviewFlow's QUESTION_REVEAL
-     config: "pop" | "fade" | "none"). Played once per question on the
-     block's single mount; `both` fill means the animation ends exactly at
-     the resting state — no terminal jump. Outside this media query the
-     resting state is fully visible, so reduced-motion users (and the
-     "none" mode, which applies no class) get an instant render. */
-  .q-reveal-pop {
-    animation: q-reveal-pop 0.3s ease-out both;
-  }
-  .q-reveal-fade {
-    animation: q-reveal-fade 0.2s ease-out both;
-  }
 
   /* Survey respondent intro (design_handoff_survey_respondent) — its own
      shorter rise distance (10px vs bs-rise's 16px) and tighter stagger
@@ -1189,26 +1371,6 @@ select {
   }
 }
 
-/* Question reveal keyframes (see .q-reveal-* above). */
-@keyframes q-reveal-pop {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-@keyframes q-reveal-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 /* Survey respondent intro's live validation checkmarks (name/email) —
    pop in via scale, cancelled outright under reduced motion by the
    motion-reduce:animate-none utility at each call site rather than a
@@ -1284,6 +1446,30 @@ select {
    room on a 380px-tall visible box. */
 .survey-viewport[data-keyboard="open"] .survey-footer {
   display: none;
+}
+
+/* Desktop (fine pointer, ≥640px): the question screen is a fixed-height
+   column, never a scrolling page. The stage takes any overflow internally,
+   with the footer pinned below it — so a window that's a little short of
+   the composer + footer shows a scrollable stage, not a page that nudges
+   the "Powered by" line into view. Mobile keeps the min-height page
+   (page scroll collapses the address bar; internal scroll doesn't), and
+   the keyboard-open rules above already do the same capping there. */
+@media (hover: hover) and (pointer: fine) and (min-width: 640px) {
+  .survey-viewport:has(> .survey-stage) {
+    min-height: 0;
+    height: 100vh;
+    overflow: hidden;
+  }
+  @supports (height: 100dvh) {
+    .survey-viewport:has(> .survey-stage) {
+      height: 100dvh;
+    }
+  }
+  .survey-stage {
+    min-height: 0;
+    overflow-y: auto;
+  }
 }
 
 /* Touch: no lingering tap flash, and no hover skin left stuck on a chip
@@ -1461,30 +1647,114 @@ select {
   }
 }
 
-/* --- Admin sidebar workspace plate (components/AdminSidebar.tsx) ---
-   Two ambient loops on the status row: the listening dot's twin pings
-   outward, and the music note bobs. Both keyframes are declared here but
-   only bound to their classes under prefers-reduced-motion: no-preference
-   (the same pattern the animations above use), so reduced-motion users get
-   the plate with a plain static dot and note.
-
-   The star avatar's tilt and hover spring live here too rather than as
-   Tailwind utilities: `duration-[250ms]` is ambiguous between transition-
-   and animation-duration, so Tailwind drops it silently and the spring
-   would quietly fall back to the default 150ms. The hover is keyed off the
-   whole user row (.ws-user-row) so hovering the name or chevron springs the
-   star as well; under reduced motion it simply holds its resting tilt. */
-@keyframes ws-ping {
+/* --- Survey question screen (design_handoff_survey_question) ---
+   The per-question screen in app/survey/[slug]/InterviewFlow.tsx. Reveal,
+   idle loops and the avatar note run only under prefers-reduced-motion:
+   no-preference; every element's resting state is its final frame. The
+   state transitions on the pills and chips are gated the same way, so a
+   reduced-motion respondent sees state changes land instantly. */
+@keyframes sq-rise {
   from {
-    transform: scale(1);
-    opacity: 0.7;
+    opacity: 0;
+    transform: translateY(14px);
   }
   to {
-    transform: scale(2.6);
-    opacity: 0;
+    opacity: 1;
+    transform: none;
   }
 }
 
+/* Progress pill. todo is the resting background set at the call site;
+   done and now are stamped via data-state. */
+.sq-pip[data-state="done"] {
+  background: hsl(var(--sv-accent));
+}
+.sq-pip[data-state="now"] {
+  background: hsl(var(--sv-ink));
+  transform: scaleY(1.6);
+}
+
+/* Quick-answer chip. Picked is aria-pressed, which is also what a screen
+   reader announces, so there is one source of truth for the state. */
+.sq-chip[aria-pressed="true"] {
+  background: hsl(var(--sv-ink));
+  color: hsl(var(--sv-ground));
+  border-color: hsl(var(--sv-ink));
+}
+/* The check that slides in from zero width on the picked chip. */
+.sq-tick {
+  display: inline-flex;
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+.sq-chip[aria-pressed="true"] .sq-tick {
+  width: 14px;
+  opacity: 1;
+  margin-right: 6px;
+}
+
+/* Marker highlight on the question's key phrase: butter behind the lower
+   third of the x-height, like a highlighter pen. */
+.sq-mark {
+  background: linear-gradient(
+    transparent 58%,
+    hsl(var(--sv-butter)) 58%,
+    hsl(var(--sv-butter)) 94%,
+    transparent 94%
+  );
+  padding: 0 3px;
+  margin: 0 -3px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sq-rev {
+    animation: sq-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: var(--sq-delay, 0s);
+  }
+  .sq-pip {
+    transition:
+      background-color 0.35s ease,
+      transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .sq-chip {
+    transition:
+      transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+      background-color 0.18s ease,
+      color 0.18s ease,
+      border-color 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+  .sq-tick {
+    transition:
+      width 0.2s ease,
+      opacity 0.2s ease,
+      margin 0.2s ease;
+  }
+  @media (hover: hover) {
+    .sq-chip:not(:disabled):hover {
+      transform: translateY(-2px) rotate(-1deg);
+      box-shadow: var(--sv-shadow-chip-hover);
+    }
+  }
+  /* The occasional note popping off the interviewer avatar. Same 7s loop
+     as the welcome cluster's first note. */
+  .sq-avatar-note {
+    animation: sw-note-a 7s ease infinite;
+  }
+}
+
+/* --- Ambient music-note bob (app/admin/HomeSections.tsx) ---
+   Bound to its class only under prefers-reduced-motion: no-preference (the
+   same pattern the animations above use), so reduced-motion users get a
+   static note.
+
+   Three siblings used to live here and are all gone, with nothing left
+   referencing them: .ws-star and .ws-user-row (a resting tilt and hover
+   spring on the sidebar's image avatar, now initials), and .ws-ping (the
+   listening dot's outward pulse, removed with the sidebar's
+   "Listening · N live" row). */
 @keyframes ws-note-bob {
   0%,
   100% {
@@ -1495,22 +1765,9 @@ select {
   }
 }
 
-.ws-star {
-  transform: rotate(-6deg);
-}
-
 @media (prefers-reduced-motion: no-preference) {
-  .ws-ping {
-    animation: ws-ping 2.4s ease-out infinite;
-  }
   .ws-note {
     animation: ws-note-bob 3.2s ease-in-out infinite;
-  }
-  .ws-star {
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  .ws-user-row:hover .ws-star {
-    transform: rotate(8deg) scale(1.08);
   }
 }
 
@@ -1580,6 +1837,12 @@ select {
     linear-gradient(to bottom, rgba(27, 31, 28, 0.055) 1px, transparent 1px);
   background-size: 188px 188px;
   background-position: center top;
+  /* Fade the lines in over the first 140px so they resolve below the nav pill
+     rather than running under it and stopping dead at its edge. Applied to a
+     dedicated layer inside the hero, never to the section — a mask here would
+     take the headline with it. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 140px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 140px);
 }
 
 /* The green CTA banner. Same 188px cell, cream lines at a lower alpha. */

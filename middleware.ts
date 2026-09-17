@@ -30,13 +30,17 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // Routes that must stay reachable by a logged-out visitor: log in, sign
-  // up, and the password-recovery flow (request + set-new-password, which
-  // is landed on via a still-unauthenticated click from an email link).
+  // up, the password-recovery flow (request + set-new-password, which is
+  // landed on via a still-unauthenticated click from an email link), and
+  // the team-invite accept page, which most people reach with no account.
+  //
+  // Must stay in step with BARE_ROUTES in components/AdminChrome.tsx.
   const PUBLIC_ADMIN_ROUTES = [
     "/admin/login",
     "/admin/signup",
     "/admin/forgot-password",
     "/admin/reset-password",
+    "/invite",
   ];
 
   const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
@@ -44,6 +48,8 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith(route)
   );
 
+  // /invite is matched so the session cookie is refreshed on the way in,
+  // but it is public: an invitee typically has no session yet.
   if (isAdminRoute && !isPublicAdminRoute && !user) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/admin/login";
@@ -54,5 +60,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/invite/:path*"],
 };

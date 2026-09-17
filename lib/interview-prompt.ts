@@ -17,20 +17,28 @@ export const MAX_EXCHANGES = 30;
 export const COMPLETE_TOKEN = "INTERVIEW_COMPLETE";
 
 // Throughout the prompt, "exchange" means exactly one thing: one question
-// from Claude plus the respondent's answer to it. It is never used for the
-// topic count (that word is "topic") and never for messages.length, which
-// runs at ~2x the respondent's actual turn count because it includes
-// Claude's own messages.
-//
-// The prompt allows each topic one question plus at most one targeted
-// follow-up, so covering N topics costs at most 2N exchanges.
-const EXCHANGES_PER_TOPIC = 2;
+// from Claude plus the respondent's answer to it. It is never used for
+// messages.length, which runs at ~2x the respondent's actual turn count
+// because it includes Claude's own messages.
 
-// The interview's soft pacing budget in respondent turns, derived from the
-// topic target. Clamped to MAX_EXCHANGES so the pacing line can never quote
-// a budget the hard ceiling would cut short.
-export function exchangeBudgetForTopics(topicCount: number): number {
-  return Math.min(topicCount * EXCHANGES_PER_TOPIC, MAX_EXCHANGES);
+/** What a survey with no num_questions set gets. */
+export const DEFAULT_QUESTION_COUNT = 8;
+
+/**
+ * The interview's length, in questions, follow-ups included.
+ *
+ * This is a hard total, not a topic target. It used to be the number of
+ * topics, with the interviewer allowed one follow-up per topic, so an
+ * interview promised as "8 questions" could legitimately run to 16 while
+ * the respondent's counter sat at "8 of 8" for the second half. The number
+ * the admin sets, the number the welcome screen promises, the counter the
+ * respondent watches and the point at which the server stops asking are now
+ * all this one value. The continue route enforces it; the prompt paces
+ * against it.
+ */
+export function questionBudgetFor(numQuestions: number | null | undefined): number {
+  const requested = numQuestions ?? DEFAULT_QUESTION_COUNT;
+  return Math.min(Math.max(1, Math.round(requested)), MAX_EXCHANGES);
 }
 
 // Synthetic first turn used to prompt Claude for the opening question. Sent
@@ -161,16 +169,17 @@ export function buildInterviewSystemPrompt({
   respondent?: InterviewRespondent | null;
   /**
    * Exchanges completed so far, i.e. the respondent's answered-turn count.
-   * The only progress counter the prompt gets: it drives both the pacing
-   * line and the MAX_EXCHANGES ceiling, so those two can never disagree.
+   * The only progress counter the prompt gets: it drives the "N of total"
+   * line, and the continue route's hard stop reads the same number, so the
+   * two can never disagree.
    */
   exchangeCount: number;
 }): string {
   const topic = survey.topic?.trim() || survey.title;
   const tone = survey.tone?.trim() || "warm, curious, and conversational";
   const guide = survey.question_guide?.trim();
-  const targetCount = survey.num_questions ?? 8;
-  const exchangeBudget = exchangeBudgetForTopics(targetCount);
+  const targetCount = questionBudgetFor(survey.num_questions);
+  const remaining = Math.max(0, targetCount - exchangeCount);
   const sponsorLine = survey.sponsor
     ? `\nThis research is being conducted on behalf of ${survey.sponsor}. Do not mention them unless the respondent brings them up first.\n`
     : "";
@@ -215,9 +224,8 @@ Rules you must always follow:
 - If it comes up naturally in the conversation, you can get curious about things like who else would be involved in a decision like this, what's actually driving them to think about it now, or what would matter most to them in picking something new. Only ask about this if it fits naturally where the conversation is already headed. Never ask more than one of these in a single interview, and never ask about the same thing twice in different words. If none of it comes up naturally, that's fine, don't force it. Keep the phrasing simple and conversational, the way a curious peer would ask it, not a business analyst.
 - Never ask a question that substantively repeats one you already asked and got an answer to earlier in this interview, even if it's phrased differently. If you're tempted to revisit something, it means it's time to move to a new topic instead.
 - After every question you ask, on its own line at the very end of the message, append a block in this exact form: ||CHIPS: option one | option two | option three|| containing 2-3 short, plausible answers to the question you just asked, as quick-reply shortcuts a respondent can tap instead of typing. The closing || is mandatory, not decoration: it is the only thing that tells the application where the block ends, and it must be the very last thing in your message, immediately after the final option, with nothing after it. Correct: ||CHIPS: mostly by phone and text | we use a shared spreadsheet | honestly kind of ad hoc||. Malformed, never do this — missing the closing ||: ||CHIPS: mostly by phone and text | we use a shared spreadsheet | honestly kind of ad hoc. If you find yourself running low on room to finish the message, shorten or drop an option rather than leaving the block unclosed. Phrase the options the way a real person would actually text them back: casual, lowercase-friendly, no full sentences, no form-option phrasing ("Option A", "Yes/No/Maybe"). They're optional shortcuts a respondent can tap and still edit, not a multiple-choice list, so your question itself must read exactly as natural on its own as if the block weren't there, never referencing or hinting that these shortcuts exist. Never include this block on the message where you respond with ${COMPLETE_TOKEN}.
-- The interview should cover around ${targetCount} distinct topics total, that's the real target, not a raw question count to pad out. Give each topic at most one follow-up before moving on: ask about it, and if the respondent's answer genuinely warrants one specific, targeted follow-up, ask that, then move to a new topic. Never drill three or four layers deep into the same thread. Once you've covered around ${targetCount} topics this way, stop opening new ones and move toward wrapping up instead.
-- An exchange is one question from you plus the respondent's answer to it. The respondent has answered ${exchangeCount} ${exchangeCount === 1 ? "time" : "times"} so far, and covering the ${targetCount} topics above at one question plus at most one follow-up each should take roughly ${exchangeBudget} exchanges. Use that only to pace yourself: if you're early in it, you have room to go deeper before opening the next topic; if you're near the end of it, start consolidating rather than opening new territory.
+- This interview is exactly ${targetCount} questions long, and a follow-up counts as one of them. The respondent sees a "question N of ${targetCount}" counter, so that total is a promise, not a guideline. An exchange is one question from you plus the respondent's answer to it. The respondent has answered ${exchangeCount} of ${targetCount} so far, so you have ${remaining} ${remaining === 1 ? "question" : "questions"} left, and the next one you ask is question ${Math.min(exchangeCount + 1, targetCount)} of ${targetCount}.
+- Spend that budget deliberately. A targeted follow-up on a thread the brief cares about is worth one of the ${targetCount}; a follow-up on a tangent is not. Never drill three or four layers deep into one thread, and make sure the brief's most important threads are reached before the budget runs out: when you have only two or three questions left, open no new territory that cannot be closed in one question.
 - If the respondent gives evasive, non-committal, or deflecting answers three times in a row, stop and wrap up early rather than pushing further.
-- Separately from all of the above, ${MAX_EXCHANGES} exchanges is a hard ceiling on this interview, never a goal to reach or fill: a good interview normally ends well before it, once the topics are covered. You are at ${exchangeCount}. Only if you ever do reach ${MAX_EXCHANGES}, that message must be your last question, and the turn after it must end the interview.
-- When the interview is over for any reason (the target topic count is covered, three evasive answers in a row, or the exchange limit), respond with exactly the string ${COMPLETE_TOKEN} and nothing else: no punctuation, no goodbye message. The application handles closing the conversation with the respondent.`;
+- When the respondent has answered question ${targetCount} of ${targetCount}, the interview is over: do not ask anything further. Respond with exactly the string ${COMPLETE_TOKEN} and nothing else. The same applies when the interview ends early for three evasive answers in a row. No punctuation, no goodbye message: the application handles closing the conversation with the respondent.`;
 }

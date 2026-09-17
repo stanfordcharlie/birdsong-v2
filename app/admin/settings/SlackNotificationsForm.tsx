@@ -1,42 +1,54 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/admin/ui";
 import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate } from "@/components/useLoadingGate";
+import { cn } from "@/lib/utils";
 
+// The Slack card. The switch is the on/off state; the URL is what "on"
+// means. Turning it off and saving stores a blank URL, which is how the
+// route already reads "off", so nothing server-side changes.
 export function SlackNotificationsForm({ initialUrl }: { initialUrl: string | null }) {
-  const [url, setUrl] = useState(initialUrl ?? "");
+  const savedUrl = initialUrl ?? "";
+  const [enabled, setEnabled] = useState(savedUrl.trim().length > 0);
+  const [url, setUrl] = useState(savedUrl);
+  const [lastSaved, setLastSaved] = useState(savedUrl);
   const [saving, setSaving] = useState(false);
   const showSaveLoader = useLoadingGate(saving);
   const [testing, setTesting] = useState(false);
   const showTestLoader = useLoadingGate(testing);
-  const [saveState, setSaveState] = useState<{ ok: boolean; message: string } | null>(null);
-  const [testState, setTestState] = useState<{ ok: boolean; message: string } | null>(null);
+  const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(null);
+  const switchId = useId();
+
+  // What Save would store: the URL when on, nothing when off.
+  const effectiveUrl = enabled ? url.trim() : "";
+  const dirty = effectiveUrl !== lastSaved.trim();
 
   async function handleSave(e: FormEvent) {
     e.preventDefault();
-    setSaveState(null);
+    setStatus(null);
     setSaving(true);
     try {
       const res = await fetch("/api/settings/slack-webhook", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: effectiveUrl }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save");
-      setSaveState({ ok: true, message: url.trim() ? "Saved." : "Slack notifications disabled." });
+      setLastSaved(effectiveUrl);
+      setStatus({ ok: true, message: effectiveUrl ? "Saved." : "Notifications off." });
     } catch (err) {
-      setSaveState({ ok: false, message: err instanceof Error ? err.message : "Something went wrong" });
+      setStatus({ ok: false, message: err instanceof Error ? err.message : "Something went wrong" });
     } finally {
       setSaving(false);
     }
   }
 
   async function handleTest() {
-    setTestState(null);
+    setStatus(null);
     setTesting(true);
     try {
       const res = await fetch("/api/settings/slack-webhook/test", {
@@ -46,58 +58,72 @@ export function SlackNotificationsForm({ initialUrl }: { initialUrl: string | nu
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send test notification");
-      setTestState({ ok: true, message: "Test notification sent. Check your Slack channel." });
+      setStatus({ ok: true, message: "Test sent." });
     } catch (err) {
-      setTestState({ ok: false, message: err instanceof Error ? err.message : "Something went wrong" });
+      setStatus({ ok: false, message: err instanceof Error ? err.message : "Something went wrong" });
     } finally {
       setTesting(false);
     }
   }
 
   return (
-    <form onSubmit={handleSave} className="flex flex-col gap-4">
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-card-foreground">Slack webhook URL</span>
-        <Input
-          type="url"
-          placeholder="https://hooks.slack.com/services/..."
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-        />
-      </label>
-      <p className="text-xs text-muted-foreground">
-        Create an incoming webhook for the channel you want notified, then paste its URL here. See{" "}
-        <a
-          href="https://api.slack.com/messaging/webhooks"
-          target="_blank"
-          rel="noreferrer"
-          className="text-indigo hover:text-indigo/80"
-        >
-          Slack&apos;s incoming webhooks guide
-        </a>
-        . Leave blank to turn Slack notifications off.
-      </p>
+    <form onSubmit={handleSave} className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            id={switchId}
+            role="switch"
+            aria-checked={enabled}
+            onClick={() => setEnabled((v) => !v)}
+            className={cn(
+              "focus-ring relative h-6 w-11 shrink-0 rounded-pill transition-colors",
+              enabled ? "bg-primary" : "bg-border"
+            )}
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "absolute top-0.5 h-5 w-5 rounded-pill bg-card shadow-sm transition-[left]",
+                enabled ? "left-[22px]" : "left-0.5"
+              )}
+            />
+          </button>
+          <label htmlFor={switchId} className="type-body font-medium">
+            {enabled ? "On" : "Off"}
+          </label>
+        </div>
+        {status && (
+          <p className={cn("type-body-sm", status.ok ? "text-muted-foreground" : "text-destructive")}>
+            {status.message}
+          </p>
+        )}
+      </div>
 
-      {saveState && (
-        <p className={`text-sm ${saveState.ok ? "text-muted-foreground" : "text-destructive"}`}>
-          {saveState.message}
-        </p>
-      )}
-      {testState && (
-        <p className={`text-sm ${testState.ok ? "text-muted-foreground" : "text-destructive"}`}>
-          {testState.message}
-        </p>
+      {enabled && (
+        <label className="flex flex-col gap-1.5">
+          <span className="type-body-sm font-medium">Webhook URL</span>
+          <Input
+            type="url"
+            placeholder="https://hooks.slack.com/services/..."
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            className="type-code h-10"
+          />
+        </label>
       )}
 
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={saving}>
+      <div className="flex items-center gap-2">
+        <Button type="submit" disabled={saving || !dirty}>
           {saving && showSaveLoader && <BirdLoader size={18} label={false} />}
-          {saving ? "Saving..." : "Save"}
+          {saving ? "Saving" : "Save"}
         </Button>
-        <Button type="button" variant="secondary" onClick={handleTest} disabled={testing || !url.trim()}>
-          {testing && showTestLoader && <BirdLoader size={18} label={false} />}
-          {testing ? "Sending..." : "Send test notification"}
-        </Button>
+        {enabled && (
+          <Button type="button" variant="secondary" onClick={handleTest} disabled={testing || !url.trim()}>
+            {testing && showTestLoader && <BirdLoader size={18} label={false} />}
+            {testing ? "Sending" : "Send test"}
+          </Button>
+        )}
       </div>
     </form>
   );

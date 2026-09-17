@@ -1,8 +1,13 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { can, requireActiveOrg } from "@/lib/org";
+import { listMembers } from "@/lib/org-team";
+import { fetchLeadActivity } from "@/lib/leads/activity";
 import type { InterviewMessage } from "@/lib/interview/types";
 import { parseCallScript } from "@/lib/interview/call-script";
+import { EMPTY_VALUE } from "@/lib/format";
 import { ResponseDetailView, type ResponseDetailData } from "./ResponseDetailView";
+import type { WorkflowMember, WorkflowPermissions } from "./LeadWorkflowPanel";
 
 export default async function ResponseDetailPage({
   params,
@@ -11,7 +16,11 @@ export default async function ResponseDetailPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
+  const [{ orgId, role }, user] = await Promise.all([requireActiveOrg(), getCurrentUser()]);
 
+  // Cookie client: the org-member read policy is what decides whether this
+  // response is visible at all. Everything fetched with the service role
+  // below (trail, members) happens only once that read has succeeded.
   const { data: response } = await supabase
     .from("responses")
     .select("*")
@@ -22,11 +31,25 @@ export default async function ResponseDetailPage({
     notFound();
   }
 
-  const { data: survey } = await supabase
-    .from("surveys")
-    .select("id, title")
-    .eq("id", response.survey_id)
-    .maybeSingle();
+  const [{ data: survey }, activity, members] = await Promise.all([
+    supabase.from("surveys").select("id, title").eq("id", response.survey_id).maybeSingle(),
+    fetchLeadActivity(response.id),
+    listMembers(orgId),
+  ]);
+  const workflowMembers: WorkflowMember[] = members.map((m) => ({
+    id: m.userId,
+    name: m.name ?? m.email ?? EMPTY_VALUE,
+  }));
+  const assigneeName = response.assigned_to
+    ? (workflowMembers.find((m) => m.id === response.assigned_to)?.name ?? null)
+    : null;
+  // Every gate reads the matrix; the actions re-check it server-side.
+  const permissions: WorkflowPermissions = {
+    claim: can(role, "lead:claim"),
+    assignOthers: can(role, "lead:assignOthers"),
+    setStatus: can(role, "lead:setStatus"),
+    note: can(role, "lead:note"),
+  };
 
   const customValues = (response.custom_field_values as Record<string, unknown> | null) ?? {};
   const jobTitle = typeof customValues.job_title === "string" ? customValues.job_title : null;
@@ -57,14 +80,24 @@ export default async function ResponseDetailPage({
       typeof signal.value === "string" && signal.value.trim().length > 0
   );
 
+  const messages = (response.messages as unknown as InterviewMessage[] | null) ?? [];
+
   const data: ResponseDetailData = {
     responseId: response.id,
     survey: survey ? { id: survey.id, title: survey.title } : null,
     respondentName: response.respondent_name,
-    identityLine: [jobTitle, company, response.respondent_email].filter(Boolean).join(" · "),
-    status: response.status ?? "new",
+    // Kept as three fields rather than one joined line: the header sets the
+    // role and company on one line and the email on its own as a mailto, so
+    // the view needs them apart.
+    role: jobTitle,
+    company,
+    email: response.respondent_email,
     isTest: response.is_test,
     completed: response.completed,
+    // There is no completed_at column; created_at is the stamp the Leads
+    // queue already labels "Completed" for a finished response.
+    createdAt: response.created_at,
+    messageCount: messages.length,
     // Null until the first successful sync, and absent entirely on databases
     // without the response_hubspot_sync migration, so read defensively the
     // same way the company-fit columns above are.
@@ -84,7 +117,18 @@ export default async function ResponseDetailPage({
     // existed; see lib/interview/call-script.ts.
     callScript: parseCallScript(response.call_script),
     signals,
-    messages: (response.messages as unknown as InterviewMessage[] | null) ?? [],
+    messages,
+    workflow: {
+      leadStatus: response.lead_status,
+      assignedTo: response.assigned_to,
+      assigneeName,
+      disqualifyReason: response.disqualify_reason,
+      disqualifyNote: response.disqualify_note,
+      members: workflowMembers,
+      currentUserId: user?.id ?? "",
+      permissions,
+      activity,
+    },
   };
 
   return <ResponseDetailView data={data} />;

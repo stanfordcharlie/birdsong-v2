@@ -18,6 +18,7 @@ import {
   type HubSpotLead,
 } from "@/lib/hubspot";
 import { formatPainPointList, selectCallScriptOpener } from "@/lib/lead-content";
+import { applyLeadChange, loadLeadRow } from "@/lib/leads/activity";
 import type { Database } from "@/types/database";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -43,7 +44,13 @@ export function getHubSpotClientFromEnv(): HubSpotClient | null {
 }
 
 export type HubSpotSyncResult =
-  | { status: "synced"; contactId: string; dealId: string | null }
+  | {
+      status: "synced";
+      contactId: string;
+      dealId: string | null;
+      /** Set when the push also moved the lead to contacted (manual pushes only). */
+      advancedTo: "contacted" | null;
+    }
   | { status: "skipped"; reason: string }
   | { status: "failed"; error: string };
 
@@ -60,6 +67,13 @@ export type HubSpotSyncInput = {
   callScript: { opener: string } | null;
   /** ISO timestamp of interview completion. */
   completedAt: string;
+  /**
+   * The person pressing the button, when there is one. The completion path
+   * passes nothing: its push is Birdsong's own doing, so the activity row
+   * has no actor and the lead is not advanced, because nobody has picked
+   * it up yet.
+   */
+  actor?: { userId: string } | null;
 };
 
 function appUrl(): string {
@@ -77,6 +91,49 @@ function describeError(err: unknown): string {
   }
   if (err instanceof Error) return err.message;
   return "Unknown HubSpot sync error";
+}
+
+// The push is a lead event, so it goes on the trail; and a person pushing a
+// lead they have not otherwise touched is the act of picking it up, so a
+// new or assigned lead moves to contacted in the same breath rather than
+// waiting for a second click that would never come. Logged as an ordinary
+// status change with the person as actor.
+//
+// Failures here are logged and swallowed: the CRM objects exist and the
+// row records them, which is what the caller asked for. A missing trail row
+// is a bug to read about in the log, not a reason to report the push failed.
+async function recordPush(
+  responseId: string,
+  actor: { userId: string } | null,
+  contactId: string,
+  dealId: string | null
+): Promise<"contacted" | null> {
+  try {
+    await applyLeadChange({
+      responseId,
+      actorId: actor?.userId ?? null,
+      type: "crm_push",
+      metadata: { provider: "hubspot", contact_id: contactId, deal_id: dealId },
+    });
+    if (!actor) return null;
+
+    const lead = await loadLeadRow(responseId);
+    if (!lead || (lead.leadStatus !== "new" && lead.leadStatus !== "assigned")) return null;
+    await applyLeadChange({
+      responseId,
+      actorId: actor.userId,
+      type: "status_change",
+      toStatus: "contacted",
+      metadata: { via: "crm_push" },
+    });
+    return "contacted";
+  } catch (err) {
+    console.error(
+      `[hubspot] response_id=${responseId} synced but the lead activity write failed:`,
+      err instanceof Error ? err.message : err
+    );
+    return null;
+  }
 }
 
 // Never throws and never rejects. Every caller is either fire-and-forget on a
@@ -127,7 +184,9 @@ export async function syncResponseToHubSpot(input: HubSpotSyncInput): Promise<Hu
     console.log(
       `[hubspot] response_id=${responseId} synced contact=${contactId} deal=${dealId ?? "none"}`
     );
-    return { status: "synced", contactId, dealId };
+
+    const advancedTo = await recordPush(responseId, input.actor ?? null, contactId, dealId);
+    return { status: "synced", contactId, dealId, advancedTo };
   } catch (err) {
     // One structured line carrying the response id and whatever HubSpot said,
     // because this usually runs detached from any request and leaves no other

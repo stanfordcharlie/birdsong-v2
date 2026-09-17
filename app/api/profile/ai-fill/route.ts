@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { orgErrorResponse, requireOrgPermission } from "@/lib/org";
 import { extractProfileFromPaste } from "@/lib/profile-onboarding/paste-extract";
 
 // POST /api/profile/ai-fill
@@ -15,6 +16,12 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+
+  try {
+    await requireOrgPermission("profile:edit");
+  } catch (err) {
+    return orgErrorResponse(err);
   }
 
   let body: { pastedText?: string };

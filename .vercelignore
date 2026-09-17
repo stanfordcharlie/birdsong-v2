@@ -1,8 +1,15 @@
 PB 1.2.vistaprint_album/
 Company profile UI redesign.zip
 Screenshot *.png
-birdsong_logo_mark_v2 copy.svg
-birdsong_logo_mark_v2.svg
+# Stray working copies at the repo root, NOT the real asset in public/.
+# These patterns must stay anchored with a leading slash: unanchored, a
+# gitignore-style pattern matches at every depth, so plain
+# `birdsong_logo_mark_v2.svg` also stripped public/birdsong_logo_mark_v2.svg
+# from every deploy. That is the sidebar account avatar, so it 404'd in
+# production and rendered as a broken-image glyph while working fine locally.
+/birdsong_logo_mark_v2 copy.svg
+/birdsong_logo_mark_v2.svg
+# The 173KB PNG beside it is genuinely unused — only the SVG is referenced.
 public/birdsong_logo_mark_v2.png
 
 # Never upload local secrets. .gitignore already excludes these, but a

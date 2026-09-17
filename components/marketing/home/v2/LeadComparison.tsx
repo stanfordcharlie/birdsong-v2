@@ -17,7 +17,7 @@ export function LeadComparison() {
         </p>
       </div>
 
-      <div className="grid max-w-[1000px] grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-[20px]">
+      <div className="mx-auto grid max-w-[1000px] grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-[20px]">
         <div className="flex flex-col gap-[20px] rounded-[8px] border border-hp-line bg-hp-card p-[28px]">
           <div className="text-[12px] tracking-[0.1em] text-hp-faint">A LEAD, USUALLY</div>
           <div className="flex items-center gap-[18px]">

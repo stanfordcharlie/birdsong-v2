@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/admin/ui";
 
 function LinkIcon() {
   return (
@@ -46,14 +46,14 @@ export function CopySurveyLinkButton({
   slug,
   title,
   variant = "icon",
-  label = "Copy a survey link",
+  label = "Copy study link",
 }: {
   slug: string;
   title: string;
   // "icon" is the square button that sits at the end of a survey row.
-  // "text" is the masthead's plain action next to the New survey pill, and
-  // "button" is the quiet state's bordered one — same copy behaviour and the
-  // same copied-confirmation in all three, only the shell differs.
+  // "text" is a plain ghost action, and "button" is the quiet state's
+  // bordered one. Same copy behaviour and the same copied-confirmation in
+  // all three, only the shell differs.
   variant?: "icon" | "text" | "button";
   label?: string;
 }) {
@@ -77,34 +77,27 @@ export function CopySurveyLinkButton({
 
   if (variant !== "icon") {
     return (
-      <button
+      <Button
         type="button"
+        variant={variant === "text" ? "ghost" : "secondary"}
         onClick={handleCopy}
         aria-label={copied ? `Link to ${title} copied` : `Copy link to ${title}`}
-        className={cn(
-          "whitespace-nowrap text-[13px] font-semibold transition-colors",
-          variant === "text"
-            ? "text-muted-foreground hover:text-card-foreground hover:underline"
-            : "rounded-control border border-border bg-card px-4 py-[9px] text-card-foreground hover:border-faint/50 hover:bg-secondary"
-        )}
       >
         {copied ? "Copied" : label}
-      </button>
+      </Button>
     );
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={handleCopy}
       aria-label={copied ? `Link to ${title} copied` : `Copy link to ${title}`}
       title={copied ? "Copied" : "Copy link"}
-      // Darkens rather than filling with `secondary`: the row underneath
-      // already goes to secondary on hover, so a secondary fill here would be
-      // invisible exactly when it's needed.
-      className="flex h-9 w-9 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-card-foreground/[0.06] hover:text-card-foreground"
+      className="w-10 px-0 hover:no-underline"
     >
       {copied ? <CheckIcon /> : <LinkIcon />}
-    </button>
+    </Button>
   );
 }

@@ -182,7 +182,7 @@ export function buildLeadNotificationMessage(fields: LeadNotificationFields): Sl
 export function buildSampleNotificationMessage(appUrl: string): SlackMessage {
   const message = buildBlocks(
     {
-      surveyTitle: "Sample survey",
+      surveyTitle: "Sample study",
       respondentName: "Jordan Lee",
       respondentEmail: "jordan.lee@acme.com",
       respondentPhone: "+1 555-0100",

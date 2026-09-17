@@ -7,7 +7,7 @@ export const MAX_EXCHANGES = 10;
 export const COMPLETE_TOKEN = "SURVEY_SETUP_COMPLETE";
 
 export const OPENING_MESSAGE =
-  "Let's set up this survey. What's the **research theme** you want to explore, what are you trying to learn?";
+  "Let's set up this study. What's the **research theme** you want to explore, what are you trying to learn?";
 
 // Synthetic first turn so the message array sent to Claude always starts
 // with a user turn (the real first item is our static OPENING_MESSAGE,

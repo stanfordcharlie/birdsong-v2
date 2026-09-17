@@ -1,6 +1,7 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageShell } from "@/components/admin/ui";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useFlybyGate } from "@/components/useLoadingGate";
 
@@ -8,35 +9,37 @@ export default function AdminHomeLoading() {
   // /admin is exactly where a fresh login lands (LoginForm does a full
   // navigation to "/admin"), so this route's loading state doubles as "first
   // app-shell load after login" in the common case. The once-per-session
-  // gate means later same-session visits to /admin (e.g. clicking Home in
-  // the sidebar) fall back to the plain skeleton instead of replaying the
-  // cutscene.
+  // gate means later same-session visits to /admin fall back to the plain
+  // skeleton instead of replaying the cutscene.
   const showFlyby = useFlybyGate(true, "app-shell-first-load");
 
   if (showFlyby) {
     return <LoadingScreen statusText="Getting your workspace ready" />;
   }
 
+  // Mirrors the page: header, composer, the study card beside the side
+  // column, the checklist.
   return (
-    <div className="admin-container flex flex-col gap-6">
-      <div className="flex items-end justify-between gap-6">
-        <div className="flex flex-col gap-3">
-          <Skeleton className="h-3 w-44" />
-          <Skeleton className="h-10 w-80" />
+    <PageShell>
+      <div className="mb-8 flex items-center justify-between gap-6">
+        <Skeleton className="h-9 w-64" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="hidden h-9 w-56 rounded-control sm:block" />
+          <Skeleton className="h-10 w-28 rounded-pill" />
         </div>
-        <Skeleton className="h-16 w-[120px] shrink-0 rounded-card" />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-[98px] w-full rounded-card" />
-        ))}
+      <div className="flex flex-col gap-8">
+        <Skeleton className="h-20 w-full rounded-card" />
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+          <Skeleton className="h-72 w-full rounded-card lg:col-span-2" />
+          <div className="flex flex-col gap-8">
+            <Skeleton className="h-40 w-full rounded-card" />
+            <Skeleton className="h-24 w-full rounded-card" />
+          </div>
+        </div>
+        <Skeleton className="h-14 w-full rounded-card" />
       </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <Skeleton className="h-[330px] w-full rounded-card" />
-        <Skeleton className="h-[330px] w-full rounded-card" />
-      </div>
-    </div>
+    </PageShell>
   );
 }

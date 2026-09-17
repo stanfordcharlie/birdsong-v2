@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { orgErrorResponse, requireOrgPermission } from "@/lib/org";
 import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
 import {
   ALTERNATION_STANDIN,
@@ -26,6 +27,12 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+
+  try {
+    await requireOrgPermission("profile:edit");
+  } catch (err) {
+    return orgErrorResponse(err);
   }
 
   let body: { messages?: OnboardingMessage[]; research?: ResearchResult | null };

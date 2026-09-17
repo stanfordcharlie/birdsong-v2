@@ -1,10 +1,27 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { orgErrorResponse, requireOrgPermission } from "@/lib/org";
 import { generateSurveyReport } from "@/lib/report/generate";
 import type { InterviewMessage } from "@/lib/interview/types";
 import type { Json } from "@/types/database";
 
-export const maxDuration = 120;
+// 300s is the ceiling Vercel allows by default on every plan. The generation
+// itself measures well under a minute for a 16-interview study (roughly 28k
+// tokens in, 5k out), so this is headroom for a retry plus a slow upstream,
+// not an expectation.
+export const maxDuration = 300;
+
+/**
+ * What the admin is allowed to see. Upstream messages can carry a request id
+ * or an echoed fragment of the request, so anything key-shaped is stripped
+ * and the text is capped: the point is a specific, actionable sentence, not
+ * a stack trace in a toast.
+ */
+function clientSafeMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const scrubbed = raw.replace(/sk-[A-Za-z0-9_-]{8,}/g, "[redacted]");
+  return scrubbed.length > 300 ? `${scrubbed.slice(0, 297)}...` : scrubbed;
+}
 
 // POST /api/surveys/[id]/report
 // Generates a thought-leadership report draft from this survey's completed
@@ -21,14 +38,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  // surveys_public_read means RLS alone won't hide other owners' surveys,
-  // so ownership is an explicit filter — a survey that isn't the caller's
-  // 404s indistinguishably from one that doesn't exist.
+  let orgId: string;
+  try {
+    ({ orgId } = await requireOrgPermission("report:generate"));
+  } catch (err) {
+    return orgErrorResponse(err);
+  }
+
+  // surveys_public_read means RLS alone won't hide other organizations'
+  // surveys, so the org is an explicit filter — a survey that isn't this
+  // org's 404s indistinguishably from one that doesn't exist.
   const { data: survey, error: surveyError } = await supabase
     .from("surveys")
-    .select("id, title, topic, question_guide, user_id")
+    .select("id, title, topic, question_guide")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("org_id", orgId)
     .maybeSingle();
 
   if (surveyError) {
@@ -64,12 +88,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     );
   }
 
-  // Owner's own profile row — cookie client is enough, no RLS boundary to
-  // cross here. Same three fields the interview prompt builder uses.
+  // The organization's profile row — cookie client is enough, no RLS
+  // boundary to cross here. Same three fields the interview prompt builder
+  // uses.
   const { data: profile } = await supabase
     .from("profiles")
     .select("what_we_sell, target_icp, value_prop")
-    .eq("user_id", user.id)
+    .eq("org_id", orgId)
     .maybeSingle();
 
   let content;
@@ -82,11 +107,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         : null
     );
   } catch (err) {
-    console.error("[surveys/report] generation failed:", err);
-    return NextResponse.json(
-      { error: "Report generation failed, please try again" },
-      { status: 502 }
-    );
+    console.error(`[surveys/report] generation failed for survey_id=${id}:`, err);
+    return NextResponse.json({ error: clientSafeMessage(err) }, { status: 502 });
   }
 
   const { data: report, error: insertError } = await supabase
@@ -94,6 +116,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .insert({
       survey_id: id,
       user_id: user.id,
+      org_id: orgId,
       content: content as unknown as Json,
       respondent_count: transcripts.length,
     })
@@ -101,7 +124,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .single();
 
   if (insertError) {
-    console.error("[surveys/report] insert failed:", insertError);
+    console.error(`[surveys/report] insert failed for survey_id=${id}:`, insertError);
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 

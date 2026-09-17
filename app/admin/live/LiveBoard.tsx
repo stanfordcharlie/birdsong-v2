@@ -2,16 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Button, DataTable, EmptyState, StatusDot, type Column } from "@/components/admin/ui";
 import { createClient } from "@/lib/supabase/client";
 import {
   isSurveyPresence,
@@ -19,7 +10,7 @@ import {
   surveyPresenceChannel,
   type SurveyPresence,
 } from "@/lib/presence/survey-presence";
-import { cn } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/format";
 
 export type LiveSurvey = {
   id: string;
@@ -39,27 +30,68 @@ type LiveRow = SurveyPresence & {
   sinceMs: number;
 };
 
-// Seconds matter here in a way they do not anywhere else in admin, so this
-// view uses its own formatter rather than the shared formatRelativeTime,
-// which starts at "Just now" and jumps straight to minutes.
-function formatSince(ms: number): string {
-  const seconds = Math.max(0, Math.round(ms / 1000));
-  if (seconds < 5) return "Just now";
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  return `${Math.floor(minutes / 60)}h ago`;
-}
-
 // "4 of 8" while the interview is inside its planned length. Past that the
 // count is still true but the fraction stops being, so the target is named
 // as a target instead of pretending to be a denominator.
 function formatProgress(step: number, target: number | null): string {
-  if (step === 0) return "Getting started";
-  if (target === null) return step === 1 ? "1 question" : `${step} questions`;
-  if (step > target) return `${step}, past the ${target} planned`;
+  if (step === 0) return "Starting";
+  if (target === null) return String(step);
+  if (step > target) return `${step} of ${target} planned`;
   return `${step} of ${target}`;
 }
+
+const COLUMNS: Column<LiveRow>[] = [
+  {
+    key: "respondent",
+    header: "Respondent",
+    cell: (row) => (
+      <span className="inline-flex items-center gap-2">
+        <StatusDot live={!row.isStale} pulse />
+        <span className="font-medium">{row.respondent_name || "Anonymous"}</span>
+        {/* Status once per row: the dot plus this word. The tooltip carries
+            the definition of inactive. */}
+        {row.isStale && (
+          <span className="text-muted-foreground" title="No heartbeat in the last 30 seconds">
+            Inactive
+          </span>
+        )}
+      </span>
+    ),
+  },
+  {
+    key: "survey",
+    header: "Study",
+    cell: (row) => (
+      <Link
+        href={`/survey/${row.slug}`}
+        target="_blank"
+        rel="noreferrer"
+        className="focus-ring rounded-control text-muted-foreground hover:text-card-foreground"
+        title={`Open /survey/${row.slug}`}
+      >
+        {row.surveyTitle}
+      </Link>
+    ),
+  },
+  {
+    key: "progress",
+    header: "Questions",
+    align: "right",
+    width: "lg",
+    cell: (row) => formatProgress(row.current_step, row.questionTarget),
+  },
+  {
+    key: "last",
+    header: "Last activity",
+    align: "right",
+    width: "md",
+    cell: (row) => (
+      <span className="text-muted-foreground" suppressHydrationWarning>
+        {formatRelativeTime(Date.now() - row.sinceMs, { seconds: true })}
+      </span>
+    ),
+  },
+];
 
 export function LiveBoard({ surveys }: { surveys: LiveSurvey[] }) {
   // Presence entries per survey id, replaced wholesale on every sync (the
@@ -88,9 +120,6 @@ export function LiveBoard({ surveys }: { surveys: LiveSurvey[] }) {
       const channel = supabase.channel(surveyPresenceChannel(survey.id));
       channel.on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
-        // presenceState() is typed as bare presence refs, since what each
-        // client tracks is its own business. The validator below is what
-        // turns that back into something this page can render.
         const entries = (Object.values(state).flat() as unknown[]).filter(isSurveyPresence);
         setPresenceBySurvey((prev) => ({ ...prev, [survey.id]: entries }));
       });
@@ -141,137 +170,41 @@ export function LiveBoard({ surveys }: { surveys: LiveSurvey[] }) {
 
   if (surveys.length === 0) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-start gap-3 p-8">
-          <p className="text-sm text-card-foreground">
-            No live surveys right now. Set a survey to live and anyone who opens its link will
-            show up here while they are being interviewed.
-          </p>
-          <Link href="/admin/surveys" className="text-sm font-medium text-indigo hover:underline">
-            Go to your surveys
-          </Link>
-        </CardContent>
-      </Card>
+      <EmptyState
+        title="No live studies."
+        action={
+          <Button asChild variant="secondary" size="sm">
+            <Link href="/admin/surveys">Open studies</Link>
+          </Button>
+        }
+      />
     );
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2.5">
-        <span
-          className={cn(
-            "block h-[7px] w-[7px] shrink-0 rounded-full",
-            activeCount > 0 ? "bs-dot bg-indigo-light" : "bg-chip"
-          )}
-        />
-        <span className="text-sm text-muted-foreground" suppressHydrationWarning>
-          {now === null
-            ? "Connecting"
-            : activeCount === 0
-              ? "Nobody is in an interview right now"
-              : activeCount === 1
-                ? "1 person is being interviewed right now"
-                : `${activeCount} people are being interviewed right now`}
-        </span>
-      </div>
+    <div className="flex flex-col gap-3">
+      {/* Only ever a positive count, so the empty state stays the single
+          voice when nobody is here. */}
+      {activeCount > 0 && (
+        <p className="type-meta tabular-nums" suppressHydrationWarning>
+          {activeCount} in an interview now
+        </p>
+      )}
 
-      <Card className="overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Respondent</TableHead>
-              <TableHead>Survey</TableHead>
-              <TableHead>Questions asked</TableHead>
-              <TableHead>Last activity</TableHead>
-              <TableHead className="text-right">Transcript</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
-                  {now === null
-                    ? "Connecting to your live surveys."
-                    : "Nobody is in an interview right now. This list updates on its own."}
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((row) => (
-                <TableRow
-                  key={row.response_id}
-                  // Inactive rows stay put rather than disappearing: a
-                  // reconnect or a backgrounded tab can stop the heartbeat
-                  // for a while without the respondent having left, and
-                  // rows vanishing and returning would read as flicker.
-                  className={cn(row.isStale && "opacity-55")}
-                >
-                  <TableCell>
-                    <span className="flex items-center gap-2.5">
-                      <span
-                        aria-hidden
-                        className={cn(
-                          "block h-[7px] w-[7px] shrink-0 rounded-full",
-                          row.isStale ? "bg-chip" : "bs-dot bg-indigo-light"
-                        )}
-                      />
-                      <span className="text-[15px] font-medium text-card-foreground">
-                        {row.respondent_name || "Anonymous"}
-                      </span>
-                      {row.isStale && (
-                        <Badge variant="outline" title="No heartbeat in the last 30 seconds.">
-                          Inactive
-                        </Badge>
-                      )}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    <Link
-                      href={`/survey/${row.slug}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="hover:text-card-foreground"
-                      title={`Open /survey/${row.slug}`}
-                    >
-                      {row.surveyTitle}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <span className="flex flex-col gap-1.5">
-                      <span className="text-sm text-card-foreground">
-                        {formatProgress(row.current_step, row.questionTarget)}
-                      </span>
-                      {row.questionTarget !== null && row.questionTarget > 0 && (
-                        <span aria-hidden className="block h-[3px] w-24 rounded-full bg-chip">
-                          <span
-                            className="block h-full rounded-full bg-primary"
-                            style={{
-                              width: `${Math.min(100, Math.round((row.current_step / row.questionTarget) * 100))}%`,
-                            }}
-                          />
-                        </span>
-                      )}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-[13px] text-muted-foreground" suppressHydrationWarning>
-                    {formatSince(row.sinceMs)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {/* Read-only view of this interview as it happens. The
-                        row id is the response id, which is what the detail
-                        page reads (under the owner's own session). */}
-                    <Link
-                      href={`/admin/live/${row.response_id}`}
-                      className="text-[13px] font-medium text-indigo hover:underline"
-                    >
-                      Watch live
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+      <DataTable
+        columns={COLUMNS}
+        rows={rows}
+        rowKey={(row) => row.response_id}
+        // Read-only view of this interview as it happens. The row id is the
+        // response id, which is what the detail page reads.
+        rowHref={(row) => `/admin/live/${row.response_id}`}
+        // Inactive rows stay put rather than disappearing: a reconnect or a
+        // backgrounded tab can stop the heartbeat for a while without the
+        // respondent having left, and rows vanishing and returning would
+        // read as flicker.
+        rowClassName={(row) => (row.isStale ? "opacity-55" : undefined)}
+        empty={{ title: now === null ? "Connecting." : "Nobody is in an interview." }}
+      />
     </div>
   );
 }

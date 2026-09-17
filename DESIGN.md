@@ -1,421 +1,647 @@
 # Birdsong Design System
 
-Status: **implemented and applied across the whole platform** — admin home, company
-profile, survey settings/detail, and the respondent-facing survey interview. This
-document describes the system as it actually exists in code today, not an aspirational
-spec — every value below is read directly from `app/globals.css`, `tailwind.config.ts`,
-`lib/fonts.ts`, and `components/ui/*`.
+**`app/globals.css` is the single source of truth. This document is a human-readable
+mirror of it.** Where the two disagree, the stylesheet wins and this file is out of
+date. Every value below is read from `app/globals.css` and `tailwind.config.ts`, not
+proposed by this document.
 
-**Out of scope:** the marketing pages (`app/page.tsx`, `app/customer-success`), which use
-their own Bricolage Grotesque / Spectral (italic) / Inter fonts and their own
-`--lp-*`-prefixed color tokens (see `design_handoff_landing_pages_full`) and are a
-separate concern. Everything else in the product — including the respondent
-interview — is on this system.
+`/admin/styleguide` renders the whole system live. Check it before adding any UI.
 
-**Single theme, no dark mode.** There used to be a light/dark toggle
-(`ThemeProvider`/`ThemeToggle`, a `data-theme` attribute); it's been removed entirely.
-One `:root` block in `globals.css`, no theme branching anywhere.
+## Scope
 
-Reference: `design_handoff_birdsong_platform/README.md` is the handoff this
-implements — "ink-black panels, warm neutrals, Young Serif display type, Archivo UI
-type, indigo-200 accents," across all four screens in one shared language.
-
-## Color palette
-
-All values stored as space-separated HSL triplets (shadcn convention) in CSS custom
-properties prefixed `--ds-*` in `app/globals.css`, mapped to semantic Tailwind classes
-in `tailwind.config.ts` (e.g. `--ds-primary` → `bg-primary`, `text-primary`).
-
-| Token | Class | Hex | Usage |
-|---|---|---|---|
-| Page background | `bg-page` | `#f8f8f7` | App shell background |
-| Card | `bg-card` | `#ffffff` | Cards, popovers, inputs |
-| Card foreground | `text-card-foreground` | `#1c1917` (ink) | Headings, primary body text |
-| Muted foreground | `text-muted-foreground` | `#78716c` (= Tailwind stone-500) | Secondary text, captions |
-| Faint | `text-faint` | `#a8a29e` (= Tailwind stone-400) | Tertiary text, index numbers, placeholders |
-| Border | `border-border` | `#e7e5e4` (= Tailwind stone-200) | Card borders, section dividers |
-| Chip | `bg-chip` / `border-chip` | `#edece8` | Lighter divider (e.g. between questions), neutral chip fill |
-| Primary | `bg-primary` | `#1c1917` (ink) | Primary buttons, active states, progress fill |
-| Primary hover | `hover:bg-primary-hover` | `#44403c` (= Tailwind stone-700) | Primary button hover |
-| Primary foreground | `text-primary-foreground` | `#f5f4ef` (cream) | Text/icons on ink-filled surfaces |
-| Secondary | `bg-secondary` | `#edece8` | Secondary buttons, hover fills |
-| Success | `text-success` | `#3a6046` | Muted green — status only (e.g. "Live" badge), unrelated to this handoff, unchanged |
-| Success bg | `bg-success-bg` | `#e4ecdd` | Success badge fill |
-| Destructive | `text-destructive` / `bg-destructive` | `#dc2626` (red-600) | Delete actions, error text, unchanged |
-| Warning | `text-warning` / `bg-warning` | amber-500 | "Draft" badge, unchanged |
-| Indigo | `text-indigo` | `#4338ca` | Links/chip text on light surfaces (e.g. "Open respondent view") |
-| Indigo light | `text-indigo-light` / `bg-indigo-light` | `#a5b4fc` | Highlights/accents on ink surfaces (survey names in the activity feed, pulsing dot, user-chip avatar) |
-| Indigo chip | `bg-indigo-chip` (used at low alpha, e.g. `/[0.08]`) | `#4f46e5` | Indigo chip fill, `rgba(79,70,229,.08)` |
-| Sidebar | `bg-sidebar` | `#121212` (true near-black) | The one permanently-dark surface: the nav rail. Redesigned per `design_handoff_create_survey` — no longer the warm ink `#1c1917` used elsewhere |
-| Sidebar foreground | `text-sidebar-foreground` | `#9aa1ac` (cool gray-blue) | Inactive nav text/labels on ink surfaces |
-| Sidebar active foreground | `text-sidebar-active-foreground` | `#ffffff` | Text on hover/active nav items and the account row (no longer inverted — hover/active is now a conventional dark-fill-plus-white-text treatment, not a cream pill) |
-| Sidebar accent | `bg-sidebar-accent` | `#262626` | Hover/active nav item fill |
-| Sidebar border | `border-sidebar-border` | `#333333` | Dividers on ink surfaces |
-
-The active nav item is marked by a 3px indigo (`bg-indigo-chip`) accent bar flush to
-the sidebar's left edge (`absolute`, `inset-y-[9px] left-[-14px]`), on top of the same
-hover/active dark fill every other item gets on hover — not by a distinct
-background/text treatment of its own.
-
-## Typography roles
-
-**Body/UI: [Archivo](https://fonts.google.com/specimen/Archivo)** (`font-archivo`),
-weights 400/500/600/700. **Display: [Young Serif](https://fonts.google.com/specimen/Young+Serif)**
-(`font-serif`), weight 400 only (the font ships no other weight — always pair with
-`font-normal`, never `font-medium`/`font-semibold`, which would be a silent no-op).
-Both from `lib/fonts.ts`.
-
-**Hard rule: serif is page-title only.** Young Serif appears in exactly one place in
-the admin: the single large page title at the top of each page (the `.type-page-title`
-role). Nothing else — not table cell content, not card headings, not section titles,
-not survey names, not form headings, not stat values. Everything else is Archivo on
-the fixed scale below. (The sidebar wordmark uses Spectral, a different serif — see
-the exceptions note below.)
-
-Every role is a reusable utility class defined in `app/globals.css` (`@layer
-components`) — pages reference roles, not raw sizes. Because the roles live in the
-components layer, a single plain utility at a call site can still override one
-property (e.g. the survey-detail breadcrumb uses `.type-label` plus its own hover
-color).
-
-| Role | Class | Font | Size / weight | Color | Used for |
-|---|---|---|---|---|---|
-| Page title | `.type-page-title` | Young Serif | 40px / 400, line-height 1.1, tracking −0.01em | ink | The one large title per page: "Your surveys", "Your lead queue", "Settings", "Company profile", "New survey", the dashboard greeting, the survey-detail title |
-| Section label (eyebrow) | `.type-label` | Archivo | 13px / 600, uppercase, tracking 0.14em | muted | Page eyebrows ("SURVEYS", "SETTINGS", the dashboard date), section titles ("BASICS", "REPORT", "WHERE TO NEXT"), breadcrumbs |
-| Card / section heading | `.type-heading` | Archivo | 17px / 600, tracking −0.01em | ink | Card headings ("Change email", "Account"), dashboard action-row titles, report titles. 16–18px / 600 is the sanctioned band when a sub-heading needs one step down (report theme `h4`s sit at 16px). |
-| Body | `.type-body` | Archivo | 15px / 400, line-height 1.6 | ink | Default copy and long-form read views; `text-sm` (14px) remains fine for denser UI copy |
-| Meta / secondary | `.type-meta` | Archivo | 13px / 400 | muted | Timestamps, slugs, created dates, attributions |
-| Table header | (baked into `components/ui/table.tsx`) | Archivo | 12px (`text-xs`) / 600, uppercase, tracking wide | muted | Every table `<th>` |
-| Table cell | (baked into `components/ui/table.tsx`) | Archivo | 14px (`text-sm`) / 400 | ink | Every table `<td>`; row-title cells (survey internal names) step up to `text-[15px] font-medium` |
-
-Sanctioned exceptions to the serif rule, all deliberate: the sidebar wordmark
-(`font-spectral text-[21px]` — branding, not a heading, and a different serif face
-than `.type-page-title`'s Young Serif — reuses the Spectral face already loaded for
-the respondent interview rather than adding a second one), the company-profile setup
-wizard's step titles (serif 28px — each wizard step's single page title, sized down
-to fit its card; the wizard's left-rail "Company Profile" label is sans), and the
-new-survey wizard's live preview panel, which renders the respondent-facing external
-name in `font-spectral` to match the real respondent interview title (see "New
-survey wizard" below) — not `.type-page-title`, since it's mimicking respondent-facing
-copy, not an admin page title.
-
-`font-archivo` is **not** the global `<body>` default — that stays `font-sans` (Inter),
-since marketing pages need it. Instead, `font-archivo` is applied once at each section's
-layout root and inherits down: `components/AdminShell.tsx` for the whole admin, and
-`app/survey/[slug]/page.tsx` for the respondent interview. Don't sprinkle
-`font-archivo` on individual components — if body text isn't rendering in Archivo,
-the fix is almost always a missing wrapper at the root, not a missing class on the
-leaf. (The `.type-*` role classes each carry `font-archivo`/`font-serif` themselves,
-so they're safe anywhere.)
-
-## Layout containers & spacing rhythm
-
-Every admin page's content sits in one of two shared containers (utility classes in
-`globals.css`), horizontally centered in the space to the right of the sidebar:
-
-| Class | Max width | Used by |
+| Surface | Design system | Tokens |
 |---|---|---|
-| `.admin-container` | 920px | Form/detail pages: dashboard, Company profile, Settings, New survey, response detail |
-| `.admin-container-wide` | 1140px | Table pages: Surveys, Leads, survey detail |
+| **Admin** (`app/admin/**`, `components/admin/**`, `AdminSidebar`) | This document | `--ds-*` |
+| Respondent survey (`app/survey/[slug]`) | Its own, light + dark | `--sv-*` |
+| Marketing (`app/page.tsx`, `app/customer-success`, `/terms`, `/privacy`) | Its own | `--lp-*` |
+| Auth screens (`components/auth/AuthScreen.tsx`, login, signup) | Its own (`design_handoff_auth`) | Bricolage Grotesque, local literals |
 
-Both are `mx-auto w-full pt-6`; combined with `AdminShell`'s `p-8` this puts the
-eyebrow label 56px from the viewport top on every page, with 32px of horizontal
-padding once the viewport is narrower than the container. Each route's `loading.tsx`
-skeleton uses the same container as its page so nothing jumps when content arrives.
+The last three are **out of scope for this document**. They are separate designed
+surfaces with their own handoffs, and admin must not reach across into their tokens.
+Admin did exactly that in two places before the unification pass; both are gone (see
+the changelog).
 
-**Page header pattern:** every page opens with an eyebrow (`.type-label`) 8–10px
-above its serif page title, then `gap-7` (28px) / `mb-10` before the first section.
+Single light theme for admin. No dark mode, no theme branching.
 
-**Vertical rhythm:** 40–48px between major sections (`mt-12` between dashboard
-sections; Company profile sections are `py-6` each side of a divider = 48px
-title-to-title), 16–24px within a section (section label → content is `mb-4`).
+---
 
-The only full-bleed layout left is the company-profile setup wizard, which cancels
-`AdminShell`'s `p-8` with `-m-8` for its own step-navigator rail. The admin home no
-longer does this — it sits on `.admin-container` like every other page.
+## Import boundaries
 
-## Spacing & radius
+```
+admin pages, admin components   ->  components/admin/ui
+respondent survey, marketing    ->  components/ui
+```
 
-Spacing uses Tailwind's default scale directly, plus arbitrary values (`px-[72px]`
-etc.) where the handoff's spec doesn't land on a default Tailwind step — no custom
-spacing tokens.
+`components/ui/{button,card,badge}.tsx` and `components/admin/ui/{Button,Card,Badge}.tsx`
+are **intentionally forked**. They are not duplicates awaiting cleanup.
 
-**Radius:**
+The `components/ui` copies are consumed by the respondent survey, `NewSurveyWizard`,
+`SurveyForm` and the marketing pages, all of which are out of scope for the admin design
+system. Unifying them would mean redesigning those surfaces, which is a different
+project.
 
-| Token | Class | Value | Usage |
+**Neither side edits the other's copy.** A change to the admin button belongs in
+`components/admin/ui/Button.tsx` only.
+
+Read-only from admin, because the respondent surface imports them:
+`components/ui/badge.tsx`, `components/marketing/PerchedBird.tsx`,
+`components/LoadingScreen.tsx`, `components/BirdLoader.tsx`, `components/useLoadingGate.ts`,
+`lib/fonts.ts`.
+
+---
+
+## Fonts
+
+| Role | Face | Token | Tailwind |
 |---|---|---|---|
-| `--ds-radius-card` | `rounded-card` | `0.75rem` (12px) | Cards, hoverable rows |
-| `--ds-radius-control` | `rounded-control` | `0.5rem` (8px) | Buttons, inputs, nav items |
-| — | `rounded-full` | 999px | Chips, badges, avatar circles |
+| Display | **Young Serif** | `--font-display` → `--font-young-serif` | `font-serif` |
+| Body / UI | **Archivo** | `--font-body` → `--font-archivo` | `font-archivo` |
 
-**Elevation:** flat for surfaces in the page flow — cards use a 1px border
-(`border-border`), never a shadow. Floating layers only (the sidebar account
-popover, collapsed-nav tooltips) add `shadow-lg` on top of their border so they
-read as intentional menus above the page.
+Loaded in `lib/fonts.ts`, applied at `AdminShell`.
 
-## Component patterns
+**Admin is not Inter.** Inter is the global `<body>` default that the marketing pages
+still use; admin overrides it. Any documentation claiming the admin body face is Inter
+is stale. Young Serif is page-title only: no other element in admin uses the display
+face, stat values explicitly included.
 
-All in `components/ui/` (shadcn convention), Radix primitives + `class-variance-authority`,
-Tailwind v3.
+---
 
-### Buttons (`components/ui/button.tsx`)
+## Layout
 
-- **`primary`** (default) — `bg-primary text-primary-foreground hover:bg-primary-hover`
-  (ink → stone-700 on hover, cream text). The one emphasized action per view.
-- **`secondary`** — `border border-border bg-card text-card-foreground hover:bg-secondary`.
-- **`destructive`** — solid `bg-destructive`, white text.
-- **`ghost`** — no background/border until hover (`hover:bg-secondary`).
-- **`link`** — text-only, `text-primary`, underline on hover.
+| Token | Value | Where |
+|---|---|---|
+| `--ds-container-max` | `1140px` | The one admin container |
+| `--ds-container-pad-x` | `32px` | Horizontal inset, from `AdminShell`'s `p-8` |
+| `--ds-container-pad-y` | `32px` | Viewport top to the page title (was 56) |
+| `--ds-rhythm-header` | `32px` | Page header to first content block |
+| `--ds-rhythm-block` | `40px` | Between major content blocks. Pages currently use 32 (`gap-8`); the token stays as the ceiling |
 
-Sizes: `sm` (32px), `default` (36px), `lg` (40px), `icon` (36×36px). All use
-`rounded-control`.
+**One container.** `PageShell` is the only thing in the codebase that applies
+`.admin-container`. No page overrides it and no page adds a second inset, which is what
+puts every admin H1 on the same x coordinate.
 
-### Cards (`components/ui/card.tsx`)
+**A page that needs a narrower measure constrains the block, not the page.** Use
+`.admin-measure` (720px) on the prose or form block. This is the rule that replaced the
+old 920px container: Company profile, Settings, Response detail and Live detail used to
+sit visibly further inset than every other page because they used a second, narrower
+container.
 
-`bg-card`, `rounded-card`, 1px `border-border`, no shadow.
+### Spacing
 
-### Form inputs (`components/ui/input.tsx`, `textarea.tsx`)
+Base unit 8. **These are the only allowed steps.**
 
-`rounded-control`, 1px `border-input`, `bg-card`. Focus state is a 2px `ring-ring`.
+| Token | Value |
+|---|---|
+| `--ds-space-1` … `-9` | `4 · 8 · 12 · 16 · 24 · 32 · 40 · 56 · 72` |
 
-### Badges (`components/ui/badge.tsx`)
+---
 
-Pill (`rounded-full`), tinted background + full-strength text — `success` (green,
-"Live"), `warning` (amber, "Draft"), `destructive`, `default`/`outline`. Unrelated to
-and unchanged by this handoff.
+## Type scale
 
-### Tables (`components/ui/table.tsx`)
+Pages reference **roles**, never a raw size. Defined in `app/globals.css` under
+`@layer components`.
 
-Header: uppercase, `text-muted-foreground`, bottom border only. Rows: bottom border,
-`hover:bg-secondary`.
+| Role | Size / line-height / tracking | Weight | Where |
+|---|---|---|---|
+| `.type-eyebrow` | 12 / 1.2 / 0.08em, uppercase | 600 | The parent-object line above a detail page's H1; section labels on a page |
+| `.type-page-title` | 30 / 1.15 / -0.015em, Young Serif | 400 | The one H1 per page. Was 44; this is the only line to change if it is ever reverted |
+| `.type-subhead` | 17 / 1.5, `max-width: 52ch` | 400 | A sentence under an H1. Defined, but no page passes one after the density sweep |
+| `.type-section-label` | 13 / 1.2 / 0.06em, uppercase | 600 | A label over a card or section |
+| `.type-table-head` | 12 / 1.2 / 0.06em, uppercase | 600 | Table headers, field labels |
+| `.type-metric-value` | 24 / 1.1, `tabular-nums` | 500 | Every stat value. Was 32 |
+| `.type-metric-label` | 14 / 1.4 | 400 | Retained; `StatRow` now labels in `text-micro` |
+| `.type-heading` | 17 / -0.01em | 600 | Card and section headings |
+| `.type-body` | 15 / 1.55 | 400 | Running text |
+| `.type-body-sm` | 13 / 1.5 | 400 | Secondary running text |
+| `.type-meta` | 13, muted | 400 | Timestamps, inline meta |
+| `.type-code` | 13 / 1.5, monospace | 400 | The AI prompt block, `?src=` fragments |
 
-### Admin shell (`components/AdminShell.tsx`, `components/AdminSidebar.tsx`)
+**Eyebrow and section label are two roles, not one.** A single `.type-label` used to do
+both jobs, which is why the label over an H1 and the label over a card section rendered
+identically and neither read as subordinate to the other.
 
-Redesigned per `design_handoff_create_survey`, 252px fixed width. Later widened
-its gutters and gained a collapse toggle back (a new feature, not a revival of the
-old 196px/64px localStorage-based mechanism the handoff removed — see the note at
-the bottom of this section). **240px expanded / 64px collapsed**, animated with a
-200ms width transition. Horizontal padding is a consistent 16px (`px-4`) across the
-logo row, "WORKSPACE" label, nav, and account row when expanded. **Top-anchored
-stack**: favicon logo (30×30, `rounded-control`) + Spectral serif "Birdsong"
-wordmark (21px/600, see below) sit at the top (`mb-[30px]`) alongside a small
-collapse-toggle button (chevron, rotates 180° between states), then a "WORKSPACE"
-section label (11px/600, uppercase, tracking `.12em`, `hsl(0 0% 42%)`, hidden while
-collapsed), then the nav links directly beneath.
+**No H1 carries a terminal period.** `PageHeader` strips one structurally, so a title
+passed in with a period cannot reintroduce the inconsistency.
 
-**Collapsed state (64px):** icons only, centered in a 40×40 hit target; labels
-drop to a `title`/`aria-label` plus a hover tooltip (`bg-card`, `border-border`,
-`rounded-control`, `shadow-lg`, `text-sm`, flush against the rail's right edge via
-`left-full ml-2`) rather than being rendered inline. The account row collapses to
-just the avatar, with its Settings/Sign out popover flying out beside the rail
-(`left-full`, fixed `w-48`) instead of above it, since 64px can't fit the menu
-text. Toggle by clicking the chevron button or `Cmd+B` / `Ctrl+B` (ignored while
-a text input/textarea/contenteditable has focus, since Cmd+B is also "bold" in
-rich text elsewhere in admin). Preference persists via a `sidebar_collapsed`
-cookie (`path=/admin`, not `localStorage`) read server-side in
-`app/admin/layout.tsx` and passed down as the initial state, so there's no
-expand/collapse flash on load.
+**Tabular figures are part of the metric role**, not a call-site choice. A column of
+proportional figures does not line up, which is the whole point of a metric.
 
-Four nav links (Home / Leads / Surveys / Company profile), 19px icons (1.4px stroke
-— a rounder, thinner set than the old Feather-style icons; apply the same style to
-any new admin nav item), 15px/500 label, `gap-[13px]`, `rounded-control`. Hover and
-active both get the same treatment — solid dark fill (`bg-sidebar-accent`) + white
-text (`text-sidebar-active-foreground`) — with the *active* route additionally
-marked by a 3px indigo (`bg-indigo-chip`) accent bar flush to the rail's left edge.
-This is a departure from the rest of the platform's Young-Serif-is-page-title-only
-rule: the sidebar wordmark uses `font-spectral`, not `font-serif` (Young Serif) —
-Spectral is already loaded for the respondent interview (`lib/fonts.ts`), reused
-here rather than adding a second serif face.
+### Named font sizes
 
-Bottom, pinned with `mt-auto`/a trailing flex spacer: a 34px indigo (`bg-indigo-chip`)
-circle with the user's initials + name/"Admin" role label + a chevron icon. Clicking
-it toggles the same Settings/Sign out popover as before (not shown in the static
-design reference, but has to live somewhere since the handoff's nav doesn't include
-Settings) — click-toggled, not hover-revealed, for the same reasons as before:
-outside click, Escape, and any navigation dismiss it. Popover styling unchanged:
-`bg-card`, 1px `border-border`, `rounded-card`, `shadow-lg`, `p-1.5`, items `text-sm`
-with `py-3` and `hover:bg-secondary`, inset to the rail's padding (`left-2 right-2`).
+For controls, which need a size without also inheriting a colour and a line height. A
+primitive uses these instead of writing a raw px value. Defined in
+`tailwind.config.ts` under `fontSize`.
 
-**Important:** the sidebar is `sticky`, not `fixed`, and is a normal flex sibling of
-`<main>` in `AdminShell` — `<main>` is just `flex-1`, no `pl-[...]` padding tracking
-the sidebar's width. Don't reintroduce fixed positioning on the sidebar without also
-adding matching padding to `<main>`.
+| Token | Value | Where |
+|---|---|---|
+| `text-micro` | 11.5px | Stat labels and deltas, small badges |
+| `text-count` | 12px, tabular figures | Counts beside a filter tab, the study chips |
+| `text-control` | 13px, tabular figures | Small buttons, badges, chips |
+| `text-nav` | 15px | Sidebar nav items only |
+| `text-wordmark` | 21px | Sidebar wordmark only |
+| `text-account` | 12.5px | Sidebar account name only |
+| `text-role` | 10.5px | Sidebar account role line only |
+| `text-display-sm` | 28px | Setup-wizard step titles only |
 
-A page can still break out of `<main>`'s `p-8` with `-m-8` for a full-bleed layout —
-the company profile onboarding wizard does this for its own step-navigator sidebar,
-and the new-survey wizard's External name step does the same for its two-pane layout
-(see below). (The admin home used to as well, for a split-screen dark panel; it now
-sits on `.admin-container` — see "Layout containers & spacing rhythm".)
+**`text-count` and `text-control` carry `font-variant-numeric: tabular-nums`**, set in
+`app/globals.css` beside the type roles because a `fontSize` tuple cannot express it. Every
+`DataTable` cell also carries tabular figures.
 
-### New survey wizard (`components/NewSurveyWizard.tsx`)
+**Every custom key here must also be registered in `lib/utils.ts`.** `tailwind-merge`
+only knows Tailwind's stock scales; an unregistered `text-*` is misread as a *colour*,
+lands in the same conflict group as the real colour beside it, and one of the two is
+silently deleted. `lib/utils.test.ts` guards it. The same applies to custom radius,
+shadow and max-width keys.
 
-Every step but one is a plain boxed card on `.admin-container`, unchanged. The
-**External name** step (`design_handoff_create_survey`) is the one exception: it
-takes over the full content area with `-m-8 flex h-screen overflow-hidden` (same
-cancel-AdminShell's-padding trick as the company profile wizard) and splits into two
-independently-scrolling panes — a `flex-[1_1_55%]` form column (white card, Back
-link, "Step X of Y", title, AI suggestion pills, name input, OK button) and a
-`flex-[1_1_45%]` live preview column, `border-l border-border`. Only this one step
-does this; navigating to any other step (including Back/Next from this one) returns
-to the normal boxed layout, so the page's outer "Surveys" eyebrow / "New survey"
-title (rendered by `NewSurveyWizard` itself, not `page.tsx` — it has to be
-per-step-conditional) reappears there.
+---
 
-AI suggestion pills are full-width stacked buttons (`bg-indigo-chip/[0.07]`,
-`border-indigo-chip/25`, `rounded-[18px]`), not the small flex-wrap chips used by the
-public-description step's single suggestion card. Picking one sets it apart with an
-inset ring (`ring-2 ring-inset ring-indigo-chip`, `border-transparent`,
-`bg-indigo-chip/10`); typing in the name input clears the selection. "Regenerate
-suggestions" reuses the same `/api/surveys/suggest-names` call as before — its
-refresh icon spins for as long as that real fetch is in flight, not a fixed mock
-delay.
+## Color
 
-The live preview panel (`SurveyPreviewPanel`) is a simplified, stylized mock of the
-real respondent welcome screen — not a literal re-render of
-`InterviewFlow.tsx`'s (more elaborate) welcome stage — using the same cream palette
-that screen hardcodes as raw hex (`#f3ecdf`/`#fffdf7`/`#e7ddc9`/`#241f18`/`#6f6757`/
-`#a89d88`): a browser-chrome header (traffic lights + URL pill showing the real
-domain and live slug), a gift-card badge (`bg-success-bg`/`text-success` — this one
-detail *does* map to an existing `--ds-*` token, and is only shown when the admin
-actually set a gift card amount earlier in the wizard), the live external-name value
-as the title (`font-spectral`), ghost input fields, and a "Powered by Birdsong"
-footer. Updates on every keystroke, reusing the wizard's own real `slug`/`externalTitle`
-state (and the real `slugify()` from `lib/surveys/slugify.ts`) rather than a
-separate mock slug rule.
+Stored as space-separated HSL triplets so Tailwind's alpha modifier (`bg-brand/80`)
+works. Every design-system variable is prefixed `--ds-*`, because unprefixed
+`--background` / `--foreground` are live legacy variables that plain `<body>` still
+reads.
 
-### Load-in animation (`globals.css`)
+### Surfaces
 
-`bs-rise`: opacity 0→1 + `translateY(16px)`→0, ease-out. Two flavors:
-- `.bs-rise-1` … `.bs-rise-6` — one-shot, staggered, fixed delays (~0.1s apart) for a
-  page's initial load (admin home, survey/profile sections).
-- `.bs-rise-repeat` — no delay, meant to be reapplied by keying the element (React
-  remounts it, restarting the CSS animation) — used for the respondent interview's
-  completion screen.
-- `.q-reveal-pop` / `.q-reveal-fade` — the respondent interview's per-question
-  entrance (rise-and-settle with slight scale, or plain fade). Which one (or
-  neither) applies is a one-line config in `InterviewFlow.tsx` (`QUESTION_REVEAL`:
-  `"pop" | "fade" | "none"`). The old word-by-word typing reveal is gone.
+| Token | Value | Tailwind | Where |
+|---|---|---|---|
+| `--ds-page-background` | `#f8f8f7` | `bg-page` | The app canvas, set on `AdminShell` |
+| `--ds-card` | `#ffffff` | `bg-card` | Every card and table surface |
+| `--ds-chip` | `#edece8` | `bg-chip` | Neutral chip fill, the code block, the segmented control track |
+| `--ds-secondary` | `#edece8` | `bg-secondary` | Row hover only. No quote block or transcript carries a fill |
+| `--ds-surface` | `#f8f8f7` | `bg-surface` | A sunk panel inside a card: Home's transcript preview. Same value as the canvas, so it is a window onto the page, not a tint |
+| `--ds-border` | `#e7e5e4` | `border-border` | Card outlines, table row rules, section rules, the left rule on a quote |
 
-`bs-dot`: 7px circle, `bg-indigo-light`, scale 1→1.4 + opacity 1→0.6, 2s infinite —
-marks "live" labels ("What's been happening", "Wren is asking").
+### Ink
 
-Both are gated behind `@media (prefers-reduced-motion: no-preference)`. Elements
-default to their fully-visible resting state via plain Tailwind classes — reduced-motion
-users see the final layout immediately, with no animation attempted at all, rather than
-a stripped-down version of it.
+| Token | Value | Tailwind | Where |
+|---|---|---|---|
+| `--ds-card-foreground` | `#1c1917` | `text-card-foreground` | Primary text |
+| `--ds-muted-foreground` | `#78716c` | `text-muted-foreground` | Secondary text, eyebrows, labels |
+| `--ds-faint` | `#a8a29e` | `text-faint` | Tertiary text: timestamps, counts |
 
-### Respondent interview (`app/survey/[slug]/InterviewFlow.tsx`)
+### Accent
 
-Single-question view (Typeform-style) over the **unchanged** `/api/interview/start` /
-`/api/interview/continue` conversational backend — the interview logic, streaming,
-follow-up generation, and the `INTERVIEW_COMPLETE` sentinel were not touched. Only the
-latest assistant message renders (as "the question"), not the full transcript; the
-completion screen still offers a "See your responses" toggle for the full exchange.
-Progress: a 3px fixed top bar (`bg-chip` track, `bg-primary` fill) using the existing
-`computeProgressPercent` — deliberately does **not** claim a fixed "Question N of X"
-denominator, since the model can genuinely run past `num_questions` (it's a soft
-target, not a hard cap). Submits on Cmd/Ctrl+Enter, not plain Enter — plain Enter
-inserts a newline, since answers can run long.
+Green is a **real token now**, not an informal reuse of the status colour it used to
+borrow. `--ds-success` keeps its own meaning for genuine status and happens to share the
+hue.
 
-## Tooling
+| Token | Value | Tailwind | Where |
+|---|---|---|---|
+| `--ds-accent` | `#3a6046` | `bg-brand` / `text-brand` | The accent. At most one instance per visible region |
+| `--ds-accent-weak` | `#e4ecdd` | `bg-brand-weak` | Tinted fill behind a 7+ `ScoreBadge` |
+| `--ds-accent-text` | `#2c4a36` | `text-brand-text` | Accent text on `accent-weak` (7.4:1) |
+| `--ds-accent-live` | `#3a6046` | `bg-brand-live` | The live dot, everywhere |
 
-- **Library:** [shadcn/ui](https://ui.shadcn.com), Radix UI primitives, Tailwind v3.
-- **Config:** `components.json` (style: `new-york`, base color: `neutral`).
-- **Adding new components:** `npx shadcn@latest add <component>` defaults to
-  Tailwind v4-style output on newer CLI versions — hand-adapt to the v3 pattern in
-  `components/ui/button.tsx` (Radix `Slot` + CVA + `hsl(var(--x) / <alpha-value>)`
-  tokens) rather than accepting v4 output as-is.
-- **Utility:** `lib/utils.ts` exports `cn()` (clsx + tailwind-merge).
-- **Icons:** inline SVG (Feather-style strokes), not an icon library.
-- **Animation:** `tailwindcss-animate` (unrelated to the `bs-rise`/`bs-dot` keyframes
-  above, which are hand-written).
-- **Fonts:** `lib/fonts.ts` — `archivo` / `youngSerif` (the platform, wired into
-  `tailwind.config.ts` as `font-archivo`/`font-serif`), `inter` / `newsreader`
-  (marketing pages only).
+### Action and state
 
-### CSS variable naming
+| Token | Value | Tailwind | Where |
+|---|---|---|---|
+| `--ds-primary` | `#1c1917` | `bg-primary` | Primary button fill |
+| `--ds-primary-hover` | `#44403c` | `bg-primary-hover` | Primary button hover |
+| `--ds-destructive` | `#dc2626` | `text-destructive` | Errors, destructive actions |
+| `--ds-warning` | `#f59e0b` | `bg-warning` | Test badges, draft markers |
+| `--ds-focus` | `#1c1917` | `ring-focus` | The focus ring |
 
-Every design-system variable is prefixed `--ds-*` (e.g. `--ds-primary`, `--ds-border`)
-rather than the shadcn-conventional unprefixed names, because `--background` and
-`--foreground` remain live as separate, unprefixed legacy variables that the plain
-`<body>` tag still depends on (see below) — prefixing sidesteps the collision.
-`tailwind.config.ts` maps the clean, standard Tailwind class names to the prefixed
-vars, so component code never needs to know about the `--ds-` prefix.
+### Sidebar
 
-## Overscroll / canvas background
+| Token | Value | Tailwind | Where |
+|---|---|---|---|
+| `--ds-sidebar` | `#121212` | `bg-sidebar` | The rail ground |
+| `--ds-sidebar-accent` | `#262626` | `bg-sidebar-accent` | Nav hover and active fill |
+| `--ds-sidebar-foreground` | `#9aa1ac` | `text-sidebar-foreground` | Inactive nav text |
+| `--ds-sidebar-active-foreground` | `#ffffff` | `text-sidebar-active-foreground` | Active nav, account name |
+| `--ds-sidebar-plate` | `#fffdf7` | `bg-sidebar-plate` | Account plate fill (3%), its edge (6%), hover/open fill (6%) |
+| `--ds-sidebar-label` | `#6b6b6b` | `text-sidebar-label` | The "Workspace" section label |
+| `--ds-sidebar-muted` | `#f3ecdf` | `text-sidebar-muted` | Account role line, at 38% |
+| `--ds-sidebar-avatar` | `#5f6bab` | `bg-sidebar-avatar` | Account avatar squircle |
+| `--ds-sidebar-avatar-foreground` | `#fffdf7` | `text-sidebar-avatar-foreground` | Account avatar initials |
 
-Browsers paint the rubber-band overscroll area using `<body>`'s actual
-`background-color`, not any inner div's. Since `<body>` itself still carries the
-legacy `--background: #ffffff`, `components/AdminShell.tsx` sets
-`document.body.style.backgroundColor` to `hsl(var(--ds-page-background))` on mount and
-clears it on unmount, scoping the fix to admin routes only.
+---
 
-That only solves the light content column, though — no single body color can also
-match the dark sidebar rail, so bouncing past the page edge still showed the rail
-"ending" in dead white space above/below it. The same `AdminShell` effect therefore
-also sets `overscroll-behavior-y: none` on `<html>` (the document scroller) while an
-admin page is mounted: admin routes don't rubber-band at all; the page stops at its
-edges. Respondent and marketing pages keep the native bounce.
+## Radius, elevation, focus
 
-## Known gaps
+| Token | Value | Where |
+|---|---|---|
+| `--ds-radius-control` | `8px` | Inputs, selects, small chips |
+| `--ds-radius-account` | `11px` | The sidebar account row, and only that |
+| `--ds-radius-card` | `12px` | Every card and panel |
+| `--ds-radius-pill` | `999px` | Every button, badge, dot, meter |
+| `--ds-shadow-card` | `0 4px 14px rgba(28,25,23,.06)` | The one card elevation. `Card` only; tables and `StatRow` carry none |
+| `--ds-shadow-card-hover` | `0 6px 20px rgba(28,25,23,.09)` | Hover step for cards that are links |
 
-Content the design handoff specifies but the data model doesn't back yet — shown where
-real, otherwise omitted rather than fabricated:
+**Focus.** One rule: `.focus-ring` gives `:focus-visible` a 2px ring in `--ds-focus` at
+2px offset. **Never remove an outline without adding this.** The dark rail uses a light
+ring against the sidebar ground instead, since the ink ring disappears there.
 
-- **Survey Settings "Survey defaults"-equivalent stats**: the handoff's Company Profile
-  screen shows company-wide "Response goal," "Max questions," "Follow-up depth," and
-  "Qualification threshold" stat blocks. None have a backing field — there's no
-  response-goal, follow-up-depth, or qualification-threshold column anywhere (survey
-  `num_questions` is per-survey, not a company default; follow-up depth is currently a
-  hardcoded instruction inside the interview system prompt, not configurable;
-  qualification is a manual admin action via response status, not a numeric rule).
-  This whole section is omitted from Company Profile rather than showing fabricated
-  numbers.
-- **Survey Settings stats row**: shown with 3 of the mockup's 4 stats (Responses,
-  Qualified leads, Completion rate — all real, computed from `responses`). "Avg.
-  duration" is omitted — there's no per-response timing data. The "Responses" stat also
-  drops the mockup's "/25" goal fraction for the same reason as above.
-- **Company Profile "Ideal customer profile" segment chips** and the **"How your
-  interviewer sounds" sample quote**: omitted. `target_icp` is one free-text field, not
-  discrete segments, and there's no generator for a sample interviewer line.
-- **Brand voice**: the handoff shows several simultaneous filled chips (e.g. "Warm,"
-  "Plainspoken," "Curious"), which doesn't fit a fixed-enum single-select. Implemented
-  as free text (the `tone` column, unchanged shape) split on commas for chip display —
-  admins type comma-separated descriptors in their own words.
-- **"Wren"** (the interviewer name shown on the respondent screen, "Wren is asking") is
-  hardcoded brand copy, not a per-survey or per-company field — same category as
-  "Powered by Birdsong."
-- **Sidebar collapse removed, then reintroduced as a new feature**: `design_handoff_create_survey`
-  removed the sidebar's collapsed state entirely (fixed 252px). The earlier 196px/64px
-  collapsible mechanism (and its 232px/76px stale-spec footnote from an older handoff)
-  no longer applies. Collapse was later added back at 240px/64px with a cookie instead
-  of `localStorage` — see "Admin shell" above — built fresh rather than restoring the
-  removed code.
+---
 
-## Deviations from the static mockups (kept for real functionality)
+## Primitives
 
-The four handoff files show idealized read-only screens; a few real, load-bearing
-features aren't depicted there and were kept, styled to match:
+`components/admin/ui/`. No primitive fetches data, none imports from `lib/supabase`, and
+each reads only tokens.
 
-- **Company Profile**: "Basics" (name/industry/website/team size/logo) and "What you
-  sell"/"Value proposition" sections aren't in the mockup at all — but nothing else in
-  the app can edit those fields once onboarding is done, so they stay, in the same
-  read-first + per-section "Edit" pattern as the sections that are shown.
-- **Survey Settings**: a single "Edit" button (opens the existing full `SurveyForm`,
-  unchanged) sits in the header next to Preview/Share link. The mockup's per-section
-  "Edit" buttons on "Audience & goal" and "Questions" all open this same form rather
-  than editing just that section — splitting `SurveyForm` into independent per-section
-  forms would be a real refactor of working, complex form logic, not a styling change.
-- **Company Profile / Survey Settings**: the "Edit with AI" bar (Company Profile) and
-  the response table (Survey Settings) are real, previously-built features not shown in
-  these particular mockups; both were kept and restyled rather than dropped.
-- **New survey wizard — External name step** (`design_handoff_create_survey`): the
-  handoff's browser-chrome URL pill shows a literal `www.usebirdsong.com` example;
-  implemented using the real `NEXT_PUBLIC_APP_URL`-derived domain with no `www.`
-  prefix added, matching what `lib/email/lead-notification.ts`/`lib/slack/lead-notification.ts`
-  actually send rather than the mockup's illustrative example. The gift-card badge
-  ("$25 GIFT CARD") is real, wired to the wizard's own `giftCardAmount` state from an
-  earlier step, and omitted rather than shown as a fabricated placeholder when that
-  field is empty. The "~10 minutes" estimate next to it has no backing field (there's
-  no rough-duration calculation available at this point in the wizard) and stays as
-  the mockup's static illustrative copy.
+| Component | Responsibility |
+|---|---|
+| `PageShell` | The container. Every admin page's outermost element. Takes no size prop. |
+| `PageHeader` | `eyebrow` (detail pages and the two account pages only), `title`, `badge`, `meta` (one line of fact), `subtitle` (rare), `actions`. Actions centre on the title row. Strips terminal periods. |
+| `Button` | `variant` primary / secondary / ghost, `size` default / sm. All pills. |
+| `Card` | `padding` default / compact / flush, `interactive`. Background, border, radius, shadow. Never inside another Card. |
+| `StatRow` | `{ label, value, delta?, href? }[]`. One vertical stack per cell. Four per page at most. |
+| `FilterTabs` | Segmented control with counts. |
+| `SearchInput` | Icon plus input. |
+| `DataTable` | Header, rows, frame, empty state. Owns alignment, density, width, truncation, sorting, `rowHref`. Draws its own frame; never wrapped in a Card. |
+| `EmptyState` | One sentence, one optional action, no chrome. Renders **once**. |
+| `Badge` | Count and status pills. |
+| `StatusDot` | The live dot. |
+| `ScoreBadge` | Every lead score. One encoding, four states. |
+| `RelativeTime` | Every timestamp a person reads. |
+| `CollapsibleSection` | Set-once configuration on a detail page. |
+
+**Props over variants-by-copy.** If two pages need two looks, that is a prop, not a
+second component.
+
+### `ScoreBadge`
+
+`score` (nullable) and `size` (`md` 28px / `sm` 24px). The number always renders, in
+tabular figures, inside a pill. **7 to 10** takes `--ds-accent-weak` on
+`--ds-accent-text`; **5 to 6** and **1 to 4** both take the neutral `--ds-chip` fill
+with `--ds-muted-foreground`, which is `Badge`'s default variant; **null** renders
+`EMPTY_VALUE` in muted text with no fill. Only 7+ carries the accent, because 7 is the
+threshold the Slack notification, the HubSpot deal rule and "worth a call" all act on;
+below it the digit is the distinction, and a third fill would be colour for its own
+sake. `aria-label` is always `Lead score N of 10`, or `No lead score yet`.
+
+This replaces the Leads queue's 26px meter bar and the study page's flat grey pill. A
+bar beside a number is a second reading of the number, and it cost the Score column
+26px of width to say the same thing twice.
+
+### `RelativeTime`
+
+`date` and `align`. Renders `<time dateTime>` whose visible text is
+`formatRelativeTime` and whose `title` is the full absolute stamp. **Relative is the
+only visible timestamp format in admin**; the absolute value lives in the tooltip. A
+`prefix` renders a muted qualifier ("started") for a row whose stamp does not mean what
+the column header says.
+
+### `CollapsibleSection`
+
+`title` (eyebrow), `summary`, `action`, `defaultOpen`, `children`. A 48px header row
+that is one full-width disclosure button, a chevron on the right that rotates in 150ms,
+and 16px of body padding on top with no horizontal padding of its own — the parent
+`Card` owns the inset. Sections stack inside one `Card`, separated by the `--ds-border`
+hairline.
+
+The summary is the point of the collapsed state: a disclosure that shows only its own
+title makes you open it to find out whether it is worth opening. `action` is a **sibling
+layered over** the header button, never a child, because a button inside a button is
+invalid markup and would not receive its own clicks.
+
+### `DataTable`
+
+Beyond header/rows/empty state it now owns:
+
+| Prop | Meaning |
+|---|---|
+| `density` | `default` rows are `h-12` (48px), `compact` `h-10` (40px). Header is `h-9`. Cell padding is `px-3`. |
+| `layout` | `fixed` makes declared widths authoritative. Required for a truncating column. |
+| `stickyHeader` | Default on. Header sticks to its scroll container on the card fill. |
+| `sort` / `onSort` | Sort state, rendered as a chevron in the header. |
+| `empty` | `{ title, action? }`. With no rows the table renders `EmptyState` bare: no column headers, no frame. |
+| Column `width` | A named step `xxs` / `xs` / `sm` / `md` / `lg` (`w-10` / `w-16` / `w-24` / `w-32` / `w-44`) or a fraction below 1 (`0.28`). `xxs` is for a bare checkbox. No px strings. |
+| Column `truncate` / `title` | One line, ellipsis, full value on the cell's `title`. |
+| Column `sortable` / `sortValue` | Client-side sort over loaded rows. Nulls always last, both directions. |
+| Column `align` | `left` / `right` / `center`. Numbers and times go right. Every cell carries tabular figures. |
+| Column `rowLabel` | The column that underlines on row hover. Defaults to the first; set it when the first column is a checkbox. |
+
+Row rules are a single hairline in `--ds-border`. No zebra striping. The frame (card surface,
+hairline, radius, no shadow) is drawn by the table itself, only while it has rows.
+
+**`DataTable` holds no state**, deliberately: the admin home renders it from a server
+component, where a `useState` would be a hard error and its `cell` functions cannot
+cross the boundary at all. Sorting lives in `useTableSort`, a client hook in the same
+folder, which hands back the `sort`/`onSort` pair the table renders.
+
+A whole row is a link via `rowHref`; the first cell underlines on row hover. The link is
+stretched across the row underneath the cells, and cell content is click-through, so a
+click anywhere in the row — on the name, not just the padding around it — navigates.
+Interactive elements inside a linked row (a select, a button, a nested link) keep their
+own pointer events and go on working; the pattern is on `/admin/styleguide` under
+"DataTable states".
+
+### `lib/format.ts`
+
+One `formatRelativeTime` for every timestamp in admin, with an explicit gapless ladder:
+`Just now` → `Nm` → `Nh` → `Yesterday` → `Nd` (<7) → `Nw` (7–27d) → `Nmo` (28d+) → `Ny`.
+No value is expressible in two units. `{ seconds: true }` opts into a sub-minute band
+for the Live board. `formatAbsolute` (date and time, no seconds) is the tooltip half of
+`RelativeTime`; `formatDayMonth` is the short stamp on a generated report. **No admin
+file calls `toLocaleString` / `toLocaleDateString` / `toLocaleTimeString` directly.**
+
+`EMPTY_VALUE` is the single empty-cell glyph. Import it; never type the character.
+
+### `lib/leads.ts`
+
+`isWorthACall` / `countWorthACall` / `WORTH_A_CALL_SCORE_MIN`. The one definition of
+"worth a call": a completed response scoring 7 or higher that nobody has moved off
+`new`. The Leads page's survey cards and the study detail page's stat both call it, so
+they cannot describe the same study differently again.
+
+---
+
+## Standing rules
+
+- Never invent a design token. If a needed value is not in `tokens.css`, stop and ask.
+- Never write a raw hex, font size, radius or px value in a component. Sizes come from the
+  Tailwind scale (`h-12`, `w-24`), the `--ds-*` tokens or a named type utility.
+- Never build a one-off card, button, or header. Extend a primitive or ask.
+- No em dashes. No beige, cream, tan, warm-neutral fill or gradient.
+- Every new admin page starts from `PageShell` plus `PageHeader`.
+- Check `/admin/styleguide` before adding any UI.
+
+### Copy
+
+- Facts, not situations. A subhead or meta line states a count, a date, a parent name or a
+  constraint. Never "N leads finished interviews and none of them have heard back yet".
+- No eyebrow on a top-level page: the sidebar states the location. An eyebrow appears on a
+  detail page, naming the parent object, and on Settings and Company profile ("Account"), which
+  have no nav item.
+- Empty states are one sentence and at most one action, with no chrome around them.
+- A description under a card or field survives only if it states a rule the user can break or
+  a consequence they cannot predict.
+- Button labels are verb plus noun, three words at most. Sentence case everywhere except the
+  eyebrow utility and table column headers. No over-affirmation, no "AI agent" phrasing.
+- A label removed visually that carried meaning survives as `aria-label` or `sr-only`.
+
+### Density
+
+- Status renders once per row or block: dot plus text in tables, a neutral badge on detail
+  pages. Never a dot, a label, a badge and a tinted fill for one state.
+- Borders only on interactive surfaces and table row rules. Where whitespace already separates
+  two blocks, there is no border. Sections on a detail page are a hairline top rule and an
+  eyebrow, not a Card.
+- Quotes and transcripts take a left hairline in `--ds-border`, never a filled background.
+- The accent appears at most once per visible region. Count badges and section pills are
+  neutral.
+- A stat value is a number, a percentage or a duration. Nothing sits inline beside it.
+- Titles in list rows truncate to one line with the full value on `title`.
+
+> On rule 1: this codebase keeps its tokens in `app/globals.css` rather than a separate
+> `tokens.css`, because `tailwind.config.ts` maps every Tailwind colour name onto those
+> variables and a second file would double-define `--ds-border` and silently fork the
+> palette. Read "tokens.css" as "the token block in `app/globals.css`".
+
+**Two documented exceptions to the no-em-dashes rule**, both typographic marks rather
+than prose:
+
+1. `EMPTY_VALUE` in `lib/format.ts` — the empty-cell glyph.
+2. `ReportSection.tsx`'s markdown export — the quote-attribution dash in
+   `> "quote" — Attribution`. Replacing it with a comma is worse typography, and the
+   string is generated file content, not UI chrome.
+
+Comments are not copy. The rule governs user-visible prose.
+
+---
+
+## Decisions log
+
+Newest first. One line each, dated. A decision lands here when a future session would
+otherwise have to re-litigate it.
+
+- **2026-09-05** — **Home answers "what should I do now", in this order: greeting, composer,
+  the most active study, what needs attention, the launch checklist.** Rebuilt from a
+  Claude Design comp taken as information architecture only; every shape is an existing
+  primitive. The greeting is the H1 through `PageHeader`, which now accepts a node so the
+  time of day can come from the visitor's clock. The composer is a launcher (a `Card`
+  holding one input and a primary button that navigate to study creation), not a chat
+  thread. The transcript preview is a `--ds-surface` panel with left/right bubbles, the
+  one transcript in admin that carries a fill, because it previews the respondent's screen
+  rather than reading as a transcript; the Live and Response pages keep the hairline rule.
+  The earlier serif hero roles and `StatRow`'s ruled variant from the same day are gone.
+  Invited counts, study close dates and bounced invites have no data behind them and are
+  not rendered; the checklist derives its state from data rather than persisting it.
+- **2026-09-02** — **The study list is a `DataTable`, not a card grid.** The covers carried one
+  status pill across roughly 150px of tinted fill in three hues that meant nothing, the
+  sparkline read as a broken graphic, and the avatar cluster belonged on the detail page.
+  `--ds-cover-1/2/3` are removed rather than left defined. If cards ever return they are
+  coverless, untinted and sized to their content.
+- **2026-09-02** — **`StatRow` is a vertical stack per cell** (`label`, `value`, `delta?`).
+  `hint` (inline beside the number) and `sub` are gone: an inline hint had no shared baseline
+  with the number, and a wrapping string was being passed as a value. "Best performer" was cut
+  for the same reason: a stat value is never a name.
+- **2026-09-02** — **`.type-metric-value` is 24px, not 32.** The brief asked for the stat number
+  in the `count` size; at 12px the number would be indistinguishable from its label, so the
+  metric role was kept and reduced instead. Recorded as a judgement call.
+- **2026-09-02** — **`DataTable` draws its own frame and renders `EmptyState` bare when empty.**
+  A Card around a table existed only to frame it, and framed an empty table's column headers
+  around nothing. The frame carries no shadow.
+- **2026-09-02** — **Column widths are named steps (`xs` / `sm` / `md` / `lg`), not px
+  strings**, so no component writes a px value. Fractions remain for fluid columns.
+- **2026-09-02** — **The H1 is a plain page title.** Home lost its time-of-day greeting; it was
+  the largest element on the page and carried no information. Top-level pages carry no eyebrow.
+- **2026-09-02** — **Company profile carries the "Account" eyebrow, like Settings.** Both are
+  reached from the sidebar's account menu and neither has a nav item; the brief named only
+  Settings, and the same reasoning covers both.
+- **2026-09-02** — **The Studies page H1 reads "Projects"**, matching the sidebar nav label that
+  was deliberately renamed in the unification pass. The object is still called a "study" in
+  every action and count; only the nav word and its page title say "Projects".
+
+- **2026-08-30** — `ScoreBadge` tiers are 7 to 10 accent (`--ds-accent-weak` /
+  `--ds-accent-text`), 5 to 6 and 1 to 4 both neutral (`--ds-chip` /
+  `--ds-muted-foreground`), null as `EMPTY_VALUE`: only the 7+ threshold the rest of the
+  product acts on earns a colour, and no new token was added for a band the digit
+  already distinguishes.
+- **2026-08-30** — The study detail stat reads **"Worth a call"**, not "Qualified
+  leads", and calls `lib/leads.ts`: `qualified` is a manual status a human sets after
+  reading a transcript and cannot double as a score threshold, which is why a study
+  scoring 9, 9, 8, 7 read "Qualified leads: 0" beside the Leads page's "6 worth a call".
+- **2026-08-30** — **Relative time is the only visible timestamp format in admin.** The
+  absolute stamp lives in `RelativeTime`'s `title` and `dateTime`. A column asks how
+  stale a row is; it does not ask for a date.
+- **2026-08-30** — **Set-once configuration on a detail page is collapsed by default**,
+  in `CollapsibleSection`s inside one `Card`, each carrying a one-line summary. The
+  study's audience, questions and respondent fields are read at setup and then never
+  again, and expanded they pushed the responses the page exists to show below the fold.
+- **2026-08-30** — `DataTable` **holds no state**: the admin home renders it from a
+  server component. Sorting is `useTableSort`, a client hook beside it, not `useState`
+  inside the primitive.
+- **2026-08-30** — The Leads queue's "Show test" chip became **"Include test responses"
+  inside the sources select**. It switches which rows exist, not which leads are hot,
+  and it was the third most prominent control on the page.
+- **2026-08-30** — A column that is the same glyph on every row is **not rendered**:
+  Fit is hidden until something in scope has a fit score, and Study is hidden while a
+  single study card is selected.
+
+---
+
+## Changelog
+
+### Density and copy reduction sweep (2026-09-02)
+
+The admin surface read text-heavy, vertically loose and decorated. This pass removed copy,
+removed decoration and compressed structure. No features were added and no new visual
+language was introduced.
+
+**Tokens changed**
+
+| Token or role | Was | Now |
+|---|---|---|
+| `.type-page-title` | 44 / 1.05 / -0.02em | 30 / 1.15 / -0.015em |
+| `.type-metric-value` | 32 | 24 |
+| `--ds-container-pad-y` | 56px | 32px (`.admin-container` no longer adds `pt-6`) |
+| `text-count`, `text-control` | size only | size plus `tabular-nums` |
+| `--ds-cover-1/2/3` | three cover fills | removed, with `bg-cover-*` in `tailwind.config.ts` |
+
+**Primitives changed**
+
+- `PageHeader`: title row with actions centred on it, one `meta` line. `subtitle` survives but
+  no page passes one.
+- `StatRow`: `{ label, value, delta?, href? }`, vertical stack per cell, no shadow.
+- `DataTable`: `h-12` / `h-10` rows, `h-9` header, `px-3` cells, `--ds-border` row rules,
+  tabular figures on every cell, named widths, `rowLabel`, its own frame, bare `EmptyState`.
+- `EmptyState`: one sentence and one optional action. No `description`.
+- `StatusDot`: `h-2 w-2`.
+
+**Decoration removed**
+
+- Study card covers, sparklines, avatar clusters and the card grid itself.
+- Home's greeting, mascot, quiet-state bird, report sticker card, progress bars and arrow glyphs.
+- The lead queue's avatar initials and the share meter on the study chips.
+- The Live board's question progress bar, the Live transcript's filled ground and bubbles.
+- Every Card on Response detail and Settings; every filled quote block.
+- Icon-plus-label buttons on Company profile.
+
+**Copy**
+
+- Every subhead deleted. Every top-level eyebrow deleted. Every empty state reduced to one
+  sentence. Button labels to verb plus noun.
+
+### Design system unification
+
+Every admin page re-derived its own type scale, container width, card treatment, button
+shape and stat layout, because each was built in a separate session. This pass created
+one source of truth and moved every page onto it.
+
+**Resolved conflicts**
+
+| Was | Now |
+|---|---|
+| Two containers, 920px and 1140px | One, 1140px |
+| Nine button shapes, two radii, five heights | Three variants, two sizes, all pills |
+| Four stat patterns | One `StatRow` |
+| Two table treatments (one not even a `<table>`) | One `DataTable` |
+| Live dot in three colours | One `StatusDot` |
+| The Live page printing its empty state twice | Once, from `EmptyState` |
+| No focus style on 27 files' worth of controls | One rule, applied everywhere |
+| Two relative-time formatters | One |
+
+**Decisions where the brief left a choice**
+
+- **`StatRow` is the joined segmented bar**, applied everywhere, replacing all four
+  existing stat patterns. Why the bar and not the detached cards, recorded verbatim:
+  *It is the only one that survives a variable stat count without leaving a hole.
+  Surveys hid its third card and Home collapsed its report card, both working around a
+  fixed grid; the bar just has fewer cells. At 1140px, three detached cards give each
+  stat ~350px of width to hold a 32px numeral, which is most of why Surveys and Leads
+  read as different products sitting next to each other. Borders do the dividing rather
+  than gaps, so it reads as one ruled object rather than as three things that happen to
+  be adjacent.*
+
+- **`--ds-border` is unchanged at `#e7e5e4`.** The brief asked to reconcile `#e5e7eb`
+  against `#e7e5e4`. **`#e5e7eb` never existed in this codebase** — not in a component,
+  not in the stylesheet, not in the Tailwind config. There was nothing to reconcile; the
+  border was already uniform. Recorded so a future session does not go looking for it.
+
+- **`--ds-accent-live` is `#3a6046`, not the `#8fbf7a` it replaces.** That literal
+  appeared in five files and was never a token. It measures **1.9:1 against the card
+  surface**, which is not legible for a 7px mark carrying real state, so it was not
+  worth preserving for continuity. The Live board's separate `indigo-light` dot maps
+  here too, so "live" is now one colour across the whole surface rather than three.
+
+- **Radius stays 12px and the container stays 1140px**, both the values already in use,
+  overriding the brief's 16px and 1160px. The goal is consistency, not a redesign; those
+  two values were already consistent and changing them would be churn on pages that were
+  already correct. Container padding stays 32px horizontal for the same reason.
+
+- **The type scale was applied as briefed: H1 44px, subhead 17px**, up from 40px and
+  15px. These were also already consistent, but they are a deliberate scale rather than
+  an artifact of drift, so they were not rolled back with the radius and container.
+
+- **Four named font-size steps were added** (`micro` / `count` / `control` /
+  `display-sm`, later joined by `nav` / `wordmark`) during the Company profile refactor.
+  They exist because a control needs a size without inheriting a colour and a line
+  height, which the `.type-*` roles carry. They are real tokens, documented above, not a
+  workaround for the greps.
+
+- **Fonts are Young Serif (display) and Archivo (body).** Not Inter. Any earlier
+  documentation saying otherwise was stale.
+
+- **`components/ui/{button,card,badge}.tsx` are intentionally forked** from
+  `components/admin/ui/*`. See "Import boundaries" above for the rule and the reason.
+
+**Naming decision, not a style fix**
+
+- **The Settings eyebrow reads `ACCOUNT`, not `SETTINGS`.** Every other eyebrow on the
+  surface is the sidebar nav label for that page. Settings has no nav item — it is
+  reached from the sidebar account menu — so there was no label to mirror, and its
+  eyebrow previously just repeated its own H1 verbatim. `ACCOUNT` names the menu the
+  page belongs to. This is a naming judgement about that specific page, **not** a
+  general licence to invent eyebrow text: every page that *does* have a nav item must
+  use that item's label.
+
+**Palette reversal**
+
+- **`LiveTranscript` no longer mirrors the respondent survey's palette.** It previously
+  hardcoded the interview's hex values so an admin saw roughly what the respondent saw.
+  That copy brought a cream ground with it, which this system bans, and an admin page
+  painting itself from a second surface's colours is exactly the drift this pass
+  removes. The resemblance was never carried by the hex values: the asymmetric bubble
+  tails, the left/right split and the accent on the respondent's own words all survive
+  in admin tokens. If the mirror is ever wanted back, it should import `--sv-*` under a
+  scoped class, not copy literals.
+
+- **The Home report card no longer borrows `--lp-butter-*`** from the marketing palette.
+  Same reasoning: the fill is a cream, and reaching across surfaces was the wrong escape
+  hatch. The card now reads as distinct through the accent tint and its sticker.
+
+- **Survey card covers dropped six invented three-stop gradients** for three flat token
+  fills. Two of the six ("sand", "blush") were the tan and cream this system bans, and a
+  gradient invented per card is not a design system.
+
+- **The sidebar account avatar is the account holder's initials on an indigo
+  squircle** (`--ds-sidebar-avatar`, `#5f6bab`). This reverses an earlier decision in this
+  same changelog, deliberately and with a reason: that pass replaced a periwinkle star
+  with the Birdsong mark on the grounds that the hue appears nowhere else in the
+  product, which was true. But the mark identifies the *product*, not the person whose
+  name it sits beside — and it was a duplicate of the mark already 200px above it on the
+  same rail. A dark tile on a near-black rail also reads as a smudge. Initials need a
+  fill that separates them from the sidebar, so the rail carries exactly one saturated
+  colour, here and nowhere else. The adjacent note glyph was orange (`#e9a674`), equally
+  off-palette, and is gone with the row that held it. Six rgba literals on the workspace
+  plate became `--ds-sidebar-plate` / `-label` / `-muted`.
+
+  The 28px periwinkle circle it replaces was the loudest thing on a dark rail; the
+  30px squircle also echoes the logo mark's geometry at the top of the same rail
+  (30px, `rounded-control`), so the two reference each other instead of competing.
+
+- **The account row is one quiet plate, with no divider above it.** A full-width
+  hairline across the rail read as a seam cutting the panel in half, so it is gone;
+  the plate's own edge (`--ds-sidebar-plate` at 6%) does the separating, over a 3%
+  fill that lifts to 6% on hover and while the menu is open. The bordered, *shadowed*
+  card this is not — that earlier treatment read as a button and spent width on
+  chrome; this one is an edge and two percentage points of fill.
+
+- **The account name is Archivo 12.5px/600, not Spectral 13.5px**, with the role line
+  at 10.5px/500 and 38% opacity — a tight two-line block the height of the avatar.
+  A serif at that size in a 240px rail read oversized and soft next to the sans nav
+  directly above it. The handoff called for Inter; admin's body sans is Archivo and
+  the rail should not carry a third face, so it is Archivo at the handoff's metrics.
+
+- **One caret, not an up/down stepper.** The row opens a menu, it does not step through
+  values: a single 12px chevron, pointing down at rest and flipping up while the menu
+  is open.
+
+- **The "Listening · N live" row is gone**, and with it the pulsing dot and the bobbing
+  note. It was the rail's only live readout, and it cost a `surveys` count query on every
+  admin page load; the same information is on Home and the Surveys page.
