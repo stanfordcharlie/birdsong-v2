@@ -44,11 +44,11 @@ function Mock({
   return (
     <div
       aria-hidden={!active}
-      className="pointer-events-none absolute inset-0 pl-[48px] pt-[48px] transition-opacity [transition-duration:450ms]"
+      className="pointer-events-none absolute inset-0 pl-[32px] pt-[32px] transition-opacity [transition-duration:450ms]"
       style={{ opacity: active ? 1 : 0 }}
     >
       <div
-        className="flex h-full flex-col justify-start rounded-tl-[10px] bg-white px-[40px] py-[36px] shadow-hp-mock"
+        className="flex h-full flex-col justify-start rounded-tl-[10px] bg-white px-[48px] py-[44px] shadow-hp-mock"
         style={{ gap }}
       >
         {children}
@@ -116,7 +116,7 @@ export function ProductSection() {
   }, []);
 
   return (
-    <section id="product" className="mx-auto max-w-[1200px] px-[24px] pb-[120px] pt-[40px]">
+    <section id="product" className="mx-auto max-w-[1280px] scroll-mt-[96px] px-[24px] pb-[120px] pt-[40px]">
       <div className="mb-[64px] flex max-w-[820px] flex-col gap-[28px]">
         <div className="text-[22px] text-hp-muted">The Product</div>
         <h2 className="m-0 text-balance font-hp-serif text-[clamp(40px,5.2vw,72px)] font-normal leading-[1.02] tracking-[-0.02em]">
@@ -124,8 +124,8 @@ export function ProductSection() {
         </h2>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-[56px] hp-wide:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
-        <div className="relative h-[680px] overflow-hidden rounded-[12px] bg-hp-green-pale shadow-[0_1px_0_rgba(27,31,28,0.06)] hp-wide:sticky hp-wide:top-[32px]">
+      <div className="grid grid-cols-1 items-start gap-[72px] hp-wide:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
+        <div className="relative h-[var(--hp-panel)] overflow-hidden rounded-[12px] bg-hp-green-pale shadow-[0_1px_0_rgba(27,31,28,0.06)] hp-wide:sticky hp-wide:top-[96px]">
           <Mock active={active === 0} gap="22px">
             <div className="text-[22px] tracking-[-0.01em]">Describe your audience</div>
             <div className="rounded-[6px] border border-hp-line-soft px-[16px] py-[14px] text-[16px] leading-[1.45] text-hp-muted">
@@ -232,7 +232,7 @@ export function ProductSection() {
               ref={(el) => {
                 stepRefs.current[i] = el;
               }}
-              className="hp-step flex min-h-[420px] flex-col justify-center gap-[20px] py-[40px] transition-opacity [transition-duration:400ms] hp-wide:min-h-[680px]"
+              className="hp-step flex min-h-[420px] flex-col justify-center gap-[20px] py-[40px] transition-opacity [transition-duration:400ms] hp-wide:min-h-[var(--hp-panel)]"
               style={{ opacity: i === active ? 1 : 0.35 }}
             >
               <div className="flex items-center">

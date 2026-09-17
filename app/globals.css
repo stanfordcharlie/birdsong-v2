@@ -239,34 +239,47 @@
   --ln-green-pale: #cfe0cc;
   --ln-logo-cream: #f5edcb;
 
-  /* Home landing page, v2 direction (design_handoff_birdsong_landing,
+  /* Stored as space-separated R G B channels, not hex, and consumed through
+     `rgb(var(--hp-x) / <alpha-value>)` in tailwind.config.ts. A var holding a
+     hex string cannot take Tailwind's `/opacity` modifier — `bg-hp-cream/[.62]`
+     silently compiles to a fully opaque `var(--hp-cream)` instead. The nav
+     pill's glass and the CTA banner's 70% circles both depend on this.
+
+     Home landing page, v2 direction (design_handoff_birdsong_landing,
      `Birdsong Landing v2.dc.html`). A separate namespace from --ln-* above
      rather than new values for it: --ln-* is shared with the public research
      report pages (app/reports/[slug], components/research/report/*), and the
      v2 palette is close enough to look like a fix and different enough to
      restyle them. `/` is the only surface on --hp-*. */
-  --hp-cream: #f8f4ec;
-  --hp-card: #fbf9f4;
-  --hp-tint: #efe9dc;
+  --hp-cream: 248 244 236;
+  --hp-card: 251 249 244;
+  --hp-tint: 239 233 220;
 
-  --hp-ink: #1b1f1c;
-  --hp-body: #4a4f49;
-  --hp-muted: #6b7069;
-  --hp-faint: #9a9e96;
+  --hp-ink: 27 31 28;
+  --hp-body: 74 79 73;
+  --hp-muted: 107 112 105;
+  --hp-faint: 154 158 150;
 
-  --hp-line: #ddd9cf;
-  --hp-line-soft: #e1ded6;
-  --hp-line-faint: #eeece6;
+  --hp-line: 221 217 207;
+  --hp-line-soft: 225 222 214;
+  --hp-line-faint: 238 236 230;
 
-  --hp-green: #3a6046;
-  --hp-green-pale: #c9dcc6;
-  --hp-green-tint: #eef4ec;
-  --hp-green-wash: #f6faf5;
-  --hp-green-line: #cfe0cc;
+  --hp-green: 58 96 70;
+  --hp-green-pale: 201 220 198;
+  --hp-green-tint: 238 244 236;
+  --hp-green-wash: 246 250 245;
+  --hp-green-line: 207 224 204;
 
-  --hp-note-tan: #d9cfbe;
-  --hp-note-yellow: #f0e2a6;
-  --hp-bubble: #f4f2ec;
+  --hp-note-tan: 217 207 190;
+  --hp-note-yellow: 240 226 166;
+  --hp-bubble: 244 242 236;
+
+  /* Height of the pinned product mock, and of each scroll step beside it, so
+     one step is paired with one panel for a full screen. 144px of reserved
+     chrome = the 96px the nav pill clears at the top + 48px of breathing room
+     at the bottom. Clamped so it stays usable on a short laptop and stops
+     growing on a tall monitor. */
+  --hp-panel: clamp(560px, calc(100vh - 144px), 860px);
 }
 
 /* ---------------------------------------------------------------------------
@@ -1824,6 +1837,12 @@ select {
     linear-gradient(to bottom, rgba(27, 31, 28, 0.055) 1px, transparent 1px);
   background-size: 188px 188px;
   background-position: center top;
+  /* Fade the lines in over the first 140px so they resolve below the nav pill
+     rather than running under it and stopping dead at its edge. Applied to a
+     dedicated layer inside the hero, never to the section — a mask here would
+     take the headline with it. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 140px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 140px);
 }
 
 /* The green CTA banner. Same 188px cell, cream lines at a lower alpha. */

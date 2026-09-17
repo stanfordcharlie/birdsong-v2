@@ -11,7 +11,7 @@ export function FinalCta() {
   return (
     <section
       id="demo"
-      className="mx-auto grid max-w-[1200px] grid-cols-1 items-center px-[24px] pb-[160px] hp-wide:grid-cols-2"
+      className="mx-auto grid max-w-[1200px] scroll-mt-[96px] grid-cols-1 items-center px-[24px] pb-[160px] hp-wide:grid-cols-2"
     >
       <div className="relative z-[2] h-[clamp(300px,34vw,440px)]">
         <div className="absolute left-[12%] top-0 h-[74%] w-[82%] rotate-[-4deg] rounded-[12px] bg-hp-green-pale shadow-[0_14px_40px_rgba(27,31,28,0.12)]" />

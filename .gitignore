@@ -61,3 +61,6 @@ design_handoff_*/
 
 # Standalone marketing site — has its own git repo and Vercel project
 /birdsong-site/
+
+# Design reference bundle, not code — same reason design_handoff_*/ is ignored
+birdsong-green-sticker-redesign-2026-09/
