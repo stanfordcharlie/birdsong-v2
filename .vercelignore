@@ -13,3 +13,6 @@ public/birdsong_logo_mark_v2.png
 .env
 .env.local
 .env*.local
+
+# Standalone marketing site — its own repo and Vercel project
+birdsong-site

@@ -1,12 +1,18 @@
 import {
   Archivo,
   Bricolage_Grotesque,
+  Caveat,
   DM_Sans,
+  Instrument_Sans,
+  Instrument_Serif,
   Inter,
   Newsreader,
+  Plus_Jakarta_Sans,
+  Source_Serif_4,
   Spectral,
   Young_Serif,
 } from "next/font/google";
+import localFont from "next/font/local";
 
 // Marketing pages only (app/page.tsx, app/customer-success) — the platform redesign
 // (design_handoff_birdsong_platform) covers admin + the respondent survey,
@@ -82,5 +88,80 @@ export const bricolage = Bricolage_Grotesque({
 export const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-dm-sans",
+  display: "swap",
+});
+
+// Home landing page redesign (design_handoff_birdsong_landing) — the display
+// face for every heading, button, eyebrow and label on `/`. Loaded as a
+// variable font rather than a weight array: the design uses 400 through 800
+// and Plus Jakarta Sans ships wght 200-800 as one file on Google Fonts, so
+// the static cuts would be five downloads instead of one. Scoped to
+// HomeShell; DM Sans (above) stays the body face there.
+export const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-plus-jakarta",
+  display: "swap",
+});
+
+// The four thin-line icons on the home landing page (mic, graphic_eq, groups,
+// edit_note). Self-hosted rather than linked from fonts.googleapis.com, and
+// subsetted to those four glyph names via the CSS API's `icon_names`
+// parameter — 2KB instead of the ~3.5MB full Material Symbols variable font,
+// with no third-party request on the critical path. Already a static wght 300
+// instance, which is the weight the design specifies.
+//
+// display: "block", not "swap". These render as ligatures, so the fallback
+// face would briefly paint the literal words "mic" and "edit_note" in the
+// icon's 56px slot. A short invisible period is the lesser artefact.
+export const materialSymbols = localFont({
+  src: "../app/fonts/MaterialSymbolsOutlined-subset.woff2",
+  variable: "--font-material-symbols",
+  display: "block",
+  weight: "300",
+});
+
+// Home landing page, v2 direction (design_handoff_birdsong_landing,
+// `Birdsong Landing v2.dc.html`). The v2 reference replaced the Plus Jakarta
+// Sans + Material Symbols direction above with an editorial serif stack, so
+// `/` now loads these four and none of the three that HomeShell's
+// predecessor (GreenShell) scopes. Scoped to HomeShell for the same reason
+// GreenShell scopes its own: admin, the respondent survey and the other
+// marketing pages must not download them.
+//
+// Instrument Serif carries every headline (H1, section H2s, step H3s, the
+// lead-card quotes) and ships one weight, 400. Italic is loaded because the
+// "A lead, usually" card's footnote is set in it.
+export const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-instrument-serif",
+  display: "swap",
+});
+
+// The "Birdsong" wordmark in the nav and the footer only — 700, and nothing
+// else on the page uses this face.
+export const sourceSerif = Source_Serif_4({
+  subsets: ["latin"],
+  weight: ["700"],
+  variable: "--font-source-serif",
+  display: "swap",
+});
+
+// Body and UI face for `/`. The static 400/500/600 cuts rather than the
+// variable file: the design uses exactly those three.
+export const instrumentSans = Instrument_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-instrument-sans",
+  display: "swap",
+});
+
+// The handwritten accents — the hero's six tilted notes and the final CTA
+// card's arrow. Weight 600 only.
+export const caveat = Caveat({
+  subsets: ["latin"],
+  weight: ["600"],
+  variable: "--font-caveat",
   display: "swap",
 });
