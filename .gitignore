@@ -58,3 +58,6 @@ PB 1.2.vistaprint_album/
 
 # One-time static design exports, kept locally as reference but not tracked
 design_handoff_*/
+
+# Standalone marketing site — has its own git repo and Vercel project
+/birdsong-site/

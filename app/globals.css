@@ -212,6 +212,63 @@
   --lp-butter-bg: #f6efd8;
 }
 
+/* --- Home landing page (design_handoff_birdsong_landing, `/` only) ---
+   A third marketing palette, separate from --lp-* above. The redesign gave
+   the root route its own visual language — cream canvas, forest green,
+   black-outlined sticker cards with hard offset shadows — while
+   /customer-success, /reports and the legal pages still render the earlier
+   landing system. The two sets are kept apart rather than reconciled: one
+   palette cannot serve both, and merging them would restyle three pages
+   that were not part of this handoff.
+
+   Plain hex for the same reason --lp-* is: nothing here needs an
+   alpha-modified variant. tailwind.config.ts's colors.ln reads these. */
+:root {
+  --ln-ink: #1a1f1b;
+  --ln-body: #2e332f;
+  --ln-muted: #5c5c66;
+  --ln-faint: #8a8790;
+  --ln-cream: #f7f3ea;
+  --ln-rule: #e9e3d3;
+  --ln-card-border: #e1dacb;
+  --ln-green: #3a6046;
+  --ln-green-hover: #2c4a35;
+  --ln-green-tint: #e8efe6;
+  --ln-sage: #a8c9a1;
+  --ln-green-mid: #5e8c6e;
+  --ln-green-pale: #cfe0cc;
+  --ln-logo-cream: #f5edcb;
+
+  /* Home landing page, v2 direction (design_handoff_birdsong_landing,
+     `Birdsong Landing v2.dc.html`). A separate namespace from --ln-* above
+     rather than new values for it: --ln-* is shared with the public research
+     report pages (app/reports/[slug], components/research/report/*), and the
+     v2 palette is close enough to look like a fix and different enough to
+     restyle them. `/` is the only surface on --hp-*. */
+  --hp-cream: #f8f4ec;
+  --hp-card: #fbf9f4;
+  --hp-tint: #efe9dc;
+
+  --hp-ink: #1b1f1c;
+  --hp-body: #4a4f49;
+  --hp-muted: #6b7069;
+  --hp-faint: #9a9e96;
+
+  --hp-line: #ddd9cf;
+  --hp-line-soft: #e1ded6;
+  --hp-line-faint: #eeece6;
+
+  --hp-green: #3a6046;
+  --hp-green-pale: #c9dcc6;
+  --hp-green-tint: #eef4ec;
+  --hp-green-wash: #f6faf5;
+  --hp-green-line: #cfe0cc;
+
+  --hp-note-tan: #d9cfbe;
+  --hp-note-yellow: #f0e2a6;
+  --hp-bubble: #f4f2ec;
+}
+
 /* ---------------------------------------------------------------------------
    Respondent survey theme (--sv-*).
 
@@ -1698,5 +1755,89 @@ select {
 @media (prefers-reduced-motion: no-preference) {
   .ws-note {
     animation: ws-note-bob 3.2s ease-in-out infinite;
+  }
+}
+
+/* --- Home landing page (design_handoff_birdsong_landing, `/` only) ---
+   Three things Tailwind utilities cannot express, everything else on the
+   page is utility classes. Names are ln-prefixed to stay clear of the
+   --lp-* landing system's own .lp-* rules. */
+
+/* The four thin-line icons, rendered as Material Symbols ligatures. The
+   glyph name is the element's text content, so `liga` is load-bearing, not
+   a nicety — without it the page reads "mic" and "edit_note" in words.
+   Every call site sets its own font-size; there is no default here because
+   the design uses four different ones (56/44/34/30px). --font-material-symbols
+   is a 2KB static wght-300 subset (see lib/fonts.ts), so the wght setting
+   below is documentation of the intended weight rather than a live axis. */
+.ln-icon {
+  font-family: var(--font-material-symbols);
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-variation-settings: "wght" 300;
+  -webkit-font-feature-settings: "liga";
+  font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Ticker marquee. The track holds the phrase run twice and shifts by half
+   its own width, so the second copy lands exactly where the first started
+   and the loop is seamless at any viewport width — which is why the
+   duplicate run in HomeTicker is required markup, not decoration.
+   Paused rather than restyled under reduced motion: a 28s scroll is the
+   kind of continuous ambient movement that setting exists to stop, and the
+   static first run still reads as three complete phrases. */
+@keyframes ln-ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.ln-ticker-track {
+  animation: ln-ticker 28s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ln-ticker-track {
+    animation: none;
+  }
+}
+
+
+/* ── Home landing page v2 (design_handoff_birdsong_landing) ───────────────
+   Two 188px rules-grids and one responsive override. Everything else on `/`
+   is Tailwind utilities; these are here because a repeating linear-gradient
+   pair and a `!important` under a max-width don't express as classes. */
+
+/* Hero. Ink lines on cream, anchored center-top so the grid stays centred on
+   the H1 as the viewport widens. */
+.hp-grid-ink {
+  background-image: linear-gradient(to right, rgba(27, 31, 28, 0.055) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(27, 31, 28, 0.055) 1px, transparent 1px);
+  background-size: 188px 188px;
+  background-position: center top;
+}
+
+/* The green CTA banner. Same 188px cell, cream lines at a lower alpha. */
+.hp-grid-cream {
+  background-image: linear-gradient(to right, rgba(248, 244, 236, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(248, 244, 236, 0.08) 1px, transparent 1px);
+  background-size: 188px 188px;
+}
+
+/* Below 900px the product mock is no longer pinned alongside the steps, so
+   dimming the inactive ones points at nothing. Beats the inline opacity that
+   ProductSection sets from `active`, which is why it needs !important. */
+@media (max-width: 899px) {
+  .hp-step {
+    opacity: 1 !important;
   }
 }
