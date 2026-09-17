@@ -4,7 +4,7 @@ import { hpPrimary } from "./buttons";
 /** Footer: oversized wordmark, three link columns, bottom rule. */
 export function HomeFooter({ bookDemoUrl }: { bookDemoUrl: string }) {
   return (
-    <footer className="mx-auto flex max-w-[1200px] flex-col gap-[56px] px-[24px] pb-[40px]">
+    <footer className="mx-auto flex max-w-[1200px] flex-col gap-[40px] px-[24px] pb-[40px] hp-wide:gap-[56px]">
       <a href="#top" className="flex items-center gap-[16px]">
         <Image
           src="/birdsong-logo.png"
@@ -18,8 +18,8 @@ export function HomeFooter({ bookDemoUrl }: { bookDemoUrl: string }) {
         </span>
       </a>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] items-start gap-[40px]">
-        <div className="col-span-2 flex flex-col gap-[20px]">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] items-start gap-[32px] hp-wide:gap-[40px]">
+        <div className="col-span-1 flex flex-col gap-[20px] hp-wide:col-span-2">
           <p className="m-0 max-w-[360px] text-[clamp(19px,1.7vw,24px)] leading-[1.35] text-hp-body">
             Interview-Led Pipeline Built For B2B Revenue Teams.
           </p>

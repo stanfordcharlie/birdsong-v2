@@ -5,8 +5,8 @@
  */
 export function LeadComparison() {
   return (
-    <section id="lead" className="mx-auto max-w-[1200px] px-[24px] pb-[120px]">
-      <div className="mx-auto mb-[44px] flex max-w-[820px] flex-col items-center gap-[20px] text-center">
+    <section id="lead" className="mx-auto max-w-[1200px] px-[24px] pb-[80px] hp-wide:pb-[120px]">
+      <div className="mx-auto mb-[32px] flex max-w-[820px] flex-col items-center gap-[20px] text-center hp-wide:mb-[44px]">
         <div className="text-[22px] text-hp-muted">The Lead</div>
         <h2 className="m-0 text-balance font-hp-serif text-[clamp(40px,5.2vw,72px)] font-normal leading-[1.02] tracking-[-0.02em]">
           Every Lead Arrives With The Whole Story.
@@ -17,8 +17,8 @@ export function LeadComparison() {
         </p>
       </div>
 
-      <div className="mx-auto grid max-w-[1000px] grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-[20px]">
-        <div className="flex flex-col gap-[20px] rounded-[8px] border border-hp-line bg-hp-card p-[28px]">
+      <div className="mx-auto grid max-w-[1000px] grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-[20px]">
+        <div className="flex flex-col gap-[20px] rounded-[8px] border border-hp-line bg-hp-card p-[22px] hp-wide:p-[28px]">
           <div className="text-[12px] tracking-[0.1em] text-hp-faint">A LEAD, USUALLY</div>
           <div className="flex items-center gap-[18px]">
             <div className="flex h-[48px] w-[48px] items-center justify-center rounded-[6px] bg-hp-tint text-[18px] text-hp-faint">
@@ -44,7 +44,7 @@ export function LeadComparison() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-[18px] rounded-[8px] border border-hp-ink bg-hp-card p-[28px]">
+        <div className="flex flex-col gap-[18px] rounded-[8px] border border-hp-ink bg-hp-card p-[22px] hp-wide:p-[28px]">
           <div className="flex items-center justify-between gap-[12px]">
             <span className="text-[12px] tracking-[0.1em] text-hp-green">A BIRDSONG LEAD</span>
             <span className="rounded-full bg-hp-green px-[12px] py-[4px] text-[13px] text-hp-cream">
@@ -63,7 +63,7 @@ export function LeadComparison() {
           <p className="m-0 font-hp-serif text-[clamp(20px,1.8vw,24px)] leading-[1.25] tracking-[-0.01em]">
             “We spend our best hours triaging inbound that goes nowhere.”
           </p>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-[14px]">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(140px,100%),1fr))] gap-[14px]">
             <div className="flex flex-col gap-[4px] border-t border-hp-ink pt-[8px]">
               <span className="text-[12px] tracking-[0.12em] text-hp-muted">METRIC</span>
               <span className="text-[14px] leading-[1.35]">40 hours a month lost to manual triage</span>
