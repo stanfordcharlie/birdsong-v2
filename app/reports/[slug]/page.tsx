@@ -1,23 +1,23 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LandingPageShell } from "@/components/marketing/LandingPageShell";
-import { LandingFooter } from "@/components/marketing/LandingFooter";
-import { PainPointChart } from "@/components/research/PainPointChart";
+import { GreenShell } from "@/components/marketing/green/GreenShell";
+import { GreenFooter } from "@/components/marketing/green/GreenFooter";
+import { ContentsRail } from "@/components/research/report/ContentsRail";
+import { FrequencyChart } from "@/components/research/report/FrequencyChart";
+import { NotifyBlock } from "@/components/research/report/NotifyBlock";
+import { ReportNav } from "@/components/research/report/ReportNav";
+import { ReportSectionHead } from "@/components/research/report/ReportSectionHead";
+import { StudyProfileCard, type ProfileRow } from "@/components/research/report/StudyProfileCard";
 import {
-  Kicker,
   KeyFindings,
-  MoreResearch,
+  MethodologyMeta,
   QuoteGrid,
-  ReportSectionHeading,
   SponsorMark,
-  TableOfContents,
-  ThemeCard,
-} from "@/components/research/ReportBlocks";
-import { ReportNav } from "@/components/research/ReportNav";
-import { ReportStats } from "@/components/research/ReportStats";
-import { StudyProfile, type ProfileRow } from "@/components/research/StudyProfile";
-import { SubscribeBlock } from "@/components/research/SubscribeBlock";
+  StatStrip,
+  SummaryCallout,
+  ThemeCards,
+} from "@/components/research/report/ReportBody";
 import { getPublicReport, listPublicReports } from "@/lib/reports/public";
 import { painPointChart, reportSection, reportSections, reportStats } from "@/lib/reports/chart-data";
 import { formatPublishDate, formatPublishMonth, isoDate } from "@/lib/reports/format";
@@ -69,15 +69,25 @@ export async function generateMetadata({
   };
 }
 
+const NUMBER_WORDS = [
+  "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen", "Twenty",
+];
+
+/** "Five findings" reads better than "5 findings" in a display heading. */
+function numberWord(n: number): string {
+  return NUMBER_WORDS[n] ?? String(n);
+}
+
 // Titles are generated from the survey brief and run anywhere from a few
-// words to a full sentence. One display size can't serve both: 80px on a
-// 110-character title is six lines and the whole first viewport. Step the
-// size down by length so long titles stay a headline, not a wall.
-function heroTitleSize(title: string) {
-  const n = title.length;
-  if (n <= 48) return "text-[clamp(44px,5.6vw,80px)]";
-  if (n <= 80) return "text-[clamp(38px,4.4vw,62px)]";
-  return "text-[clamp(32px,3.4vw,48px)]";
+// words to a full sentence. The handoff's single clamp is sized for its own
+// example; on a 120-character real title it is seven lines and the whole
+// first screen. Step the top of the clamp down by length so a long title
+// still reads as a headline rather than a wall.
+function titleSize(title: string) {
+  if (title.length <= 60) return "text-[clamp(34px,4.2vw,58px)]";
+  if (title.length <= 100) return "text-[clamp(30px,3.4vw,46px)]";
+  return "text-[clamp(28px,2.8vw,38px)]";
 }
 
 export default async function ReportPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -95,7 +105,6 @@ export default async function ReportPage({ params }: { params: Promise<{ slug: s
   const stats = reportStats(content, report.respondentCount);
 
   const all = await listPublicReports();
-  const others = all.filter((r) => r.slug !== report.slug).slice(0, 3);
   // Numbered from the oldest published report, so a number never changes
   // once a report has one.
   const position = all.findIndex((r) => r.slug === report.slug);
@@ -110,16 +119,8 @@ export default async function ReportPage({ params }: { params: Promise<{ slug: s
     ...(report.roles ? [{ label: "Roles", value: report.roles }] : []),
     ...(report.companySize ? [{ label: "Company size", value: report.companySize }] : []),
     { label: "Coded themes", value: String(content.key_themes?.length ?? 0) },
-    ...(chart ? [{ label: "Issues counted", value: String((content.pain_point_frequency ?? []).length) }] : []),
+    ...(chart ? [{ label: "Issues counted", value: String(chart.bars.length) }] : []),
   ];
-
-  const railFooter = (
-    <>
-      Birdsong Research · Report {reportNumber}
-      <br />
-      Published {formatPublishDate(report.publishedAt)}
-    </>
-  );
 
   // schema.org Report. datePublished, publisher and the methodology as
   // description are the fields the brief calls for; isPartOf ties every
@@ -135,11 +136,7 @@ export default async function ReportPage({ params }: { params: Promise<{ slug: s
     inLanguage: "en",
     url: `${siteUrl()}/reports/${report.slug}`,
     mainEntityOfPage: { "@type": "WebPage", "@id": `${siteUrl()}/reports/${report.slug}` },
-    publisher: {
-      "@type": "Organization",
-      name: "Birdsong",
-      url: siteUrl(),
-    },
+    publisher: { "@type": "Organization", name: "Birdsong", url: siteUrl() },
     ...(report.sponsor ? { sponsor: { "@type": "Organization", name: report.sponsor } } : {}),
     isPartOf: {
       "@type": "CollectionPage",
@@ -156,87 +153,79 @@ export default async function ReportPage({ params }: { params: Promise<{ slug: s
   const methodologySection = reportSection(sections, "methodology")!;
 
   return (
-    <LandingPageShell>
+    <GreenShell>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <ReportNav />
 
-      {/* Hero: the report on the left, the study profile on the right. */}
-      <header className="mx-auto grid max-w-[1480px] grid-cols-[minmax(0,1fr)_420px] items-start gap-16 px-6 pb-16 pt-20 md:px-10 lp-stack:grid-cols-1 lp-stack:gap-10 lp-stack:pt-12">
-        <div className="max-w-[760px]">
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="rounded-full bg-landing-sunk px-4 py-2 font-mono text-[13px] font-semibold uppercase tracking-[0.2em] text-landing-ink">
+      {/* Title block: the report on the left, the study's shape on the right. */}
+      <header className="mx-auto grid max-w-[1240px] grid-cols-[repeat(auto-fit,minmax(320px,1fr))] items-start gap-[48px] px-[20px] pb-[56px] pt-[56px] sm:px-[32px] sm:pt-[72px]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-[10px] font-jakarta text-[13px] font-semibold uppercase tracking-[0.18em]">
+            <span className="rounded-full border-[1.5px] border-ln-ink bg-ln-green-pale px-[16px] py-[8px]">
               Report {reportNumber}
             </span>
-            <span className="font-mono text-[13px] font-medium uppercase tracking-[0.2em] text-landing-muted">
-              {report.sponsor ?? "Birdsong research"}
-              <span className="mx-3" aria-hidden />
+            {report.sponsor && (
+              <span className="rounded-full border-[1.5px] border-ln-ink px-[16px] py-[8px]">
+                {report.sponsor}
+              </span>
+            )}
+            <span className="px-[6px] py-[8px] text-ln-muted">
               {formatPublishMonth(report.publishedAt)}
             </span>
           </div>
           <h1
             className={cn(
-              "m-0 mt-8 text-balance font-bricolage font-bold leading-[1.02] tracking-[-0.04em] text-landing-ink",
-              heroTitleSize(report.title)
+              "m-0 mb-[24px] mt-[28px] text-pretty font-jakarta font-extrabold leading-[1.08] tracking-[-0.03em]",
+              titleSize(report.title)
             )}
           >
             {report.title}
           </h1>
-          <p className="m-0 mt-8 max-w-[56ch] text-pretty font-spectral text-[clamp(21px,2vw,27px)] leading-[1.45] text-landing-ink">
+          <p className="m-0 max-w-[640px] text-pretty text-[clamp(18px,1.5vw,22px)] leading-[1.5] text-ln-body">
             {report.dek}
-          </p>
-          {/* No call-to-action row: the header nav already links Methodology
-              and the page is a scroll read, so a "read the findings" button
-              only pointed at the next section. The methodology line closes
-              the hero, with the header's own bottom padding as the gap to
-              the stats band. */}
-          <p className="m-0 mt-8 max-w-[62ch] text-[17.5px] leading-[1.65] text-landing-ink-soft">
-            {report.methodology}
           </p>
         </div>
 
-        <StudyProfile rows={profileRows} headline={report.headline} />
+        <StudyProfileCard
+          rows={profileRows}
+          topIssue={chart?.bars[0] ?? null}
+          total={chart?.total ?? report.respondentCount}
+        />
       </header>
 
-      <ReportStats stats={stats} />
+      <StatStrip stats={stats} />
 
-      {/* Body. The contents rail is a real sibling column at xl and above;
-          below that it collapses to the <details> inside TableOfContents and
-          the article takes the full measure. */}
-      <div className="mx-auto grid max-w-[1480px] grid-cols-1 gap-20 px-6 pb-28 pt-20 md:px-10 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <article className="max-w-[900px]">
-          <div className="xl:hidden">
-            <TableOfContents sections={sections} variant="collapsed" />
-          </div>
-
-          <section id="summary" className="scroll-mt-32">
-            <ReportSectionHeading
+      {/* Body and contents rail. The rail is a real second column at 960px
+          and up; below that the grid is one column and ContentsRail hides
+          itself. */}
+      <div className="mx-auto grid max-w-[1240px] grid-cols-1 items-start gap-[48px] px-[20px] pb-[96px] pt-[56px] sm:px-[32px] sm:pt-[80px] ln-rail:grid-cols-[minmax(0,1fr)_260px] ln-rail:gap-[64px]">
+        <div className="grid min-w-0 gap-[64px] sm:gap-[96px]">
+          <section id="summary" className="min-w-0 scroll-mt-[104px]">
+            <ReportSectionHead
               section={summarySection}
               title={`What ${numberWord(report.respondentCount).toLowerCase()} interviews found`}
             />
-            <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-10 lp-stack:grid-cols-1 lp-stack:gap-6">
-              <p className="m-0 font-spectral text-[22px] leading-[1.55] text-landing-ink">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] items-start gap-[36px]">
+              <p className="m-0 text-pretty text-[19px] leading-[1.6] text-ln-body">
                 {content.executive_summary}
               </p>
-              {/* The one counted figure, pulled out beside the prose. */}
               {report.headline && (
-                <aside className="rounded-2xl bg-landing-green-deep px-8 py-8 text-landing-bg">
-                  <div className="font-bricolage text-[56px] font-bold leading-none tracking-[-0.04em]">
-                    {report.headline.percent}
-                  </div>
-                  <div className="mt-4 text-[17px] leading-[1.5] opacity-90">
-                    of respondents raised {report.headline.label.replace(/\.+$/, "").replace(/^./, (c) => c.toLowerCase())}
-                  </div>
-                </aside>
+                <SummaryCallout
+                  percent={report.headline.percent}
+                  label={report.headline.label
+                    .replace(/\.+$/, "")
+                    .replace(/^./, (c) => c.toLowerCase())}
+                />
               )}
             </div>
           </section>
 
           {findingsSection && (
-            <section id="key-findings" className="scroll-mt-32 pt-24">
-              <ReportSectionHeading
+            <section id="key-findings" className="min-w-0 scroll-mt-[104px]">
+              <ReportSectionHead
                 section={findingsSection}
                 title={`${numberWord(content.takeaways.length)} findings`}
               />
@@ -245,110 +234,92 @@ export default async function ReportPage({ params }: { params: Promise<{ slug: s
           )}
 
           {frequencySection && chart && (
-            <section id="frequency" className="scroll-mt-32 pt-24">
-              <ReportSectionHeading
+            <section id="frequency" className="min-w-0 scroll-mt-[104px]">
+              <ReportSectionHead
                 section={frequencySection}
                 title="Issue frequency across the set"
                 lede={`Every issue raised by more than one respondent, counted once per person. Bars are out of ${chart.total}.`}
               />
-              <PainPointChart data={chart} />
+              <FrequencyChart data={chart} />
             </section>
           )}
 
           {themesSection && (
-            <section id="themes" className="scroll-mt-32 pt-24">
-              <ReportSectionHeading
+            <section id="themes" className="min-w-0 scroll-mt-[104px]">
+              <ReportSectionHead
                 section={themesSection}
                 title={`${numberWord(content.key_themes.length)} themes, with evidence`}
               />
-              <div className="flex flex-col gap-6">
-                {content.key_themes.map((theme, i) => (
-                  <ThemeCard
-                    key={theme.heading}
-                    index={i + 1}
-                    heading={theme.heading}
-                    paragraph={theme.paragraph}
-                    points={theme.supporting_points ?? []}
-                  />
-                ))}
-              </div>
+              <ThemeCards themes={content.key_themes} />
             </section>
           )}
 
           {quotesSection && (
-            <section id="in-their-words" className="scroll-mt-32 pt-24">
-              <ReportSectionHeading section={quotesSection} title="In their words" />
+            <section id="in-their-words" className="min-w-0 scroll-mt-[104px]">
+              <ReportSectionHead section={quotesSection} title="In their words" />
               <QuoteGrid quotes={content.notable_quotes} />
             </section>
           )}
 
-          <section id="methodology" className="scroll-mt-32 pt-24">
-            <ReportSectionHeading section={methodologySection} title="How this study was run" />
-            <div className="rounded-2xl border border-landing-border bg-landing-surface px-10 py-9 lp-mobile:px-6">
-              <p className="m-0 text-[18px] leading-[1.65] text-landing-ink-soft">{report.methodology}</p>
-              <p className="m-0 mt-4 text-[18px] leading-[1.65] text-landing-ink-soft">
-                Each conversation was a one-on-one interview run by Birdsong. Counts are distinct
-                respondents; an issue is counted once per person however often they returned to it.
-                Respondent names, emails and companies are not published.
-              </p>
-              <dl className="m-0 mt-8 grid grid-cols-3 gap-8 border-t border-landing-hair pt-7 lp-mobile:grid-cols-1">
-                <div>
-                  <dt>
-                    <Kicker>Published</Kicker>
-                  </dt>
-                  <dd className="m-0 mt-2 text-[17px] text-landing-ink">
-                    <time dateTime={isoDate(report.publishedAt)}>{formatPublishDate(report.publishedAt)}</time>
-                  </dd>
-                </div>
-                <div>
-                  <dt>
-                    <Kicker>Interviews</Kicker>
-                  </dt>
-                  <dd className="m-0 mt-2 text-[17px] text-landing-ink">{report.respondentCount}</dd>
-                </div>
-                {report.sponsor && (
-                  <div>
-                    <dt>
-                      <Kicker>Sponsored by</Kicker>
-                    </dt>
-                    <dd className="m-0 mt-2 text-[17px] text-landing-ink">
-                      <SponsorMark sponsor={report.sponsor} size="sm" />
-                    </dd>
-                  </div>
-                )}
-              </dl>
-            </div>
+          <section id="methodology" className="min-w-0 scroll-mt-[104px]">
+            <ReportSectionHead section={methodologySection} title="How this study was run" />
+            <p className="m-0 mb-[14px] max-w-[680px] text-pretty text-[19px] leading-[1.55] text-ln-body">
+              {report.methodology}
+            </p>
+            <p className="m-0 mb-[32px] max-w-[680px] text-pretty text-[19px] leading-[1.55] text-ln-body">
+              Each conversation was a one-on-one interview run by Birdsong. Counts are distinct
+              respondents; an issue is counted once per person however often they returned to it.
+              Respondent names, emails and companies are not published.
+            </p>
+            <MethodologyMeta
+              items={[
+                {
+                  label: "Published",
+                  value: (
+                    <time dateTime={isoDate(report.publishedAt)}>
+                      {formatPublishDate(report.publishedAt)}
+                    </time>
+                  ),
+                },
+                { label: "Interviews", value: report.respondentCount },
+                ...(report.sponsor
+                  ? [
+                      {
+                        label: "Sponsored by",
+                        value: <SponsorMark sponsor={report.sponsor} />,
+                      },
+                    ]
+                  : []),
+              ]}
+            />
           </section>
 
-          <div className="mt-24">
-            <SubscribeBlock sourceSlug={report.slug} />
-          </div>
+          <NotifyBlock sourceSlug={report.slug} />
+        </div>
 
-          <div className="mt-20">
-            <MoreResearch reports={others} />
-          </div>
-        </article>
-
-        <aside className="hidden xl:block">
-          <TableOfContents sections={sections} variant="sticky" footer={railFooter} />
-        </aside>
+        <ContentsRail
+          sections={sections}
+          footer={
+            <>
+              Birdsong Research · Report {reportNumber}
+              <br />
+              Published {formatPublishDate(report.publishedAt)}
+            </>
+          }
+        />
       </div>
 
-      <LandingFooter
-        description="Birdsong runs paid, in-depth interviews and publishes what the field says."
-        crossLink={{ label: "Research", href: "/reports" }}
-        variant="minimal"
+      <GreenFooter
+        bordered
+        tagline="Birdsong runs in-depth interviews and publishes what the field says."
+        column={{
+          heading: "Research",
+          links: [
+            { label: "All reports", href: "/reports" },
+            { label: "Methodology", href: "#methodology" },
+          ],
+        }}
       />
-    </LandingPageShell>
+    </GreenShell>
   );
-}
-
-const NUMBER_WORDS = [
-  "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
-  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen", "Twenty",
-];
-
-/** "Five findings" reads better than "5 findings" in a display heading. */
-function numberWord(n: number): string {
-  return NUMBER_WORDS[n] ?? String(n);
 }

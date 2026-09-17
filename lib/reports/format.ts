@@ -29,3 +29,12 @@ export function formatPublishMonth(iso: string): string {
     timeZone: "UTC",
   });
 }
+
+/** "September 2026", for the home landing page's featured-study eyebrow. */
+export function formatPublishMonthLong(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  });
+}
