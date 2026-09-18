@@ -40,7 +40,7 @@ export function HomeFooter({ bookDemoUrl }: { bookDemoUrl: string }) {
             Careers
           </a>
           <a
-            href="https://www.linkedin.com/company/usebirdsong"
+            href="https://www.linkedin.com/company/birdsong-ai"
             target="_blank"
             rel="noopener"
             aria-label="Birdsong on LinkedIn"
