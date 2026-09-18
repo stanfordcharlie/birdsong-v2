@@ -45,7 +45,31 @@ export type PublicSurvey = Pick<
   Database["public"]["Tables"]["surveys"]["Row"],
   "id" | "title" | "external_title" | "sponsor" | "public_description" | "gift_card_amount" | "custom_fields"
 >;
-type Stage = "welcome" | "intro" | "chat" | "complete";
+// A resolved prospect link (/survey/[slug]/[token]), or null on the generic
+// link. Everything here is either the recipient's own contact detail or the
+// token already sitting in their address bar, so none of it is new exposure —
+// but it is still an explicit allowlist, and the enrichment the prospects row
+// also holds (apollo_id, firmographics, company_domain) is deliberately not
+// on it. See lib/prospects/lookup.ts.
+export type ProspectContext = {
+  id: string;
+  // Re-verified server-side on every start call. The client is never trusted
+  // to assert WHICH prospect it is — it hands back the same secret it was
+  // given, and the start route resolves it again.
+  token: string;
+  firstName: string | null;
+  fullName: string | null;
+  email: string;
+  companyName: string | null;
+  title: string | null;
+  alreadyStarted: boolean;
+};
+
+// "prospect" is the gated landing beat that replaces "welcome" for an invited
+// prospect: same design, greeted, and with the intake already answered. It
+// exists so that arriving at a link and starting an interview are two
+// different events — see the note on the start button below.
+type Stage = "prospect" | "welcome" | "intro" | "chat" | "complete";
 
 // The welcome screen (stage === "welcome") is the frozen respondent design;
 // every other stage is styled from these values rather than from its own
@@ -277,6 +301,7 @@ export function InterviewFlow({
   testEmail = null,
   source = null,
   questionCount = null,
+  prospect = null,
 }: {
   survey: PublicSurvey;
   // The public slug already in this page's URL, passed as its own display
@@ -303,6 +328,10 @@ export function InterviewFlow({
   // survey object so that allowlist stays free of internal fields; the
   // genuinely-sensitive fields never cross to the client either way.
   questionCount?: number | null;
+  // Resolved server-side from the [token] segment, null on the generic link.
+  // When present the flow opens on the landing beat instead of the welcome
+  // screen, and the name/email intake is already answered.
+  prospect?: ProspectContext | null;
 }) {
   const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
   const customFieldDefs = parseCustomRespondentFieldDefs(survey.custom_fields);
@@ -319,19 +348,39 @@ export function InterviewFlow({
   // field state below is already filled in, and the mount effect further down
   // submits it immediately, so "intro" is only ever the in-flight moment
   // between mount and the first question.
-  const [stage, setStage] = useState<Stage>(isTest ? "intro" : "welcome");
+  // Test mode skips straight to the auto-start; a prospect opens on their
+  // landing beat; everyone else gets the welcome screen. None of the three
+  // performs a write on mount (see the start button on the landing beat).
+  const [stage, setStage] = useState<Stage>(
+    isTest ? "intro" : prospect ? "prospect" : "welcome"
+  );
   // Initializers rather than a later setState, and this matters: the
   // auto-start effect calls startInterview(), which reads these values out of
   // the closure of the render it was created in. Anything written after the
   // first render would not be visible to it.
-  const [name, setName] = useState(() => (isTest ? TEST_RESPONDENT.name : ""));
-  const [email, setEmail] = useState(() => (isTest ? testRespondentEmail(testEmail) : ""));
+  // A prospect's name and email come from the record we already hold, so the
+  // intake never asks for them. Prefilled into the same state the form would
+  // have written, which is what lets startInterview stay one code path.
+  const [name, setName] = useState(() =>
+    isTest ? TEST_RESPONDENT.name : prospect ? (prospect.fullName ?? "") : ""
+  );
+  const [email, setEmail] = useState(() =>
+    isTest ? testRespondentEmail(testEmail) : prospect ? prospect.email : ""
+  );
   // Whether the email field has been blurred (or a submit attempted) —
   // gates the invalid-email X so it never flashes mid-typing.
   const [emailTouched, setEmailTouched] = useState(false);
   const [phone, setPhone] = useState(() => (isTest ? TEST_RESPONDENT.phone : ""));
-  const [jobTitle, setJobTitle] = useState(() => (isTest ? TEST_RESPONDENT.jobTitle : ""));
-  const [company, setCompany] = useState(() => (isTest ? TEST_RESPONDENT.company : ""));
+  // Title and company are the two preset fields the prospect record can also
+  // answer, so an invited prospect is not asked to retype what we already
+  // know. Everything the record cannot fill (phone, LinkedIn, per-survey
+  // custom fields) is still asked — see beginAsProspect.
+  const [jobTitle, setJobTitle] = useState(() =>
+    isTest ? TEST_RESPONDENT.jobTitle : (prospect?.title ?? "")
+  );
+  const [company, setCompany] = useState(() =>
+    isTest ? TEST_RESPONDENT.company : (prospect?.companyName ?? "")
+  );
   const [linkedin, setLinkedin] = useState(() => (isTest ? TEST_RESPONDENT.linkedin : ""));
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>(() =>
     isTest
@@ -477,6 +526,56 @@ export function InterviewFlow({
     }
   }
 
+  // Rejoins an interview in progress, given its id and session token.
+  //
+  // Two callers reach it: the mount effect below, for a tab that reloaded
+  // and still holds its own pointer, and startInterview, for a prospect
+  // whose link resolved to an interview they had already begun elsewhere.
+  // The second is why this is a function rather than effect-local code —
+  // rejoining an interview has one implementation, and a prospect returning
+  // on a new device must land in exactly the state a reload would give them.
+  //
+  // Throws on any failure so each caller can decide what that means; neither
+  // shows the respondent an error about a session they never knew existed.
+  async function resumeInterview(id: string, token: string) {
+    const res = await fetch("/api/interview/resume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ response_id: id, token }),
+    });
+    if (!res.ok) throw new Error("This interview session could not be resumed");
+    const data = await res.json();
+    if (!isMountedRef.current) return;
+
+    if (data.complete) {
+      clearActiveSession();
+      // Match what a live completion writes, so later visits take the
+      // normal short-circuit path rather than resuming again. The
+      // transcript is not part of a completed resume payload, hence the
+      // empty history (the completion screen hides its transcript toggle
+      // when there is nothing to show).
+      window.localStorage.setItem(
+        completionStorageKey(survey.id),
+        JSON.stringify({ closingMessage: data.message, messages: [] })
+      );
+      setClosingMessage(data.message);
+      setStage("complete");
+      return;
+    }
+
+    const restored = (data.messages ?? []) as InterviewMessage[];
+    if (restored.length === 0) throw new Error("Nothing to restore");
+    setResponseId(id);
+    sessionTokenRef.current = token;
+    setMessages(restored);
+    setChips(Array.isArray(data.chips) ? data.chips : []);
+    setRestoredMessageCount(restored.length);
+    setStage("chat");
+    // A prospect resuming on a second device has no pointer in this tab yet.
+    // Write one, so a reload here behaves like a reload anywhere else.
+    if (!isTest) writeActiveSession(id, token);
+  }
+
   // Rejoins an interview this tab already started, after a reload or after
   // the OS discarded the page while the respondent was in another app. The
   // server holds the transcript; the only thing this tab kept is the pointer.
@@ -506,42 +605,7 @@ export function InterviewFlow({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/interview/resume", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            response_id: pointer.responseId,
-            token: pointer.token,
-          }),
-        });
-        if (!res.ok) throw new Error("This interview session could not be resumed");
-        const data = await res.json();
-        if (cancelled || !isMountedRef.current) return;
-
-        if (data.complete) {
-          clearActiveSession();
-          // Match what a live completion writes, so later visits take the
-          // normal short-circuit path rather than resuming again. The
-          // transcript is not part of a completed resume payload, hence the
-          // empty history (the completion screen hides its transcript toggle
-          // when there is nothing to show).
-          window.localStorage.setItem(
-            completionStorageKey(survey.id),
-            JSON.stringify({ closingMessage: data.message, messages: [] })
-          );
-          setClosingMessage(data.message);
-          setStage("complete");
-          return;
-        }
-
-        const restored = (data.messages ?? []) as InterviewMessage[];
-        if (restored.length === 0) throw new Error("Nothing to restore");
-        setResponseId(pointer.responseId);
-        sessionTokenRef.current = pointer.token;
-        setMessages(restored);
-        setChips(Array.isArray(data.chips) ? data.chips : []);
-        setRestoredMessageCount(restored.length);
-        setStage("chat");
+        await resumeInterview(pointer.responseId, pointer.token);
       } catch {
         if (cancelled) return;
         clearActiveSession();
@@ -571,6 +635,15 @@ export function InterviewFlow({
   }, []);
 
   const keyboardInset = useKeyboardInset();
+
+  // autoFocus lives on the name input, which a prospect never sees, so the
+  // remainder-of-the-intake form would otherwise open with nothing focused.
+  // Focus whatever field ended up first instead. Guarded on prospect so the
+  // anonymous form keeps using its own autoFocus and this never fights it.
+  useEffect(() => {
+    if (stage !== "intro" || !prospect) return;
+    fieldRefs.current[0]?.focus();
+  }, [stage, prospect]);
 
   // Refocus the answer box whenever it becomes usable again (first question,
   // and after each round trip) so respondents never have to click into it.
@@ -651,6 +724,40 @@ export function InterviewFlow({
     return null;
   }
 
+  // THE START OF AN INTERVIEW. Reached only from the landing beat's button,
+  // never from a render, an effect or a route handler — which is the entire
+  // point of that beat. Enterprise mail security (Defender, Proofpoint,
+  // Mimecast) fetches every link in a delivered message, so a prospect link
+  // that started an interview on load would file a phantom in-progress
+  // response for every scanned email, days before the human opened it. A
+  // scanner does not click.
+  //
+  // What the click has to decide is whether the intake still has anything to
+  // ask. Name, email, and (where the record has them) title and company are
+  // already answered from the prospect row, so a survey that asks for nothing
+  // else goes straight into the conversation; a survey that also wants a
+  // phone number, a LinkedIn URL or its own custom fields still shows the
+  // form, now containing only the parts we could not fill.
+  function beginAsProspect() {
+    if (firstMissingRequiredField() === null && !hasUnfilledOptionalIntake()) {
+      startInterview();
+      return;
+    }
+    setStage("intro");
+  }
+
+  // Whether the intake form would still show a field worth asking about.
+  // Required fields are covered by firstMissingRequiredField; this is the
+  // optional half — an enabled-but-empty field is still worth offering to a
+  // prospect, and skipping the form would silently drop it.
+  function hasUnfilledOptionalIntake(): boolean {
+    if (hasPhone && !phone.trim()) return true;
+    if (hasJobTitle && !jobTitle.trim()) return true;
+    if (hasCompany && !company.trim()) return true;
+    if (hasLinkedin && !linkedin.trim()) return true;
+    return customFieldDefs.some((field) => !customFieldValues[field.key]?.trim());
+  }
+
   // Split from the form's onSubmit so Enter-on-the-last-field can trigger it
   // directly without needing to fabricate a submit event.
   async function startInterview() {
@@ -659,21 +766,30 @@ export function InterviewFlow({
       setError(`Please fill in ${missing}.`);
       return;
     }
-    // Same shape check the live tick uses — catches it client-side instead
-    // of waiting for the start route to reject the address.
-    if (!EMAIL_LIVE_CHECK_PATTERN.test(email.trim())) {
-      setEmailTouched(true);
-      setError("That doesn't look like a valid email address.");
-      return;
-    }
-    // Same blocklist the start route enforces server-side — this is just
-    // the inline, catch-it-before-the-round-trip copy; the route never
-    // trusts this check on its own.
-    const domain = extractEmailDomain(email.trim());
-    if (domain && isFreeEmailDomain(domain)) {
-      setEmailTouched(true);
-      setError("Please use your work email so we can send your gift card");
-      return;
+    // Both address checks below exist to send the respondent back to the
+    // email field to fix it. A prospect has no email field — the address is
+    // the one we mailed the invite to — so for them these would be a dead
+    // end: an error about a value they cannot edit, on a screen with nothing
+    // to correct. The route applies its own rules either way (it is directly
+    // callable and never trusts this pass), and it makes the same exception
+    // for a verified prospect token.
+    if (!prospect) {
+      // Same shape check the live tick uses — catches it client-side instead
+      // of waiting for the start route to reject the address.
+      if (!EMAIL_LIVE_CHECK_PATTERN.test(email.trim())) {
+        setEmailTouched(true);
+        setError("That doesn't look like a valid email address.");
+        return;
+      }
+      // Same blocklist the start route enforces server-side — this is just
+      // the inline, catch-it-before-the-round-trip copy; the route never
+      // trusts this check on its own.
+      const domain = extractEmailDomain(email.trim());
+      if (domain && isFreeEmailDomain(domain)) {
+        setEmailTouched(true);
+        setError("Please use your work email so we can send your gift card");
+        return;
+      }
     }
     setError(null);
     setLoading(true);
@@ -686,6 +802,10 @@ export function InterviewFlow({
           survey_id: survey.id,
           ...(isTest ? { is_test: true } : {}),
           ...(source ? { source } : {}),
+          // The token, not the prospect id: the route re-resolves it rather
+          // than trusting this call to say who the caller is. Sending the id
+          // would let anyone file a response as any prospect they could name.
+          ...(prospect ? { prospect_token: prospect.token } : {}),
           respondent_name: name,
           respondent_email: email,
           respondent_phone: hasPhone ? phone : undefined,
@@ -703,6 +823,17 @@ export function InterviewFlow({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to start the interview");
+
+      // This prospect already had an interview under way (another device, an
+      // earlier click). The route resolved that instead of opening a second
+      // one; pick it up where they left it rather than starting over.
+      if (data.resume) {
+        await resumeInterview(data.response_id, data.token);
+        setLoading(false);
+        setIsTyping(false);
+        return;
+      }
+
       setResponseId(data.response_id);
       sessionTokenRef.current = data.token ?? null;
       // Written once, here, at the moment the chat stage begins: the server
@@ -887,6 +1018,262 @@ export function InterviewFlow({
   // title, interviewer speech bubble, ink pill CTA, powered-by footer. All
   // exact values (colors, type, spacing, motion) are from the handoff README.
   // Tapping the CTA advances to "intro" (the intake fields), unchanged.
+  // The prospect landing beat: the welcome screen, addressed to someone whose
+  // name we know. Same ground, same ambient layer, same bird-and-sticker
+  // cluster, same pill, same footer — an invited prospect and a cold visitor
+  // should not be able to tell they are looking at two different screens.
+  //
+  // NOTHING ON THIS SCREEN WRITES. No fetch, no route call, no Anthropic
+  // call, on mount or on render. It is safe to load as many times as a mail
+  // scanner, a preview pane or a curious recipient cares to load it; the
+  // interview begins at the button and nowhere else.
+  //
+  // COPY: every line here is lifted from the anonymous welcome screen rather
+  // than written fresh, so the two screens cannot drift into making different
+  // promises about the same study. The one addition is the greeting.
+  if (stage === "prospect" && prospect) {
+    const minutes =
+      questionCount != null ? Math.max(3, Math.round(questionCount * MINUTES_PER_QUESTION)) : null;
+    const metaLine =
+      questionCount != null && minutes != null
+        ? `${questionCount} question${questionCount === 1 ? "" : "s"} · about ${minutes} minutes`
+        : null;
+
+    // Same continuous-clamp treatment the welcome heading uses, so a long
+    // study name behaves identically on both screens.
+    const TITLE_MAX_PX = 58;
+    const TITLE_MIN_PX = 26;
+    const TITLE_SHRINK_AFTER = 20;
+    const TITLE_PX_PER_CHAR = 1.1;
+    const titleCeilingPx = Math.max(
+      TITLE_MIN_PX,
+      TITLE_MAX_PX - Math.max(0, surveyName.length - TITLE_SHRINK_AFTER) * TITLE_PX_PER_CHAR
+    );
+    const titleFontSize = `clamp(${TITLE_MIN_PX}px, 10vw, ${titleCeilingPx}px)`;
+
+    return (
+      <div
+        className={cn(
+          bricolage.variable,
+          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-survey-ink"
+        )}
+        style={{ background: SURVEY_GROUND }}
+      >
+        <TestModeBadge isTest={isTest} />
+        <SurveyThemeToggle offsetForBadge={isTest} />
+        <AmbientBackdrop />
+
+        <main className="relative flex flex-1 items-center justify-center px-5 pb-6 pt-8 sm:px-8 sm:pb-8 sm:pt-12">
+          <div className="flex w-full max-w-[640px] flex-col items-center text-center">
+            {/* Bird + sticker cluster (decorative), identical to the welcome
+                screen including the gift-card sticker's bottom-margin
+                allowance for its overhang. */}
+            <div
+              aria-hidden="true"
+              className={cn(
+                "sw-rev relative h-[64px] w-[180px]",
+                survey.gift_card_amount ? "mb-7" : "mb-1.5"
+              )}
+            >
+              <span
+                className="sw-clusternote-a absolute left-[52px] top-0 text-[17px]"
+                style={{ color: "hsl(var(--sv-accent))", opacity: 0 }}
+              >
+                &#9834;
+              </span>
+              <span
+                className="sw-clusternote-b absolute left-[96px] top-4 text-[14px]"
+                style={{ color: "hsl(var(--sv-faint))", opacity: 0 }}
+              >
+                &#9835;
+              </span>
+              <WelcomeBird
+                width={46}
+                height={42}
+                fill="hsl(var(--sv-ink))"
+                eyeFill="hsl(var(--sv-ground))"
+                className="sw-bird absolute bottom-0 left-[62px]"
+              />
+              {survey.gift_card_amount ? (
+                <div
+                  className="sw-sticker absolute right-[-52px] top-[-16px] h-[98px] w-[98px]"
+                  style={{ transform: "rotate(8deg)" }}
+                >
+                  <svg
+                    viewBox="0 0 100 100"
+                    className="absolute inset-0"
+                    style={{ filter: "drop-shadow(var(--sv-drop-mascot))" }}
+                  >
+                    <polygon
+                      points="100,50 83.3,63.8 85.4,85.4 63.8,83.3 50,100 36.2,83.3 14.6,85.4 16.7,63.8 0,50 16.7,36.2 14.6,14.6 36.2,16.7 50,0 63.8,16.7 85.4,14.6 83.3,36.2"
+                      fill="hsl(var(--sv-butter))"
+                      stroke="hsl(var(--sv-ink))"
+                      strokeWidth="2.5"
+                    />
+                  </svg>
+                  <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-survey-ink">
+                    <span className="text-[19px] font-bold italic">${survey.gift_card_amount}</span>
+                    <span className="text-[10.5px] font-semibold tracking-[0.02em]">gift card</span>
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Incentive is visual-only above (the cluster is aria-hidden), so
+                announce it once to assistive tech without changing the layout. */}
+            {survey.gift_card_amount ? (
+              <span className="sr-only">Includes a ${survey.gift_card_amount} gift card.</span>
+            ) : null}
+
+            {/* The greeting, and the only line on this screen the anonymous
+                welcome does not have. First name alone: the record often has a
+                mangled or all-caps last name from enrichment, and "Hi Jane" is
+                both friendlier and harder to get embarrassingly wrong. A
+                prospect with no first name simply gets no greeting rather than
+                a placeholder. */}
+            {prospect.firstName && (
+              <div className="sw-rev mb-2 text-[17px] font-semibold text-survey-ink">
+                Hi {prospect.firstName} &#128075;
+              </div>
+            )}
+
+            {metaLine && (
+              <div className="sw-rev mb-3 text-[15px] font-medium text-survey-muted">{metaLine}</div>
+            )}
+
+            <h1
+              className="sw-rev m-0 mb-2.5 text-balance font-bricolage font-bold leading-[1.05] tracking-[-0.025em]"
+              style={
+                {
+                  "--sw-delay": "0.08s",
+                  fontSize: titleFontSize,
+                } as React.CSSProperties
+              }
+            >
+              {surveyName}
+            </h1>
+
+            {survey.sponsor && (
+              <div
+                className="sw-rev mb-6 text-[15px] text-survey-muted"
+                style={{ "--sw-delay": "0.14s" } as React.CSSProperties}
+              >
+                Research conducted on behalf of{" "}
+                <span className="font-semibold text-survey-ink">{survey.sponsor}</span>
+              </div>
+            )}
+
+            {/* Respondent-facing description ONLY — the same rule the intro
+                stage states at length. The internal `topic` field names the
+                interview's intent, is not on PublicSurvey, and must never
+                appear on a respondent screen. When public_description is
+                unset nothing renders here; there is no fallback. */}
+            {survey.public_description?.trim() && (
+              <p
+                className="sw-rev text-pretty mb-6 max-w-[520px] text-[16px] leading-[1.6] text-survey-muted sm:text-[17px]"
+                style={{ "--sw-delay": "0.18s" } as React.CSSProperties}
+              >
+                {survey.public_description}
+              </p>
+            )}
+
+            <div
+              className="sw-rev mb-7 flex flex-col items-center gap-2.5"
+              style={{ "--sw-delay": "0.22s" } as React.CSSProperties}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-survey-ink">
+                  <WelcomeBird width={15} height={13} fill="hsl(var(--sv-ground))" />
+                </span>
+                <span className="text-[12.5px] font-semibold tracking-[0.04em] text-survey-faint">
+                  YOUR INTERVIEWER
+                </span>
+              </div>
+              <div
+                className="text-pretty max-w-[500px] rounded-[18px] border border-survey-border bg-survey-surface px-[26px] py-4 text-[16.5px] leading-[1.6]"
+                style={{ boxShadow: "var(--sv-shadow-soft)" }}
+              >
+                {/* RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
+                    No "sales", "pitch", "leads", "not a sales call", etc. Also
+                    never claim their info is "only" used for X, or make any
+                    exclusive-use / "never shared" claim — state true things
+                    we WILL do, don't enumerate or limit what else happens. */}
+                This is a short, relaxed conversation about how you work. Answer in your own words; there are
+                no wrong answers.
+              </div>
+            </div>
+
+            <div
+              className="sw-rev flex flex-col items-center"
+              style={{ "--sw-delay": "0.3s" } as React.CSSProperties}
+            >
+              <button
+                type="button"
+                onClick={beginAsProspect}
+                disabled={loading}
+                className={PILL_BUTTON}
+              >
+                {/* Same label as the welcome screen's CTA. A prospect who
+                    already began and came back still sees "Let's get started":
+                    the start call picks their conversation up where it left
+                    off rather than beginning a second one, so a label
+                    promising a fresh start would be the inaccurate one. */}
+                Let&apos;s get started
+                <svg width="20" height="12" viewBox="0 0 22 12" fill="none" aria-hidden="true">
+                  <path
+                    d="M1 6h18m0 0l-4-4.5M19 6l-4 4.5"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+
+              {/* A start that fails leaves the respondent on this screen with
+                  the button still live, so the error has to say so here —
+                  there is no later screen to show it on. */}
+              {error && <p className="mt-4 text-sm text-survey-danger">{error}</p>}
+
+              <div className="mt-[18px] text-[13.5px] text-survey-faint">
+                By continuing, you agree to our{" "}
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-survey-muted underline [text-underline-offset:3px]"
+                >
+                  Terms
+                </a>{" "}
+                and{" "}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-survey-muted underline [text-underline-offset:3px]"
+                >
+                  Privacy Policy
+                </a>
+                .
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <footer
+          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-6 pt-5"
+          style={{ "--sw-delay": "0.4s" } as React.CSSProperties}
+        >
+          <span className="text-[13.5px] text-survey-faint">Powered by</span>
+          <a href="/" className="inline-flex items-center gap-[7px]">
+            <WelcomeBird width={17} height={15} fill="hsl(var(--sv-ink))" />
+            <span className="font-bricolage text-[15px] font-bold text-survey-ink">Birdsong</span>
+          </a>
+        </footer>
+      </div>
+    );
+  }
+
   if (stage === "welcome") {
     const minutes =
       questionCount != null ? Math.max(3, Math.round(questionCount * MINUTES_PER_QUESTION)) : null;
@@ -1126,9 +1513,16 @@ export function InterviewFlow({
     const emailOk = EMAIL_LIVE_CHECK_PATTERN.test(email.trim());
     const emailShowsX = !emailOk && emailTouched && email.trim().length > 0;
 
+    // A prospect arrives with both of these already answered from their
+    // record, so the form does not draw them — and must not count them
+    // either: the indices below drive the Enter-advances-field order and the
+    // mobile keyboard's next/go hint, and a hidden field left in the sequence
+    // would be a dead stop partway through the form.
+    const asksIdentity = !prospect;
+
     let fieldCount = 0;
-    const nameIdx = fieldCount++;
-    const emailIdx = fieldCount++;
+    const nameIdx = asksIdentity ? fieldCount++ : -1;
+    const emailIdx = asksIdentity ? fieldCount++ : -1;
     const phoneIdx = hasPhone ? fieldCount++ : -1;
     const jobTitleIdx = hasJobTitle ? fieldCount++ : -1;
     const companyIdx = hasCompany ? fieldCount++ : -1;
@@ -1190,74 +1584,88 @@ export function InterviewFlow({
 
           <form onSubmit={handleIntroSubmit}>
             <div className="survey-intro-rise-4 flex flex-col gap-3">
-              <div className="relative flex flex-col gap-1.5">
-                {/* The notes are absolutely placed up to ~64px right of the
-                    bird's own left edge, so at 360–430px the default
-                    right-[14px] perch pushes them against (and past) the
-                    form's right edge. Sliding the whole bird inboard on
-                    phones keeps the arrangement intact rather than clipping
-                    it; sm: restores the desktop perch exactly. */}
-                <PerchedBird
-                  className="pointer-events-none absolute -top-[14px] right-[58px] z-[2] sm:right-[14px]"
-                  width={48}
-                  height={46}
-                  notes={INTRO_BIRD_NOTES}
-                />
-                <label htmlFor="respondent-name" className={FIELD_LABEL_CLASSES}>
-                  Your name
-                </label>
-                <input
-                  id="respondent-name"
-                  ref={setFieldRef(nameIdx)}
-                  type="text"
-                  autoComplete="name"
-                  enterKeyHint={enterHintFor(nameIdx)}
-                  autoFocus
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onKeyDown={(e) => onFieldKeyDown(e, nameIdx)}
-                  placeholder="First and last"
-                  disabled={loading}
-                  className={cn(FIELD_INPUT_BASE, "pl-4 pr-11")}
-                />
-                {nameOk && <CheckIcon className="absolute bottom-4 right-[15px]" />}
-              </div>
+              {/* Hidden, not disabled-and-shown: a prospect has already told
+                  us their name and address, and rendering them greyed out
+                  invites "is that right?" on a screen with no way to change
+                  it. The values are still in state and still sent — see the
+                  prefill in the useState initializers.
 
-              <div className="relative flex flex-col gap-1.5">
-                <label htmlFor="respondent-email" className={FIELD_LABEL_CLASSES}>
-                  Work email
-                </label>
-                <p className="text-[13px] text-survey-faint">
-                  This is where we&apos;ll send your gift card and a copy of the report.
-                </p>
-                <input
-                  id="respondent-email"
-                  ref={setFieldRef(emailIdx)}
-                  type="email"
-                  autoComplete="email"
-                  enterKeyHint={enterHintFor(emailIdx)}
-                  inputMode="email"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onBlur={() => setEmailTouched(true)}
-                  onKeyDown={(e) => onFieldKeyDown(e, emailIdx)}
-                  placeholder="you@yourcompany.com"
-                  disabled={loading}
-                  aria-invalid={emailShowsX}
-                  className={cn(
-                    FIELD_INPUT_BASE,
-                    "pl-4 pr-11",
-                    emailShowsX && "border-survey-danger focus:border-survey-danger"
-                  )}
-                />
-                {emailOk && <CheckIcon className="absolute bottom-4 right-[15px]" />}
-                {emailShowsX && <XIcon className="absolute bottom-4 right-[15px]" />}
-              </div>
+                  The perched bird is decoration anchored to the name field
+                  and goes with it; a prospect reaching this form is seeing a
+                  short remainder-of-the-intake, not the full first impression
+                  the bird was drawn for. */}
+              {asksIdentity && (
+                <>
+                <div className="relative flex flex-col gap-1.5">
+                  {/* The notes are absolutely placed up to ~64px right of the
+                      bird's own left edge, so at 360–430px the default
+                      right-[14px] perch pushes them against (and past) the
+                      form's right edge. Sliding the whole bird inboard on
+                      phones keeps the arrangement intact rather than clipping
+                      it; sm: restores the desktop perch exactly. */}
+                  <PerchedBird
+                    className="pointer-events-none absolute -top-[14px] right-[58px] z-[2] sm:right-[14px]"
+                    width={48}
+                    height={46}
+                    notes={INTRO_BIRD_NOTES}
+                  />
+                  <label htmlFor="respondent-name" className={FIELD_LABEL_CLASSES}>
+                    Your name
+                  </label>
+                  <input
+                    id="respondent-name"
+                    ref={setFieldRef(nameIdx)}
+                    type="text"
+                    autoComplete="name"
+                    enterKeyHint={enterHintFor(nameIdx)}
+                    autoFocus
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    onKeyDown={(e) => onFieldKeyDown(e, nameIdx)}
+                    placeholder="First and last"
+                    disabled={loading}
+                    className={cn(FIELD_INPUT_BASE, "pl-4 pr-11")}
+                  />
+                  {nameOk && <CheckIcon className="absolute bottom-4 right-[15px]" />}
+                </div>
+
+                <div className="relative flex flex-col gap-1.5">
+                  <label htmlFor="respondent-email" className={FIELD_LABEL_CLASSES}>
+                    Work email
+                  </label>
+                  <p className="text-[13px] text-survey-faint">
+                    This is where we&apos;ll send your gift card and a copy of the report.
+                  </p>
+                  <input
+                    id="respondent-email"
+                    ref={setFieldRef(emailIdx)}
+                    type="email"
+                    autoComplete="email"
+                    enterKeyHint={enterHintFor(emailIdx)}
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onBlur={() => setEmailTouched(true)}
+                    onKeyDown={(e) => onFieldKeyDown(e, emailIdx)}
+                    placeholder="you@yourcompany.com"
+                    disabled={loading}
+                    aria-invalid={emailShowsX}
+                    className={cn(
+                      FIELD_INPUT_BASE,
+                      "pl-4 pr-11",
+                      emailShowsX && "border-survey-danger focus:border-survey-danger"
+                    )}
+                  />
+                  {emailOk && <CheckIcon className="absolute bottom-4 right-[15px]" />}
+                  {emailShowsX && <XIcon className="absolute bottom-4 right-[15px]" />}
+                </div>
+                </>
+              )}
 
               {hasPhone && (
                 <div className="flex flex-col gap-1.5">

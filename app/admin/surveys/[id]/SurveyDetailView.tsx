@@ -241,6 +241,11 @@ export function SurveyDetailView({
                 Preview interview
               </a>
             </Button>
+            {/* The prospect roster is a sibling route, not a tab: this page
+                is one column of sections with no tab strip to join. */}
+            <Button type="button" variant="secondary" asChild>
+              <Link href={`/admin/surveys/${survey.id}/prospects`}>Prospects</Link>
+            </Button>
           </>
         }
       />

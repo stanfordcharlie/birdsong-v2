@@ -1,79 +1,18 @@
-import { cache } from "react";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { sanitizeSource } from "@/lib/interview/source";
-import { InterviewFlow, type PublicSurvey } from "./InterviewFlow";
-import { SurveyThemeProvider } from "./SurveyTheme";
+import { buildSurveyMetadata, SurveyEntry } from "./survey-entry";
 
-// cache() so generateMetadata and the page component share one query per
-// request instead of hitting Supabase twice for the same survey.
-//
-// The column list is a security boundary, not an optimization: this row is
-// handed (in part) to a Client Component, so every column reachable by the
-// client must be deliberate. The genuinely sensitive internal fields (topic,
-// question_guide, tone, target_*) are NOT selected, so they can never leak
-// even by accident. status and user_id are selected for server-only gating
-// and are never forwarded to the client (see publicSurvey). num_questions is
-// selected only to derive the welcome screen's "N questions / M minutes"
-// display line; it is passed as the questionCount prop, never on publicSurvey.
-// Keep this list minimal; never widen it to select("*").
-const getSurvey = cache(async (slug: string) => {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("surveys")
-    .select(
-      "id, slug, title, external_title, sponsor, public_description, gift_card_amount, custom_fields, num_questions, status, user_id, archived_at"
-    )
-    .eq("slug", slug)
-    .maybeSingle();
-  return data;
-});
+// The generic survey link. Everything it does — the survey lookup, the
+// archived/draft gates, the metadata — lives in survey-entry.tsx, shared with
+// the prospect-token route at /survey/[slug]/[token]. This file is only the
+// route binding.
 
-// Survey URLs are distributed links (ads, Slack, SMS), so their previews
-// carry the respondent-facing name and sponsor rather than the app-generic
-// fallback. external_title over title always: title is the internal admin
-// name (e.g. "7/14/26 P&R") and must never surface in a link preview.
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const survey = await getSurvey(slug);
-
-  // Missing, draft, and archived surveys all render a non-interview state,
-  // and their previews stay generic for the same least-information reason.
-  if (!survey || survey.status !== "live" || survey.archived_at) {
-    return {};
-  }
-
-  const name = survey.external_title || survey.title;
-  // public_description only, never topic: this description goes into public
-  // <meta>/OpenGraph/Twitter tags and link-preview unfurls, so the internal
-  // topic must never be sourced here. Falls back to a generic line, not to
-  // any internal field.
-  const description =
-    [survey.public_description?.trim() || null, survey.sponsor ? `Research by ${survey.sponsor}` : null]
-      .filter(Boolean)
-      .join(" · ") || "A short research conversation. Share your perspective in your own words.";
-
-  return {
-    title: name,
-    description,
-    openGraph: {
-      title: name,
-      description,
-      type: "website",
-      siteName: "Birdsong",
-    },
-    twitter: {
-      card: "summary",
-      title: name,
-      description,
-    },
-  };
+  return buildSurveyMetadata(slug);
 }
 
 export default async function PublicSurveyPage({
@@ -83,107 +22,9 @@ export default async function PublicSurveyPage({
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ test?: string; testEmail?: string; src?: string }>;
 }) {
-  const [{ slug }, { test, testEmail: testEmailParam, src }] = await Promise.all([params, searchParams]);
-  const survey = await getSurvey(slug);
+  const [{ slug }, { test, testEmail, src }] = await Promise.all([params, searchParams]);
 
-  if (!survey) {
-    notFound();
-  }
-
-  // ?test=1 is only honored for the authenticated owner of this survey
-  // (cookie session, checked server-side) — for anyone else the param is
-  // ignored entirely and normal rules apply, so a curious respondent
-  // adding it gets exactly the standard behavior.
-  const isTest = test === "1" && (await getCurrentUser())?.id === survey.user_id;
-
-  // ?testEmail= pins the address the test-mode auto-start fills in, so a
-  // preview can be re-run against the same respondent record instead of a
-  // fresh timestamped one every time. Gated on isTest for the same reason
-  // ?test=1 is: for anyone who is not the verified owner it resolves to null
-  // and never crosses into the Client Component's props at all.
-  const testEmail = isTest ? testEmailParam?.trim() || null : null;
-
-  // ?src= tags which channel this link was shared through (in-app popup,
-  // an email blast, paid ads, ...). Sanitized here so InterviewFlow only
-  // ever sees a clean value; the start route re-sanitizes independently
-  // since it's directly callable and can't trust this pass either.
-  const source = sanitizeSource(src);
-
-  // Archiving is a deliberate, permanent-feeling close of the study, so it
-  // applies unconditionally — including to the owner's own ?test=1 preview,
-  // unlike the draft-preview exception right below. Never falls through to
-  // InterviewFlow: interview logic is never reached for an archived survey.
-  if (survey.archived_at) {
-    return (
-      <SurveyThemeProvider className="font-sans survey-viewport flex flex-col items-center justify-center gap-3 bg-survey-ground px-6 text-center">
-        {/* RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
-            No "sales", "pitch", "leads", "not a sales call", etc. Also never
-            claim their info is "only" used for X, or make any exclusive-use
-            / "never shared" claim — state true things we WILL do, don't
-            enumerate or limit what else happens. */}
-        <div className="max-w-[420px] rounded-[18px] border border-survey-border bg-survey-surface px-7 py-8 shadow-[var(--sv-shadow-soft)]">
-          <h1 className="font-spectral text-[22px] font-medium text-survey-ink">
-            This study is no longer accepting responses
-          </h1>
-          <p className="mt-2.5 text-[15px] leading-[1.6] text-survey-muted">
-            Thanks for your interest. This conversation has been closed.
-          </p>
-        </div>
-      </SurveyThemeProvider>
-    );
-  }
-
-  // A draft survey isn't publicly answerable yet. A 404 (not a distinct
-  // "this survey is closed" page) is deliberate: it's the least-informative
-  // response and doesn't confirm a draft slug exists. The owner's test
-  // path is the one exception — previewing before going live is its point.
-  if (survey.status !== "live" && !isTest) {
-    notFound();
-  }
-
-  // The respondent has no session, and profiles RLS only allows a row's own
-  // owner to read it, so the survey owner's logo needs the admin client to
-  // fetch across that boundary. Only the logo URL is exposed to the page —
-  // and any select here must stay this narrow: every admin-client read that
-  // crosses an RLS boundary is one careless select("*") away from leaking a
-  // sponsor's whole profile to the public.
-  const adminClient = createAdminClient();
-  const { data: profile } = await adminClient
-    .from("profiles")
-    .select("logo_url")
-    .eq("user_id", survey.user_id)
-    .maybeSingle();
-
-  // Explicit allowlist of the only survey fields the respondent UI needs.
-  // status and user_id were selected for the server-side gates above but are
-  // intentionally excluded here so they never cross into the Client
-  // Component's serialized props. Anything not on this object cannot reach
-  // the browser.
-  const publicSurvey: PublicSurvey = {
-    id: survey.id,
-    title: survey.title,
-    external_title: survey.external_title,
-    sponsor: survey.sponsor,
-    public_description: survey.public_description,
-    gift_card_amount: survey.gift_card_amount,
-    custom_fields: survey.custom_fields,
-  };
-
-  return (
-    // survey-viewport, not min-h-screen: 100vh on iOS Safari is the
-    // toolbars-hidden height, so a min-h-screen wrapper would keep the
-    // document taller than the visible area and reintroduce the scroll
-    // InterviewFlow's own dvh sizing exists to remove.
-    <SurveyThemeProvider className="font-archivo survey-viewport bg-survey-ground">
-      <InterviewFlow
-        survey={publicSurvey}
-        slug={slug}
-        logoUrl={profile?.logo_url ?? null}
-        isTest={isTest}
-        testEmail={testEmail}
-        source={source}
-        questionCount={survey.num_questions}
-      />
-    </SurveyThemeProvider>
-  );
+  // No prospect: this is the anonymous flow, which starts on the welcome
+  // screen and asks for name and email in the intake form.
+  return <SurveyEntry slug={slug} test={test} testEmail={testEmail} src={src} />;
 }

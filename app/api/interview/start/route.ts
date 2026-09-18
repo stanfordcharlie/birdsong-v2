@@ -16,6 +16,11 @@ import {
 } from "@/lib/interview/validation";
 import { deriveCompanyNameFromDomain, extractEmailDomain, isFreeEmailDomain } from "@/lib/interview/work-email";
 import { sanitizeSource } from "@/lib/interview/source";
+import {
+  markProspectStarted,
+  resolveProspectForStart,
+  type ProspectForStart,
+} from "@/lib/prospects/lookup";
 import type { InterviewMessage } from "@/lib/interview/types";
 import type { Json } from "@/types/database";
 
@@ -33,6 +38,7 @@ export async function POST(request: Request) {
     survey_id?: string;
     is_test?: unknown;
     source?: unknown;
+    prospect_token?: unknown;
     respondent_name?: string;
     respondent_email?: string;
     respondent_phone?: string;
@@ -64,11 +70,28 @@ export async function POST(request: Request) {
     );
   }
 
-  const respondent_name =
-    typeof body.respondent_name === "string" ? truncate(body.respondent_name.trim(), NAME_MAX_LENGTH) : undefined;
+  // A prospect link (/survey/[slug]/[token]) proves who the caller is, so the
+  // identity fields below come from the record rather than from the body.
+  // The TOKEN is what the client sends and what is re-resolved here: a body
+  // that simply named a prospect_id would let any caller file a response as
+  // anyone they could guess. Null for a missing, malformed, unknown, or
+  // wrong-survey token, which is just the anonymous path.
+  const prospect: ProspectForStart | null = await resolveProspectForStart(body.prospect_token, survey_id);
 
-  const respondent_email =
-    typeof body.respondent_email === "string" ? truncate(body.respondent_email.trim(), EMAIL_MAX_LENGTH) : undefined;
+  const respondent_name = prospect
+    ? prospect.name
+    : typeof body.respondent_name === "string"
+      ? truncate(body.respondent_name.trim(), NAME_MAX_LENGTH)
+      : undefined;
+
+  // The body's address is ignored entirely for a prospect — the invite went
+  // to one mailbox, and the person holding the token does not get to
+  // redirect the gift card to another.
+  const respondent_email = prospect
+    ? prospect.email
+    : typeof body.respondent_email === "string"
+      ? truncate(body.respondent_email.trim(), EMAIL_MAX_LENGTH)
+      : undefined;
 
   if (!respondent_email) {
     return NextResponse.json({ error: "A work email is required." }, { status: 400 });
@@ -82,13 +105,26 @@ export async function POST(request: Request) {
   // is the actual gate, and it's also where the company name gets derived
   // since the domain only exists once the address has passed validation.
   const emailDomain = extractEmailDomain(respondent_email);
-  if (!emailDomain || isFreeEmailDomain(emailDomain)) {
+  if (!emailDomain) {
+    return NextResponse.json({ error: "That doesn't look like a valid email address." }, { status: 400 });
+  }
+  // The work-email rule exists to stop a respondent typing a personal
+  // address into the form. A prospect typed nothing: this is the address we
+  // chose to mail, from a list we built, and the respondent has no field to
+  // correct it in — so enforcing the rule here would lock out an invited
+  // person over our own data, with no path forward. Whether a free-domain
+  // contact belongs on the list is a question for the import, not for the
+  // moment they show up to answer.
+  if (isFreeEmailDomain(emailDomain) && !prospect) {
     return NextResponse.json(
       { error: "Please use your work email so we can send your gift card" },
       { status: 400 }
     );
   }
-  const derivedCompanyName = deriveCompanyNameFromDomain(emailDomain);
+  // The prospect record's own company name wins when we have one: it is the
+  // enriched value, where the domain guess is a heuristic on the string
+  // before the dot.
+  const derivedCompanyName = prospect?.companyName || deriveCompanyNameFromDomain(emailDomain);
 
   const sanitizedCustomFieldValues = {
     ...sanitizeCustomFieldValues(custom_field_values),
@@ -140,6 +176,47 @@ export async function POST(request: Request) {
   if (survey.status !== "live" && !isTest) {
     console.error(`[interview/start] survey_id=${survey_id} is not live (status=${survey.status})`);
     return NextResponse.json({ error: "This survey isn't available" }, { status: 403 });
+  }
+
+  // A prospect who already began and came back — a reopened tab, a second
+  // device, a link clicked again a day later. Their interview is resumed,
+  // not restarted: a second responses row for the same invite would be the
+  // duplicate lead this whole feature exists to avoid, and it would throw
+  // away everything they already said.
+  //
+  // Placed deliberately BEFORE the Anthropic call below, so a returning
+  // prospect costs a lookup rather than a generated opening question they
+  // will never see. The client takes the id and token from here to
+  // /api/interview/resume, which is the one implementation of rejoining an
+  // interview — this route does not grow a second copy of it.
+  //
+  // Reading their own session_token back out is not an escalation: the token
+  // in their URL already authorizes this interview, and it is the same token
+  // their own tab was given when they started.
+  if (prospect) {
+    const { data: existing, error: existingError } = await supabase
+      .from("responses")
+      .select("id, session_token")
+      .eq("prospect_id", prospect.id)
+      .eq("survey_id", survey_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) {
+      console.error("[interview/start] prospect response lookup failed:", existingError);
+      return NextResponse.json({ error: existingError.message }, { status: 500 });
+    }
+    if (existing) {
+      console.log(
+        `[interview/start] prospect_id=${prospect.id} already has response_id=${existing.id}; resuming`
+      );
+      return NextResponse.json({
+        resume: true,
+        response_id: existing.id,
+        token: existing.session_token,
+      });
+    }
   }
 
   // The sponsoring organization's company profile (what they sell, target
@@ -223,6 +300,7 @@ export async function POST(request: Request) {
       session_token: sessionToken,
       source,
       ...(isTest ? { is_test: true } : {}),
+      ...(prospect ? { prospect_id: prospect.id } : {}),
     })
     .select("id")
     .single();
@@ -233,6 +311,16 @@ export async function POST(request: Request) {
   }
 
   console.log(`[interview/start] created response_id=${response.id} for survey_id=${survey_id}`);
+
+  // After the row exists, never before: started_at means "this invite
+  // produced an interview", and stamping it ahead of a failed insert would
+  // make the prospects table claim an interview that does not exist. Its own
+  // failures are logged and swallowed inside — the respondent is already in
+  // a live conversation, and losing invite bookkeeping is not a reason to
+  // hand them an error.
+  if (prospect) {
+    await markProspectStarted(prospect.id);
+  }
 
   return NextResponse.json({
     response_id: response.id,
