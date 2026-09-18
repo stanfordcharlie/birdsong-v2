@@ -148,6 +148,11 @@ export type Database = {
           disqualify_note: string | null;
           status_changed_at: string | null;
           last_activity_at: string;
+          // The prospect invite this response came from, when it came from
+          // one (20260905000000_prospects.sql). Null for the generic link,
+          // which is still the common path. One direction only: prospects
+          // carries no response_id back.
+          prospect_id: string | null;
           user_id: string;
           org_id: string;
           created_at: string;
@@ -184,6 +189,7 @@ export type Database = {
           disqualify_note?: string | null;
           status_changed_at?: string | null;
           last_activity_at?: string;
+          prospect_id?: string | null;
           // Populated server-side by the set_response_user_id and
           // set_response_org_id triggers (both derived from the parent
           // survey, and org_id is always overwritten); safe to omit on
@@ -224,6 +230,7 @@ export type Database = {
           disqualify_note?: string | null;
           status_changed_at?: string | null;
           last_activity_at?: string;
+          prospect_id?: string | null;
           user_id?: string;
           org_id?: string;
           created_at?: string;
@@ -234,6 +241,13 @@ export type Database = {
             columns: ["survey_id"];
             isOneToOne: false;
             referencedRelation: "surveys";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "responses_prospect_id_fkey";
+            columns: ["prospect_id"];
+            isOneToOne: false;
+            referencedRelation: "prospects";
             referencedColumns: ["id"];
           },
           {
@@ -693,6 +707,82 @@ export type Database = {
             columns: ["actor_id"];
             isOneToOne: false;
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      prospects: {
+        Row: {
+          id: string;
+          // The secret in /survey/[slug]/[token]. Globally unique.
+          token: string;
+          survey_id: string | null;
+          // Set by the set_prospect_user_id trigger from the parent survey;
+          // never supplied by application code.
+          user_id: string;
+          first_name: string | null;
+          last_name: string | null;
+          email: string;
+          title: string | null;
+          company_name: string | null;
+          company_domain: string | null;
+          linkedin_url: string | null;
+          apollo_id: string | null;
+          firmographics: Json;
+          status: string;
+          sent_at: string | null;
+          // Set at the explicit click on the landing page, never at page
+          // load — see 20260905000000_prospects.sql.
+          started_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          token: string;
+          survey_id?: string | null;
+          user_id?: string;
+          first_name?: string | null;
+          last_name?: string | null;
+          email: string;
+          title?: string | null;
+          company_name?: string | null;
+          company_domain?: string | null;
+          linkedin_url?: string | null;
+          apollo_id?: string | null;
+          firmographics?: Json;
+          status?: string;
+          sent_at?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          token?: string;
+          survey_id?: string | null;
+          user_id?: string;
+          first_name?: string | null;
+          last_name?: string | null;
+          email?: string;
+          title?: string | null;
+          company_name?: string | null;
+          company_domain?: string | null;
+          linkedin_url?: string | null;
+          apollo_id?: string | null;
+          firmographics?: Json;
+          status?: string;
+          sent_at?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "prospects_survey_id_fkey";
+            columns: ["survey_id"];
+            isOneToOne: false;
+            referencedRelation: "surveys";
             referencedColumns: ["id"];
           },
         ];
