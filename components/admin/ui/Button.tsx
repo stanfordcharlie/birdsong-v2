@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
  *
  * Deliberately separate from components/ui/button.tsx rather than replacing
  * it: that one is shared with the respondent survey, the marketing pages and
- * NewSurveyWizard, which are out of scope for this pass. Admin imports from
+ * NewStudyWizard, which are out of scope for this pass. Admin imports from
  * here; respondent and marketing import from there; neither edits the other.
  */
 const adminButtonVariants = cva(

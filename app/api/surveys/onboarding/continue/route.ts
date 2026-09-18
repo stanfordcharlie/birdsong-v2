@@ -8,10 +8,10 @@ import {
   COMPLETE_TOKEN,
   MAX_EXCHANGES,
   buildSurveyOnboardingSystemPrompt,
-} from "@/lib/survey-onboarding/prompt";
-import { extractSurveySetup } from "@/lib/survey-onboarding/extract";
-import type { SurveyOnboardingMessage } from "@/lib/survey-onboarding/types";
-import { generateQuestionGuide, type QuestionGuideProfileContext } from "@/lib/surveys/question-guide";
+} from "@/lib/study-onboarding/prompt";
+import { extractSurveySetup } from "@/lib/study-onboarding/extract";
+import type { SurveyOnboardingMessage } from "@/lib/study-onboarding/types";
+import { generateQuestionGuide, type QuestionGuideProfileContext } from "@/lib/studies/question-guide";
 
 // POST /api/surveys/onboarding/continue
 // Body: { messages }

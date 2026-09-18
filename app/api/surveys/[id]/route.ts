@@ -51,7 +51,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: surveyError.message }, { status: 500 });
   }
   if (!survey) {
-    return NextResponse.json({ error: "Survey not found" }, { status: 404 });
+    return NextResponse.json({ error: "Study not found" }, { status: 404 });
   }
 
   const { data: updated, error: updateError } = await supabase
@@ -107,7 +107,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     return NextResponse.json({ error: surveyError.message }, { status: 500 });
   }
   if (!survey) {
-    return NextResponse.json({ error: "Survey not found" }, { status: 404 });
+    return NextResponse.json({ error: "Study not found" }, { status: 404 });
   }
 
   const { count, error: countError } = await supabase
@@ -122,7 +122,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
   if (count && count > 0) {
     return NextResponse.json(
-      { error: "This survey has responses and can't be permanently deleted. Archive it instead." },
+      { error: "This study has responses and can't be permanently deleted. Archive it instead." },
       { status: 409 }
     );
   }

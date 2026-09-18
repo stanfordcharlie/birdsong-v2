@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // A prospect link (/survey/[slug]/[token]) proves who the caller is, so the
+  // A prospect link (/study/[slug]/[token]) proves who the caller is, so the
   // identity fields below come from the record rather than from the body.
   // The TOKEN is what the client sends and what is re-resolved here: a body
   // that simply named a prospect_id would let any caller file a response as

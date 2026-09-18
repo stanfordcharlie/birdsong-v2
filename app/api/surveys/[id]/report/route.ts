@@ -60,7 +60,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: surveyError.message }, { status: 500 });
   }
   if (!survey) {
-    return NextResponse.json({ error: "Survey not found" }, { status: 404 });
+    return NextResponse.json({ error: "Study not found" }, { status: 404 });
   }
 
   const { data: responses, error: responsesError } = await supabase

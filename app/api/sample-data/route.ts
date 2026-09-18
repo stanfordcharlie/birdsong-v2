@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { orgErrorResponse, requireOrgPermission } from "@/lib/org";
-import { randomSlugSuffix } from "@/lib/surveys/slugify";
+import { randomSlugSuffix } from "@/lib/studies/slugify";
 import { SAMPLE_SURVEY, SAMPLE_RESPONSES } from "@/lib/sample-data";
 import type { Json } from "@/types/database";
 

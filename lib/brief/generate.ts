@@ -7,9 +7,9 @@ import {
   type GuideSignal,
   type GuideTheme,
   type StructuredGuide,
-} from "@/lib/surveys/guide";
-import type { QuestionGuideProfileContext } from "@/lib/surveys/question-guide";
-import { slugifyCustomFieldKey } from "@/lib/surveys/respondent-fields";
+} from "@/lib/studies/guide";
+import type { QuestionGuideProfileContext } from "@/lib/studies/question-guide";
+import { slugifyCustomFieldKey } from "@/lib/studies/respondent-fields";
 import { QUESTION_RULES } from "./rules";
 import type { ExtractedBrief } from "./types";
 

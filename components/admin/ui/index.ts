@@ -5,7 +5,7 @@
 //   respondent + marketing -> components/ui
 // Neither side edits the other's copy. components/ui/{button,card,badge}.tsx
 // are intentionally forked from these, because the respondent survey,
-// NewSurveyWizard and the marketing pages still consume them and are out of
+// NewStudyWizard and the marketing pages still consume them and are out of
 // scope for the admin design pass.
 
 export { PageShell } from "./PageShell";

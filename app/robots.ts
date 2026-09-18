@@ -6,7 +6,7 @@ import { siteUrl } from "@/lib/reports/site";
  * explicitly rather than relying on the bare Allow: /.
  *
  * The disallows are the surfaces that would be actively harmful to index:
- * /admin is the authenticated app, /survey/* is a respondent's live
+ * /admin is the authenticated app, /study/* is a respondent's live
  * interview, and /api returns JSON. None of them would rank for anything,
  * and a respondent interview appearing in a search result would be a real
  * privacy problem.
@@ -17,7 +17,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: ["/", "/reports"],
-        disallow: ["/admin", "/api/", "/survey/"],
+        disallow: ["/admin", "/api/", "/study/"],
       },
     ],
     sitemap: `${siteUrl()}/sitemap.xml`,

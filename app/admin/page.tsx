@@ -73,7 +73,7 @@ export default async function AdminHomePage() {
   const supabase = await createClient();
   const [{ orgId, role }, user] = await Promise.all([requireActiveOrg(), getCurrentUser()]);
   const canCreateStudy = can(role, "study:create");
-  const newStudyHref = canCreateStudy ? "/admin/surveys/new" : "/admin/surveys";
+  const newStudyHref = canCreateStudy ? "/admin/projects/new" : "/admin/projects";
 
   // Four parallel queries. surveys and survey_reports carry an explicit
   // org_id filter because both tables have a public-read policy, so RLS
@@ -197,7 +197,7 @@ export default async function AdminHomePage() {
       id: "reports",
       title: `${reportReady.length} report ${reportReady.length === 1 ? "draft is" : "drafts are"} ready`,
       detail: listNames(reportReady.map((s) => s.title)),
-      href: reportReady.length === 1 ? `/admin/surveys/${reportReady[0].id}` : "/admin/surveys",
+      href: reportReady.length === 1 ? `/admin/projects/${reportReady[0].id}` : "/admin/projects",
     });
   }
   // Drafts only count as attention once something else is live: with
@@ -207,7 +207,7 @@ export default async function AdminHomePage() {
       id: "drafts",
       title: `${draftSurveys.length} ${draftSurveys.length === 1 ? "draft is" : "drafts are"} not live yet`,
       detail: listNames(draftSurveys.map((s) => s.title)),
-      href: "/admin/surveys",
+      href: "/admin/projects",
     });
   }
 
@@ -241,14 +241,14 @@ export default async function AdminHomePage() {
       id: "launch",
       label: "Launch a study",
       done: liveSurveys.length > 0,
-      href: "/admin/surveys",
+      href: "/admin/projects",
       action: "Open studies",
     },
     {
       id: "respond",
       label: "Hear from your first respondent",
       done: completed.length > 0,
-      href: heroSurvey ? `/admin/surveys/${heroSurvey.id}` : "/admin/surveys",
+      href: heroSurvey ? `/admin/projects/${heroSurvey.id}` : "/admin/projects",
       action: "Share the link",
     },
   ];

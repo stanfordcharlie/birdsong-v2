@@ -33,7 +33,7 @@ export async function sendLeadNotification(notification: LeadNotification): Prom
     notification;
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const adminLink = `${appUrl}/admin/surveys/${survey.id}`;
+  const adminLink = `${appUrl}/admin/projects/${survey.id}`;
 
   const painPointsHtml = painPoints.length
     ? `<ul>${painPoints.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>`

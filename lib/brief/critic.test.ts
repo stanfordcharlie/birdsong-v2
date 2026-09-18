@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { lexicalFailures, themeFailures } from "./critic";
-import type { GuideTheme } from "@/lib/surveys/guide";
+import type { GuideTheme } from "@/lib/studies/guide";
 
 describe("lexicalFailures", () => {
   it("passes a recency-anchored, open-ended opening", () => {

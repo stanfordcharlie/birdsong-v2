@@ -5,7 +5,7 @@ See [DESIGN.md](./DESIGN.md) before making any UI change, and check
 single source of truth; DESIGN.md is a human-readable mirror of it.
 
 DESIGN.md covers the **admin** surface (`app/admin/**`, `components/admin/**`,
-`AdminSidebar`). The respondent survey (`app/survey/[slug]`, `--sv-*`), the marketing
+`AdminSidebar`). The respondent survey (`app/study/[slug]`, `--sv-*`), the marketing
 pages (`--lp-*`) and the auth screens are separate designed surfaces with their own
 tokens; admin must not reach across into them. Admin components import from
 `components/admin/ui`; respondent and marketing import from `components/ui`. The two

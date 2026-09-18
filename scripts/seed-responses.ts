@@ -64,7 +64,7 @@ import {
 import { extractInterviewInsights, type CompanyProfile } from "@/lib/interview/extract";
 import { parseChips } from "@/lib/interview/chips";
 import { generateSessionToken } from "@/lib/interview/token";
-import { slugify, randomSlugSuffix } from "@/lib/surveys/slugify";
+import { slugify, randomSlugSuffix } from "@/lib/studies/slugify";
 import { extractEmailDomain, deriveCompanyNameFromDomain, isFreeEmailDomain } from "@/lib/interview/work-email";
 import { sanitizeCustomFieldValues } from "@/lib/interview/validation";
 import { sendLeadNotification } from "@/lib/email/lead-notification";
@@ -131,7 +131,7 @@ const OWNER_EMAIL = "charlie@usebirdsong.com";
 
 // --- The study (--create) --------------------------------------------------
 
-// custom_fields uses the object shape lib/surveys/respondent-fields.ts parses:
+// custom_fields uses the object shape lib/studies/respondent-fields.ts parses:
 // preset keys (job_title) carry a label and a required flag, and anything the
 // admin defines beyond the presets is a custom_-prefixed key from
 // slugifyCustomFieldKey. Company size is not a preset, so it is a custom
@@ -142,7 +142,7 @@ const STUDY = {
   topic:
     "lead routing, CRM data quality, and handoff between marketing and sales at mid-market B2B SaaS companies",
   sponsor: "Meridian Ops",
-  // One of SURVEY_TONE_OPTIONS (lib/survey-onboarding/types.ts): the three
+  // One of SURVEY_TONE_OPTIONS (lib/study-onboarding/types.ts): the three
   // allowed values are Conversational, Peer-to-peer, and Academic.
   tone: "Conversational",
   num_questions: 10,
@@ -1026,8 +1026,8 @@ async function main() {
   heading("Result");
   console.log(`Study slug:          ${survey.slug}`);
   console.log(`Survey id:           ${survey.id}`);
-  console.log(`Admin URL:           ${appUrl}/admin/surveys/${survey.id}`);
-  console.log(`Public survey URL:   ${appUrl}/survey/${survey.slug}`);
+  console.log(`Admin URL:           ${appUrl}/admin/projects/${survey.id}`);
+  console.log(`Public survey URL:   ${appUrl}/study/${survey.slug}`);
   console.log(`Responses inserted:  ${seeded.length} (all completed, is_test=false)`);
   console.log(`Elapsed:             ${elapsedMin} min`);
   console.log(`\nScore distribution (lead_score -> count):`);

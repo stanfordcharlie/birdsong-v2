@@ -20,8 +20,8 @@ import {
 import { isBriefComplete, missingBriefFields, type BriefMessage, type ExtractedBrief } from "../../lib/brief/types";
 import { generateGuide } from "../../lib/brief/generate";
 import { runCriticPass } from "../../lib/brief/critic";
-import { renderGuideToText } from "../../lib/surveys/guide";
-import type { QuestionGuideProfileContext } from "../../lib/surveys/question-guide";
+import { renderGuideToText } from "../../lib/studies/guide";
+import type { QuestionGuideProfileContext } from "../../lib/studies/question-guide";
 
 const OUT = process.argv[2] ?? "/tmp/brief-run.json";
 const MODEL = "claude-sonnet-5";

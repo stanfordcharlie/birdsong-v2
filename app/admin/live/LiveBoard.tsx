@@ -5,11 +5,11 @@ import Link from "next/link";
 import { Button, DataTable, EmptyState, StatusDot, type Column } from "@/components/admin/ui";
 import { createClient } from "@/lib/supabase/client";
 import {
-  isSurveyPresence,
+  isStudyPresence,
   PRESENCE_STALE_MS,
-  surveyPresenceChannel,
-  type SurveyPresence,
-} from "@/lib/presence/survey-presence";
+  studyPresenceChannel,
+  type StudyPresence,
+} from "@/lib/presence/study-presence";
 import { formatRelativeTime } from "@/lib/format";
 
 export type LiveSurvey = {
@@ -22,7 +22,7 @@ export type LiveSurvey = {
   questionTarget: number | null;
 };
 
-type LiveRow = SurveyPresence & {
+type LiveRow = StudyPresence & {
   surveyId: string;
   surveyTitle: string;
   questionTarget: number | null;
@@ -63,11 +63,11 @@ const COLUMNS: Column<LiveRow>[] = [
     header: "Study",
     cell: (row) => (
       <Link
-        href={`/survey/${row.slug}`}
+        href={`/study/${row.slug}`}
         target="_blank"
         rel="noreferrer"
         className="focus-ring rounded-control text-muted-foreground hover:text-card-foreground"
-        title={`Open /survey/${row.slug}`}
+        title={`Open /study/${row.slug}`}
       >
         {row.surveyTitle}
       </Link>
@@ -97,7 +97,7 @@ export function LiveBoard({ surveys }: { surveys: LiveSurvey[] }) {
   // Presence entries per survey id, replaced wholesale on every sync (the
   // sync event carries the full state for that channel, so there is nothing
   // to merge).
-  const [presenceBySurvey, setPresenceBySurvey] = useState<Record<string, SurveyPresence[]>>({});
+  const [presenceBySurvey, setPresenceBySurvey] = useState<Record<string, StudyPresence[]>>({});
   // Drives the relative times and the stale check. Presence does not push an
   // event when a heartbeat simply stops arriving, so the clock has to tick
   // on its own for a row to go inactive.
@@ -117,10 +117,10 @@ export function LiveBoard({ surveys }: { surveys: LiveSurvey[] }) {
     // for surveys it just loaded from the database under the owner's own
     // session, so it cannot watch anyone else's.
     const channels = surveys.map((survey) => {
-      const channel = supabase.channel(surveyPresenceChannel(survey.id));
+      const channel = supabase.channel(studyPresenceChannel(survey.id));
       channel.on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
-        const entries = (Object.values(state).flat() as unknown[]).filter(isSurveyPresence);
+        const entries = (Object.values(state).flat() as unknown[]).filter(isStudyPresence);
         setPresenceBySurvey((prev) => ({ ...prev, [survey.id]: entries }));
       });
       // Subscribe without track(): an admin watching is not a participant,
@@ -174,7 +174,7 @@ export function LiveBoard({ surveys }: { surveys: LiveSurvey[] }) {
         title="No live studies."
         action={
           <Button asChild variant="secondary" size="sm">
-            <Link href="/admin/surveys">Open studies</Link>
+            <Link href="/admin/projects">Open studies</Link>
           </Button>
         }
       />

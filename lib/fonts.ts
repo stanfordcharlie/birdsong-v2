@@ -40,7 +40,7 @@ export const newsreader = Newsreader({
 // design_handoff_birdsong_platform. Young Serif for display headings, big
 // numbers, and the wordmark only; Archivo for everything else. Wired into
 // tailwind.config.ts as font-serif / font-archivo. Applied at each
-// section's layout root (app/admin/layout.tsx, app/survey/[slug]/page.tsx)
+// section's layout root (app/admin/layout.tsx, app/study/[slug]/page.tsx)
 // rather than the global <body>, so marketing pages are unaffected.
 export const youngSerif = Young_Serif({
   subsets: ["latin"],

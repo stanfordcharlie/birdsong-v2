@@ -1,4 +1,4 @@
-// Shared between the public survey page (app/survey/[slug]/page.tsx, which
+// Shared between the public survey page (app/study/[slug]/page.tsx, which
 // sanitizes ?src= before it's ever passed into the client bundle) and
 // /api/interview/start (which re-sanitizes independently — the page's
 // cleaning is UX only, a direct caller could send anything). Lets survey

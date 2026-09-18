@@ -3,7 +3,7 @@ import {
   parseEnabledRespondentFields,
   parseCustomRespondentFieldDefs,
   parsePresetFieldLabel,
-} from "@/lib/surveys/respondent-fields";
+} from "@/lib/studies/respondent-fields";
 
 // RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
 // No "sales", "pitch", "leads", "not a sales call", etc. Also never claim

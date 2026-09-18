@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Birdsong",
-  description: "AI-moderated survey platform for B2B demand gen.",
+  description: "AI-moderated research platform for B2B demand gen.",
   icons: {
     // Rounded green tile with the cream bird mark. The PNG tab icons live in
     // public/ and are wired explicitly here. The .ico is not listed: Next

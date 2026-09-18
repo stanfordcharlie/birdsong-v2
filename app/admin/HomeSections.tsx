@@ -200,12 +200,12 @@ export function HeroStudyCard({ study }: { study: HeroStudy }) {
             wide at 1280, and two default pills do not fit on one row there. */}
         <div className="flex flex-wrap items-center gap-3">
           <Button asChild size="sm">
-            <Link href={`/admin/surveys/${study.id}`}>Read insights</Link>
+            <Link href={`/admin/projects/${study.id}`}>Read insights</Link>
           </Button>
           {/* ?test=1 is owner-verified server-side; the preview runs the
               real interview without counting as a response. */}
           <Button asChild variant="ghost" size="sm" className="px-0">
-            <a href={`/survey/${study.slug}?test=1`} target="_blank" rel="noreferrer">
+            <a href={`/study/${study.slug}?test=1`} target="_blank" rel="noreferrer">
               Preview as respondent
             </a>
           </Button>
@@ -235,7 +235,7 @@ export function HeroEmpty({
         }
         action={
           <Button asChild>
-            <Link href={draftCount > 0 ? "/admin/surveys" : newStudyHref}>
+            <Link href={draftCount > 0 ? "/admin/projects" : newStudyHref}>
               {draftCount > 0 ? "Open studies" : "New study"}
             </Link>
           </Button>

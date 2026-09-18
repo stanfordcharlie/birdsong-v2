@@ -30,7 +30,7 @@ function LeadsIcon() {
   );
 }
 
-function SurveysIcon() {
+function ProjectsIcon() {
   return (
     <svg width="19" height="19" viewBox="0 0 18 18" fill="none" className="shrink-0">
       <rect x="3.5" y="2.5" width="11" height="13" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
@@ -110,7 +110,7 @@ function CollapseIcon({ collapsed }: { collapsed: boolean }) {
 const NAV_ITEMS = [
   { href: "/admin", label: "Home", icon: HomeIcon, also: [] as string[] },
   { href: "/admin/leads", label: "Leads", icon: LeadsIcon, also: ["/admin/live"] },
-  { href: "/admin/surveys", label: "Projects", icon: SurveysIcon, also: [] as string[] },
+  { href: "/admin/projects", label: "Projects", icon: ProjectsIcon, also: [] as string[] },
 ];
 
 export function AdminSidebar({

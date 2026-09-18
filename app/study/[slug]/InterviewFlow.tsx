@@ -1,0 +1,2280 @@
+"use client";
+
+import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent } from "react";
+import type { Database } from "@/types/database";
+import type { InterviewMessage } from "@/lib/interview/types";
+import {
+  parseCustomRespondentFieldDefs,
+  parseEnabledRespondentFields,
+  parsePresetFieldLabel,
+  parsePresetFieldRequired,
+} from "@/lib/studies/respondent-fields";
+import { extractEmailDomain, isFreeEmailDomain } from "@/lib/interview/work-email";
+import {
+  activeSessionStorageKey,
+  parseActiveSession,
+  serializeActiveSession,
+} from "@/lib/interview/active-session";
+import { PerchedBird } from "@/components/marketing/PerchedBird";
+import { StudyThemeToggle } from "./StudyTheme";
+import { AmbientBackdrop, Footer, PillArrow, PoweredBy, TestModeBadge, WelcomeBird } from "./StudyChrome";
+import { LoadingScreen } from "@/components/LoadingScreen";
+import { BirdLoader } from "@/components/BirdLoader";
+import { useLoadingGate, useFlybyGate } from "@/components/useLoadingGate";
+import { renderWithBold } from "@/lib/chat/render-with-bold";
+import { questionSegments, splitQuestion, stripBold } from "@/lib/interview/split-question";
+import { useStudyPresence } from "@/lib/presence/use-study-presence";
+import { newsreader, bricolage } from "@/lib/fonts";
+import { cn } from "@/lib/utils";
+
+// Design reference: design_handoff_survey_respondent/. Editorial palette
+// (matches the marketing pages), deliberately not the admin/shadcn stone
+// tokens (bg-primary, border-input, etc. resolve to different hex values
+// than this design calls for) — so this file uses raw elements with the
+// handoff's exact hex values throughout, the same approach the marketing
+// components already take for their own distinct palette.
+
+// The respondent-facing survey shape: an explicit allowlist of the only
+// fields this public Client Component is permitted to see. Derived via Pick
+// from the full Row so field types stay in sync, but structurally it CANNOT
+// name an internal field (topic, question_guide, tone, num_questions,
+// target_*, etc.) — referencing survey.topic here is a compile error, which
+// is the point. The page (app/study/[slug]/page.tsx) constructs exactly
+// this object; nothing else reaches the browser.
+export type PublicSurvey = Pick<
+  Database["public"]["Tables"]["surveys"]["Row"],
+  "id" | "title" | "external_title" | "sponsor" | "public_description" | "gift_card_amount" | "custom_fields"
+>;
+// A resolved prospect link (/study/[slug]/[token]), or null on the generic
+// link. Everything here is either the recipient's own contact detail or the
+// token already sitting in their address bar, so none of it is new exposure —
+// but it is still an explicit allowlist, and the enrichment the prospects row
+// also holds (apollo_id, firmographics, company_domain) is deliberately not
+// on it. See lib/prospects/lookup.ts.
+export type ProspectContext = {
+  id: string;
+  // Re-verified server-side on every start call. The client is never trusted
+  // to assert WHICH prospect it is — it hands back the same secret it was
+  // given, and the start route resolves it again.
+  token: string;
+  firstName: string | null;
+  fullName: string | null;
+  email: string;
+  companyName: string | null;
+  title: string | null;
+  alreadyStarted: boolean;
+};
+
+// "prospect" is the gated landing beat that replaces "welcome" for an invited
+// prospect: same design, greeted, and with the intake already answered. It
+// exists so that arriving at a link and starting an interview are two
+// different events — see the note on the start button below.
+type Stage = "prospect" | "welcome" | "intro" | "chat" | "complete";
+
+// The welcome screen (stage === "welcome") is the frozen respondent design;
+// every other stage is styled from these values rather than from its own
+// palette, so the whole flow reads as one page. All of them are lifted
+// verbatim from that screen's JSX below.
+//   bg-survey-ground / -surface / -raised   text-survey-ink / -muted / -faint
+//   border-survey-border   text-survey-accent   text-survey-danger
+//
+// Those resolve through the --sv-* custom properties in app/globals.css,
+// which is what gives this screen a dark theme (see StudyTheme.tsx). Do not
+// reintroduce raw hex here: a literal will not switch, and a single one is
+// enough to make a themed screen look broken.
+const SURVEY_GROUND = "hsl(var(--sv-ground))";
+
+// The dark pill, matching "Let's get started" exactly (see the welcome CTA).
+const PILL_BUTTON =
+  "inline-flex touch-manipulation items-center gap-3 rounded-full bg-survey-ink px-[30px] py-4 text-[16.5px] font-semibold text-survey-ground [transition:transform_0.25s_ease,box-shadow_0.25s_ease] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[var(--sv-shadow-press)]";
+
+const RESPONDENT_BUBBLE =
+  "self-end max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-survey-ink px-4 py-2.5 text-sm leading-relaxed text-survey-ground";
+
+const FIELD_LABEL_CLASSES = "text-[13px] font-semibold text-survey-muted";
+// Same surface the welcome screen's interviewer card uses (survey-surface on
+// a survey-border hairline with --sv-shadow-soft), just at input proportions.
+//
+// text-base (16px) is load-bearing on iOS, not just a type choice: Safari
+// auto-zooms the whole page on focus for any input under 16px and never
+// zooms back out. min-h-[48px] is the touch-target floor; on desktop the
+// py-[14px] + 16px line box already exceeds it, so it changes nothing there.
+const FIELD_INPUT_BASE =
+  "w-full min-w-0 min-h-[48px] rounded-[14px] border border-survey-border bg-survey-surface py-[14px] text-base text-survey-ink placeholder:text-survey-faint focus:border-survey-muted focus:outline-none focus:ring-[3px] focus:ring-survey-ink/[0.07] disabled:cursor-not-allowed disabled:opacity-60";
+
+// Same bird, different perch: 48x46 (vs the marketing default 40x38) and
+// its own two-note arrangement, per the handoff.
+const INTRO_BIRD_NOTES = [
+  { glyph: "♪", top: "-7px", left: "41px", fontSize: "18px", delaySeconds: 0 },
+  { glyph: "♫", top: "2px", left: "50px", fontSize: "14px", delaySeconds: 1.1 },
+];
+
+// No skip sentinel exists in the interview prompt/model (out of scope to
+// add one here), so Skip sends a plain, natural-reading reply the
+// interviewer's existing evasive-answer handling can react to normally.
+const SKIP_MESSAGE_CONTENT = "I'd rather not answer that one.";
+
+// The chat progress bar and "X of Y" counter read the survey's real question
+// count (the questionCount prop, the same number the welcome screen quotes).
+// The server enforces that count as a hard total, so the counter is a
+// promise the interview keeps: "8 of 8" is the last question. This fallback
+// only covers a survey with no count set, and matches the prompt's default.
+const DEFAULT_TARGET_QUESTION_COUNT = 8;
+
+// Rough minutes-per-question used only to render the welcome screen's time
+// estimate from the (display-only) questionCount prop. 6 questions -> ~9 min,
+// matching the design handoff.
+const MINUTES_PER_QUESTION = 1.5;
+
+const EMAIL_LIVE_CHECK_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+// What test mode types into the intake form on the owner's behalf. Static,
+// so two previews of the same survey differ only in what the owner actually
+// says — a run-to-run diff of the transcript is then meaningful. Every
+// enabled field gets a value, including the preset optionals, so a survey
+// that marks any of them required still passes firstMissingRequiredField
+// and starts rather than erroring on a form nobody can see.
+const TEST_RESPONDENT = {
+  name: "Test Respondent",
+  phone: "(555) 010-0000",
+  jobTitle: "Test Job Title",
+  company: "Test Company",
+  linkedin: "https://www.linkedin.com/in/test-respondent",
+  customField: "Test value",
+} as const;
+
+// The email is the one value that varies: a fixed address would collide on
+// the same respondent record every run. ?testEmail= (owner-verified by the
+// page) pins it when reusing one address across runs is the point.
+function testRespondentEmail(pinned: string | null): string {
+  return pinned?.trim() || `test+${Math.floor(Date.now() / 1000)}@example.com`;
+}
+
+// Progressively formats the phone field as a US number — "(925) 948-4350" —
+// as the respondent types. Re-derived from the digits on every keystroke, so
+// it self-heals when they backspace (deleting a separator just re-strips the
+// digit behind it). Capped at 10 digits (US NANP). Non-US respondents are
+// rare for this field, which is optional; the raw digits are still what any
+// downstream dialer needs, and they remain recoverable from the display form.
+function formatUsPhone(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 10);
+  if (digits.length === 0) return "";
+  if (digits.length < 4) return `(${digits}`;
+  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+function wait(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+// Below this, a visual-viewport shrink is the URL bar collapsing or a
+// find-in-page bar, not a keyboard — re-anchoring the stage for those would
+// be a visible jolt for no reason.
+const KEYBOARD_MIN_INSET_PX = 120;
+
+// How much of the layout viewport the on-screen keyboard is covering, or 0
+// when it's closed.
+//
+// No CSS unit reports this. dvh shrinks for browser toolbars but *not* for
+// the keyboard — on iOS the keyboard is painted over the layout viewport
+// without resizing it at all — so the pinned-to-the-bottom composer ends up
+// underneath it. window.visualViewport is the only API that describes the
+// box the respondent can actually see, hence measuring here and handing the
+// number to CSS as a custom property. offsetTop is subtracted because iOS
+// scrolls the visual viewport within the layout viewport when focusing a
+// field near the bottom; without it the inset reads short by that amount.
+function useKeyboardInset() {
+  const [inset, setInset] = useState(0);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const covered = window.innerHeight - vv.height - vv.offsetTop;
+      setInset(covered > KEYBOARD_MIN_INSET_PX ? Math.round(covered) : 0);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+
+  return inset;
+}
+
+// How incoming interviewer questions arrive. Flip in one line:
+//   "pop"  — the full question rises and settles: fade + 10px rise + slight
+//            scale, 300ms ease-out (default)
+//   "fade" — plain 200ms opacity fade, no movement
+//   "none" — instant render, no animation
+// All three collapse to an instant render under prefers-reduced-motion (the
+// classes are gated in globals.css; resting state is fully visible).
+type QuestionReveal = "pop" | "fade" | "none";
+const QUESTION_REVEAL: QuestionReveal = "pop";
+
+// How long the typing dots take to fade out before the question lands —
+// keep in sync with TypingDots' motion-safe:duration-150.
+const DOTS_FADE_MS = 150;
+
+// If a respondent starts typing a follow-up thought right after sending
+// (e.g. they forgot to mention something) before the next question has
+// appeared, don't let it pop in over them mid-keystroke: hold it back
+// until they've paused typing for this long.
+const TYPING_PAUSE_MS = 10000;
+
+// The question currently on screen. `answered` can equal `target` only on
+// the completion screen (which does not render this), and an early wrap-up
+// leaves it below; the clamp is belt and braces against a stale count.
+function displayedQuestionNumber(answered: number, target: number): number {
+  return Math.min(answered + 1, Math.max(1, target));
+}
+
+// Respondents are one-and-done: a survey they've already finished should
+// never show the intro form again, whether from revisiting the URL, a hard
+// refresh, or (in dev) a Fast Refresh remount. localStorage, not just React
+// state, is what makes that stick across a full page reload.
+function completionStorageKey(surveyId: string) {
+  return `birdsong-survey-complete:${surveyId}`;
+}
+
+// Live name/email validation tick (intro only): pops in via the `pop`
+// keyframe (globals.css). motion-reduce:animate-none, not a settled-state
+// class, since the icon's presence (not its entrance) carries the actual
+// validity signal — reduced-motion users still see it, just without the pop.
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={cn("motion-reduce:animate-none", className)}
+      style={{ animation: "pop 0.25s ease both" }}
+    >
+      <path
+        d="M5 12.5l4.5 4.5L19 7.5"
+        stroke="hsl(var(--sv-accent))"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// Invalid-state counterpart to CheckIcon (email only): shown once the
+// respondent has left the field (or tried to submit) with a value that
+// doesn't parse as an email, and swaps to the check the moment it does.
+// Not shown while they're still mid-typing a fresh address — flashing red
+// at "cha…" would just be noise.
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={cn("motion-reduce:animate-none", className)}
+      style={{ animation: "pop 0.25s ease both" }}
+    >
+      <path
+        d="M6.5 6.5l11 11M17.5 6.5l-11 11"
+        stroke="hsl(var(--sv-danger))"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function InterviewFlow({
+  survey,
+  slug,
+  logoUrl,
+  isTest = false,
+  testEmail = null,
+  source = null,
+  questionCount = null,
+  prospect = null,
+}: {
+  survey: PublicSurvey;
+  // The public slug already in this page's URL, passed as its own display
+  // prop rather than being added to the PublicSurvey allowlist. Used only to
+  // label the respondent's entry on the admin Live page (see
+  // lib/presence/study-presence.ts); the interview itself never reads it.
+  slug: string;
+  logoUrl: string | null;
+  // Owner-verified server-side by the page; drives the "Test mode" marker,
+  // the is_test flag on the start call (re-verified by the route), and
+  // skipping completion persistence so previews are repeatable.
+  isTest?: boolean;
+  // Overrides the timestamped address test mode would otherwise generate
+  // (from ?testEmail=). Already gated on isTest server-side by the page, so
+  // it is null on every real run. Ignored entirely when isTest is false.
+  testEmail?: string | null;
+  // Already sanitized server-side by the page (from ?src=). Never rendered
+  // anywhere — just carried through to the start call unchanged, however
+  // long the respondent takes to fill in the intro form.
+  source?: string | null;
+  // The survey's planned question count, passed as a dedicated display prop
+  // (not on the PublicSurvey allowlist) purely to render the welcome's
+  // "N questions · about M minutes" line. It's a benign integer, kept off the
+  // survey object so that allowlist stays free of internal fields; the
+  // genuinely-sensitive fields never cross to the client either way.
+  questionCount?: number | null;
+  // Resolved server-side from the [token] segment, null on the generic link.
+  // When present the flow opens on the landing beat instead of the welcome
+  // screen, and the name/email intake is already answered.
+  prospect?: ProspectContext | null;
+}) {
+  const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
+  const customFieldDefs = parseCustomRespondentFieldDefs(survey.custom_fields);
+  const hasPhone = enabledFields.includes("phone");
+  const hasJobTitle = enabledFields.includes("job_title");
+  const hasCompany = enabledFields.includes("company");
+  const hasLinkedin = enabledFields.includes("linkedin");
+
+  // Opens on the welcome beat; the completion-restore effect below still
+  // jumps straight to "complete" for a returning respondent, and tapping the
+  // welcome CTA advances to "intro" (the intake fields).
+  //
+  // Test mode opens on "intro" instead, with no welcome beat and no form: the
+  // field state below is already filled in, and the mount effect further down
+  // submits it immediately, so "intro" is only ever the in-flight moment
+  // between mount and the first question.
+  // Test mode skips straight to the auto-start; a prospect opens on their
+  // landing beat; everyone else gets the welcome screen. None of the three
+  // performs a write on mount (see the start button on the landing beat).
+  const [stage, setStage] = useState<Stage>(
+    isTest ? "intro" : prospect ? "prospect" : "welcome"
+  );
+  // Initializers rather than a later setState, and this matters: the
+  // auto-start effect calls startInterview(), which reads these values out of
+  // the closure of the render it was created in. Anything written after the
+  // first render would not be visible to it.
+  // A prospect's name and email come from the record we already hold, so the
+  // intake never asks for them. Prefilled into the same state the form would
+  // have written, which is what lets startInterview stay one code path.
+  const [name, setName] = useState(() =>
+    isTest ? TEST_RESPONDENT.name : prospect ? (prospect.fullName ?? "") : ""
+  );
+  const [email, setEmail] = useState(() =>
+    isTest ? testRespondentEmail(testEmail) : prospect ? prospect.email : ""
+  );
+  // Whether the email field has been blurred (or a submit attempted) —
+  // gates the invalid-email X so it never flashes mid-typing.
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [phone, setPhone] = useState(() => (isTest ? TEST_RESPONDENT.phone : ""));
+  // Title and company are the two preset fields the prospect record can also
+  // answer, so an invited prospect is not asked to retype what we already
+  // know. Everything the record cannot fill (phone, LinkedIn, per-survey
+  // custom fields) is still asked — see beginAsProspect.
+  const [jobTitle, setJobTitle] = useState(() =>
+    isTest ? TEST_RESPONDENT.jobTitle : (prospect?.title ?? "")
+  );
+  const [company, setCompany] = useState(() =>
+    isTest ? TEST_RESPONDENT.company : (prospect?.companyName ?? "")
+  );
+  const [linkedin, setLinkedin] = useState(() => (isTest ? TEST_RESPONDENT.linkedin : ""));
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>(() =>
+    isTest
+      ? Object.fromEntries(customFieldDefs.map((field) => [field.key, TEST_RESPONDENT.customField]))
+      : {}
+  );
+  const [responseId, setResponseId] = useState<string | null>(null);
+  // Proves to /api/interview/continue and /api/interview/resume that this tab
+  // is the one that started this interview, since response_id alone is a
+  // guessable UUID, not a credential.
+  //
+  // The ref is the live copy; a duplicate is also written to sessionStorage
+  // (see writeActiveSession) so a reload can rejoin the interview instead of
+  // stranding the respondent. That is a real tradeoff, taken deliberately:
+  // the token now sits on disk for the life of the tab rather than only in
+  // memory, so anything with access to this origin's sessionStorage in this
+  // tab can read it. sessionStorage, not localStorage, is what bounds that:
+  // it is scoped to this one tab and is discarded when the tab closes, so the
+  // token never becomes cross-tab or long-lived ambient state, and it is
+  // cleared the moment the interview completes or a resume is refused.
+  const sessionTokenRef = useRef<string | null>(null);
+  const [messages, setMessages] = useState<InterviewMessage[]>([]);
+  const [answer, setAnswer] = useState("");
+  const [closingMessage, setClosingMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  // True for the brief window where the typing dots are fading out before
+  // the finished question replaces them (see revealAssistantMessage).
+  const [dotsLeaving, setDotsLeaving] = useState(false);
+  const [chips, setChips] = useState<string[]>([]);
+  // Which chip (if any) is currently highlighted/pending auto-submit.
+  const [pickedChipIndex, setPickedChipIndex] = useState<number | null>(null);
+  // Content of the most recent user message that failed to send, or null if
+  // nothing's failed / it's since been resolved. The message itself stays in
+  // `messages` (it was already appended optimistically) — this only tracks
+  // whether that last entry needs a retry, so retry can resend the same
+  // content without appending a duplicate.
+  const [failedMessage, setFailedMessage] = useState<string | null>(null);
+  const [showResponses, setShowResponses] = useState(false);
+  // How many messages a restored session came back with, or null when this
+  // tab started the interview normally. The question that was already on
+  // screen before the reload must not replay its entrance animation, so the
+  // reveal is suppressed for exactly the render where messages.length still
+  // equals this. Answering anything grows the transcript past it and normal
+  // reveals resume with no cleanup needed.
+  const [restoredMessageCount, setRestoredMessageCount] = useState<number | null>(null);
+  // Full flyby cutscene while the first question is generated (known-long:
+  // the intake POST triggers Claude's opening question). Gated to the intro
+  // stage specifically since `loading` is also true later, during ordinary
+  // in-chat sends, which get the mini loader instead (see showBirdLoader).
+  const showIntroFlyby = useFlybyGate(stage === "intro" && loading, "survey-start");
+  // Mini loader between questions, and on the Retry button after a failed
+  // send. Both share the same 300ms "nothing first" gate; the mini loader
+  // itself takes over TypingDots' old spot rather than adding a screen
+  // takeover, per the design handoff's "not a takeover" placement rule.
+  const showBirdLoader = useLoadingGate(isTyping);
+  const showRetryLoader = useLoadingGate(loading && !!failedMessage);
+  const answerInputRef = useRef<HTMLTextAreaElement>(null);
+  // The chat stage's scroll box once the keyboard is up (see the
+  // .survey-stage rules in globals.css) — scrolled back to the top when a
+  // new question lands so the question, not the middle of the composer, is
+  // what the respondent sees.
+  const stageRef = useRef<HTMLDivElement>(null);
+  const isMountedRef = useRef(true);
+  // Epoch 0 so a fresh page load with no typing yet never waits.
+  const lastKeystrokeAtRef = useRef(0);
+  // Intro fields in render order, populated via setFieldRef(idx) below, so
+  // Enter-to-advance can focus "whichever field is next" without hardcoding
+  // which optional fields this particular survey has enabled.
+  const fieldRefs = useRef<Array<HTMLInputElement | null>>([]);
+  // Guards the test-mode auto-start against React's double-invoked mount
+  // effects in development, which would otherwise open two interviews (and
+  // create two response rows) on every preview.
+  const autoStartedRef = useRef(false);
+
+  // Live presence for the admin Live page. Additive only: it observes state
+  // this component already keeps and changes nothing about the interview.
+  // Joined once the chat stage begins (never on the welcome or intake
+  // screens) and dropped when the stage leaves "chat", which covers both
+  // INTERVIEW_COMPLETE and a mid-interview unmount. Test previews are
+  // excluded so an owner checking their own survey does not show up as a
+  // respondent.
+  useStudyPresence({
+    enabled: stage === "chat" && !isTest && responseId !== null,
+    surveyId: survey.id,
+    slug,
+    responseId,
+    respondentName: name,
+    // Questions asked so far. Derived from the transcript that is already in
+    // state, so nothing new needs tracking on this side.
+    currentStep: messages.filter((m) => m.role === "assistant").length,
+  });
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    // Test mode ignores stored completion: a real respondent is
+    // one-and-done, but the owner needs to preview repeatedly.
+    if (isTest) return;
+    const stored = window.localStorage.getItem(completionStorageKey(survey.id));
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as {
+          closingMessage: string;
+          messages: InterviewMessage[];
+        };
+        setClosingMessage(parsed.closingMessage);
+        setMessages(parsed.messages);
+        setStage("complete");
+      } catch {
+        // Ignore anything from an older, incompatible storage format.
+      }
+    }
+    // Only ever meant to run once, against whatever's in storage at mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Storage can throw (a locked-down browser, a full quota). Losing the
+  // ability to resume is a downgrade, never a reason to fail the interview
+  // the respondent is actually in, so both sides swallow it.
+  function writeActiveSession(id: string, token: string) {
+    try {
+      window.sessionStorage.setItem(
+        activeSessionStorageKey(survey.id),
+        serializeActiveSession({ responseId: id, token, surveyId: survey.id })
+      );
+    } catch {
+      // Resume will simply not be available in this tab.
+    }
+  }
+
+  function clearActiveSession() {
+    try {
+      window.sessionStorage.removeItem(activeSessionStorageKey(survey.id));
+    } catch {
+      // Nothing to do; a stale pointer fails its resume check harmlessly.
+    }
+  }
+
+  // Rejoins an interview in progress, given its id and session token.
+  //
+  // Two callers reach it: the mount effect below, for a tab that reloaded
+  // and still holds its own pointer, and startInterview, for a prospect
+  // whose link resolved to an interview they had already begun elsewhere.
+  // The second is why this is a function rather than effect-local code —
+  // rejoining an interview has one implementation, and a prospect returning
+  // on a new device must land in exactly the state a reload would give them.
+  //
+  // Throws on any failure so each caller can decide what that means; neither
+  // shows the respondent an error about a session they never knew existed.
+  async function resumeInterview(id: string, token: string) {
+    const res = await fetch("/api/interview/resume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ response_id: id, token }),
+    });
+    if (!res.ok) throw new Error("This interview session could not be resumed");
+    const data = await res.json();
+    if (!isMountedRef.current) return;
+
+    if (data.complete) {
+      clearActiveSession();
+      // Match what a live completion writes, so later visits take the
+      // normal short-circuit path rather than resuming again. The
+      // transcript is not part of a completed resume payload, hence the
+      // empty history (the completion screen hides its transcript toggle
+      // when there is nothing to show).
+      window.localStorage.setItem(
+        completionStorageKey(survey.id),
+        JSON.stringify({ closingMessage: data.message, messages: [] })
+      );
+      setClosingMessage(data.message);
+      setStage("complete");
+      return;
+    }
+
+    const restored = (data.messages ?? []) as InterviewMessage[];
+    if (restored.length === 0) throw new Error("Nothing to restore");
+    setResponseId(id);
+    sessionTokenRef.current = token;
+    setMessages(restored);
+    setChips(Array.isArray(data.chips) ? data.chips : []);
+    setRestoredMessageCount(restored.length);
+    setStage("chat");
+    // A prospect resuming on a second device has no pointer in this tab yet.
+    // Write one, so a reload here behaves like a reload anywhere else.
+    if (!isTest) writeActiveSession(id, token);
+  }
+
+  // Rejoins an interview this tab already started, after a reload or after
+  // the OS discarded the page while the respondent was in another app. The
+  // server holds the transcript; the only thing this tab kept is the pointer.
+  //
+  // Every failure path is silent and ends on the normal welcome screen: a
+  // respondent who cannot resume has no idea a session existed, so an error
+  // about one would be nonsense to them.
+  useEffect(() => {
+    // Test mode never writes a pointer (see startInterview), so there is
+    // nothing to rejoin; previews stay repeatable.
+    if (isTest) return;
+    // An interview already recorded as finished short-circuits to the
+    // completion screen in the effect above; do not also resume it.
+    if (window.localStorage.getItem(completionStorageKey(survey.id))) return;
+
+    let pointer: ReturnType<typeof parseActiveSession> = null;
+    try {
+      pointer = parseActiveSession(
+        window.sessionStorage.getItem(activeSessionStorageKey(survey.id)),
+        survey.id
+      );
+    } catch {
+      return;
+    }
+    if (!pointer) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        await resumeInterview(pointer.responseId, pointer.token);
+      } catch {
+        if (cancelled) return;
+        clearActiveSession();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Mount only, against whatever pointer storage holds at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Test mode has no welcome beat and no intake form: the field state above
+  // is already what the form would have collected, so the interview starts
+  // here, on mount, and the owner's next frame is the first question. This is
+  // the ordinary start path with the typing skipped — same startInterview,
+  // same payload, same chat UI, same is_test flag (re-verified by the route).
+  useEffect(() => {
+    if (!isTest || autoStartedRef.current) return;
+    autoStartedRef.current = true;
+    startInterview();
+    // Mount only. startInterview is deliberately not a dependency: it closes
+    // over the first render's prefilled field state, which is exactly the
+    // state it needs, and re-running this is never correct.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const keyboardInset = useKeyboardInset();
+
+  // autoFocus lives on the name input, which a prospect never sees, so the
+  // remainder-of-the-intake form would otherwise open with nothing focused.
+  // Focus whatever field ended up first instead. Guarded on prospect so the
+  // anonymous form keeps using its own autoFocus and this never fights it.
+  useEffect(() => {
+    if (stage !== "intro" || !prospect) return;
+    fieldRefs.current[0]?.focus();
+  }, [stage, prospect]);
+
+  // Refocus the answer box whenever it becomes usable again (first question,
+  // and after each round trip) so respondents never have to click into it.
+  useEffect(() => {
+    if (stage === "chat" && !loading) {
+      answerInputRef.current?.focus();
+    }
+  }, [stage, loading]);
+
+  // A new question replaces the old one in place, so there's no thread to
+  // follow — but with the keyboard up the stage is a scroll box that may be
+  // left mid-scroll from the previous answer. Reset it so each question
+  // starts at the top of the visible area. Keyed on message count, which
+  // changes exactly once per question (see revealAssistantMessage).
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    stageRef.current?.scrollTo({ top: 0, behavior: prefersReducedMotion ? "auto" : "smooth" });
+  }, [messages.length]);
+
+  async function waitForRespondentToPauseTyping() {
+    while (isMountedRef.current) {
+      const idleMs = Date.now() - lastKeystrokeAtRef.current;
+      if (idleMs >= TYPING_PAUSE_MS) return;
+      await wait(TYPING_PAUSE_MS - idleMs);
+    }
+  }
+
+  // The typing indicator is already showing by the time this runs (callers
+  // turn it on immediately when they send, before the fetch that produces
+  // `content` even resolves) — this just holds it up if the respondent is
+  // mid-keystroke on a follow-up, then hands off from indicator to question:
+  // the dots fade out, and the full question arrives in one motion (per
+  // QUESTION_REVEAL).
+  async function revealAssistantMessage(content: string, nextChips: string[] = []) {
+    await waitForRespondentToPauseTyping();
+    if (!isMountedRef.current) return;
+
+    if (QUESTION_REVEAL !== "none") {
+      // Let the dots reach transparent before the swap, so the height
+      // change from short indicator to full question block happens while
+      // nothing is visible (the question itself starts at opacity 0).
+      setDotsLeaving(true);
+      await wait(DOTS_FADE_MS);
+      if (!isMountedRef.current) return;
+    }
+
+    // One batched commit: the dots unmount and the finished question mounts
+    // (keyed on messages.length) playing its entrance exactly once. The old
+    // word-by-word reveal appended the message *after* streaming into an
+    // already-mounted block, which changed the key and remounted it —
+    // replaying the entrance over fully-visible text (the end-of-reveal
+    // flash). Chips land in the same commit, part of the same arrival.
+    setIsTyping(false);
+    setDotsLeaving(false);
+    setMessages((prev) => [...prev, { role: "assistant", content }]);
+    setLoading(false);
+    setChips(nextChips);
+  }
+
+  function firstMissingRequiredField(): string | null {
+    if (!name.trim()) return "your name";
+    if (!email.trim()) return "your work email";
+    if (hasPhone && parsePresetFieldRequired(survey.custom_fields, "phone") && !phone.trim()) {
+      return parsePresetFieldLabel(survey.custom_fields, "phone");
+    }
+    if (hasJobTitle && parsePresetFieldRequired(survey.custom_fields, "job_title") && !jobTitle.trim()) {
+      return parsePresetFieldLabel(survey.custom_fields, "job_title");
+    }
+    if (hasCompany && parsePresetFieldRequired(survey.custom_fields, "company") && !company.trim()) {
+      return parsePresetFieldLabel(survey.custom_fields, "company");
+    }
+    if (hasLinkedin && parsePresetFieldRequired(survey.custom_fields, "linkedin") && !linkedin.trim()) {
+      return parsePresetFieldLabel(survey.custom_fields, "linkedin");
+    }
+    for (const field of customFieldDefs) {
+      if (field.required && !customFieldValues[field.key]?.trim()) return field.label;
+    }
+    return null;
+  }
+
+  // THE START OF AN INTERVIEW. Reached only from the landing beat's button,
+  // never from a render, an effect or a route handler — which is the entire
+  // point of that beat. Enterprise mail security (Defender, Proofpoint,
+  // Mimecast) fetches every link in a delivered message, so a prospect link
+  // that started an interview on load would file a phantom in-progress
+  // response for every scanned email, days before the human opened it. A
+  // scanner does not click.
+  //
+  // What the click has to decide is whether the intake still has anything to
+  // ask. Name, email, and (where the record has them) title and company are
+  // already answered from the prospect row, so a survey that asks for nothing
+  // else goes straight into the conversation; a survey that also wants a
+  // phone number, a LinkedIn URL or its own custom fields still shows the
+  // form, now containing only the parts we could not fill.
+  function beginAsProspect() {
+    if (firstMissingRequiredField() === null && !hasUnfilledOptionalIntake()) {
+      startInterview();
+      return;
+    }
+    setStage("intro");
+  }
+
+  // Whether the intake form would still show a field worth asking about.
+  // Required fields are covered by firstMissingRequiredField; this is the
+  // optional half — an enabled-but-empty field is still worth offering to a
+  // prospect, and skipping the form would silently drop it.
+  function hasUnfilledOptionalIntake(): boolean {
+    if (hasPhone && !phone.trim()) return true;
+    if (hasJobTitle && !jobTitle.trim()) return true;
+    if (hasCompany && !company.trim()) return true;
+    if (hasLinkedin && !linkedin.trim()) return true;
+    return customFieldDefs.some((field) => !customFieldValues[field.key]?.trim());
+  }
+
+  // Split from the form's onSubmit so Enter-on-the-last-field can trigger it
+  // directly without needing to fabricate a submit event.
+  async function startInterview() {
+    const missing = firstMissingRequiredField();
+    if (missing) {
+      setError(`Please fill in ${missing}.`);
+      return;
+    }
+    // Both address checks below exist to send the respondent back to the
+    // email field to fix it. A prospect has no email field — the address is
+    // the one we mailed the invite to — so for them these would be a dead
+    // end: an error about a value they cannot edit, on a screen with nothing
+    // to correct. The route applies its own rules either way (it is directly
+    // callable and never trusts this pass), and it makes the same exception
+    // for a verified prospect token.
+    if (!prospect) {
+      // Same shape check the live tick uses — catches it client-side instead
+      // of waiting for the start route to reject the address.
+      if (!EMAIL_LIVE_CHECK_PATTERN.test(email.trim())) {
+        setEmailTouched(true);
+        setError("That doesn't look like a valid email address.");
+        return;
+      }
+      // Same blocklist the start route enforces server-side — this is just
+      // the inline, catch-it-before-the-round-trip copy; the route never
+      // trusts this check on its own.
+      const domain = extractEmailDomain(email.trim());
+      if (domain && isFreeEmailDomain(domain)) {
+        setEmailTouched(true);
+        setError("Please use your work email so we can send your gift card");
+        return;
+      }
+    }
+    setError(null);
+    setLoading(true);
+    setIsTyping(true);
+    try {
+      const res = await fetch("/api/interview/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          survey_id: survey.id,
+          ...(isTest ? { is_test: true } : {}),
+          ...(source ? { source } : {}),
+          // The token, not the prospect id: the route re-resolves it rather
+          // than trusting this call to say who the caller is. Sending the id
+          // would let anyone file a response as any prospect they could name.
+          ...(prospect ? { prospect_token: prospect.token } : {}),
+          respondent_name: name,
+          respondent_email: email,
+          respondent_phone: hasPhone ? phone : undefined,
+          custom_field_values: {
+            ...(hasJobTitle && jobTitle ? { job_title: jobTitle } : {}),
+            ...(hasCompany && company ? { company } : {}),
+            ...(hasLinkedin && linkedin ? { linkedin } : {}),
+            ...Object.fromEntries(
+              customFieldDefs
+                .filter((field) => customFieldValues[field.key]?.trim())
+                .map((field) => [field.key, customFieldValues[field.key].trim()])
+            ),
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to start the interview");
+
+      // This prospect already had an interview under way (another device, an
+      // earlier click). The route resolved that instead of opening a second
+      // one; pick it up where they left it rather than starting over.
+      if (data.resume) {
+        await resumeInterview(data.response_id, data.token);
+        setLoading(false);
+        setIsTyping(false);
+        return;
+      }
+
+      setResponseId(data.response_id);
+      sessionTokenRef.current = data.token ?? null;
+      // Written once, here, at the moment the chat stage begins: the server
+      // owns the transcript from now on, so this tab only needs to remember
+      // which interview is its own. Test runs deliberately skip it, matching
+      // how they already skip completion persistence.
+      if (!isTest && data.response_id && data.token) {
+        writeActiveSession(data.response_id, data.token);
+      }
+      setStage("chat");
+      await revealAssistantMessage(data.message, data.chips ?? []);
+    } catch (err) {
+      setIsTyping(false);
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setLoading(false);
+    }
+  }
+
+  function handleIntroSubmit(e: FormEvent) {
+    e.preventDefault();
+    startInterview();
+  }
+
+  function setFieldRef(idx: number) {
+    return (el: HTMLInputElement | null) => {
+      fieldRefs.current[idx] = el;
+    };
+  }
+
+  // Enter in any intro field moves to the next one; on the last field it
+  // starts the survey. totalFields is computed fresh per render (see the
+  // intro branch below) and closed over here, always consistent with
+  // whichever optional fields this survey actually has enabled.
+  function handleFieldKeyDown(e: KeyboardEvent<HTMLInputElement>, idx: number, totalFields: number) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (idx < totalFields - 1) {
+      fieldRefs.current[idx + 1]?.focus();
+    } else {
+      startInterview();
+    }
+  }
+
+  // Shared by a fresh send, a chip auto-submit, and Skip: all end up
+  // posting some already-decided message content to the same endpoint and
+  // need identical success/failure handling. `content` is a plain argument
+  // rather than reading `answer` state, specifically so a chip's auto-submit
+  // (fired from a setTimeout) never risks sending a stale value.
+  async function sendMessage(content: string, historyForCompletion: InterviewMessage[]) {
+    try {
+      const res = await fetch("/api/interview/continue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          response_id: responseId,
+          message: content,
+          token: sessionTokenRef.current,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to continue the interview");
+      setFailedMessage(null);
+      if (data.complete) {
+        // The interview is over, so the pointer has nothing left to point at:
+        // drop the stored token rather than leaving it readable for the rest
+        // of the tab's life.
+        clearActiveSession();
+        if (!isTest) {
+          window.localStorage.setItem(
+            completionStorageKey(survey.id),
+            JSON.stringify({
+              closingMessage: data.message,
+              messages: historyForCompletion,
+            })
+          );
+        }
+        setIsTyping(false);
+        setClosingMessage(data.message);
+        setStage("complete");
+        setLoading(false);
+      } else {
+        await revealAssistantMessage(data.message, data.chips ?? []);
+      }
+    } catch (err) {
+      // Deliberately not removed from `messages` and not silently dropped:
+      // the respondent already saw this answer accepted into the
+      // conversation, so it stays there, visually marked, with a way back
+      // in rather than vanishing on a flaky connection.
+      setIsTyping(false);
+      setFailedMessage(content);
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setLoading(false);
+    }
+  }
+
+  async function submitAnswerContent(content: string) {
+    if (!content.trim() || !responseId || loading) return;
+    setError(null);
+    // Typing a fresh answer instead of retrying replaces the failed one
+    // rather than letting both exist — simpler to reason about than
+    // forcing retry-first, and it mirrors editing/resending in any normal
+    // chat input. Resolved only here (not on every keystroke) so `messages`
+    // — and the `key` the entrance animation below is keyed on — never
+    // changes while the respondent is actively typing.
+    const baseMessages = failedMessage ? messages.slice(0, -1) : messages;
+    setFailedMessage(null);
+    setLoading(true);
+    setIsTyping(true);
+    setPickedChipIndex(null);
+    const userMessage: InterviewMessage = { role: "user", content };
+    const updatedMessages = [...baseMessages, userMessage];
+    setMessages(updatedMessages);
+    setAnswer("");
+    setChips([]);
+    // The keystrokes that just composed this answer shouldn't count as
+    // "still typing" against the next reveal's pause check — without this
+    // reset, every send looks stalled for a full TYPING_PAUSE_MS because
+    // the respondent's last keystroke (finishing their answer) was just
+    // now. Only keystrokes typed *after* this point (a follow-up while
+    // waiting) should ever trigger that pause.
+    lastKeystrokeAtRef.current = 0;
+    await sendMessage(content, updatedMessages);
+  }
+
+  // What Continue (and Enter) actually sends. A picked chip and typed text
+  // can coexist: the chip is the short answer, the text is the elaboration,
+  // and the interviewer should see both. Empty when neither is present, which
+  // submitAnswerContent treats as nothing to send.
+  function composeAnswer(): string {
+    const chip = pickedChipIndex !== null ? chips[pickedChipIndex] : null;
+    return [chip, answer.trim()].filter(Boolean).join("\n");
+  }
+
+  async function submitAnswer() {
+    await submitAnswerContent(composeAnswer());
+  }
+
+  // Resends the exact content of the last failed message. Doesn't touch
+  // `messages` (that entry is already there from the original attempt) and
+  // deliberately doesn't set isTyping/show the typing-dots screen — the
+  // failed bubble and Retry button stay visible, just disabled via
+  // `loading`, so retrying doesn't look like the message vanished again.
+  async function retrySend() {
+    if (!failedMessage || !responseId || loading) return;
+    setError(null);
+    setLoading(true);
+    await sendMessage(failedMessage, messages);
+  }
+
+  function handleSend(e: FormEvent) {
+    e.preventDefault();
+    submitAnswer();
+  }
+
+  function handleSkip() {
+    if (!responseId || loading) return;
+    submitAnswerContent(SKIP_MESSAGE_CONTENT);
+  }
+
+  // Chips are a single-select toggle: tapping one picks it, tapping the
+  // picked one clears it. Nothing is sent until Send (or Enter), and the
+  // answer box is left alone so a respondent can add to a chip in their own
+  // words.
+  function handleChipTap(index: number) {
+    setPickedChipIndex((prev) => (prev === index ? null : index));
+  }
+
+  // Plain Enter sends (Cmd/Ctrl+Enter falls under the same check, since
+  // both are just "Enter" without Shift); Shift+Enter inserts a newline.
+  function handleAnswerKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      submitAnswer();
+    }
+  }
+
+  const surveyName = survey.external_title || survey.title;
+
+  // Welcome screen — the redesign in design_handoff_survey_welcome. Single
+  // centered column in Birdsong's editorial brand system: eggshell ground
+  // with drifting washes/notes, bird-and-sticker cluster, Bricolage display
+  // title, interviewer speech bubble, ink pill CTA, powered-by footer. All
+  // exact values (colors, type, spacing, motion) are from the handoff README.
+  // Tapping the CTA advances to "intro" (the intake fields), unchanged.
+  // The prospect landing beat: the welcome screen, addressed to someone whose
+  // name we know. Same ground, same ambient layer, same bird-and-sticker
+  // cluster, same pill, same footer — an invited prospect and a cold visitor
+  // should not be able to tell they are looking at two different screens.
+  //
+  // NOTHING ON THIS SCREEN WRITES. No fetch, no route call, no Anthropic
+  // call, on mount or on render. It is safe to load as many times as a mail
+  // scanner, a preview pane or a curious recipient cares to load it; the
+  // interview begins at the button and nowhere else.
+  //
+  // COPY: every line here is lifted from the anonymous welcome screen rather
+  // than written fresh, so the two screens cannot drift into making different
+  // promises about the same study. The one addition is the greeting.
+  if (stage === "prospect" && prospect) {
+    const minutes =
+      questionCount != null ? Math.max(3, Math.round(questionCount * MINUTES_PER_QUESTION)) : null;
+    const metaLine =
+      questionCount != null && minutes != null
+        ? `${questionCount} question${questionCount === 1 ? "" : "s"} · about ${minutes} minutes`
+        : null;
+
+    // Same continuous-clamp treatment the welcome heading uses, so a long
+    // study name behaves identically on both screens.
+    const TITLE_MAX_PX = 58;
+    const TITLE_MIN_PX = 26;
+    const TITLE_SHRINK_AFTER = 20;
+    const TITLE_PX_PER_CHAR = 1.1;
+    const titleCeilingPx = Math.max(
+      TITLE_MIN_PX,
+      TITLE_MAX_PX - Math.max(0, surveyName.length - TITLE_SHRINK_AFTER) * TITLE_PX_PER_CHAR
+    );
+    const titleFontSize = `clamp(${TITLE_MIN_PX}px, 10vw, ${titleCeilingPx}px)`;
+
+    return (
+      <div
+        className={cn(
+          bricolage.variable,
+          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-survey-ink"
+        )}
+        style={{ background: SURVEY_GROUND }}
+      >
+        <TestModeBadge isTest={isTest} />
+        <StudyThemeToggle offsetForBadge={isTest} />
+        <AmbientBackdrop />
+
+        <main className="relative flex flex-1 items-center justify-center px-5 pb-6 pt-8 sm:px-8 sm:pb-8 sm:pt-12">
+          <div className="flex w-full max-w-[640px] flex-col items-center text-center">
+            {/* Bird + sticker cluster (decorative), identical to the welcome
+                screen including the gift-card sticker's bottom-margin
+                allowance for its overhang. */}
+            <div
+              aria-hidden="true"
+              className={cn(
+                "sw-rev relative h-[64px] w-[180px]",
+                survey.gift_card_amount ? "mb-7" : "mb-1.5"
+              )}
+            >
+              <span
+                className="sw-clusternote-a absolute left-[52px] top-0 text-[17px]"
+                style={{ color: "hsl(var(--sv-accent))", opacity: 0 }}
+              >
+                &#9834;
+              </span>
+              <span
+                className="sw-clusternote-b absolute left-[96px] top-4 text-[14px]"
+                style={{ color: "hsl(var(--sv-faint))", opacity: 0 }}
+              >
+                &#9835;
+              </span>
+              <WelcomeBird
+                width={46}
+                height={42}
+                fill="hsl(var(--sv-ink))"
+                eyeFill="hsl(var(--sv-ground))"
+                className="sw-bird absolute bottom-0 left-[62px]"
+              />
+              {survey.gift_card_amount ? (
+                <div
+                  className="sw-sticker absolute right-[-52px] top-[-16px] h-[98px] w-[98px]"
+                  style={{ transform: "rotate(8deg)" }}
+                >
+                  <svg
+                    viewBox="0 0 100 100"
+                    className="absolute inset-0"
+                    style={{ filter: "drop-shadow(var(--sv-drop-mascot))" }}
+                  >
+                    <polygon
+                      points="100,50 83.3,63.8 85.4,85.4 63.8,83.3 50,100 36.2,83.3 14.6,85.4 16.7,63.8 0,50 16.7,36.2 14.6,14.6 36.2,16.7 50,0 63.8,16.7 85.4,14.6 83.3,36.2"
+                      fill="hsl(var(--sv-butter))"
+                      stroke="hsl(var(--sv-ink))"
+                      strokeWidth="2.5"
+                    />
+                  </svg>
+                  <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-survey-ink">
+                    <span className="text-[19px] font-bold italic">${survey.gift_card_amount}</span>
+                    <span className="text-[10.5px] font-semibold tracking-[0.02em]">gift card</span>
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Incentive is visual-only above (the cluster is aria-hidden), so
+                announce it once to assistive tech without changing the layout. */}
+            {survey.gift_card_amount ? (
+              <span className="sr-only">Includes a ${survey.gift_card_amount} gift card.</span>
+            ) : null}
+
+            {/* The greeting, and the only line on this screen the anonymous
+                welcome does not have. First name alone: the record often has a
+                mangled or all-caps last name from enrichment, and "Hi Jane" is
+                both friendlier and harder to get embarrassingly wrong. A
+                prospect with no first name simply gets no greeting rather than
+                a placeholder. */}
+            {prospect.firstName && (
+              <div className="sw-rev mb-2 text-[17px] font-semibold text-survey-ink">
+                Hi {prospect.firstName} &#128075;
+              </div>
+            )}
+
+            {metaLine && (
+              <div className="sw-rev mb-3 text-[15px] font-medium text-survey-muted">{metaLine}</div>
+            )}
+
+            <h1
+              className="sw-rev m-0 mb-2.5 text-balance font-bricolage font-bold leading-[1.05] tracking-[-0.025em]"
+              style={
+                {
+                  "--sw-delay": "0.08s",
+                  fontSize: titleFontSize,
+                } as React.CSSProperties
+              }
+            >
+              {surveyName}
+            </h1>
+
+            {survey.sponsor && (
+              <div
+                className="sw-rev mb-6 text-[15px] text-survey-muted"
+                style={{ "--sw-delay": "0.14s" } as React.CSSProperties}
+              >
+                Research conducted on behalf of{" "}
+                <span className="font-semibold text-survey-ink">{survey.sponsor}</span>
+              </div>
+            )}
+
+            {/* Respondent-facing description ONLY — the same rule the intro
+                stage states at length. The internal `topic` field names the
+                interview's intent, is not on PublicSurvey, and must never
+                appear on a respondent screen. When public_description is
+                unset nothing renders here; there is no fallback. */}
+            {survey.public_description?.trim() && (
+              <p
+                className="sw-rev text-pretty mb-6 max-w-[520px] text-[16px] leading-[1.6] text-survey-muted sm:text-[17px]"
+                style={{ "--sw-delay": "0.18s" } as React.CSSProperties}
+              >
+                {survey.public_description}
+              </p>
+            )}
+
+            <div
+              className="sw-rev mb-7 flex flex-col items-center gap-2.5"
+              style={{ "--sw-delay": "0.22s" } as React.CSSProperties}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-survey-ink">
+                  <WelcomeBird width={15} height={13} fill="hsl(var(--sv-ground))" />
+                </span>
+                <span className="text-[12.5px] font-semibold tracking-[0.04em] text-survey-faint">
+                  YOUR INTERVIEWER
+                </span>
+              </div>
+              <div
+                className="text-pretty max-w-[500px] rounded-[18px] border border-survey-border bg-survey-surface px-[26px] py-4 text-[16.5px] leading-[1.6]"
+                style={{ boxShadow: "var(--sv-shadow-soft)" }}
+              >
+                {/* RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
+                    No "sales", "pitch", "leads", "not a sales call", etc. Also
+                    never claim their info is "only" used for X, or make any
+                    exclusive-use / "never shared" claim — state true things
+                    we WILL do, don't enumerate or limit what else happens. */}
+                This is a short, relaxed conversation about how you work. Answer in your own words; there are
+                no wrong answers.
+              </div>
+            </div>
+
+            <div
+              className="sw-rev flex flex-col items-center"
+              style={{ "--sw-delay": "0.3s" } as React.CSSProperties}
+            >
+              <button
+                type="button"
+                onClick={beginAsProspect}
+                disabled={loading}
+                className={PILL_BUTTON}
+              >
+                {/* Same label as the welcome screen's CTA. A prospect who
+                    already began and came back still sees "Let's get started":
+                    the start call picks their conversation up where it left
+                    off rather than beginning a second one, so a label
+                    promising a fresh start would be the inaccurate one. */}
+                Let&apos;s get started
+                <svg width="20" height="12" viewBox="0 0 22 12" fill="none" aria-hidden="true">
+                  <path
+                    d="M1 6h18m0 0l-4-4.5M19 6l-4 4.5"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+
+              {/* A start that fails leaves the respondent on this screen with
+                  the button still live, so the error has to say so here —
+                  there is no later screen to show it on. */}
+              {error && <p className="mt-4 text-sm text-survey-danger">{error}</p>}
+
+              <div className="mt-[18px] text-[13.5px] text-survey-faint">
+                By continuing, you agree to our{" "}
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-survey-muted underline [text-underline-offset:3px]"
+                >
+                  Terms
+                </a>{" "}
+                and{" "}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-survey-muted underline [text-underline-offset:3px]"
+                >
+                  Privacy Policy
+                </a>
+                .
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <footer
+          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-6 pt-5"
+          style={{ "--sw-delay": "0.4s" } as React.CSSProperties}
+        >
+          <span className="text-[13.5px] text-survey-faint">Powered by</span>
+          <a href="/" className="inline-flex items-center gap-[7px]">
+            <WelcomeBird width={17} height={15} fill="hsl(var(--sv-ink))" />
+            <span className="font-bricolage text-[15px] font-bold text-survey-ink">Birdsong</span>
+          </a>
+        </footer>
+      </div>
+    );
+  }
+
+  if (stage === "welcome") {
+    const minutes =
+      questionCount != null ? Math.max(3, Math.round(questionCount * MINUTES_PER_QUESTION)) : null;
+    const metaLine =
+      questionCount != null && minutes != null
+        ? `${questionCount} question${questionCount === 1 ? "" : "s"} · about ${minutes} minutes`
+        : null;
+
+    // Titles are usually short (the AI suggestion flow caps at ~8 words),
+    // but an admin can type anything here, and this heading is set at a
+    // large display size — long, unwrapped-friendly titles at that size
+    // stack into 3-4 lines and push the CTA off the bottom of the fold.
+    // Real clamp(), not a couple of hard breakpoints: the vw term gives
+    // genuine viewport-fluid scaling (small on phones, large on desktop),
+    // and the ceiling itself shrinks continuously as the title gets longer
+    // (only past TITLE_SHRINK_AFTER chars, so short titles are unaffected)
+    // instead of jumping between a few fixed sizes. TITLE_MIN_PX is the
+    // floor so even a very long title stays legible rather than vanishing.
+    const TITLE_MAX_PX = 58;
+    const TITLE_MIN_PX = 26;
+    const TITLE_SHRINK_AFTER = 20;
+    const TITLE_PX_PER_CHAR = 1.1;
+    const titleCeilingPx = Math.max(
+      TITLE_MIN_PX,
+      TITLE_MAX_PX - Math.max(0, surveyName.length - TITLE_SHRINK_AFTER) * TITLE_PX_PER_CHAR
+    );
+    const titleFontSize = `clamp(${TITLE_MIN_PX}px, 10vw, ${titleCeilingPx}px)`;
+
+    return (
+      <div
+        className={cn(
+          bricolage.variable,
+          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-survey-ink"
+        )}
+        style={{ background: "hsl(var(--sv-ground))" }}
+      >
+        <TestModeBadge isTest={isTest} />
+        <StudyThemeToggle offsetForBadge={isTest} />
+
+        <AmbientBackdrop />
+
+        <main className="relative flex flex-1 items-center justify-center px-5 pb-6 pt-8 sm:px-8 sm:pb-8 sm:pt-12">
+          <div className="flex w-full max-w-[640px] flex-col items-center text-center">
+            {/* Bird + sticker cluster (decorative). The gift-card sticker
+                overhangs below this box (top-[-16px] + h-[98px] on a
+                h-[64px] box), so it needs extra bottom margin to clear the
+                meta line below it — plain mb-1.5 is enough with just the
+                bird, but not with the sticker's overhang. */}
+            <div
+              aria-hidden="true"
+              className={cn(
+                "sw-rev relative h-[64px] w-[180px]",
+                survey.gift_card_amount ? "mb-7" : "mb-1.5"
+              )}
+            >
+              <span className="sw-clusternote-a absolute left-[52px] top-0 text-[17px]" style={{ color: "hsl(var(--sv-accent))", opacity: 0 }}>
+                &#9834;
+              </span>
+              <span className="sw-clusternote-b absolute left-[96px] top-4 text-[14px]" style={{ color: "hsl(var(--sv-faint))", opacity: 0 }}>
+                &#9835;
+              </span>
+              <WelcomeBird
+                width={46}
+                height={42}
+                fill="hsl(var(--sv-ink))"
+                eyeFill="hsl(var(--sv-ground))"
+                className="sw-bird absolute bottom-0 left-[62px]"
+              />
+              {survey.gift_card_amount ? (
+                <div
+                  className="sw-sticker absolute right-[-52px] top-[-16px] h-[98px] w-[98px]"
+                  style={{ transform: "rotate(8deg)" }}
+                >
+                  <svg
+                    viewBox="0 0 100 100"
+                    className="absolute inset-0"
+                    style={{ filter: "drop-shadow(var(--sv-drop-mascot))" }}
+                  >
+                    <polygon
+                      points="100,50 83.3,63.8 85.4,85.4 63.8,83.3 50,100 36.2,83.3 14.6,85.4 16.7,63.8 0,50 16.7,36.2 14.6,14.6 36.2,16.7 50,0 63.8,16.7 85.4,14.6 83.3,36.2"
+                      fill="hsl(var(--sv-butter))"
+                      stroke="hsl(var(--sv-ink))"
+                      strokeWidth="2.5"
+                    />
+                  </svg>
+                  <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-survey-ink">
+                    <span className="text-[19px] font-bold italic">${survey.gift_card_amount}</span>
+                    <span className="text-[10.5px] font-semibold tracking-[0.02em]">gift card</span>
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Incentive is visual-only above (the cluster is aria-hidden), so
+                announce it once to assistive tech without changing the layout. */}
+            {survey.gift_card_amount ? (
+              <span className="sr-only">Includes a ${survey.gift_card_amount} gift card.</span>
+            ) : null}
+
+            {metaLine && <div className="sw-rev mb-3 text-[15px] font-medium text-survey-muted">{metaLine}</div>}
+
+            <h1
+              className="sw-rev m-0 mb-2.5 text-balance font-bricolage font-bold leading-[1.05] tracking-[-0.025em]"
+              style={
+                {
+                  "--sw-delay": "0.08s",
+                  fontSize: titleFontSize,
+                } as React.CSSProperties
+              }
+            >
+              {surveyName}
+            </h1>
+
+            {survey.sponsor && (
+              <div
+                className="sw-rev mb-6 text-[15px] text-survey-muted"
+                style={{ "--sw-delay": "0.14s" } as React.CSSProperties}
+              >
+                Research conducted on behalf of{" "}
+                <span className="font-semibold text-survey-ink">{survey.sponsor}</span>
+              </div>
+            )}
+
+            <div
+              className="sw-rev mb-7 flex flex-col items-center gap-2.5"
+              style={{ "--sw-delay": "0.22s" } as React.CSSProperties}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-survey-ink">
+                  <WelcomeBird width={15} height={13} fill="hsl(var(--sv-ground))" />
+                </span>
+                <span className="text-[12.5px] font-semibold tracking-[0.04em] text-survey-faint">
+                  YOUR INTERVIEWER
+                </span>
+              </div>
+              <div
+                className="text-pretty max-w-[500px] rounded-[18px] border border-survey-border bg-survey-surface px-[26px] py-4 text-[16.5px] leading-[1.6]"
+                style={{ boxShadow: "var(--sv-shadow-soft)" }}
+              >
+                {/* RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
+                    No "sales", "pitch", "leads", "not a sales call", etc. Also
+                    never claim their info is "only" used for X, or make any
+                    exclusive-use / "never shared" claim — state true things
+                    we WILL do, don't enumerate or limit what else happens. */}
+                This is a short, relaxed conversation about how you work. Answer in your own words; there are
+                no wrong answers.
+              </div>
+            </div>
+
+            <div
+              className="sw-rev flex flex-col items-center"
+              style={{ "--sw-delay": "0.3s" } as React.CSSProperties}
+            >
+              <button
+                type="button"
+                onClick={() => setStage("intro")}
+                className="inline-flex touch-manipulation items-center gap-3 rounded-full bg-survey-ink px-[30px] py-4 text-[16.5px] font-semibold text-survey-ground [transition:transform_0.25s_ease,box-shadow_0.25s_ease] active:translate-y-0 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[var(--sv-shadow-press)]"
+              >
+                Let&apos;s get started
+                <svg width="20" height="12" viewBox="0 0 22 12" fill="none" aria-hidden="true">
+                  <path
+                    d="M1 6h18m0 0l-4-4.5M19 6l-4 4.5"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <div className="mt-[18px] text-[13.5px] text-survey-faint">
+                By continuing, you agree to our{" "}
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-survey-muted underline [text-underline-offset:3px]"
+                >
+                  Terms
+                </a>{" "}
+                and{" "}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-survey-muted underline [text-underline-offset:3px]"
+                >
+                  Privacy Policy
+                </a>
+                .
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <footer
+          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-6 pt-5"
+          style={{ "--sw-delay": "0.4s" } as React.CSSProperties}
+        >
+          <PoweredBy />
+        </footer>
+      </div>
+    );
+  }
+
+  if (stage === "intro") {
+    // Test mode reaches this stage only while the auto-started interview is
+    // in flight, so there is no form to draw — just the ground, the badge and
+    // the same flyby a real run shows between Start and the first question.
+    // Wrapper, palette and error treatment are the real intro's, verbatim.
+    if (isTest) {
+      return (
+        <div
+          className={cn(
+            bricolage.variable,
+            newsreader.variable,
+            "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[16px] text-survey-ink"
+          )}
+          style={{ background: SURVEY_GROUND }}
+        >
+          {showIntroFlyby && <LoadingScreen statusText="Preparing your conversation" />}
+          <AmbientBackdrop />
+          <TestModeBadge isTest={isTest} />
+        <StudyThemeToggle offsetForBadge={isTest} />
+          {/* Nothing here can be retried by hand (there are no fields to fix),
+              but a start that fails must still say so rather than leaving the
+              owner on an empty ground wondering. */}
+          {error && (
+            <div className="relative mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-10 sm:px-6 sm:py-16">
+              <p className="text-sm text-survey-danger">{error}</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const nameOk = name.trim().length > 1;
+    const emailOk = EMAIL_LIVE_CHECK_PATTERN.test(email.trim());
+    const emailShowsX = !emailOk && emailTouched && email.trim().length > 0;
+
+    // A prospect arrives with both of these already answered from their
+    // record, so the form does not draw them — and must not count them
+    // either: the indices below drive the Enter-advances-field order and the
+    // mobile keyboard's next/go hint, and a hidden field left in the sequence
+    // would be a dead stop partway through the form.
+    const asksIdentity = !prospect;
+
+    let fieldCount = 0;
+    const nameIdx = asksIdentity ? fieldCount++ : -1;
+    const emailIdx = asksIdentity ? fieldCount++ : -1;
+    const phoneIdx = hasPhone ? fieldCount++ : -1;
+    const jobTitleIdx = hasJobTitle ? fieldCount++ : -1;
+    const companyIdx = hasCompany ? fieldCount++ : -1;
+    const linkedinIdx = hasLinkedin ? fieldCount++ : -1;
+    const customFieldIdxs = customFieldDefs.map(() => fieldCount++);
+    const totalFieldCount = fieldCount;
+    const onFieldKeyDown = (e: KeyboardEvent<HTMLInputElement>, idx: number) =>
+      handleFieldKeyDown(e, idx, totalFieldCount);
+    // Label the mobile keyboard's action key to match what Enter actually
+    // does here, so the software keyboard agrees with the existing
+    // Enter-advances-field handler instead of offering a generic "return"
+    // that looks like it will insert a newline.
+    const enterHintFor = (idx: number): "next" | "go" => (idx < totalFieldCount - 1 ? "next" : "go");
+
+    return (
+      <div
+        className={cn(
+          bricolage.variable,
+          // PerchedBird's note glyphs are set in font-newsreader; the rest of
+          // this stage is the welcome screen's font-sans / font-bricolage pair.
+          newsreader.variable,
+          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[16px] text-survey-ink"
+        )}
+        style={{ background: SURVEY_GROUND }}
+      >
+        {showIntroFlyby && <LoadingScreen statusText="Preparing your conversation" />}
+        <AmbientBackdrop />
+        <TestModeBadge isTest={isTest} />
+        <StudyThemeToggle offsetForBadge={isTest} />
+        <div className="relative mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-10 sm:px-6 sm:py-16">
+          {survey.sponsor && logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt={survey.sponsor}
+              className="survey-intro-rise-1 mb-6 h-8 w-auto object-contain"
+            />
+          )}
+
+          {/* Incentive pill and timing meta now live on the welcome beat, so
+              they're deliberately gone from here — the intro is the intake
+              form, not a second pitch (don't show the pill twice). */}
+          {/* Welcome-screen heading treatment (Bricolage 700, -0.025em,
+              1.05 leading), held at the intro's smaller step size: the
+              display size belongs to the welcome beat, the type does not. */}
+          <h1 className="survey-intro-rise-2 mb-3.5 text-balance break-words font-bricolage text-[31px] font-bold leading-[1.05] tracking-[-0.025em] sm:text-[44px]">
+            {surveyName}
+          </h1>
+
+          {/* Respondent-facing description ONLY. Never the internal `topic`
+              field (which names the interview's intent and is not even
+              present on PublicSurvey). When public_description is unset,
+              nothing renders here; there is no fallback. */}
+          {survey.public_description?.trim() && (
+            <p className="survey-intro-rise-3 text-pretty mb-7 text-[16px] leading-[1.6] text-survey-muted sm:mb-9 sm:text-[17px]">
+              {survey.public_description}
+            </p>
+          )}
+
+          <form onSubmit={handleIntroSubmit}>
+            <div className="survey-intro-rise-4 flex flex-col gap-3">
+              {/* Hidden, not disabled-and-shown: a prospect has already told
+                  us their name and address, and rendering them greyed out
+                  invites "is that right?" on a screen with no way to change
+                  it. The values are still in state and still sent — see the
+                  prefill in the useState initializers.
+
+                  The perched bird is decoration anchored to the name field
+                  and goes with it; a prospect reaching this form is seeing a
+                  short remainder-of-the-intake, not the full first impression
+                  the bird was drawn for. */}
+              {asksIdentity && (
+                <>
+                <div className="relative flex flex-col gap-1.5">
+                  {/* The notes are absolutely placed up to ~64px right of the
+                      bird's own left edge, so at 360–430px the default
+                      right-[14px] perch pushes them against (and past) the
+                      form's right edge. Sliding the whole bird inboard on
+                      phones keeps the arrangement intact rather than clipping
+                      it; sm: restores the desktop perch exactly. */}
+                  <PerchedBird
+                    className="pointer-events-none absolute -top-[14px] right-[58px] z-[2] sm:right-[14px]"
+                    width={48}
+                    height={46}
+                    notes={INTRO_BIRD_NOTES}
+                  />
+                  <label htmlFor="respondent-name" className={FIELD_LABEL_CLASSES}>
+                    Your name
+                  </label>
+                  <input
+                    id="respondent-name"
+                    ref={setFieldRef(nameIdx)}
+                    type="text"
+                    autoComplete="name"
+                    enterKeyHint={enterHintFor(nameIdx)}
+                    autoFocus
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    onKeyDown={(e) => onFieldKeyDown(e, nameIdx)}
+                    placeholder="First and last"
+                    disabled={loading}
+                    className={cn(FIELD_INPUT_BASE, "pl-4 pr-11")}
+                  />
+                  {nameOk && <CheckIcon className="absolute bottom-4 right-[15px]" />}
+                </div>
+
+                <div className="relative flex flex-col gap-1.5">
+                  <label htmlFor="respondent-email" className={FIELD_LABEL_CLASSES}>
+                    Work email
+                  </label>
+                  <p className="text-[13px] text-survey-faint">
+                    This is where we&apos;ll send your gift card and a copy of the report.
+                  </p>
+                  <input
+                    id="respondent-email"
+                    ref={setFieldRef(emailIdx)}
+                    type="email"
+                    autoComplete="email"
+                    enterKeyHint={enterHintFor(emailIdx)}
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onBlur={() => setEmailTouched(true)}
+                    onKeyDown={(e) => onFieldKeyDown(e, emailIdx)}
+                    placeholder="you@yourcompany.com"
+                    disabled={loading}
+                    aria-invalid={emailShowsX}
+                    className={cn(
+                      FIELD_INPUT_BASE,
+                      "pl-4 pr-11",
+                      emailShowsX && "border-survey-danger focus:border-survey-danger"
+                    )}
+                  />
+                  {emailOk && <CheckIcon className="absolute bottom-4 right-[15px]" />}
+                  {emailShowsX && <XIcon className="absolute bottom-4 right-[15px]" />}
+                </div>
+                </>
+              )}
+
+              {hasPhone && (
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="respondent-phone" className={FIELD_LABEL_CLASSES}>
+                    {parsePresetFieldLabel(survey.custom_fields, "phone")}
+                  </label>
+                  <input
+                    id="respondent-phone"
+                    ref={setFieldRef(phoneIdx)}
+                    type="tel"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    enterKeyHint={enterHintFor(phoneIdx)}
+                    required={parsePresetFieldRequired(survey.custom_fields, "phone")}
+                    value={phone}
+                    onChange={(e) => setPhone(formatUsPhone(e.target.value))}
+                    onKeyDown={(e) => onFieldKeyDown(e, phoneIdx)}
+                    disabled={loading}
+                    className={cn(FIELD_INPUT_BASE, "px-4")}
+                  />
+                </div>
+              )}
+
+              {(hasJobTitle || hasCompany) && (
+                <div
+                  className={
+                    hasJobTitle && hasCompany
+                      ? "grid grid-cols-1 gap-3 sm:grid-cols-2"
+                      : "flex flex-col gap-3"
+                  }
+                >
+                  {hasJobTitle && (
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                      <label htmlFor="respondent-job-title" className={FIELD_LABEL_CLASSES}>
+                        {parsePresetFieldLabel(survey.custom_fields, "job_title")}
+                      </label>
+                      <input
+                        id="respondent-job-title"
+                        ref={setFieldRef(jobTitleIdx)}
+                        type="text"
+                        autoComplete="organization-title"
+                        enterKeyHint={enterHintFor(jobTitleIdx)}
+                        required={parsePresetFieldRequired(survey.custom_fields, "job_title")}
+                        value={jobTitle}
+                        onChange={(e) => setJobTitle(e.target.value)}
+                        onKeyDown={(e) => onFieldKeyDown(e, jobTitleIdx)}
+                        disabled={loading}
+                        className={cn(FIELD_INPUT_BASE, "px-4")}
+                      />
+                    </div>
+                  )}
+                  {hasCompany && (
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                      <label htmlFor="respondent-company" className={FIELD_LABEL_CLASSES}>
+                        {parsePresetFieldLabel(survey.custom_fields, "company")}
+                      </label>
+                      <input
+                        id="respondent-company"
+                        ref={setFieldRef(companyIdx)}
+                        type="text"
+                        autoComplete="organization"
+                        enterKeyHint={enterHintFor(companyIdx)}
+                        required={parsePresetFieldRequired(survey.custom_fields, "company")}
+                        value={company}
+                        onChange={(e) => setCompany(e.target.value)}
+                        onKeyDown={(e) => onFieldKeyDown(e, companyIdx)}
+                        disabled={loading}
+                        className={cn(FIELD_INPUT_BASE, "px-4")}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {hasLinkedin && (
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="respondent-linkedin" className={FIELD_LABEL_CLASSES}>
+                    {parsePresetFieldLabel(survey.custom_fields, "linkedin")}
+                  </label>
+                  <input
+                    id="respondent-linkedin"
+                    ref={setFieldRef(linkedinIdx)}
+                    type="url"
+                    autoComplete="url"
+                    inputMode="url"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    enterKeyHint={enterHintFor(linkedinIdx)}
+                    required={parsePresetFieldRequired(survey.custom_fields, "linkedin")}
+                    value={linkedin}
+                    onChange={(e) => setLinkedin(e.target.value)}
+                    onKeyDown={(e) => onFieldKeyDown(e, linkedinIdx)}
+                    disabled={loading}
+                    className={cn(FIELD_INPUT_BASE, "px-4")}
+                  />
+                </div>
+              )}
+
+              {customFieldDefs.map((field, i) => (
+                <div key={field.key} className="flex flex-col gap-1.5">
+                  <label htmlFor={`respondent-custom-${field.key}`} className={FIELD_LABEL_CLASSES}>
+                    {field.required ? `${field.label} *` : field.label}
+                  </label>
+                  <input
+                    id={`respondent-custom-${field.key}`}
+                    ref={setFieldRef(customFieldIdxs[i])}
+                    type="text"
+                    enterKeyHint={enterHintFor(customFieldIdxs[i])}
+                    required={field.required === true}
+                    value={customFieldValues[field.key] ?? ""}
+                    onChange={(e) =>
+                      setCustomFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                    }
+                    onKeyDown={(e) => onFieldKeyDown(e, customFieldIdxs[i])}
+                    disabled={loading}
+                    className={cn(FIELD_INPUT_BASE, "px-4")}
+                  />
+                </div>
+              ))}
+
+              {error && <p className="text-sm text-survey-danger">{error}</p>}
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className={cn(PILL_BUTTON, "survey-intro-rise-5 mt-7 flex w-fit")}
+            >
+              {loading ? "Starting…" : "Start"}
+              <PillArrow />
+            </button>
+          </form>
+
+          {/* Desktop-only: the one hint left here describes a physical Enter
+              key, so the whole line is hidden on phones rather than leaving
+              an empty box under the button. The email field's own helper
+              text already says where the gift card goes; nothing about the
+              incentive is repeated here. */}
+          <div className="survey-intro-rise-6 mt-3.5 hidden text-balance text-[13.5px] text-survey-faint sm:block">
+            <span>Press Enter to move between fields</span>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Completion / thank-you screen (design_handoff_survey_thanks) — matches the
+  // welcome screen's editorial system. One layout, one boolean: the
+  // showResponses toggle only mounts/unmounts the transcript below the pill;
+  // nothing above it restyles or re-lays-out between states (the fix for the
+  // old two-different-UIs bug).
+  if (stage === "complete") {
+    const hasIncentive = survey.gift_card_amount != null;
+    return (
+      <div
+        className={cn(
+          bricolage.variable,
+          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-survey-ink"
+        )}
+        style={{ background: "hsl(var(--sv-ground))" }}
+      >
+        <TestModeBadge isTest={isTest} />
+        <StudyThemeToggle offsetForBadge={isTest} />
+
+        <AmbientBackdrop />
+
+        <main className="relative flex flex-1 items-center justify-center px-5 pb-10 pt-14 sm:px-8 sm:pb-12 sm:pt-20">
+          <div className="flex w-full max-w-[640px] flex-col items-center text-center">
+            {/* Check + sticker cluster (decorative). */}
+            <div aria-hidden="true" className="sw-rev relative mb-[22px] h-[86px] w-[180px]">
+              <span className="sw-clusternote-a absolute left-[38px] top-0 text-[17px]" style={{ color: "hsl(var(--sv-accent))", opacity: 0 }}>
+                &#9834;
+              </span>
+              <span className="sw-clusternote-b absolute left-[130px] top-[14px] text-[14px]" style={{ color: "hsl(var(--sv-faint))", opacity: 0 }}>
+                &#9835;
+              </span>
+              <span className="sw-bird absolute bottom-0 left-[53px] flex h-[74px] w-[74px] items-center justify-center rounded-full border border-survey-border bg-survey-accent-bg">
+                <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+                  <path
+                    d="M7.5 15.5 L13 21 L23 9.5"
+                    stroke="hsl(var(--sv-accent))"
+                    strokeWidth="2.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="26"
+                    className="sw-check"
+                  />
+                </svg>
+              </span>
+              {hasIncentive && (
+                <div
+                  className="sw-sticker absolute right-[-46px] top-[-12px] h-[92px] w-[92px]"
+                  style={{ transform: "rotate(8deg)" }}
+                >
+                  <svg
+                    viewBox="0 0 100 100"
+                    className="absolute inset-0"
+                    style={{ filter: "drop-shadow(var(--sv-drop-mascot))" }}
+                  >
+                    <polygon
+                      points="100,50 83.3,63.8 85.4,85.4 63.8,83.3 50,100 36.2,83.3 14.6,85.4 16.7,63.8 0,50 16.7,36.2 14.6,14.6 36.2,16.7 50,0 63.8,16.7 85.4,14.6 83.3,36.2"
+                      fill="hsl(var(--sv-butter))"
+                      stroke="hsl(var(--sv-ink))"
+                      strokeWidth="2.5"
+                    />
+                  </svg>
+                  <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-survey-ink">
+                    <span className="text-[18px] font-bold italic">${survey.gift_card_amount}</span>
+                    <span className="text-[10px] font-semibold tracking-[0.02em]">on its way</span>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <h1
+              className="sw-rev m-0 mb-[18px] text-balance font-bricolage text-[34px] font-bold leading-[1.06] tracking-[-0.025em] sm:text-[52px]"
+              style={{ "--sw-delay": "0.08s" } as React.CSSProperties}
+            >
+              That&apos;s everything. Thank you.
+            </h1>
+
+            <p
+              className="sw-rev text-pretty m-0 mb-9 max-w-[520px] text-[16px] leading-[1.6] text-survey-muted sm:text-[17px]"
+              style={{ "--sw-delay": "0.16s" } as React.CSSProperties}
+            >
+              {closingMessage}
+              {hasIncentive && (
+                <>
+                  {" "}
+                  The{" "}
+                  <span className="font-semibold text-survey-ink">${survey.gift_card_amount} gift card</span>{" "}
+                  will land in your inbox within a day or two.
+                </>
+              )}
+            </p>
+
+            {/* The toggle and the transcript share one wrapper: only the
+                transcript mounts/unmounts, so the pill never moves relative to
+                the content above it. */}
+            <div
+              className="sw-rev flex w-full flex-col items-center"
+              style={{ "--sw-delay": "0.24s" } as React.CSSProperties}
+            >
+              {/* Hidden when there is no transcript to show, which happens
+                  when this tab resumed straight into an interview that was
+                  already finished: the resume payload carries the closing
+                  line, not the conversation. */}
+              {messages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowResponses((prev) => !prev)}
+                  aria-expanded={showResponses}
+                  className="inline-flex touch-manipulation items-center gap-2.5 rounded-full border-[1.5px] border-survey-border bg-transparent px-6 py-3 text-[15px] font-semibold text-survey-muted transition-colors duration-[250ms] motion-reduce:transition-none [@media(hover:hover)]:hover:border-survey-accent [@media(hover:hover)]:hover:text-survey-accent"
+                >
+                  {showResponses ? "Hide your responses" : "See your responses"}
+                  <svg
+                    width="14"
+                    height="9"
+                    viewBox="0 0 14 9"
+                    fill="none"
+                    aria-hidden="true"
+                    className={cn(
+                      "transition-transform duration-300 motion-reduce:transition-none",
+                      showResponses && "rotate-180"
+                    )}
+                  >
+                    <path
+                      d="M1.5 1.5 L7 7 L12.5 1.5"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              )}
+
+              {showResponses && (
+                <div className="mt-[34px] flex w-full max-w-[600px] flex-col gap-3.5 text-left">
+                  <div
+                    className="sw-bubble mb-1 self-center text-[12.5px] font-semibold tracking-[0.08em] text-survey-faint"
+                    style={{ "--sw-bubble-delay": "0s" } as React.CSSProperties}
+                  >
+                    YOUR RESPONSES
+                  </div>
+                  {messages.map((m, i) => {
+                    const isInterviewer = m.role === "assistant";
+                    return (
+                      <div
+                        key={i}
+                        className={cn(
+                          "sw-bubble whitespace-pre-wrap break-words text-[15.5px] leading-[1.6]",
+                          isInterviewer
+                            ? "max-w-[86%] self-start rounded-[16px_16px_16px_5px] border border-survey-border bg-survey-surface px-5 py-3.5 text-survey-ink shadow-[var(--sv-shadow-bubble)]"
+                            : "max-w-[78%] self-end rounded-[16px_16px_5px_16px] bg-survey-accent px-[18px] py-3 text-survey-raised"
+                        )}
+                        style={{ "--sw-bubble-delay": `${0.05 + i * 0.07}s` } as React.CSSProperties}
+                      >
+                        {isInterviewer ? renderWithBold(m.content) : m.content}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
+
+        <footer
+          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-[34px] pt-[26px]"
+          style={{ "--sw-delay": "0.34s" } as React.CSSProperties}
+        >
+          <PoweredBy />
+        </footer>
+      </div>
+    );
+  }
+
+  // Question screen (design_handoff_survey_question). One column, no logo:
+  // progress pills, the interviewer speaking from a bubble, quick-answer
+  // chips, a two-row answer box, then Send / Skip. Every
+  // value (colours, radii, shadows, easings) is the handoff's, routed through
+  // the --sv-* tokens so the dark theme still holds.
+  const answeredCount = messages.filter((m) => m.role === "user").length;
+  const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant")?.content ?? "";
+  // Drives the progress pills and the "X of Y" counter. The same count the
+  // welcome screen quotes and the server enforces, so all three agree.
+  const targetQuestionCount = questionCount ?? DEFAULT_TARGET_QUESTION_COUNT;
+  const currentQuestionNumber = displayedQuestionNumber(answeredCount, targetQuestionCount);
+  const hasAnswer = pickedChipIndex !== null || answer.trim().length > 0;
+  // A restored question was already on screen before the reload, so replaying
+  // its entrance would animate in something the respondent has been reading
+  // for a while. Suppressed for that first render only; the moment they
+  // answer, messages.length moves past the restored count and every
+  // subsequent question reveals normally.
+  const isRestoredRender = restoredMessageCount !== null && messages.length === restoredMessageCount;
+  // Staggered entrance: opacity 0 -> 1, translateY(14px -> 0), .6s on the
+  // reveal easing, delayed per block (0 / .06 / .18 / .24 / .3 / .4s).
+  // globals.css gates the animation on prefers-reduced-motion.
+  const reveal = (delaySeconds: number): { className?: string; style?: React.CSSProperties } =>
+    isRestoredRender
+      ? {}
+      : { className: "sq-rev", style: { "--sq-delay": `${delaySeconds}s` } as React.CSSProperties };
+
+  const { lead, question } = splitQuestion(lastAssistantMessage);
+  const segments = questionSegments(question);
+
+  return (
+    <div
+      className={cn(
+        bricolage.variable,
+        "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[16px] text-survey-ink"
+      )}
+      data-keyboard={keyboardInset > 0 ? "open" : undefined}
+      style={
+        {
+          background: SURVEY_GROUND,
+          "--kb-inset": `${keyboardInset}px`,
+        } as React.CSSProperties
+      }
+    >
+      <AmbientBackdrop />
+      <TestModeBadge isTest={isTest} />
+      <StudyThemeToggle offsetForBadge={isTest} />
+
+      {/* On phones the fixed theme toggle (and, for an owner preview, the
+          test-mode pill above it) sits in the top-right corner where the
+          progress label would be, so the stage starts below them. From sm up
+          the column is centred with room on both sides and the handoff's
+          24px top padding applies. */}
+      <div
+        ref={stageRef}
+        className={cn(
+          "survey-stage relative flex flex-1 justify-center px-5 pb-3 sm:px-8 sm:pt-6 short:pb-2 short:sm:pt-4",
+          isTest ? "pt-[104px]" : "pt-[64px]"
+        )}
+      >
+        {/* my-auto rather than items-center on the stage: auto margins
+            center the column when there's room and collapse to 0 when it
+            overflows, so a scrolling stage starts at the top of the
+            question instead of clipping it. */}
+        <div className="my-auto flex w-full max-w-[680px] flex-col">
+          {/* Hidden live regions, always mounted (a live region only fires
+              if it exists before its content changes). Two separate regions
+              on purpose: the question region's content is derived from
+              `messages`, which updates exactly once per question, so each
+              question is announced once, in full, regardless of the visual
+              entrance. The status region handles transient state (typing,
+              send failure); it flips to "" when the question lands, and an
+              empty update announces nothing. Politeness is deliberate: no
+              assertive interruptions anywhere. */}
+          <div aria-live="polite" aria-atomic="true" className="sr-only">
+            {stripBold(lastAssistantMessage)}
+          </div>
+          <div role="status" className="sr-only">
+            {isTyping
+              ? "The interviewer is typing…"
+              : error
+                ? `${error}${failedMessage ? " Your answer was not sent. Use the Retry button to send it again." : ""}`
+                : ""}
+          </div>
+
+          {/* Progress. Mounted once for the whole chat stage (not keyed on
+              the question) so the pills transition between states with the
+              spring rather than remounting. */}
+          <div
+            className={cn("mb-6 flex items-center gap-3.5 short:mb-4 xshort:mb-3", reveal(0).className)} style={reveal(0).style}
+            role="progressbar"
+            aria-valuemin={1}
+            aria-valuemax={targetQuestionCount}
+            aria-valuenow={currentQuestionNumber}
+            aria-label={`Question ${currentQuestionNumber} of ${targetQuestionCount}`}
+          >
+            <div aria-hidden="true" className="flex h-1.5 flex-1 gap-[5px]">
+              {Array.from({ length: targetQuestionCount }, (_, k) => (
+                <div
+                  key={k}
+                  className="sq-pip flex-1 rounded-[3px] bg-survey-border"
+                  data-state={k < currentQuestionNumber - 1 ? "done" : k === currentQuestionNumber - 1 ? "now" : "todo"}
+                />
+              ))}
+            </div>
+            <div className="whitespace-nowrap text-[13.5px] font-semibold tabular-nums text-survey-muted">
+              {currentQuestionNumber} of {targetQuestionCount}
+            </div>
+          </div>
+
+          {/* Keyed on messages.length so the staggered entrance replays once
+              per new question. The key changes only when a message is
+              appended, never mid-animation, so the reveal can't double-fire.
+              While the interviewer is "typing" the same block shows the
+              avatar and an empty bubble carrying the loader, so the layout
+              holds its shape between questions. */}
+          <div key={messages.length} className="flex flex-col">
+            <div className={cn("mb-4 flex items-start gap-3.5 short:mb-3 xshort:mb-2.5", reveal(0.06).className)} style={reveal(0.06).style}>
+              <div
+                aria-hidden="true"
+                className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-survey-ink"
+                style={{ boxShadow: "var(--sv-shadow-avatar)" }}
+              >
+                <WelcomeBird width={24} height={22} fill="hsl(var(--sv-ground))" className="sw-bird" />
+                <span
+                  className="sq-avatar-note absolute right-[-6px] top-[-10px] text-[15px]"
+                  style={{ color: "hsl(var(--sv-accent))", opacity: 0 }}
+                >
+                  &#9834;
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div
+                  className="rounded-[4px_22px_22px_22px] border border-survey-border bg-survey-surface px-6 pb-5 pt-[18px] short:pb-4 short:pt-3.5 xshort:px-5 xshort:pb-3.5 xshort:pt-3"
+                  style={{ boxShadow: "var(--sv-shadow-speech)" }}
+                >
+                  {isTyping ? (
+                    <div
+                      aria-hidden="true"
+                      className={cn(
+                        "flex min-h-[40px] items-center motion-safe:transition-opacity motion-safe:duration-150",
+                        dotsLeaving && "opacity-0"
+                      )}
+                    >
+                      {showBirdLoader && <BirdLoader />}
+                    </div>
+                  ) : (
+                    <>
+                      {lead && (
+                        <div className="text-pretty mb-2.5 text-[16px] leading-[1.55] text-survey-muted short:mb-2 short:text-[15px] xshort:text-[14px] xshort:leading-[1.5]">
+                          {stripBold(lead)}
+                        </div>
+                      )}
+                      <h1 className="m-0 text-balance break-words font-bricolage text-[24px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[28px] short:sm:text-[24px] xshort:sm:text-[22px]">
+                        {segments.pre}
+                        {segments.highlight && <span className="sq-mark">{segments.highlight}</span>}
+                        {segments.post}
+                      </h1>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {!isTyping && (
+              <>
+                {failedMessage && (
+                  <div className="mb-5 flex flex-col items-end gap-1.5">
+                    <div className={cn(RESPONDENT_BUBBLE, "opacity-60")}>{failedMessage}</div>
+                    <div className="flex items-center gap-2 text-xs text-survey-danger">
+                      <span>Failed to send</span>
+                      <button
+                        type="button"
+                        onClick={retrySend}
+                        disabled={loading}
+                        aria-label="Retry sending your answer"
+                        className="inline-flex min-h-[44px] touch-manipulation items-center px-2 font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-survey-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:opacity-80"
+                      >
+                        {loading ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            {showRetryLoader && <BirdLoader size={18} label={false} />}
+                            Retrying…
+                          </span>
+                        ) : (
+                          "Retry"
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <form onSubmit={handleSend} className="flex flex-col">
+                  {chips.length > 0 && (
+                    // Wrap, not horizontal scroll: a scroller hides options
+                    // off the right edge and its swipe competes with
+                    // scrolling the stage when the keyboard is up.
+                    <div className={cn("mb-3 short:mb-2.5", reveal(0.18).className)} style={reveal(0.18).style}>
+                      <div className="flex flex-wrap gap-2.5 short:gap-2">
+                        {chips.map((chip, i) => {
+                          const picked = pickedChipIndex === i;
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => handleChipTap(i)}
+                              disabled={loading}
+                              aria-label={`Quick answer: ${chip}`}
+                              aria-pressed={picked}
+                              className="sq-chip inline-flex min-h-[44px] touch-manipulation items-center break-words rounded-full border-[1.5px] border-survey-border bg-survey-surface px-5 py-3 text-left text-[15.5px] font-medium text-survey-ink short:min-h-[40px] short:px-4 short:py-2.5 xshort:min-h-[36px] xshort:py-2 xshort:text-[15px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-survey-accent focus-visible:ring-offset-2 focus-visible:ring-offset-survey-ground disabled:cursor-not-allowed"
+                            >
+                              <span className="sq-tick" aria-hidden="true">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                  <path
+                                    d="M2.5 7.5l3 3 6-6.5"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              </span>
+                              {chip}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={cn("relative mb-3 short:mb-2.5", reveal(0.24).className)} style={reveal(0.24).style}>
+                    <textarea
+                      ref={answerInputRef}
+                      aria-label="Your answer"
+                      placeholder={chips.length > 0 ? "Or type your own answer" : "Type your answer"}
+                      value={answer}
+                      onChange={(e) => {
+                        setAnswer(e.target.value);
+                        lastKeystrokeAtRef.current = Date.now();
+                      }}
+                      onKeyDown={handleAnswerKeyDown}
+                      rows={2}
+                      disabled={loading}
+                      enterKeyHint="send"
+                      // Two rows, scrolling past that: the handoff's fixed
+                      // height is what keeps the whole screen inside 100vh.
+                      // text-[17px] also clears iOS Safari's 16px auto-zoom
+                      // threshold.
+                      className="block w-full touch-manipulation resize-none overflow-y-auto rounded-[20px] border-[1.5px] border-survey-border bg-survey-surface px-[22px] pb-[34px] pt-4 text-[17px] leading-[1.55] text-survey-ink short:pb-[26px] short:pt-3 short:text-[16px] xshort:pb-[22px] xshort:pt-2.5 [transition:border-color_0.2s_ease,box-shadow_0.2s_ease] placeholder:text-survey-faint focus:border-survey-ink focus:outline-none focus:ring-4 focus:ring-survey-ink/[0.08] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
+                      style={{ boxShadow: "var(--sv-shadow-soft)" }}
+                    />
+                    {answer.length > 0 && (
+                      <div aria-hidden="true" className="pointer-events-none absolute bottom-3.5 right-[18px] text-[12.5px] tabular-nums text-survey-faint short:bottom-2.5 xshort:bottom-2">
+                        {answer.length} chars
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={cn("flex flex-wrap items-center gap-x-[18px] gap-y-3", reveal(0.3).className)} style={reveal(0.3).style}>
+                    <button
+                      type="submit"
+                      disabled={!hasAnswer || loading}
+                      className={cn(
+                        "inline-flex touch-manipulation items-center gap-3 rounded-full px-7 py-4 text-[16.5px] font-semibold short:py-3 short:text-[16px] xshort:px-6 xshort:py-2.5 [transition:transform_0.25s_ease,box-shadow_0.25s_ease,background-color_0.25s_ease,color_0.25s_ease] motion-reduce:transition-none",
+                        hasAnswer
+                          ? "bg-survey-ink text-survey-ground active:translate-y-0 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[var(--sv-shadow-press)]"
+                          : "cursor-not-allowed bg-survey-border text-survey-muted",
+                        loading && "cursor-not-allowed opacity-60"
+                      )}
+                    >
+                      Send
+                      <PillArrow />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSkip}
+                      disabled={loading}
+                      className="ml-auto flex min-h-[44px] touch-manipulation items-center text-[14px] text-survey-muted underline [text-underline-offset:3px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:text-survey-ink"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </form>
+                {error && <p className="mt-3 text-sm text-survey-danger">{error}</p>}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Footer className={reveal(0.4).className} style={reveal(0.4).style} />
+    </div>
+  );
+}

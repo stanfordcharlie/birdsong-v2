@@ -1,6 +1,6 @@
 import { customAlphabet } from "nanoid";
 
-// The token in /survey/[slug]/[token]. It is the whole credential for a
+// The token in /study/[slug]/[token]. It is the whole credential for a
 // prospect link: holding it is what proves the recipient is the person we
 // emailed, so it is generated from nanoid's crypto RNG rather than anything
 // derived from the prospect's own details.

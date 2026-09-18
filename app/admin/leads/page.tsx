@@ -119,7 +119,7 @@ export default async function LeadsPage({
           action={
             canCreateStudy ? (
               <Button asChild size="sm">
-                <Link href="/admin/surveys/new">New study</Link>
+                <Link href="/admin/projects/new">New study</Link>
               </Button>
             ) : undefined
           }

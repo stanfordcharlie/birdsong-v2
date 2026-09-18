@@ -12,7 +12,7 @@
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import Anthropic from "@anthropic-ai/sdk";
-import { renderGuideToText, type StructuredGuide } from "../../lib/surveys/guide";
+import { renderGuideToText, type StructuredGuide } from "../../lib/studies/guide";
 import type { ExtractedBrief } from "../../lib/brief/types";
 import type { BriefMessage } from "../../lib/brief/types";
 
@@ -118,7 +118,7 @@ async function main() {
   const questionGuide = renderGuideToText(run.guide);
   const slug = `verify-brief-${Date.now().toString(36)}`;
 
-  // The same payload shape NewSurveyWizard.createSurvey builds.
+  // The same payload shape NewStudyWizard.createSurvey builds.
   const { data: created, error } = await admin
     .from("surveys")
     .insert({

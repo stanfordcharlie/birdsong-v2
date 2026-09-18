@@ -15,7 +15,7 @@ import {
   type Column,
 } from "@/components/admin/ui";
 import { LeadStatusBadge } from "@/components/admin/LeadStatusBadge";
-import { SurveyFilterCards, type SurveyCard } from "./SurveyFilterCards";
+import { StudyFilterCards, type StudyFilterCard } from "./StudyFilterCards";
 import { EMPTY_VALUE } from "@/lib/format";
 import { isWorthACall, WORTH_A_CALL_SCORE_MIN } from "@/lib/leads";
 import { isClosedStatus, type LeadStatus } from "@/lib/leads/state";
@@ -130,7 +130,7 @@ export function LeadsQueue({
   useEffect(() => setLeads(items), [items]);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<QueueTab>(initialTab);
-  // null = the "All studies" chip. Driven by SurveyFilterCards above the
+  // null = the "All studies" chip. Driven by StudyFilterCards above the
   // queue, which replaced the toolbar's survey <select>.
   const [surveyFilter, setSurveyFilter] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<string>("all");
@@ -165,8 +165,8 @@ export function LeadsQueue({
   // Only surveys that actually have completed responses can produce rows, so
   // the chips are derived from the rows themselves rather than from the
   // survey list: a survey nobody has finished has nothing to show here.
-  const surveyCards = useMemo<SurveyCard[]>(() => {
-    const bySurvey = new Map<string, SurveyCard>();
+  const surveyCards = useMemo<StudyFilterCard[]>(() => {
+    const bySurvey = new Map<string, StudyFilterCard>();
     for (const lead of visibleLeads) {
       let card = bySurvey.get(lead.surveyId);
       if (!card) {
@@ -482,7 +482,7 @@ export function LeadsQueue({
       <StatRow stats={stats} className="mb-6" />
 
       <div className="mb-4">
-        <SurveyFilterCards cards={surveyCards} selectedId={surveyFilter} onSelect={setSurveyFilter} />
+        <StudyFilterCards cards={surveyCards} selectedId={surveyFilter} onSelect={setSurveyFilter} />
       </div>
 
       {/* One toolbar row: which leads (tabs) on the left, search, source and

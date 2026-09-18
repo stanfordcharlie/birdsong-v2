@@ -5,7 +5,7 @@
 // admin roster (copy and open), and anything that later emails it. A link
 // that differs between the file and the screen is the bug this prevents.
 export function prospectLinkFor(origin: string, slug: string, token: string): string {
-  return `${origin.replace(/\/+$/, "")}/survey/${slug}/${token}`;
+  return `${origin.replace(/\/+$/, "")}/study/${slug}/${token}`;
 }
 
 // Where the link should point when it is generated on the server.

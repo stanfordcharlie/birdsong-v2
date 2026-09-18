@@ -39,8 +39,8 @@ const PAGES: { href: string; label: string; description: string; also: string[] 
   { href: "/admin", label: "Home", description: "What is live and what needs you", also: ["dashboard", "overview"] },
   { href: "/admin/leads", label: "Leads", description: "Every completed interview, hottest first", also: ["queue", "calls", "worth a call"] },
   { href: "/admin/live", label: "Live", description: "Interviews happening right now", also: ["in progress", "now"] },
-  { href: "/admin/surveys", label: "Projects", description: "All of your studies", also: ["studies", "study", "research"] },
-  { href: "/admin/surveys/new", label: "New study", description: "Start a study", also: ["create", "brief", "start"] },
+  { href: "/admin/projects", label: "Projects", description: "All of your studies", also: ["studies", "study", "research"] },
+  { href: "/admin/projects/new", label: "New study", description: "Start a study", also: ["create", "brief", "start"] },
   { href: "/admin/profile", label: "Company profile", description: "What you sell and who you sell to", also: ["company", "icp", "value proposition"] },
   { href: "/admin/settings", label: "Settings", description: "Account, email, password, notifications, sample data", also: ["account", "slack", "preferences"] },
   { href: "/admin/settings/team", label: "Team", description: "Who is in your workspace", also: ["members", "invite", "teammates", "workspace"] },
@@ -67,7 +67,7 @@ function toRows(results: SearchResults): { studies: Row[]; respondents: Row[] } 
   return {
     studies: results.studies.map((s) => ({
       key: `study:${s.id}`,
-      href: `/admin/surveys/${s.id}`,
+      href: `/admin/projects/${s.id}`,
       primary: s.title,
       secondary: s.topic,
       score: null,

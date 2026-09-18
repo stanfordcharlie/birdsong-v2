@@ -10,7 +10,7 @@ const CONTACT_EMAIL = "charlie@usebirdsong.com";
 
 export const metadata: Metadata = {
   title: "Privacy Policy · Birdsong",
-  description: "How Birdsong collects, uses, and shares information from survey respondents.",
+  description: "How Birdsong collects, uses, and shares information from study respondents.",
 };
 
 export default function PrivacyPage() {
@@ -19,17 +19,17 @@ export default function PrivacyPage() {
       <p>
         This Privacy Policy explains how Birdsong handles information when you take part in a
         research conversation on our platform. Birdsong runs short, AI moderated interviews on
-        behalf of the company that commissioned the survey (the &ldquo;sponsor&rdquo;). By taking
+        behalf of the company that commissioned the study (the &ldquo;sponsor&rdquo;). By taking
         part, you agree to the handling of information described here.
       </p>
 
       <h2>Information we collect from respondents</h2>
-      <p>When you take part in a survey, we collect:</p>
+      <p>When you take part in a study, we collect:</p>
       <ul>
         <li>
           <strong>Contact and profile details you provide</strong> before the interview: your name,
           your email address, and, when the sponsor asks for them, your phone number and any custom
-          fields the survey defines (for example job title, organization, or a LinkedIn URL).
+          fields the study defines (for example job title, organization, or a LinkedIn URL).
         </li>
         <li>
           <strong>The full interview transcript:</strong> everything you type in response to the
@@ -45,7 +45,7 @@ export default function PrivacyPage() {
       <p>
         The interview is conducted by an AI interviewer, not a live person. It asks follow up
         questions based on what you say so the conversation stays relevant. The interview is run on
-        behalf of the sponsor who commissioned the survey.
+        behalf of the sponsor who commissioned the study.
       </p>
 
       <h2>How we use your information</h2>
@@ -59,7 +59,7 @@ export default function PrivacyPage() {
       <h2>How we share your information</h2>
       <p>
         <strong>With the sponsor.</strong> Your responses, including the full transcript and the
-        analysis derived from it, are shared with the sponsor who commissioned the survey. The
+        analysis derived from it, are shared with the sponsor who commissioned the study. The
         sponsor may use that information for their own research and business purposes. Your contact
         details are shared with the sponsor as part of your response.
       </p>
@@ -77,15 +77,15 @@ export default function PrivacyPage() {
 
       <h2>Gift card fulfillment</h2>
       <p>
-        When a survey offers a gift card, we use the email address (and, if provided, other contact
+        When a study offers a gift card, we use the email address (and, if provided, other contact
         details) you gave us solely to confirm your completed response and deliver the gift card and
         report. We ask for a work email so we can verify and fulfill the reward.
       </p>
 
       <h2>Cookies and analytics</h2>
       <p>
-        The respondent survey does not use third party advertising or cross site tracking cookies.
-        It uses your browser&rsquo;s local storage to remember that you have completed a survey so
+        The study does not use third party advertising or cross site tracking cookies.
+        It uses your browser&rsquo;s local storage to remember that you have completed a study so
         you are not asked to repeat it. Our administrative areas use essential session cookies for
         account login.
       </p>

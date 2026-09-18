@@ -5,7 +5,7 @@ import { PageHeader, PageShell } from "@/components/admin/ui";
 import { LiveBoard, type LiveSurvey } from "./LiveBoard";
 
 // Who is in an interview right now, read entirely from Supabase Realtime
-// Presence in the browser (see lib/presence/survey-presence.ts). Nothing on
+// Presence in the browser (see lib/presence/study-presence.ts). Nothing on
 // this page is persisted or queryable after the fact: the only database read
 // here is the list of surveys to watch, which is also what scopes the page,
 // since a channel is only joined for a survey this owner actually has.

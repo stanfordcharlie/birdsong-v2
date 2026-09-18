@@ -22,7 +22,7 @@ export function AddSampleDataButton({ className }: { className?: string }) {
       const res = await fetch("/api/sample-data", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to add sample data");
-      router.push(`/admin/surveys/${data.survey_id}`);
+      router.push(`/admin/projects/${data.survey_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);

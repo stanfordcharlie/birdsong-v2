@@ -11,7 +11,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Birdsong",
     short_name: "Birdsong",
-    description: "AI-moderated survey platform for B2B demand gen.",
+    description: "AI-moderated research platform for B2B demand gen.",
     start_url: "/",
     display: "standalone",
     theme_color: "#3a6046",

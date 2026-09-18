@@ -1,4 +1,4 @@
-import type { QuestionGuideProfileContext } from "@/lib/surveys/question-guide";
+import type { QuestionGuideProfileContext } from "@/lib/studies/question-guide";
 import { REQUIRED_BRIEF_FIELDS, type ExtractedBrief } from "./types";
 
 /**

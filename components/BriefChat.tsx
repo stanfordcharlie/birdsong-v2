@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { OPENING_MESSAGE } from "@/lib/brief/prompt";
 import type { BriefMessage, ExtractedBrief } from "@/lib/brief/types";
 import type { CriticReport } from "@/lib/brief/critic";
-import type { StructuredGuide } from "@/lib/surveys/guide";
+import type { StructuredGuide } from "@/lib/studies/guide";
 import { renderWithBold } from "@/lib/chat/render-with-bold";
 import { BirdLoader } from "@/components/BirdLoader";
 

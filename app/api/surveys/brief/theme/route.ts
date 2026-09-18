@@ -5,7 +5,7 @@ import { regenerateTheme } from "@/lib/brief/generate";
 import { loadProfileContext } from "@/lib/brief/profile";
 import { getActiveOrg, requireOrgPermission } from "@/lib/org";
 import type { ExtractedBrief } from "@/lib/brief/types";
-import { isStructuredGuide, type StructuredGuide } from "@/lib/surveys/guide";
+import { isStructuredGuide, type StructuredGuide } from "@/lib/studies/guide";
 import {
   BRIEF_REQUIRED_ENV,
   briefLog,

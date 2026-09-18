@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { QuestionGuideProfileContext } from "@/lib/surveys/question-guide";
+import type { QuestionGuideProfileContext } from "@/lib/studies/question-guide";
 
 /**
  * The organization's Company Profile, read server-side.

@@ -18,31 +18,31 @@ export default function TermsPage() {
     <LegalPage title="Terms of Service" updated="July 23, 2026">
       <p>
         These Terms of Service apply when you take part in a research conversation on Birdsong. By
-        starting a survey, you agree to these terms. If you do not agree, please do not take part.
+        starting a study, you agree to these terms. If you do not agree, please do not take part.
       </p>
 
       <h2>What Birdsong is</h2>
       <p>
         Birdsong runs short, AI moderated research interviews on behalf of the company that
-        commissioned the survey (the &ldquo;sponsor&rdquo;). The interview is conducted by an AI
+        commissioned the study (the &ldquo;sponsor&rdquo;). The interview is conducted by an AI
         interviewer, and your responses are shared with the sponsor. How we handle your information
         is described in our <a href="/privacy">Privacy Policy</a>.
       </p>
 
       <h2>Eligibility</h2>
       <p>
-        You must be at least 18 years old to take part. By starting a survey, you confirm that you
+        You must be at least 18 years old to take part. By starting a study, you confirm that you
         are 18 or older.
       </p>
 
       <h2>Incentives and gift cards</h2>
       <ul>
         <li>
-          When a survey offers a gift card, it is issued for a completed, good faith response to the
+          When a study offers a gift card, it is issued for a completed, good faith response to the
           interview.
         </li>
         <li>
-          Eligibility is limited to one gift card per person per survey. Fraudulent, automated,
+          Eligibility is limited to one gift card per person per study. Fraudulent, automated,
           duplicate, or bad faith submissions void eligibility, and we may withhold or reverse a
           reward in those cases.
         </li>
@@ -61,7 +61,7 @@ export default function TermsPage() {
         <li>Answer honestly and in your own words.</li>
         <li>
           Do not submit responses through bots, scripts, or other automated means, and do not
-          attempt more than one response to the same survey.
+          attempt more than one response to the same study.
         </li>
         <li>Do not impersonate another person or misrepresent your identity or affiliation.</li>
         <li>
@@ -82,7 +82,7 @@ export default function TermsPage() {
       <p>
         To the fullest extent permitted by law, Birdsong will not be liable for any indirect,
         incidental, or consequential damages arising from your use of the platform or your
-        participation in a survey.
+        participation in a study.
       </p>
 
       <h2>Governing law</h2>

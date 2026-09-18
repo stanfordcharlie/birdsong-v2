@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveOrg, orgErrorResponse, requireOrgPermission } from "@/lib/org";
-import { suggestSurveyNames } from "@/lib/survey-onboarding/suggest";
-import type { ExtractedSurveyDetails } from "@/lib/survey-onboarding/types";
+import { suggestSurveyNames } from "@/lib/study-onboarding/suggest";
+import type { ExtractedSurveyDetails } from "@/lib/study-onboarding/types";
 
 // POST /api/surveys/suggest-names
 // Body: { details }

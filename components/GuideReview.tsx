@@ -10,7 +10,7 @@ import {
   SIGNAL_LABELS,
   type GuideTheme,
   type StructuredGuide,
-} from "@/lib/surveys/guide";
+} from "@/lib/studies/guide";
 
 /**
  * The review step. The generated guide, theme by theme, showing the

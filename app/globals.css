@@ -1399,7 +1399,7 @@ select {
   }
 }
 
-/* --- Respondent survey: mobile viewport + keyboard (app/survey/[slug]) ---
+/* --- Respondent survey: mobile viewport + keyboard (app/study/[slug]) ---
    Most respondents arrive from paid ads on a phone, so this flow is the one
    surface tuned for a 360–430px portrait viewport with the on-screen
    keyboard up. Everything below is either width-agnostic (dvh, safe-area,
@@ -1648,7 +1648,7 @@ select {
 }
 
 /* --- Survey question screen (design_handoff_survey_question) ---
-   The per-question screen in app/survey/[slug]/InterviewFlow.tsx. Reveal,
+   The per-question screen in app/study/[slug]/InterviewFlow.tsx. Reveal,
    idle loops and the avatar note run only under prefers-reduced-motion:
    no-preference; every element's resting state is its final frame. The
    state transitions on the pills and chips are gated the same way, so a

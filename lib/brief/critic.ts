@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
-import type { GuideTheme, StructuredGuide } from "@/lib/surveys/guide";
-import type { QuestionGuideProfileContext } from "@/lib/surveys/question-guide";
+import type { GuideTheme, StructuredGuide } from "@/lib/studies/guide";
+import type { QuestionGuideProfileContext } from "@/lib/studies/question-guide";
 import { regenerateTheme } from "./generate";
 import { BANNED_QUESTION_TERMS, QUESTION_RULES, YES_NO_OPENERS } from "./rules";
 import type { ExtractedBrief } from "./types";

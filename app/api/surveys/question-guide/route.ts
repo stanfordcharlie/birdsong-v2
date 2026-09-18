@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveOrg, orgErrorResponse, requireOrgPermission } from "@/lib/org";
-import { generateQuestionGuide } from "@/lib/surveys/question-guide";
+import { generateQuestionGuide } from "@/lib/studies/question-guide";
 
 // POST /api/surveys/question-guide
 // Body: { title?, topic?, tone?, existing_guide? }
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   const { title, topic, tone, existing_guide } = body;
 
   if (!title && !topic) {
-    return NextResponse.json({ error: "Give the survey a title or topic first" }, { status: 400 });
+    return NextResponse.json({ error: "Give the study a title or topic first" }, { status: 400 });
   }
 
   const org = await getActiveOrg();

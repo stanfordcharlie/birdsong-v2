@@ -12,7 +12,7 @@ proposed by this document.
 | Surface | Design system | Tokens |
 |---|---|---|
 | **Admin** (`app/admin/**`, `components/admin/**`, `AdminSidebar`) | This document | `--ds-*` |
-| Respondent survey (`app/survey/[slug]`) | Its own, light + dark | `--sv-*` |
+| Respondent survey (`app/study/[slug]`) | Its own, light + dark | `--sv-*` |
 | Marketing (`app/page.tsx`, `app/customer-success`, `/terms`, `/privacy`) | Its own | `--lp-*` |
 | Auth screens (`components/auth/AuthScreen.tsx`, login, signup) | Its own (`design_handoff_auth`) | Bricolage Grotesque, local literals |
 
@@ -35,8 +35,8 @@ respondent survey, marketing    ->  components/ui
 `components/ui/{button,card,badge}.tsx` and `components/admin/ui/{Button,Card,Badge}.tsx`
 are **intentionally forked**. They are not duplicates awaiting cleanup.
 
-The `components/ui` copies are consumed by the respondent survey, `NewSurveyWizard`,
-`SurveyForm` and the marketing pages, all of which are out of scope for the admin design
+The `components/ui` copies are consumed by the respondent survey, `NewStudyWizard`,
+`StudyForm` and the marketing pages, all of which are out of scope for the admin design
 system. Unifying them would mean redesigning those surfaces, which is a different
 project.
 

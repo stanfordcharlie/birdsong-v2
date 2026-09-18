@@ -21,7 +21,7 @@ export async function AccountHeader() {
             href="/admin"
             className="text-sidebar-foreground transition-colors hover:text-sidebar-active-foreground"
           >
-            Surveys
+            Projects
           </Link>
           <Link
             href="/admin/profile"

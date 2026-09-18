@@ -28,7 +28,7 @@ import { Section } from "./Section";
 //   - Sections are ruled, not carded: whitespace and a hairline separate
 //     them. A quote gets a left rule, never a filled block.
 //
-// Split from page.tsx (the shape app/admin/surveys/[id] also uses) so the
+// Split from page.tsx (the shape app/admin/projects/[id] also uses) so the
 // rendering is one pure function of plain data.
 
 /**
@@ -139,7 +139,7 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
         eyebrow={
           survey ? (
             <Link
-              href={`/admin/surveys/${survey.id}`}
+              href={`/admin/projects/${survey.id}`}
               className="focus-ring rounded-control transition-colors hover:text-card-foreground"
             >
               {survey.title}
