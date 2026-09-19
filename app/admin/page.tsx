@@ -264,7 +264,12 @@ export default async function AdminHomePage() {
   // clips under a fade rather than pushing the page taller. Below `lg` the
   // columns stack and the page scrolls as normal.
   return (
-    <PageShell className="min-h-[calc(100vh-2*var(--ds-container-pad-y))] lg:h-[calc(100vh-2*var(--ds-container-pad-y))]">
+    // min-h, not h, on large screens: the hero row fills whatever the
+    // viewport leaves when the page is short, and the page grows (and
+    // scrolls) instead of crushing the hero when the launch checklist makes
+    // it tall. A fixed height here is what once clipped the Live now card
+    // to a 96px strip with its title spilling out.
+    <PageShell className="min-h-[calc(100vh-2*var(--ds-container-pad-y))]">
       {/* relative z-10: bs-rise leaves the header with a transform, so it
           is its own stacking context and the search popover inside it would
           otherwise paint under the composer and the rail. */}
@@ -284,10 +289,12 @@ export default async function AdminHomePage() {
           <HomeComposer href={newStudyHref} />
         </div>
 
-        {/* The one row is minmax(0, 1fr), not auto: an auto row sizes to its
-            content, so the hero's max-h-full would resolve against the
-            content instead of the space that is actually left. */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-8 lg:grid-cols-3 lg:grid-rows-[minmax(0,1fr)] lg:items-start">
+        {/* The one row is minmax(min-content, 1fr), not auto and not
+            minmax(0, 1fr): 1fr lets the hero's max-h-full resolve against the
+            space actually left, and the min-content floor means that space
+            is never less than the hero's own copy column. Below that floor
+            the page gets taller rather than the card getting clipped. */}
+        <div className="grid flex-1 grid-cols-1 gap-8 lg:grid-cols-3 lg:grid-rows-[minmax(min-content,1fr)] lg:items-start">
           {/* max-h-full is what caps the hero card at the row's height; the
               card itself shrinks its transcript panel to fit. */}
           <div className="bs-rise-3 flex min-h-0 max-h-full flex-col lg:col-span-2">

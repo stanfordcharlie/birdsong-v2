@@ -183,10 +183,10 @@ function TranscriptPanel({ preview }: { preview: TranscriptPreview | null }) {
 
 export function HeroStudyCard({ study }: { study: HeroStudy }) {
   return (
-    // The single grid row is minmax(0, 1fr) rather than auto so the card can
-    // be shorter than its transcript; the panel clips, the copy column never
-    // does.
-    <Card className="grid min-h-0 gap-6 md:grid-cols-2 md:grid-rows-[minmax(0,1fr)]">
+    // The single grid row is minmax(min-content, 1fr) rather than auto so
+    // the card can be shorter than its transcript when the page has room
+    // (the panel clips) but never shorter than its own copy column.
+    <Card className="grid min-h-0 gap-6 md:grid-cols-2 md:grid-rows-[minmax(min-content,1fr)]">
       <div className="flex min-h-0 flex-col gap-4">
         <div className="flex items-center gap-2">
           <StatusDot live pulse />
