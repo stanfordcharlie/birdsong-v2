@@ -264,15 +264,16 @@ export function ProspectsView({
 
   // Widths are fractions that sum to 1, so the table uses the whole row
   // before any cell truncates; the fixed steps it used to mix in left a
-  // third of the width idle while emails were cut short. Email and company
-  // get the most room, title the least: title is the noisiest column.
+  // third of the width idle while emails were cut short. Email gets the
+  // most room, title the least (it is the noisiest column), and the
+  // actions column is sized for three buttons on one line.
   // Every truncating column also carries `title`, which DataTable puts on
   // the cell as a native tooltip, so a long value is still one hover away.
   const columns: Column<ProspectRow>[] = [
     {
       key: "name",
       header: "Name",
-      width: 0.19,
+      width: 0.17,
       truncate: true,
       rowLabel: true,
       sortable: true,
@@ -283,7 +284,7 @@ export function ProspectsView({
     {
       key: "title",
       header: "Title",
-      width: 0.14,
+      width: 0.13,
       truncate: true,
       title: (row) => row.title ?? undefined,
       cell: (row) => row.title ?? EMPTY_VALUE,
@@ -291,7 +292,7 @@ export function ProspectsView({
     {
       key: "company",
       header: "Company",
-      width: 0.16,
+      width: 0.13,
       truncate: true,
       title: (row) => row.company ?? undefined,
       cell: (row) => row.company ?? EMPTY_VALUE,
@@ -299,7 +300,7 @@ export function ProspectsView({
     {
       key: "email",
       header: "Email",
-      width: 0.25,
+      width: 0.24,
       truncate: true,
       title: (row) => row.email,
       cell: (row) => row.email,
@@ -313,16 +314,20 @@ export function ProspectsView({
     {
       key: "created",
       header: "Added",
-      width: 0.07,
+      width: 0.09,
       sortable: true,
       sortValue: (row) => new Date(row.createdAt).getTime(),
-      cell: (row) => <RelativeTime date={row.createdAt} />,
+      cell: (row) => (
+        <span className="whitespace-nowrap">
+          <RelativeTime date={row.createdAt} />
+        </span>
+      ),
     },
     {
       key: "link",
       header: <span className="sr-only">Study link</span>,
       align: "right",
-      width: 0.11,
+      width: 0.16,
       cell: (row) => <RowLinkActions row={row} />,
     },
   ];
