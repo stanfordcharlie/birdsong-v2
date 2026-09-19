@@ -2,7 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
 import type { GuideTheme, StructuredGuide } from "@/lib/studies/guide";
 import type { QuestionGuideProfileContext } from "@/lib/studies/question-guide";
-import { regenerateTheme } from "./generate";
+import { regenerateTheme, type ThemeDraftAttempt } from "./generate";
+import { briefLog, describeError } from "./log";
 import { BANNED_QUESTION_TERMS, QUESTION_RULES, YES_NO_OPENERS } from "./rules";
 import type { ExtractedBrief } from "./types";
 
@@ -25,11 +26,24 @@ export type CriticReport = {
   initial: QuestionVerdict[];
   /** Verdicts on what actually shipped. */
   final: QuestionVerdict[];
-  /** Themes that were redrafted, and why. */
+  /** Themes that were redrafted, and why (the critique of the first draft). */
   regenerated: { themeIndex: number; themeLabel: string; reasons: string[] }[];
-  /** Themes still failing after one regeneration. Surfaced, never hidden. */
+  /** Themes still failing after every attempt. Surfaced, never hidden. */
   unresolved: { themeIndex: number; themeLabel: string; reasons: string[] }[];
+  /** One entry per theme that went through the retry loop. */
+  attempts: { themeIndex: number; themeLabel: string; attempts: number; cleared: boolean; kept: number }[];
 };
+
+/**
+ * Attempts per theme, the initial draft included: one draft and up to two
+ * critique-aware redrafts. Not configurable on purpose. Three is where the
+ * cost of another model round trip stops buying a better question: a theme
+ * that has been told the objection twice and still fails is shown to the
+ * admin, whose judgment is cheaper than a fourth draft.
+ */
+export const MAX_THEME_ATTEMPTS = 3;
+
+const LOG_SCOPE = "brief/critic";
 
 function questionId(themeIndex: number, slot: QuestionSlot, slotIndex = 0): string {
   return slot === "probe" ? `t${themeIndex}.probe${slotIndex + 1}` : `t${themeIndex}.${slot}`;
@@ -43,22 +57,20 @@ type AddressedQuestion = {
   question: string;
 };
 
-function addressQuestions(themes: GuideTheme[]): AddressedQuestion[] {
+function addressTheme(theme: GuideTheme, themeIndex: number): AddressedQuestion[] {
   const out: AddressedQuestion[] = [];
-  themes.forEach((theme, themeIndex) => {
-    const push = (slot: QuestionSlot, question: string, slotIndex = 0) => {
-      out.push({
-        id: questionId(themeIndex, slot, slotIndex),
-        themeIndex,
-        themeLabel: theme.theme,
-        slot,
-        question,
-      });
-    };
-    push("opening", theme.opening_question);
-    theme.probes.forEach((probe, i) => push("probe", probe, i));
-    if (theme.quantification_probe.trim()) push("quantification", theme.quantification_probe);
-  });
+  const push = (slot: QuestionSlot, question: string, slotIndex = 0) => {
+    out.push({
+      id: questionId(themeIndex, slot, slotIndex),
+      themeIndex,
+      themeLabel: theme.theme,
+      slot,
+      question,
+    });
+  };
+  push("opening", theme.opening_question);
+  theme.probes.forEach((probe, i) => push("probe", probe, i));
+  if (theme.quantification_probe.trim()) push("quantification", theme.quantification_probe);
   return out;
 }
 
@@ -260,9 +272,15 @@ async function modelVerdicts(
   return failures;
 }
 
-/** One full validation sweep over a guide: lexical, then the model. */
-export async function reviewGuide(guide: StructuredGuide): Promise<QuestionVerdict[]> {
-  const questions = addressQuestions(guide.themes);
+/**
+ * One validation sweep over a set of addressed themes: lexical, then the
+ * model. `themes` carries each theme with the index it has in the guide,
+ * so the ids the model answers against are the guide's own.
+ */
+async function reviewThemes(
+  themes: { theme: GuideTheme; themeIndex: number }[]
+): Promise<QuestionVerdict[]> {
+  const questions = themes.flatMap(({ theme, themeIndex }) => addressTheme(theme, themeIndex));
   const modelFailures = await modelVerdicts(questions);
 
   const verdicts: QuestionVerdict[] = questions.map((q) => {
@@ -272,17 +290,32 @@ export async function reviewGuide(guide: StructuredGuide): Promise<QuestionVerdi
 
   // Theme-shaped failures attach to that theme's opening question, so a
   // theme missing its numeric follow-up entirely still fails something.
-  guide.themes.forEach((theme, themeIndex) => {
+  for (const { theme, themeIndex } of themes) {
     const problems = themeFailures(theme);
-    if (problems.length === 0) return;
+    if (problems.length === 0) continue;
     const opening = verdicts.find((v) => v.themeIndex === themeIndex && v.slot === "opening");
     if (opening) {
       opening.failures.push(...problems);
       opening.pass = false;
     }
-  });
+  }
 
   return verdicts;
+}
+
+/** One full validation sweep over a guide: lexical, then the model. */
+export async function reviewGuide(guide: StructuredGuide): Promise<QuestionVerdict[]> {
+  return reviewThemes(guide.themes.map((theme, themeIndex) => ({ theme, themeIndex })));
+}
+
+/**
+ * One theme on its own. The critic judges questions individually, so a
+ * theme's verdict does not depend on its neighbours; reviewing it alone is
+ * what lets one theme be retried without re-judging (and possibly newly
+ * failing) the ones that already passed.
+ */
+export async function reviewTheme(theme: GuideTheme, themeIndex: number): Promise<QuestionVerdict[]> {
+  return reviewThemes([{ theme, themeIndex }]);
 }
 
 function failuresByTheme(verdicts: QuestionVerdict[]): Map<number, string[]> {
@@ -296,9 +329,145 @@ function failuresByTheme(verdicts: QuestionVerdict[]): Map<number, string[]> {
   return byTheme;
 }
 
+/** The critique for one theme, in the form the redraft prompt and the UI both use. */
+function critiqueFor(verdicts: QuestionVerdict[], themeIndex: number): string[] {
+  return failuresByTheme(verdicts).get(themeIndex) ?? [];
+}
+
+export type ThemeRetryResult = {
+  themeIndex: number;
+  themeLabel: string;
+  /** The version that ships: the first to clear, else the least-flagged. */
+  theme: GuideTheme;
+  verdicts: QuestionVerdict[];
+  critique: string[];
+  cleared: boolean;
+  /** Attempts made, the initial draft included. */
+  attempts: number;
+  /** Which attempt's draft was kept, 1-based. */
+  kept: number;
+};
+
 /**
- * The mandatory pass. Review, redraft every failing theme once, review the
- * redrafts, and keep whichever version is better.
+ * The retry loop for one theme, with the model calls injected so the
+ * control flow can be tested without them.
+ *
+ * Attempt 1 is the initial draft, already reviewed. Each further attempt
+ * redrafts with the full history of prior drafts and their critiques in
+ * hand, re-reviews just this theme, and stops on the first clear pass. A
+ * redraft that throws or comes back unparseable is a failed attempt, not a
+ * crash: it is recorded and the loop moves on. If nothing clears, the
+ * least-flagged draft ships, flagged, and the admin decides.
+ */
+export async function retryTheme({
+  themeIndex,
+  themeLabel,
+  initialTheme,
+  initialVerdicts,
+  redraft,
+  review,
+  requestId,
+}: {
+  themeIndex: number;
+  themeLabel: string;
+  initialTheme: GuideTheme;
+  initialVerdicts: QuestionVerdict[];
+  /** Redraft given the history so far. Null means nothing parseable came back. */
+  redraft: (history: ThemeDraftAttempt[]) => Promise<GuideTheme | null>;
+  review: (theme: GuideTheme) => Promise<QuestionVerdict[]>;
+  requestId: string;
+}): Promise<ThemeRetryResult> {
+  const initialCritique = critiqueFor(initialVerdicts, themeIndex);
+  const history: ThemeDraftAttempt[] = [{ attempt: 1, theme: initialTheme, critique: initialCritique }];
+
+  let best: ThemeRetryResult = {
+    themeIndex,
+    themeLabel,
+    theme: initialTheme,
+    verdicts: initialVerdicts,
+    critique: initialCritique,
+    cleared: initialCritique.length === 0,
+    attempts: 1,
+    kept: 1,
+  };
+
+  briefLog(LOG_SCOPE, requestId, "attempt", {
+    themeIndex,
+    themeLabel,
+    attempt: 1,
+    critique: initialCritique,
+    cleared: best.cleared,
+  });
+  if (best.cleared) return best;
+
+  for (let attempt = 2; attempt <= MAX_THEME_ATTEMPTS; attempt++) {
+    const startedAt = Date.now();
+
+    let theme: GuideTheme | null = null;
+    try {
+      theme = await redraft(history);
+    } catch (err) {
+      briefLog(LOG_SCOPE, requestId, "redraft_error", { themeIndex, themeLabel, attempt, ...describeError(err) });
+    }
+
+    if (!theme) {
+      const critique = ["Redraft returned nothing usable."];
+      history.push({ attempt, theme: history[history.length - 1].theme, critique });
+      briefLog(LOG_SCOPE, requestId, "attempt", {
+        themeIndex,
+        themeLabel,
+        attempt,
+        critique,
+        cleared: false,
+        parsed: false,
+        durationMs: Date.now() - startedAt,
+      });
+      best = { ...best, attempts: attempt };
+      continue;
+    }
+
+    const verdicts = await review(theme);
+    const critique = critiqueFor(verdicts, themeIndex);
+    const cleared = critique.length === 0;
+    history.push({ attempt, theme, critique });
+    briefLog(LOG_SCOPE, requestId, "attempt", {
+      themeIndex,
+      themeLabel,
+      attempt,
+      critique,
+      cleared,
+      parsed: true,
+      durationMs: Date.now() - startedAt,
+    });
+
+    // The least-flagged draft wins, later attempts winning ties: the
+    // redraft was told about every earlier objection, so at equal flag
+    // counts it is the one that has not reintroduced an old problem.
+    if (cleared || critique.length <= best.critique.length) {
+      best = { themeIndex, themeLabel, theme, verdicts, critique, cleared, attempts: attempt, kept: attempt };
+    } else {
+      best = { ...best, attempts: attempt };
+    }
+    if (cleared) break;
+  }
+
+  briefLog(LOG_SCOPE, requestId, "theme_result", {
+    themeIndex,
+    themeLabel,
+    attempts: best.attempts,
+    cleared: best.cleared,
+    kept: best.kept,
+    remaining: best.critique,
+  });
+  return best;
+}
+
+/**
+ * The mandatory pass. Review the whole draft once, then put every failing
+ * theme through its own retry loop (see retryTheme), each in isolation and
+ * all in parallel: a theme that passed the first review is never re-judged
+ * or redrafted because a neighbour failed, and one theme running out of
+ * attempts changes nothing about the others.
  *
  * A theme that still fails is kept and flagged rather than dropped or
  * silently shipped: the review step renders the flag, and the person
@@ -308,89 +477,65 @@ export async function runCriticPass({
   brief,
   profile,
   guide,
+  requestId = "critic",
 }: {
   brief: ExtractedBrief;
   profile: QuestionGuideProfileContext | null;
   guide: StructuredGuide;
+  /** Carried onto every log line so an attempt can be matched to its request. */
+  requestId?: string;
 }): Promise<{ guide: StructuredGuide; report: CriticReport }> {
   const initial = await reviewGuide(guide);
+  const failing = failuresByTheme(initial);
 
-  let current: StructuredGuide = guide;
-  let verdicts = initial;
-  const regenerated: CriticReport["regenerated"] = [];
-  // Every theme gets at most one redraft, which is the contract: fail once
-  // and you are rewritten, fail twice and you are shown to the admin rather
-  // than shipped quietly.
-  const attempted = new Set<number>();
-
-  // Two rounds, because the model half of the review is not deterministic:
-  // a theme can pass the first sweep and fail the sweep that runs after its
-  // neighbours were redrafted. Without a second round that theme ships
-  // flagged having never been given its one redraft, which is the bug this
-  // loop replaced.
-  for (let round = 0; round < 2; round++) {
-    const failing = Array.from(failuresByTheme(verdicts).entries()).filter(
-      ([themeIndex]) => !attempted.has(themeIndex)
-    );
-    if (failing.length === 0) break;
-
-    failing.forEach(([themeIndex]) => attempted.add(themeIndex));
-
-    // Redrafts within a round are independent, so they go out together
-    // rather than serially.
-    const redrafts = await Promise.all(
-      failing.map(async ([themeIndex, reasons]) => {
-        try {
-          const theme = await regenerateTheme({
-            brief,
-            profile,
-            guide: current,
-            index: themeIndex,
-            failures: reasons,
-          });
-          return { themeIndex, reasons, theme };
-        } catch {
-          return { themeIndex, reasons, theme: null };
-        }
+  const results = await Promise.all(
+    Array.from(failing.keys()).map((themeIndex) =>
+      retryTheme({
+        themeIndex,
+        themeLabel: guide.themes[themeIndex].theme,
+        initialTheme: guide.themes[themeIndex],
+        initialVerdicts: initial.filter((v) => v.themeIndex === themeIndex),
+        // The other themes go in from the original guide: they are either
+        // passing and untouched, or in their own loop, and a redraft only
+        // needs to know what territory it must not land on.
+        redraft: (history) => regenerateTheme({ brief, profile, guide, index: themeIndex, history }),
+        review: (theme) => reviewTheme(theme, themeIndex),
+        requestId,
       })
-    );
+    )
+  );
 
-    const themes = [...current.themes];
-    for (const redraft of redrafts) {
-      if (!redraft.theme) continue;
-      regenerated.push({
-        themeIndex: redraft.themeIndex,
-        themeLabel: themes[redraft.themeIndex].theme,
-        reasons: redraft.reasons,
-      });
-      themes[redraft.themeIndex] = redraft.theme;
-    }
+  const byTheme = new Map(results.map((r) => [r.themeIndex, r]));
+  const themes = guide.themes.map((theme, i) => {
+    const result = byTheme.get(i);
+    if (!result) return { ...theme, flags: undefined };
+    return result.cleared ? { ...result.theme, flags: undefined } : { ...result.theme, flags: result.critique };
+  });
 
-    current = { ...current, themes };
-    verdicts = await reviewGuide(current);
-  }
-
-  const stillFailing = failuresByTheme(verdicts);
-
-  // Flags live on the theme so the review UI can render them beside the
-  // questions they describe, without needing the report alongside.
-  const flaggedThemes = current.themes.map((theme, i) => {
-    const reasons = stillFailing.get(i);
-    return reasons && reasons.length > 0
-      ? { ...theme, flags: reasons }
-      : { ...theme, flags: undefined };
+  // Final verdicts: the initial sweep, with each retried theme's verdicts
+  // replaced by those of the draft that shipped.
+  const final = guide.themes.flatMap((_, i) => {
+    const result = byTheme.get(i);
+    return result ? result.verdicts : initial.filter((v) => v.themeIndex === i);
   });
 
   return {
-    guide: { ...current, themes: flaggedThemes },
+    guide: { ...guide, themes },
     report: {
       initial,
-      final: verdicts,
-      regenerated,
-      unresolved: Array.from(stillFailing.entries()).map(([themeIndex, reasons]) => ({
-        themeIndex,
-        themeLabel: current.themes[themeIndex]?.theme ?? `Theme ${themeIndex + 1}`,
-        reasons,
+      final,
+      regenerated: results
+        .filter((r) => r.attempts > 1)
+        .map((r) => ({ themeIndex: r.themeIndex, themeLabel: r.themeLabel, reasons: critiqueFor(initial, r.themeIndex) })),
+      unresolved: results
+        .filter((r) => !r.cleared)
+        .map((r) => ({ themeIndex: r.themeIndex, themeLabel: r.themeLabel, reasons: r.critique })),
+      attempts: results.map((r) => ({
+        themeIndex: r.themeIndex,
+        themeLabel: r.themeLabel,
+        attempts: r.attempts,
+        cleared: r.cleared,
+        kept: r.kept,
       })),
     },
   };

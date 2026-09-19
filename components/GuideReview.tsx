@@ -166,7 +166,7 @@ function ThemeCard({
       {theme.flags && theme.flags.length > 0 && (
         <div className="flex flex-col gap-1.5 rounded-control border border-destructive/30 bg-destructive/[0.05] px-3 py-2.5">
           <span className="text-xs font-semibold text-destructive">
-            Review flagged this theme and one redraft did not clear it
+            Review flagged this theme and two redrafts did not clear it
           </span>
           <ul className="flex flex-col gap-1">
             {theme.flags.map((flag, i) => (
@@ -231,7 +231,8 @@ export function GuideReview({
       const res = await fetch("/api/surveys/brief/theme", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brief, guide, index }),
+        // The theme's flags ride along so the redraft knows what to clear.
+        body: JSON.stringify({ brief, guide, index, failures: guide.themes[index]?.flags ?? [] }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn't redraft that theme");
@@ -281,8 +282,8 @@ export function GuideReview({
       {flaggedCount > 0 && (
         <div className="rounded-control border border-destructive/30 bg-destructive/[0.05] px-3.5 py-3 text-sm leading-[1.5] text-destructive">
           {flaggedCount === 1 ? "One theme is" : `${flaggedCount} themes are`} flagged below. Review
-          caught something in {flaggedCount === 1 ? "it" : "them"} that a redraft did not fix, so it
-          is being shown to you instead of shipped quietly. Edit the question, redraft the theme
+          caught something in {flaggedCount === 1 ? "it" : "them"} that two redrafts did not fix, so
+          it is being shown to you instead of shipped quietly. Edit the question, redraft the theme
           again, or keep it as is.
         </div>
       )}

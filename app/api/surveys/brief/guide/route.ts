@@ -24,11 +24,17 @@ import {
 //
 // Same wrapper as brief/continue: one try around the whole body, every
 // failure a typed { error, code, requestId } with its real status, and the
-// request id on every log line. Generation plus the critic pass is several
-// model calls, so this takes the full Hobby ceiling.
+// request id on every log line.
+//
+// Worst case is one draft, one review, then for every flagged theme up to
+// two more redraft-plus-review round trips (MAX_THEME_ATTEMPTS). Themes
+// retry in parallel, so the wall clock is draft + review + 2 x (redraft +
+// theme review), roughly 90s measured, before any SDK-level retry on a 429
+// or 5xx (two retries with backoff, up to about 30s more). 300 is the
+// Fluid Compute ceiling on the Hobby plan and leaves that headroom.
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const SCOPE = "brief/guide";
 
@@ -101,8 +107,17 @@ async function handle(request: Request, requestId: string, phase: { current: str
     const draft = await generateGuide({ brief: brief as ExtractedBrief, profile });
     briefLog(SCOPE, requestId, "drafted", { themes: draft.themes.length });
     phase.current = "critic";
-    const { guide, report } = await runCriticPass({ brief: brief as ExtractedBrief, profile, guide: draft });
-    briefLog(SCOPE, requestId, "reviewed", { themes: guide.themes.length });
+    const { guide, report } = await runCriticPass({
+      brief: brief as ExtractedBrief,
+      profile,
+      guide: draft,
+      requestId,
+    });
+    briefLog(SCOPE, requestId, "reviewed", {
+      themes: guide.themes.length,
+      retried: report.attempts.length,
+      unresolved: report.unresolved.length,
+    });
     return NextResponse.json({ guide, report, requestId });
   } catch (err) {
     return errorResponse(SCOPE, requestId, phase.current, err);

@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { OrgAccessError } from "@/lib/org";
+import { GuideDraftError } from "./generate";
+import { briefLog, describeError } from "./log";
+
+// Logging lives in ./log so lib/brief/critic can log without importing the
+// org and Supabase layers this file needs for its error mapping.
+export { briefLog, describeError } from "./log";
 import type { BriefMessage } from "./types";
 
 // Shared plumbing for the three brief routes (continue, guide, theme):
@@ -19,38 +25,8 @@ export function newRequestId(): string {
   return crypto.randomUUID().split("-")[0];
 }
 
-/** One JSON line per event, so the Vercel log is searchable by field. */
-export function briefLog(scope: string, requestId: string, event: string, fields: Record<string, unknown> = {}): void {
-  console.log(JSON.stringify({ scope, requestId, event, ...fields }));
-}
-
 export function fail(requestId: string, status: number, code: string, error: string): NextResponse<BriefErrorBody> {
   return NextResponse.json({ error, code, requestId }, { status });
-}
-
-/**
- * Primitives only, every read guarded. A caught value can be anything
- * (undefined, a string, an object whose getters throw), and the whole point
- * of the catch is that it is the one place that must not fail.
- */
-export function describeError(err: unknown): { name: string; message: string; status: number | null; stack: string | null } {
-  const obj = typeof err === "object" && err !== null ? (err as Record<string, unknown>) : null;
-  let name: string = typeof err;
-  let message = "";
-  let status: number | null = null;
-  let stack: string | null = null;
-  try {
-    if (obj) {
-      if (typeof obj.name === "string") name = obj.name;
-      if (typeof obj.message === "string") message = obj.message;
-      if (typeof obj.status === "number") status = obj.status;
-      if (typeof obj.stack === "string") stack = obj.stack;
-    }
-    if (!message) message = typeof err === "string" ? err : String(err);
-  } catch {
-    message = message || "(unprintable error)";
-  }
-  return { name, message, status, stack };
 }
 
 export function logFailure(scope: string, requestId: string, phase: string, err: unknown): void {
@@ -70,6 +46,11 @@ export function errorResponse(scope: string, requestId: string, phase: string, e
 
   if (err instanceof OrgAccessError) {
     return fail(requestId, err.status, "FORBIDDEN", err.message);
+  }
+  // The model answered but with nothing usable. logFailure above already
+  // wrote its stop reason and block types; the admin gets the generic line.
+  if (err instanceof GuideDraftError) {
+    return fail(requestId, 502, "MODEL_EMPTY", `${err.message}. Try again.`);
   }
   // APIConnectionError extends APIError, so it is checked first.
   if (err instanceof Anthropic.APIConnectionError) {

@@ -16,10 +16,12 @@ import {
 } from "@/lib/brief/route-utils";
 
 // POST /api/surveys/brief/theme
-// Body: { brief, guide, index }
+// Body: { brief, guide, index, failures? }
 // Admin-only. Redrafts one theme in place, for the review step's per-theme
 // regenerate. The whole guide comes along so the redraft can be told what
 // the other themes already cover and cannot land on top of one of them.
+// `failures` is the theme's current flags, when it has any, so a redraft
+// asked for from the banner knows the objection it is meant to clear.
 //
 // The redraft is re-checked lexically before it is returned. That is the
 // deterministic half of the critic only, not the model pass: this runs on a
@@ -73,7 +75,7 @@ async function handle(request: Request, requestId: string, phase: { current: str
   }
 
   phase.current = "body";
-  let body: { brief?: unknown; guide?: unknown; index?: unknown };
+  let body: { brief?: unknown; guide?: unknown; index?: unknown; failures?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -81,13 +83,16 @@ async function handle(request: Request, requestId: string, phase: { current: str
   }
 
   const { brief, guide, index } = body ?? {};
+  const failures = Array.isArray(body?.failures)
+    ? body.failures.filter((f): f is string => typeof f === "string" && f.trim().length > 0)
+    : [];
   if (!brief || typeof brief !== "object" || !isStructuredGuide(guide) || typeof index !== "number") {
     return fail(requestId, 400, "BAD_THEME_REQUEST", "brief, guide and index are required.");
   }
   if (!Number.isInteger(index) || index < 0 || index >= guide.themes.length) {
     return fail(requestId, 400, "NO_SUCH_THEME", "That theme does not exist in this guide.");
   }
-  briefLog(SCOPE, requestId, "entry", { userId: user.id, index, themes: guide.themes.length });
+  briefLog(SCOPE, requestId, "entry", { userId: user.id, index, themes: guide.themes.length, failures });
 
   phase.current = "profile";
   const org = await getActiveOrg();
@@ -105,6 +110,7 @@ async function handle(request: Request, requestId: string, phase: { current: str
       profile,
       guide: guide as StructuredGuide,
       index,
+      failures: failures.length > 0 ? failures : undefined,
     });
 
     const flags = [
