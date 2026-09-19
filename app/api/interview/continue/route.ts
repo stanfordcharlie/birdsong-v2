@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
+import {
+  describeModelError,
+  describeModelResponse,
+  getAnthropicClient,
+  INTERVIEW_MODEL,
+  logModelFailure,
+} from "@/lib/interview/anthropic";
 import {
   buildInterviewSystemPrompt,
   KICKOFF_MESSAGE,
@@ -49,6 +55,8 @@ export const maxDuration = 120;
 // wrap up + score the lead once the interview is complete), and persists
 // the updated transcript.
 export async function POST(request: Request) {
+  // Short enough to read back from a screen, unique enough to grep a log.
+  const requestId = crypto.randomUUID().split("-")[0];
   let body: { response_id?: string; message?: string; token?: string };
   try {
     body = await request.json();
@@ -177,12 +185,25 @@ export async function POST(request: Request) {
     ...updatedHistory.map((m) => ({ role: m.role, content: m.content })),
   ];
 
-  const completion = await anthropic.messages.create({
-    model: INTERVIEW_MODEL,
-    max_tokens: 512,
-    system: systemPrompt,
-    messages: claudeMessages,
-  });
+  // Logged and rethrown, not handled: the route's behaviour on a model
+  // error is unchanged (an unhandled throw), but the log now says what the
+  // SDK actually reported instead of nothing at all.
+  let completion: Anthropic.Message;
+  try {
+    completion = await anthropic.messages.create({
+      model: INTERVIEW_MODEL,
+      max_tokens: 512,
+      system: systemPrompt,
+      messages: claudeMessages,
+    });
+  } catch (err) {
+    logModelFailure("interview/continue", requestId, "model_call", {
+      responseId: response_id,
+      exchangeCount,
+      ...describeModelError(err),
+    });
+    throw err;
+  }
 
   const rawReply = completion.content
     .filter((block): block is Anthropic.TextBlock => block.type === "text")
@@ -191,6 +212,13 @@ export async function POST(request: Request) {
     .trim();
 
   if (!rawReply) {
+    // The call succeeded and came back with no text at all: a refusal, a
+    // non-text block, or an empty completion. This was the silent path.
+    logModelFailure("interview/continue", requestId, "empty_reply", {
+      responseId: response_id,
+      exchangeCount,
+      ...describeModelResponse(completion, rawReply),
+    });
     return NextResponse.json({ error: "Failed to generate the next question" }, { status: 502 });
   }
 
@@ -214,10 +242,12 @@ export async function POST(request: Request) {
   // no placeholder substitution: the respondent's message is not persisted on
   // this path, so they can simply resend.
   if (!reply) {
-    console.error(
-      `[interview/continue] response_id=${response_id} reply was empty after chip parsing; raw model output:`,
-      JSON.stringify(rawReply)
-    );
+    // Preview only: the model's reply can echo what the respondent said.
+    logModelFailure("interview/continue", requestId, "parse_chips", {
+      responseId: response_id,
+      exchangeCount,
+      ...describeModelResponse(completion, rawReply),
+    });
     return NextResponse.json({ error: "Failed to generate the next question" }, { status: 502 });
   }
 

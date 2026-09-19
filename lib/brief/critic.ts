@@ -253,7 +253,23 @@ async function modelVerdicts(
   );
 
   const failures = new Map<string, string[]>();
-  if (!toolUse) return failures;
+  if (!toolUse) {
+    // Behaviour unchanged (every question passes), but it is no longer
+    // silent: a review that returned no verdicts is worth knowing about.
+    console.error(
+      JSON.stringify({
+        scope: LOG_SCOPE,
+        requestId: "critic",
+        event: "failure",
+        phase: "review_no_tool_use",
+        stopReason: result.stop_reason ?? null,
+        blockTypes: result.content.map((block) => block.type),
+        modelRequestId: (result as { _request_id?: string })._request_id ?? null,
+        questions: questions.length,
+      })
+    );
+    return failures;
+  }
 
   const raw = (toolUse.input as { verdicts?: unknown }).verdicts;
   if (!Array.isArray(raw)) return failures;

@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient as createCookieClient } from "@/lib/supabase/server";
-import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
+import {
+  describeModelError,
+  describeModelResponse,
+  getAnthropicClient,
+  INTERVIEW_MODEL,
+  logModelFailure,
+} from "@/lib/interview/anthropic";
 import { buildInterviewSystemPrompt, buildKickoffMessage } from "@/lib/interview-prompt";
 import { parseChips } from "@/lib/interview/chips";
 import { generateSessionToken } from "@/lib/interview/token";
@@ -34,6 +40,8 @@ import type { Json } from "@/types/database";
 // CAPTCHA (e.g. Turnstile/hCaptcha) would slot in right here, verified
 // before the rate-limit check below even runs — not added in this pass.
 export async function POST(request: Request) {
+  // Short enough to read back from a screen, unique enough to grep a log.
+  const requestId = crypto.randomUUID().split("-")[0];
   let body: {
     survey_id?: string;
     is_test?: unknown;
@@ -251,12 +259,24 @@ export async function POST(request: Request) {
     exchangeCount: 0,
   });
 
-  const completion = await anthropic.messages.create({
-    model: INTERVIEW_MODEL,
-    max_tokens: 512,
-    system: systemPrompt,
-    messages: [{ role: "user", content: buildKickoffMessage(respondent) }],
-  });
+  // Logged and rethrown, not handled: the route's behaviour on a model
+  // error is unchanged (an unhandled throw), but the log now says what the
+  // SDK actually reported instead of nothing at all.
+  let completion: Anthropic.Message;
+  try {
+    completion = await anthropic.messages.create({
+      model: INTERVIEW_MODEL,
+      max_tokens: 512,
+      system: systemPrompt,
+      messages: [{ role: "user", content: buildKickoffMessage(respondent) }],
+    });
+  } catch (err) {
+    logModelFailure("interview/start", requestId, "model_call", {
+      surveyId: survey_id,
+      ...describeModelError(err),
+    });
+    throw err;
+  }
 
   const rawOpeningQuestion = completion.content
     .filter((block): block is Anthropic.TextBlock => block.type === "text")
@@ -265,6 +285,10 @@ export async function POST(request: Request) {
     .trim();
 
   if (!rawOpeningQuestion) {
+    logModelFailure("interview/start", requestId, "empty_reply", {
+      surveyId: survey_id,
+      ...describeModelResponse(completion, rawOpeningQuestion),
+    });
     return NextResponse.json({ error: "Failed to generate opening question" }, { status: 502 });
   }
 
@@ -278,10 +302,10 @@ export async function POST(request: Request) {
   // Deliberately no placeholder substitution: a fabricated opening question
   // is worse than a failed start the respondent can retry.
   if (!openingQuestion) {
-    console.error(
-      `[interview/start] survey_id=${survey_id} opening question was empty after chip parsing; raw model output:`,
-      JSON.stringify(rawOpeningQuestion)
-    );
+    logModelFailure("interview/start", requestId, "parse_chips", {
+      surveyId: survey_id,
+      ...describeModelResponse(completion, rawOpeningQuestion),
+    });
     return NextResponse.json({ error: "Failed to generate opening question" }, { status: 502 });
   }
 

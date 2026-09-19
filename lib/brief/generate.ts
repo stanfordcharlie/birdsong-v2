@@ -183,8 +183,17 @@ function coerceTheme(raw: unknown): GuideTheme | null {
 type GuideToolCall = {
   input: Record<string, unknown> | null;
   /** What the model reported about its own reply, for the failure log. */
-  details: { stopReason: string | null; blockTypes: string[]; outputTokens: number | null };
+  details: {
+    stopReason: string | null;
+    blockTypes: string[];
+    outputTokens: number | null;
+    modelRequestId: string | null;
+    /** Any text the model sent instead of (or beside) the tool call, capped. */
+    rawText: string;
+  };
 };
+
+const RAW_TEXT_CAP = 2000;
 
 async function callGuideTool(system: string, userContent: string): Promise<GuideToolCall> {
   const anthropic = getAnthropicClient();
@@ -206,6 +215,12 @@ async function callGuideTool(system: string, userContent: string): Promise<Guide
       stopReason: result.stop_reason ?? null,
       blockTypes: result.content.map((block) => block.type),
       outputTokens: result.usage?.output_tokens ?? null,
+      modelRequestId: (result as { _request_id?: string })._request_id ?? null,
+      rawText: result.content
+        .filter((block): block is Anthropic.TextBlock => block.type === "text")
+        .map((block) => block.text)
+        .join("")
+        .slice(0, RAW_TEXT_CAP),
     },
   };
 }
