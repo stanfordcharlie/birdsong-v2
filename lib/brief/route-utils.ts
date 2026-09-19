@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { OrgAccessError } from "@/lib/org";
 import { GuideDraftError } from "./generate";
-import { briefLog, describeError } from "./log";
+import { describeError } from "./log";
 
 // Logging lives in ./log so lib/brief/critic can log without importing the
 // org and Supabase layers this file needs for its error mapping.
