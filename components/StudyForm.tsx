@@ -12,6 +12,7 @@ import {
 import { StudyOnboardingChat } from "@/components/StudyOnboardingChat";
 import { SURVEY_TONE_OPTIONS, type ExtractedSurveyDetails } from "@/lib/study-onboarding/types";
 import { slugify, randomSlugSuffix } from "@/lib/studies/slugify";
+import { GIFT_CARD_BRAND_MAX_LENGTH, normalizeGiftCardBrand } from "@/lib/studies/incentive";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ export type StudyFormValues = {
   tone: string;
   numQuestions: string;
   giftCardAmount: string;
+  giftCardBrand: string;
   collectPhone: boolean;
   collectJobTitle: boolean;
   collectCompany: boolean;
@@ -61,6 +63,7 @@ const EMPTY_VALUES: StudyFormValues = {
   tone: "",
   numQuestions: "",
   giftCardAmount: "",
+  giftCardBrand: "",
   collectPhone: false,
   collectJobTitle: false,
   collectCompany: false,
@@ -122,6 +125,7 @@ export function StudyForm(props: StudyFormProps) {
   const [tone, setTone] = useState(initial.tone);
   const [numQuestions, setNumQuestions] = useState(initial.numQuestions);
   const [giftCardAmount, setGiftCardAmount] = useState(initial.giftCardAmount);
+  const [giftCardBrand, setGiftCardBrand] = useState(initial.giftCardBrand);
   const [collectPhone, setCollectPhone] = useState(initial.collectPhone);
   const [collectJobTitle, setCollectJobTitle] = useState(initial.collectJobTitle);
   const [collectCompany, setCollectCompany] = useState(initial.collectCompany);
@@ -303,6 +307,8 @@ export function StudyForm(props: StudyFormProps) {
         tone: tone || null,
         num_questions: numQuestions ? Number(numQuestions) : null,
         gift_card_amount: giftCardAmount ? Number(giftCardAmount) : null,
+        // Brand is a label beside the amount; without an amount it is not kept.
+        gift_card_brand: giftCardAmount ? normalizeGiftCardBrand(giftCardBrand) : null,
         // Presets stay bare strings; admin-defined fields are {key, label}
         // objects in the same array — see lib/studies/respondent-fields.ts.
         custom_fields: [...enabledFields, ...customFields] as Json,
@@ -618,6 +624,20 @@ export function StudyForm(props: StudyFormProps) {
                 min="0"
                 value={giftCardAmount}
                 onChange={(e) => setGiftCardAmount(e.target.value)}
+              />
+            </label>
+
+            <label className="flex flex-1 flex-col gap-1">
+              <span className="text-sm font-medium text-card-foreground">
+                Gift card brand
+              </span>
+              <Input
+                type="text"
+                maxLength={GIFT_CARD_BRAND_MAX_LENGTH}
+                value={giftCardBrand}
+                onChange={(e) => setGiftCardBrand(e.target.value)}
+                placeholder="Amazon, Chipotle, Starbucks..."
+                disabled={!giftCardAmount}
               />
             </label>
 

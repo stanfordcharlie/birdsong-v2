@@ -36,7 +36,7 @@ export const getStudy = cache(async (slug: string) => {
   const { data } = await supabase
     .from("surveys")
     .select(
-      "id, slug, title, external_title, sponsor, public_description, gift_card_amount, custom_fields, num_questions, status, user_id, archived_at"
+      "id, slug, title, external_title, sponsor, public_description, gift_card_amount, gift_card_brand, custom_fields, num_questions, status, user_id, archived_at"
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -189,6 +189,7 @@ export async function StudyEntry({
     sponsor: survey.sponsor,
     public_description: survey.public_description,
     gift_card_amount: survey.gift_card_amount,
+    gift_card_brand: survey.gift_card_brand,
     custom_fields: survey.custom_fields,
   };
 

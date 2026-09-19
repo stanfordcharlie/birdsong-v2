@@ -25,6 +25,7 @@ export type Database = {
           tone: string | null;
           num_questions: number | null;
           gift_card_amount: number | null;
+          gift_card_brand: string | null;
           custom_fields: Json;
           status: string;
           is_sample: boolean;
@@ -52,6 +53,7 @@ export type Database = {
           tone?: string | null;
           num_questions?: number | null;
           gift_card_amount?: number | null;
+          gift_card_brand?: string | null;
           custom_fields?: Json;
           status?: string;
           is_sample?: boolean;
@@ -79,6 +81,7 @@ export type Database = {
           tone?: string | null;
           num_questions?: number | null;
           gift_card_amount?: number | null;
+          gift_card_brand?: string | null;
           custom_fields?: Json;
           status?: string;
           is_sample?: boolean;

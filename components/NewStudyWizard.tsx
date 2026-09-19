@@ -10,6 +10,12 @@ import {
   type CustomRespondentFieldDef,
 } from "@/lib/studies/respondent-fields";
 import { slugify, randomSlugSuffix } from "@/lib/studies/slugify";
+import {
+  GIFT_CARD_BRANDS,
+  GIFT_CARD_BRAND_MAX_LENGTH,
+  giftCardPhrase,
+  normalizeGiftCardBrand,
+} from "@/lib/studies/incentive";
 import { BriefChat, type BriefResult } from "@/components/BriefChat";
 import { GuideReview } from "@/components/GuideReview";
 import { renderGuideToText, type StructuredGuide } from "@/lib/studies/guide";
@@ -508,12 +514,15 @@ function SurveyPreviewPanel({
   publicDescription,
   enabledFields,
   customFields,
+  incentive,
 }: {
   externalTitle: string;
   slug: string;
   publicDescription: string;
   enabledFields: CustomRespondentFieldDef[];
   customFields: CustomRespondentFieldDef[];
+  /** The phrase the intake form will use, from giftCardPhrase. */
+  incentive: string;
 }) {
   // "-xxxxxx" stands in for the random anti-enumeration suffix that gets
   // appended at creation (see createSurvey) — the real value doesn't exist
@@ -567,7 +576,7 @@ function SurveyPreviewPanel({
               <div className="flex flex-col gap-1.5">
                 <span className="text-[13px] font-semibold text-survey-ink">Work email</span>
                 <span className="text-[13px] leading-[1.5] text-survey-muted">
-                  This is where we&apos;ll send your gift card and a copy of the report.
+                  This is where we&apos;ll send your {incentive} and a copy of the report.
                 </span>
                 <span className="block rounded-[14px] border border-survey-border bg-survey-surface px-4 py-3 text-[15px] text-survey-faint">
                   you@yourcompany.com
@@ -637,6 +646,13 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [giftCardAmount, setGiftCardAmount] = useState("");
+  // A brand from the fixed list, or "Other" with whatever was typed. Only
+  // asked once an amount exists, and only stored when one does.
+  const [giftCardBrandChoice, setGiftCardBrandChoice] = useState<string>("");
+  const [giftCardBrandOther, setGiftCardBrandOther] = useState("");
+  const giftCardBrand = giftCardAmount
+    ? normalizeGiftCardBrand(giftCardBrandChoice === "Other" ? giftCardBrandOther : giftCardBrandChoice)
+    : null;
 
   const [collectPhone, setCollectPhone] = useState(true);
   const [collectJobTitle, setCollectJobTitle] = useState(true);
@@ -899,6 +915,7 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
         tone: DEFAULT_TONE,
         num_questions: finalGuide.themes.length,
         gift_card_amount: giftCardAmount ? Number(giftCardAmount) : null,
+        gift_card_brand: giftCardBrand,
         // Presets stay bare strings; admin-defined fields are {key, label}
         // objects in the same array, see lib/studies/respondent-fields.ts.
         custom_fields: [...enabledFields, ...customFields] as Json,
@@ -1117,6 +1134,7 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
             publicDescription={publicDescription}
             enabledFields={previewEnabledFields}
             customFields={customFields}
+            incentive={giftCardPhrase(giftCardAmount ? Number(giftCardAmount) : null, giftCardBrand)}
           />
         </div>
       </div>
@@ -1262,6 +1280,48 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
                 onChange={(e) => setGiftCardAmount(e.target.value)}
                 onKeyDown={(e) => handleEnterKey(e, goNext)}
               />
+              {giftCardAmount && (
+                <div className="mt-5 flex flex-col gap-2.5">
+                  <span className="text-sm font-medium text-card-foreground">
+                    Brand <span className="font-normal text-muted-foreground">(optional)</span>
+                  </span>
+                  <div className="flex flex-wrap gap-2" role="group" aria-label="Gift card brand">
+                    {[...GIFT_CARD_BRANDS, "Other"].map((option) => {
+                      const selected = giftCardBrandChoice === option;
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => setGiftCardBrandChoice(selected ? "" : option)}
+                          className={cn(
+                            "rounded-full border px-3.5 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            selected
+                              ? "border-card-foreground bg-card-foreground text-card"
+                              : "border-border bg-card text-card-foreground hover:bg-secondary"
+                          )}
+                        >
+                          {option}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {giftCardBrandChoice === "Other" && (
+                    <Input
+                      type="text"
+                      maxLength={GIFT_CARD_BRAND_MAX_LENGTH}
+                      placeholder="Brand name"
+                      aria-label="Other gift card brand"
+                      value={giftCardBrandOther}
+                      onChange={(e) => setGiftCardBrandOther(e.target.value)}
+                      onKeyDown={(e) => handleEnterKey(e, goNext)}
+                    />
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Respondents will see {giftCardPhrase(Number(giftCardAmount), giftCardBrand)}.
+                  </p>
+                </div>
+              )}
             </StepShell>
           )}
 
@@ -1447,7 +1507,7 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
                 <div className="flex items-baseline justify-between gap-4">
                   <span className="shrink-0 text-muted-foreground">Gift card</span>
                   <span className="text-right text-card-foreground">
-                    {giftCardAmount ? `$${giftCardAmount}` : "None"}
+                    {giftCardAmount ? giftCardPhrase(Number(giftCardAmount), giftCardBrand) : "None"}
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between gap-4">
@@ -1489,6 +1549,7 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
             publicDescription={publicDescription}
             enabledFields={previewEnabledFields}
             customFields={customFields}
+            incentive={giftCardPhrase(giftCardAmount ? Number(giftCardAmount) : null, giftCardBrand)}
           />}
       </div>
       </div>

@@ -62,6 +62,7 @@ export default async function StudyDetailPage({
     tone: survey.tone ?? "",
     numQuestions: survey.num_questions != null ? String(survey.num_questions) : "",
     giftCardAmount: survey.gift_card_amount != null ? String(survey.gift_card_amount) : "",
+    giftCardBrand: survey.gift_card_brand ?? "",
     collectPhone: enabledFields.includes("phone"),
     collectJobTitle: enabledFields.includes("job_title"),
     collectCompany: enabledFields.includes("company"),

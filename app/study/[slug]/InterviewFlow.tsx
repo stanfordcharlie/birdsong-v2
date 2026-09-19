@@ -24,6 +24,7 @@ import { useLoadingGate, useFlybyGate } from "@/components/useLoadingGate";
 import { renderWithBold } from "@/lib/chat/render-with-bold";
 import { questionSegments, splitQuestion, stripBold } from "@/lib/interview/split-question";
 import { useStudyPresence } from "@/lib/presence/use-study-presence";
+import { giftCardPhrase } from "@/lib/studies/incentive";
 import { newsreader, bricolage } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
@@ -43,7 +44,7 @@ import { cn } from "@/lib/utils";
 // this object; nothing else reaches the browser.
 export type PublicSurvey = Pick<
   Database["public"]["Tables"]["surveys"]["Row"],
-  "id" | "title" | "external_title" | "sponsor" | "public_description" | "gift_card_amount" | "custom_fields"
+  "id" | "title" | "external_title" | "sponsor" | "public_description" | "gift_card_amount" | "gift_card_brand" | "custom_fields"
 >;
 // A resolved prospect link (/study/[slug]/[token]), or null on the generic
 // link. Everything here is either the recipient's own contact detail or the
@@ -1113,6 +1114,11 @@ export function InterviewFlow({
                   </svg>
                   <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-survey-ink">
                     <span className="text-[19px] font-bold italic">${survey.gift_card_amount}</span>
+                    {survey.gift_card_brand ? (
+                      <span className="max-w-[72px] truncate text-[10px] font-semibold tracking-[0.02em]">
+                        {survey.gift_card_brand}
+                      </span>
+                    ) : null}
                     <span className="text-[10.5px] font-semibold tracking-[0.02em]">gift card</span>
                   </span>
                 </div>
@@ -1122,7 +1128,7 @@ export function InterviewFlow({
             {/* Incentive is visual-only above (the cluster is aria-hidden), so
                 announce it once to assistive tech without changing the layout. */}
             {survey.gift_card_amount ? (
-              <span className="sr-only">Includes a ${survey.gift_card_amount} gift card.</span>
+              <span className="sr-only">Includes a {giftCardPhrase(survey.gift_card_amount, survey.gift_card_brand)}.</span>
             ) : null}
 
             {/* The greeting, and the only line on this screen the anonymous
@@ -1361,6 +1367,11 @@ export function InterviewFlow({
                   </svg>
                   <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-survey-ink">
                     <span className="text-[19px] font-bold italic">${survey.gift_card_amount}</span>
+                    {survey.gift_card_brand ? (
+                      <span className="max-w-[72px] truncate text-[10px] font-semibold tracking-[0.02em]">
+                        {survey.gift_card_brand}
+                      </span>
+                    ) : null}
                     <span className="text-[10.5px] font-semibold tracking-[0.02em]">gift card</span>
                   </span>
                 </div>
@@ -1370,7 +1381,7 @@ export function InterviewFlow({
             {/* Incentive is visual-only above (the cluster is aria-hidden), so
                 announce it once to assistive tech without changing the layout. */}
             {survey.gift_card_amount ? (
-              <span className="sr-only">Includes a ${survey.gift_card_amount} gift card.</span>
+              <span className="sr-only">Includes a {giftCardPhrase(survey.gift_card_amount, survey.gift_card_brand)}.</span>
             ) : null}
 
             {metaLine && <div className="sw-rev mb-3 text-[15px] font-medium text-survey-muted">{metaLine}</div>}
@@ -1635,7 +1646,9 @@ export function InterviewFlow({
                     Work email
                   </label>
                   <p className="text-[13px] text-survey-faint">
-                    This is where we&apos;ll send your gift card and a copy of the report.
+                    This is where we&apos;ll send your{" "}
+                    {giftCardPhrase(survey.gift_card_amount, survey.gift_card_brand)} and a copy of the
+                    report.
                   </p>
                   <input
                     id="respondent-email"
@@ -1898,7 +1911,9 @@ export function InterviewFlow({
                 <>
                   {" "}
                   The{" "}
-                  <span className="font-semibold text-survey-ink">${survey.gift_card_amount} gift card</span>{" "}
+                  <span className="font-semibold text-survey-ink">
+                    {giftCardPhrase(survey.gift_card_amount, survey.gift_card_brand)}
+                  </span>{" "}
                   will land in your inbox within a day or two.
                 </>
               )}
