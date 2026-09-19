@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MAX_CHIP_LENGTH, parseChips } from "@/lib/interview/chips";
+import { MAX_CHIP_LENGTH, chipsFor, isDontKnowChip, parseChips } from "@/lib/interview/chips";
 
 // The parser's two salvage paths log loudly by design; silenced here so a
 // passing run stays readable, and asserted on where the log is the point.
@@ -158,5 +158,52 @@ describe("parseChips", () => {
       expect(text).toBe("");
       expect(chips).toEqual([]);
     });
+  });
+});
+
+describe("answer type marker and chip gate", () => {
+  it("reads a factual marker, strips it, and keeps the chips", () => {
+    const parsed = parseChips(
+      "Roughly how many technicians are on the road on a normal day?\n||ANSWER: factual||\n||CHIPS: fewer than 10 | 10 to 30 | more than 30||"
+    );
+    expect(parsed.text).toBe("Roughly how many technicians are on the road on a normal day?");
+    expect(parsed.answerType).toBe("factual");
+    expect(chipsFor(parsed)).toEqual(["fewer than 10", "10 to 30", "more than 30"]);
+  });
+
+  it("drops chips on a story question even when the model attached some", () => {
+    const parsed = parseChips(
+      "Walk me through the last time a job was reassigned mid-day.\n||ANSWER: story||\n||CHIPS: dispatcher called | tech texted me | it just happened||"
+    );
+    expect(parsed.text).toBe("Walk me through the last time a job was reassigned mid-day.");
+    expect(parsed.answerType).toBe("story");
+    expect(chipsFor(parsed)).toEqual([]);
+  });
+
+  it("treats a missing marker as a story question: no chips by default", () => {
+    const parsed = parseChips("What tool do you dispatch from?\n||CHIPS: a spreadsheet | ServiceTitan | a whiteboard||");
+    expect(parsed.answerType).toBe("story");
+    expect(chipsFor(parsed)).toEqual([]);
+    expect(parsed.chips).toHaveLength(3);
+  });
+
+  it("strips a truncated marker fragment at the end", () => {
+    expect(parseChips("What tool do you dispatch from?\n||ANSW").text).toBe("What tool do you dispatch from?");
+  });
+
+  it("never offers a way out, however it is phrased", () => {
+    const parsed = parseChips(
+      "Which channel do most after-hours calls come in on?\n||ANSWER: factual||\n||CHIPS: the office line | honestly not sure offhand | an answering service||"
+    );
+    expect(chipsFor(parsed)).toEqual(["the office line", "an answering service"]);
+    for (const chip of ["not sure", "Don't know", "hard to say", "can't recall", "no idea", "never really thought about it", "I'd rather not say"]) {
+      expect(isDontKnowChip(chip)).toBe(true);
+    }
+    expect(isDontKnowChip("a shared spreadsheet")).toBe(false);
+  });
+
+  it("caps at three where chips appear", () => {
+    const parsed = parseChips("How many?\n||ANSWER: factual||\n||CHIPS: one | two | three | four||");
+    expect(chipsFor(parsed)).toHaveLength(3);
   });
 });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CLOSING_MESSAGE } from "@/lib/interview-prompt";
-import { parseChips } from "@/lib/interview/chips";
+import { chipsFor, parseChips } from "@/lib/interview/chips";
 import { sessionTokenIsValid } from "@/lib/interview/token";
 import { lastAssistantContent, toPublicTranscript, withLastAssistantContent } from "@/lib/interview/resume";
 import { getClientIp, isRateLimited, resumeRateLimiter } from "@/lib/interview/rate-limit";
@@ -91,7 +91,9 @@ export async function POST(request: Request) {
   // its quick replies. Running the stored content through the one existing
   // parser anyway means a row that somehow does hold a raw block still gets
   // handled correctly, and there is no second chip parser to keep in sync.
-  const { text: parsedQuestion, chips } = parseChips(lastQuestion);
+  const parsed = parseChips(lastQuestion);
+  const parsedQuestion = parsed.text;
+  const chips = chipsFor(parsed);
 
   // Only reachable if a raw block was stored: the delimiter must never be
   // rendered, so the transcript carries the parsed text. An empty result

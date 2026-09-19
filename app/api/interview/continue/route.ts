@@ -18,7 +18,7 @@ import {
 } from "@/lib/interview-prompt";
 import { extractInterviewInsights } from "@/lib/interview/extract";
 import { runCompanyFitScoring } from "@/lib/interview/company-fit";
-import { parseChips } from "@/lib/interview/chips";
+import { chipsFor, parseChips } from "@/lib/interview/chips";
 import { tokensMatch } from "@/lib/interview/token";
 import {
   continueIpRateLimiter,
@@ -232,7 +232,10 @@ export async function POST(request: Request) {
     return completeInterview(supabase, response_id, updatedHistory, survey, response);
   }
 
-  const { text: reply, chips } = parseChips(rawReply);
+  const parsed = parseChips(rawReply);
+  const reply = parsed.text;
+  // Only a factual question gets chips, and never a way out (chipsFor).
+  const chips = chipsFor(parsed);
 
   // A non-empty reply can still parse down to nothing — most obviously when
   // the whole message is a chips block, or when an unclosed ||CHIPS opener

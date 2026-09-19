@@ -10,7 +10,7 @@ import {
   logModelFailure,
 } from "@/lib/interview/anthropic";
 import { buildInterviewSystemPrompt, buildKickoffMessage } from "@/lib/interview-prompt";
-import { parseChips } from "@/lib/interview/chips";
+import { chipsFor, parseChips } from "@/lib/interview/chips";
 import { generateSessionToken } from "@/lib/interview/token";
 import { getClientIp, isRateLimited, startRateLimiter } from "@/lib/interview/rate-limit";
 import {
@@ -292,7 +292,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to generate opening question" }, { status: 502 });
   }
 
-  const { text: openingQuestion, chips } = parseChips(rawOpeningQuestion);
+  const parsed = parseChips(rawOpeningQuestion);
+  const openingQuestion = parsed.text;
+  // Only a factual question gets chips, and never a way out (chipsFor).
+  const chips = chipsFor(parsed);
 
   // A non-empty reply can still parse down to nothing — most obviously when
   // the whole message is a chips block, or when an unclosed ||CHIPS opener

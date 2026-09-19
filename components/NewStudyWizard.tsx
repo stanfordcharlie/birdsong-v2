@@ -10,6 +10,7 @@ import {
   type CustomRespondentFieldDef,
 } from "@/lib/studies/respondent-fields";
 import { slugify, randomSlugSuffix } from "@/lib/studies/slugify";
+import { QUESTION_COUNT_DEFAULT, QUESTION_COUNT_MIN, questionCountIssue } from "@/lib/studies/question-count";
 import {
   GIFT_CARD_BRANDS,
   GIFT_CARD_BRAND_MAX_LENGTH,
@@ -42,13 +43,17 @@ const STEP_BRIEF = 2;
 // Reviewing and editing the guide it generated. Generation happens at the
 // end of the brief; this step is where the admin decides anything about it.
 const STEP_GUIDE = 3;
-const STEP_GIFT_CARD = 4;
-const STEP_RESPONDENT_INFO = 5;
-const STEP_EXTERNAL_NAME = 6;
-const STEP_SLUG = 7;
-const STEP_PUBLIC_DESCRIPTION = 8;
-const STEP_REVIEW = 9;
-const TOTAL_STEPS = 10;
+// How long the interview runs, as a total of exchanges (follow-ups count).
+// Used to be silently set to the theme count, which made 4 to 6 question
+// studies; see lib/studies/question-count.ts for the floor and the range.
+const STEP_QUESTION_COUNT = 4;
+const STEP_GIFT_CARD = 5;
+const STEP_RESPONDENT_INFO = 6;
+const STEP_EXTERNAL_NAME = 7;
+const STEP_SLUG = 8;
+const STEP_PUBLIC_DESCRIPTION = 9;
+const STEP_REVIEW = 10;
+const TOTAL_STEPS = 11;
 
 const invalidBorder = "border-destructive focus-visible:ring-destructive";
 
@@ -645,6 +650,9 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
   const [publicDescription, setPublicDescription] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
+  const [questionCount, setQuestionCount] = useState(String(QUESTION_COUNT_DEFAULT));
+  const [questionCountBlocked, setQuestionCountBlocked] = useState(false);
+  const questionCountInputRef = useRef<HTMLInputElement>(null);
   const [giftCardAmount, setGiftCardAmount] = useState("");
   // A brand from the fixed list, or "Other" with whatever was typed. Only
   // asked once an amount exists, and only stored when one does.
@@ -728,6 +736,7 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
   // change with nothing animating over it.
   useEffect(() => {
     if (step === STEP_GIFT_CARD) giftCardInputRef.current?.focus();
+    if (step === STEP_QUESTION_COUNT) questionCountInputRef.current?.focus();
   }, [step]);
 
   useEffect(() => {
@@ -823,6 +832,15 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
     setStep((s) => Math.min(TOTAL_STEPS - 1, s + 1));
   }
 
+  function handleQuestionCountNext() {
+    if (questionCountIssue(questionCount)?.kind === "blocked") {
+      setQuestionCountBlocked(true);
+      questionCountInputRef.current?.focus();
+      return;
+    }
+    goNext();
+  }
+
   function handleTitleNext() {
     if (!title.trim()) {
       setTitleError(true);
@@ -913,7 +931,7 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
         // Captured and stored. Nothing reads it in this build.
         qualification_criteria: finalBrief.qualificationCriteria || null,
         tone: DEFAULT_TONE,
-        num_questions: finalGuide.themes.length,
+        num_questions: Number(questionCount),
         gift_card_amount: giftCardAmount ? Number(giftCardAmount) : null,
         gift_card_brand: giftCardBrand,
         // Presets stay bare strings; admin-defined fields are {key, label}
@@ -1265,6 +1283,38 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
             />
           )}
 
+          {step === STEP_QUESTION_COUNT && (
+            <StepShell
+              label="How many questions?"
+              helper="The total the respondent is promised, follow-ups included. Each is about a minute and a half."
+              error={
+                questionCountBlocked && questionCountIssue(questionCount)?.kind === "blocked"
+                  ? questionCountIssue(questionCount)?.message
+                  : null
+              }
+              onBack={goBack}
+              footer={<StepFooter onNext={handleQuestionCountNext} />}
+            >
+              <Input
+                ref={questionCountInputRef}
+                type="number"
+                min={QUESTION_COUNT_MIN}
+                step={1}
+                value={questionCount}
+                onChange={(e) => {
+                  setQuestionCount(e.target.value);
+                  setQuestionCountBlocked(false);
+                }}
+                onKeyDown={(e) => handleEnterKey(e, handleQuestionCountNext)}
+              />
+              {questionCountIssue(questionCount)?.kind === "warning" && (
+                <p className="mt-2 text-sm text-warning-foreground" role="status">
+                  {questionCountIssue(questionCount)?.message}
+                </p>
+              )}
+            </StepShell>
+          )}
+
           {step === STEP_GIFT_CARD && (
             <StepShell
               label="Gift card amount ($)"
@@ -1503,6 +1553,10 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
                   <span className="text-right text-card-foreground">
                     {guide?.recommended_topic || brief?.publicTopic || "—"}
                   </span>
+                </div>
+                <div className="flex items-baseline justify-between gap-4">
+                  <span className="shrink-0 text-muted-foreground">Questions</span>
+                  <span className="text-right text-card-foreground">{questionCount}</span>
                 </div>
                 <div className="flex items-baseline justify-between gap-4">
                   <span className="shrink-0 text-muted-foreground">Gift card</span>
