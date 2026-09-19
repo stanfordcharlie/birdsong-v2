@@ -1065,7 +1065,7 @@ export function InterviewFlow({
         <StudyThemeToggle offsetForBadge={isTest} />
         <AmbientBackdrop />
 
-        <main className="relative flex flex-1 items-center justify-center px-5 pb-6 pt-8 sm:px-8 sm:pb-8 sm:pt-12">
+        <main className="relative flex flex-1 items-center justify-center px-5 pb-4 pt-6 sm:px-8 sm:pb-5 sm:pt-7">
           <div className="flex w-full max-w-[640px] flex-col items-center text-center">
             {/* Bird + sticker cluster (decorative), identical to the welcome
                 screen including the gift-card sticker's bottom-margin
@@ -1074,7 +1074,7 @@ export function InterviewFlow({
               aria-hidden="true"
               className={cn(
                 "sw-rev relative h-[64px] w-[180px]",
-                survey.gift_card_amount ? "mb-7" : "mb-1.5"
+                survey.gift_card_amount ? "mb-5" : "mb-1.5"
               )}
             >
               <span
@@ -1145,7 +1145,7 @@ export function InterviewFlow({
             )}
 
             {metaLine && (
-              <div className="sw-rev mb-3 text-[15px] font-medium text-survey-muted">{metaLine}</div>
+              <div className="sw-rev mb-2 text-[15px] font-medium text-survey-muted">{metaLine}</div>
             )}
 
             <h1
@@ -1162,7 +1162,7 @@ export function InterviewFlow({
 
             {survey.sponsor && (
               <div
-                className="sw-rev mb-6 text-[15px] text-survey-muted"
+                className="sw-rev mb-4 text-[15px] text-survey-muted"
                 style={{ "--sw-delay": "0.14s" } as React.CSSProperties}
               >
                 Research conducted on behalf of{" "}
@@ -1177,7 +1177,7 @@ export function InterviewFlow({
                 unset nothing renders here; there is no fallback. */}
             {survey.public_description?.trim() && (
               <p
-                className="sw-rev text-pretty mb-6 max-w-[520px] text-[16px] leading-[1.6] text-survey-muted sm:text-[17px]"
+                className="sw-rev text-pretty mb-5 max-w-[560px] text-[16px] leading-[1.5] text-survey-muted sm:text-[17px]"
                 style={{ "--sw-delay": "0.18s" } as React.CSSProperties}
               >
                 {survey.public_description}
@@ -1185,7 +1185,7 @@ export function InterviewFlow({
             )}
 
             <div
-              className="sw-rev mb-7 flex flex-col items-center gap-2.5"
+              className="sw-rev mb-5 flex flex-col items-center gap-2"
               style={{ "--sw-delay": "0.22s" } as React.CSSProperties}
             >
               <div className="flex items-center gap-2.5">
@@ -1197,7 +1197,7 @@ export function InterviewFlow({
                 </span>
               </div>
               <div
-                className="text-pretty max-w-[500px] rounded-[18px] border border-survey-border bg-survey-surface px-[26px] py-4 text-[16.5px] leading-[1.6]"
+                className="text-pretty max-w-[560px] rounded-[18px] border border-survey-border bg-survey-surface px-[26px] py-3 text-[16.5px] leading-[1.55]"
                 style={{ boxShadow: "var(--sv-shadow-soft)" }}
               >
                 {/* RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
@@ -1242,7 +1242,7 @@ export function InterviewFlow({
                   there is no later screen to show it on. */}
               {error && <p className="mt-4 text-sm text-survey-danger">{error}</p>}
 
-              <div className="mt-[18px] text-[13.5px] text-survey-faint">
+              <div className="mt-3 text-[13.5px] text-survey-faint">
                 By continuing, you agree to our{" "}
                 <a
                   href="/terms"
@@ -1268,7 +1268,7 @@ export function InterviewFlow({
         </main>
 
         <footer
-          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-6 pt-5"
+          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-4 pt-3"
           style={{ "--sw-delay": "0.4s" } as React.CSSProperties}
         >
           <span className="text-[13.5px] text-survey-faint">Powered by</span>
@@ -1322,7 +1322,7 @@ export function InterviewFlow({
 
         <AmbientBackdrop />
 
-        <main className="relative flex flex-1 items-center justify-center px-5 pb-6 pt-8 sm:px-8 sm:pb-8 sm:pt-12">
+        <main className="relative flex flex-1 items-center justify-center px-5 pb-4 pt-6 sm:px-8 sm:pb-5 sm:pt-7">
           <div className="flex w-full max-w-[640px] flex-col items-center text-center">
             {/* Bird + sticker cluster (decorative). The gift-card sticker
                 overhangs below this box (top-[-16px] + h-[98px] on a
@@ -1333,7 +1333,7 @@ export function InterviewFlow({
               aria-hidden="true"
               className={cn(
                 "sw-rev relative h-[64px] w-[180px]",
-                survey.gift_card_amount ? "mb-7" : "mb-1.5"
+                survey.gift_card_amount ? "mb-5" : "mb-1.5"
               )}
             >
               <span className="sw-clusternote-a absolute left-[52px] top-0 text-[17px]" style={{ color: "hsl(var(--sv-accent))", opacity: 0 }}>
@@ -1385,7 +1385,7 @@ export function InterviewFlow({
               <span className="sr-only">Includes a {giftCardPhrase(survey.gift_card_amount, survey.gift_card_brand)}.</span>
             ) : null}
 
-            {metaLine && <div className="sw-rev mb-3 text-[15px] font-medium text-survey-muted">{metaLine}</div>}
+            {metaLine && <div className="sw-rev mb-2 text-[15px] font-medium text-survey-muted">{metaLine}</div>}
 
             <h1
               className="sw-rev m-0 mb-2.5 text-balance font-bricolage font-bold leading-[1.05] tracking-[-0.025em]"
@@ -1401,7 +1401,7 @@ export function InterviewFlow({
 
             {survey.sponsor && (
               <div
-                className="sw-rev mb-6 text-[15px] text-survey-muted"
+                className="sw-rev mb-4 text-[15px] text-survey-muted"
                 style={{ "--sw-delay": "0.14s" } as React.CSSProperties}
               >
                 Research conducted on behalf of{" "}
@@ -1410,7 +1410,7 @@ export function InterviewFlow({
             )}
 
             <div
-              className="sw-rev mb-7 flex flex-col items-center gap-2.5"
+              className="sw-rev mb-5 flex flex-col items-center gap-2"
               style={{ "--sw-delay": "0.22s" } as React.CSSProperties}
             >
               <div className="flex items-center gap-2.5">
@@ -1422,7 +1422,7 @@ export function InterviewFlow({
                 </span>
               </div>
               <div
-                className="text-pretty max-w-[500px] rounded-[18px] border border-survey-border bg-survey-surface px-[26px] py-4 text-[16.5px] leading-[1.6]"
+                className="text-pretty max-w-[560px] rounded-[18px] border border-survey-border bg-survey-surface px-[26px] py-3 text-[16.5px] leading-[1.55]"
                 style={{ boxShadow: "var(--sv-shadow-soft)" }}
               >
                 {/* RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
@@ -1455,7 +1455,7 @@ export function InterviewFlow({
                   />
                 </svg>
               </button>
-              <div className="mt-[18px] text-[13.5px] text-survey-faint">
+              <div className="mt-3 text-[13.5px] text-survey-faint">
                 By continuing, you agree to our{" "}
                 <a
                   href="/terms"
@@ -1481,7 +1481,7 @@ export function InterviewFlow({
         </main>
 
         <footer
-          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-6 pt-5"
+          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-4 pt-3"
           style={{ "--sw-delay": "0.4s" } as React.CSSProperties}
         >
           <PoweredBy />
