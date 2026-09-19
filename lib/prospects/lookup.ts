@@ -1,4 +1,6 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Database } from "@/types/database";
 import { looksLikeProspectToken } from "./token";
 
 // What a resolved token is allowed to tell the browser. An explicit
@@ -156,4 +158,45 @@ export async function markProspectStarted(prospectId: string): Promise<void> {
     .update({ status: "started" })
     .eq("id", prospectId);
   if (statusError) console.error("[prospects/lookup] status update failed:", statusError);
+}
+
+// ---------------------------------------------------------------------------
+// The prospect record behind a completed response, for the lead notifications.
+//
+// When a response came from a prospect link, the Slack notification and the
+// HubSpot push both want the same four facts from the Apollo record: title,
+// company, company domain and LinkedIn URL. One lookup, so the two
+// consumers cannot disagree about what a prospect is. Exact columns only.
+// Null for an anonymous response, an unknown id, or a lookup error, and
+// every consumer treats null as "no prospect context", never as a failure.
+
+export type ProspectContactContext = {
+  title: string | null;
+  companyName: string | null;
+  companyDomain: string | null;
+  linkedinUrl: string | null;
+};
+
+export async function loadProspectContact(
+  supabase: SupabaseClient<Database>,
+  prospectId: string | null | undefined
+): Promise<ProspectContactContext | null> {
+  if (!prospectId) return null;
+  const { data, error } = await supabase
+    .from("prospects")
+    .select("title, company_name, company_domain, linkedin_url")
+    .eq("id", prospectId)
+    .maybeSingle();
+  if (error) {
+    console.error(`[prospects/lookup] contact context lookup failed for prospect_id=${prospectId}:`, error.message);
+    return null;
+  }
+  if (!data) return null;
+  const text = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null);
+  return {
+    title: text(data.title),
+    companyName: text(data.company_name),
+    companyDomain: text(data.company_domain),
+    linkedinUrl: text(data.linkedin_url),
+  };
 }

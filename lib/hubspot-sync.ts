@@ -18,6 +18,7 @@ import {
   type HubSpotLead,
 } from "@/lib/hubspot";
 import { formatPainPointList, selectCallScriptOpener } from "@/lib/lead-content";
+import type { ProspectContactContext } from "@/lib/prospects/lookup";
 import { applyLeadChange, loadLeadRow } from "@/lib/leads/activity";
 import type { Database } from "@/types/database";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -67,6 +68,8 @@ export type HubSpotSyncInput = {
   callScript: { opener: string } | null;
   /** ISO timestamp of interview completion. */
   completedAt: string;
+  /** The prospect record behind the response, from loadProspectContact. */
+  prospect?: ProspectContactContext | null;
   /**
    * The person pressing the button, when there is one. The completion path
    * passes nothing: its push is Birdsong's own doing, so the activity row
@@ -157,6 +160,7 @@ export async function syncResponseToHubSpot(input: HubSpotSyncInput): Promise<Hu
       callScriptOpener: selectCallScriptOpener(input.callScript),
       responseUrl: `${appUrl()}/admin/responses/${responseId}`,
       interviewDate: input.completedAt,
+      prospect: input.prospect ?? null,
     };
 
     const { contactId, dealId } = await syncLeadToHubSpot(client, lead);

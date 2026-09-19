@@ -462,7 +462,25 @@ export type HubSpotLead = {
   responseUrl: string;
   /** ISO timestamp of interview completion. */
   interviewDate: string;
+  /**
+   * The Apollo record when the response came from a prospect link. Maps onto
+   * HubSpot's standard contact properties (jobtitle, company, website,
+   * hs_linkedin_url); absent or null leaves the payload exactly as before.
+   */
+  prospect?: {
+    title: string | null;
+    companyName: string | null;
+    companyDomain: string | null;
+    linkedinUrl: string | null;
+  } | null;
 };
+
+// HubSpot's Website URL property is a URL; the import stores a bare domain.
+function websiteFromDomain(domain: string | null): string | undefined {
+  const trimmed = domain?.trim();
+  if (!trimmed) return undefined;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
 
 // HubSpot `date` properties store midnight UTC and reject a full timestamp,
 // so the completion time is narrowed to its calendar date. Returns null for an
@@ -510,6 +528,12 @@ function contactProperties(lead: HubSpotLead): Record<string, string> {
     birdsong_call_script: lead.callScriptOpener,
     birdsong_response_url: lead.responseUrl,
     birdsong_interview_date: toHubSpotDate(lead.interviewDate),
+    // Standard properties, prospect-sourced only. omitEmpty keeps a missing
+    // value from clearing what the customer already has on the contact.
+    jobtitle: lead.prospect?.title ?? undefined,
+    company: lead.prospect?.companyName ?? undefined,
+    website: websiteFromDomain(lead.prospect?.companyDomain ?? null),
+    hs_linkedin_url: lead.prospect?.linkedinUrl ?? undefined,
   });
 }
 

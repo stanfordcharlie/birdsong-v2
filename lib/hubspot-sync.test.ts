@@ -181,3 +181,37 @@ describe("syncResponseToHubSpot", () => {
     });
   });
 });
+
+describe("prospect context on the contact", () => {
+  function contactBody(fetchMock: ReturnType<typeof vi.fn>): Record<string, string> {
+    const call = fetchMock.mock.calls.find(
+      (call: unknown[]) => new URL(String(call[0])).pathname === "/crm/v3/objects/contacts" && (call[1] as RequestInit).method === "POST"
+    );
+    return JSON.parse(String((call![1] as RequestInit).body)).properties;
+  }
+
+  it("maps title, company, domain and LinkedIn onto HubSpot's standard properties", async () => {
+    const fetchMock = stubHubSpotApi();
+    await syncResponseToHubSpot(
+      input({ prospect: { title: "Director of Demand Gen", companyName: "TRM Labs", companyDomain: "trmlabs.com", linkedinUrl: "https://www.linkedin.com/in/example" } })
+    );
+    expect(contactBody(fetchMock)).toMatchObject({
+      jobtitle: "Director of Demand Gen",
+      company: "TRM Labs",
+      website: "https://trmlabs.com",
+      hs_linkedin_url: "https://www.linkedin.com/in/example",
+    });
+  });
+
+  it("sends none of those properties without a prospect, and skips a missing value", async () => {
+    const without = stubHubSpotApi();
+    await syncResponseToHubSpot(input());
+    const body = contactBody(without);
+    for (const key of ["jobtitle", "company", "website", "hs_linkedin_url"]) expect(body).not.toHaveProperty(key);
+
+    const partial = stubHubSpotApi();
+    await syncResponseToHubSpot(input({ prospect: { title: "VP Ops", companyName: null, companyDomain: null, linkedinUrl: null } }));
+    expect(contactBody(partial)).toMatchObject({ jobtitle: "VP Ops" });
+    expect(contactBody(partial)).not.toHaveProperty("website");
+  });
+});

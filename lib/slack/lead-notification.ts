@@ -1,3 +1,5 @@
+import type { ProspectContactContext } from "@/lib/prospects/lookup";
+
 // Slack incoming-webhook notifications: a second, independent consumer of
 // the same completion event that triggers the lead notification email
 // (lib/email/lead-notification.ts). Never allowed to affect completion or
@@ -55,6 +57,13 @@ export type LeadNotificationFields = {
   // whenever the message happens to be built.
   completedAt: string;
   responseUrl: string;
+  /**
+   * The Apollo record when the response came from a prospect link, else
+   * null. Adds Title, Company and LinkedIn to the contact section; a
+   * missing value is omitted, and with null the message is exactly what it
+   * was before prospects existed.
+   */
+  prospect?: ProspectContactContext | null;
 };
 
 export type SlackMessage = { text: string; blocks: Record<string, unknown>[] };
@@ -138,6 +147,12 @@ function buildBlocks(fields: LeadNotificationFields, testLabel: boolean): SlackM
   }
   if (fields.respondentPhone?.trim()) {
     contactFields.push({ type: "mrkdwn", text: `*Phone*\n${fields.respondentPhone}` });
+  }
+  if (fields.prospect) {
+    const { title, companyName, linkedinUrl } = fields.prospect;
+    if (title) contactFields.push({ type: "mrkdwn", text: `*Title*\n${title}` });
+    if (companyName) contactFields.push({ type: "mrkdwn", text: `*Company*\n${companyName}` });
+    if (linkedinUrl) contactFields.push({ type: "mrkdwn", text: `*LinkedIn*\n<${linkedinUrl}|View profile>` });
   }
   if (contactFields.length > 0) {
     blocks.push({ type: "section", fields: contactFields });

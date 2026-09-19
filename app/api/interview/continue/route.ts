@@ -30,6 +30,7 @@ import { MESSAGE_MAX_LENGTH } from "@/lib/interview/validation";
 import { sendLeadNotification } from "@/lib/email/lead-notification";
 import { sendLeadNotificationToSlack } from "@/lib/slack/lead-notification";
 import { syncResponseToHubSpot } from "@/lib/hubspot-sync";
+import { loadProspectContact } from "@/lib/prospects/lookup";
 import { selectCallScriptOpener, selectTopPainPoint } from "@/lib/lead-content";
 import type { InterviewMessage } from "@/lib/interview/types";
 import type { Database, Json } from "@/types/database";
@@ -453,6 +454,10 @@ async function extractAndNotify({
       return;
     }
 
+    // The prospect record, once, for both notifications below. Null for an
+    // anonymous respondent, which leaves both messages exactly as they were.
+    const prospect = await loadProspectContact(supabase, response.prospect_id);
+
     // HubSpot: a third consumer of this same completion event, sitting
     // alongside the email and Slack notifications rather than in front of
     // them. Started here and settled at the very end of this task, so it runs
@@ -473,6 +478,7 @@ async function extractAndNotify({
       painPoints,
       callScript,
       completedAt,
+      prospect,
     });
 
     // Best-effort, wrapped independently: a failed email must not take the
@@ -535,6 +541,7 @@ async function extractAndNotify({
         callScriptOpener: selectCallScriptOpener(callScript),
         completedAt,
         responseUrl: `${appUrl}/admin/responses/${responseId}`,
+        prospect,
       });
     }
 
