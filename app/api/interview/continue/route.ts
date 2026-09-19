@@ -128,7 +128,7 @@ export async function POST(request: Request) {
   }
   if (!survey) {
     console.error(`[interview/continue] survey not found for id=${response.survey_id}`);
-    return NextResponse.json({ error: "Survey not found" }, { status: 404 });
+    return NextResponse.json({ error: "Study not found" }, { status: 404 });
   }
 
   // Deliberately no survey.status check here: unlike start, an interview

@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { can, requireActiveOrg } from "@/lib/org";
 import { type ResponseTableRow } from "./ResponsesTable";
-import { StudyDetailView, type RespondentChip } from "./StudyDetailView";
+import { StudyDetailView, type RespondentChip, type SourceBreakdownRow } from "./StudyDetailView";
+import { isSystemSource } from "@/lib/interview/source";
 import { type SurveyReportRow } from "./ReportSection";
 import { type StudyFormValues } from "@/components/StudyForm";
 import { countWorthACall } from "@/lib/leads";
@@ -146,19 +147,27 @@ export default async function StudyDetailPage({
   // organic traffic still shows a real comparison. Only worth showing once
   // there's actually something to compare — a single bucket (all direct,
   // or every response from the same source) isn't a breakdown.
-  const sourceBuckets = new Map<string, { starts: number; completions: number }>();
+  //
+  // Two kinds of row. "Direct" (no tag) and "Outbound" (a response that began
+  // from a prospect's token link; /api/interview/start writes the reserved
+  // value itself) are assigned by Birdsong. Everything else is a ?src= tag
+  // the admin put on a link, shown verbatim so it matches what they typed.
+  const sourceBuckets = new Map<string, SourceBreakdownRow>();
   for (const r of responseList) {
-    const key = r.source?.trim() || "Direct";
-    const bucket = sourceBuckets.get(key) ?? { starts: 0, completions: 0 };
+    const tag = r.source?.trim() || null;
+    const row: Pick<SourceBreakdownRow, "source" | "kind"> = !tag
+      ? { source: "Direct", kind: "system" }
+      : isSystemSource(tag)
+        ? { source: "Outbound", kind: "system" }
+        : { source: tag, kind: "tag" };
+    const bucket = sourceBuckets.get(row.source) ?? { ...row, starts: 0, completions: 0 };
     bucket.starts += 1;
     if (r.completed) bucket.completions += 1;
-    sourceBuckets.set(key, bucket);
+    sourceBuckets.set(row.source, bucket);
   }
   const sourceBreakdown =
     sourceBuckets.size > 1
-      ? Array.from(sourceBuckets, ([source, counts]) => ({ source, ...counts })).sort(
-          (a, b) => b.starts - a.starts
-        )
+      ? Array.from(sourceBuckets.values()).sort((a, b) => b.starts - a.starts)
       : null;
 
   return (

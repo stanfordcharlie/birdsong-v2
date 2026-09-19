@@ -21,6 +21,9 @@ import { ResponsesTable, type ResponseTableRow } from "./ResponsesTable";
 
 export type SourceBreakdownRow = {
   source: string;
+  // "system" is a row Birdsong assigns (Direct, Outbound); "tag" is a ?src=
+  // value the admin put on a link, shown verbatim.
+  kind: "system" | "tag";
   starts: number;
   completions: number;
 };
@@ -64,10 +67,32 @@ function saysTheSameThing(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
+// A tag the admin typed renders as a chip, so it reads as a literal value
+// they set; the rows Birdsong assigns (Direct, Outbound) are plain text.
 const SOURCE_COLUMNS: Column<SourceBreakdownRow>[] = [
-  { key: "source", header: "Source", cell: (row) => <span className="font-medium">{row.source}</span> },
+  {
+    key: "source",
+    header: "Source",
+    cell: (row) =>
+      row.kind === "tag" ? (
+        <Badge variant="count" size="sm">
+          {row.source}
+        </Badge>
+      ) : (
+        <span className="font-medium">{row.source}</span>
+      ),
+  },
   { key: "starts", header: "Starts", align: "right", width: "sm", cell: (row) => row.starts },
   { key: "completions", header: "Completions", align: "right", width: "md", cell: (row) => row.completions },
+  {
+    key: "rate",
+    header: "Completion rate",
+    align: "right",
+    width: "md",
+    // A row exists only once something started, so zero starts is the
+    // empty glyph rather than a division by zero dressed up as 0%.
+    cell: (row) => formatPercent(row.starts > 0 ? row.completions / row.starts : null),
+  },
 ];
 
 function SectionHeader({ title }: { title: string }) {
@@ -343,6 +368,16 @@ export function StudyDetailView({
         {sourceBreakdown && (
           <section>
             <SectionHeader title="Sources" />
+            {/* Above the table so the two rows Birdsong names are explained
+                before they are read, and the one thing the admin can do
+                about it (tag a link) is stated in the same breath. */}
+            <p className="type-body-sm mb-3 text-muted-foreground">
+              Where respondents came from, with how many started and how many finished. Direct is
+              anyone who opened the plain study link. Outbound is anyone who arrived through a
+              personal prospect link. To tag a link you share yourself, add{" "}
+              <code className="type-code">?src=name</code> to the end of it and that name gets its
+              own row here.
+            </p>
             <DataTable
               columns={SOURCE_COLUMNS}
               rows={sourceBreakdown}
@@ -350,11 +385,6 @@ export function StudyDetailView({
               density="compact"
               empty={{ title: "No tagged traffic yet." }}
             />
-            {/* States the one rule the table cannot show: what Direct means. */}
-            <p className="type-body-sm mt-2 text-faint">
-              By <code className="type-code text-faint">?src=</code> on the shared link. Untagged
-              traffic is Direct.
-            </p>
           </section>
         )}
 

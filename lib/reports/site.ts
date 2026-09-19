@@ -11,5 +11,5 @@
 export function siteUrl(): string {
   const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (configured) return configured.replace(/\/+$/, "");
-  return "https://usebirdsong.com";
+  return "https://www.usebirdsong.com";
 }

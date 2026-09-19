@@ -15,7 +15,7 @@ import {
   truncate,
 } from "@/lib/interview/validation";
 import { deriveCompanyNameFromDomain, extractEmailDomain, isFreeEmailDomain } from "@/lib/interview/work-email";
-import { sanitizeSource } from "@/lib/interview/source";
+import { OUTBOUND_SOURCE, reserveSystemSources, sanitizeSource } from "@/lib/interview/source";
 import {
   markProspectStarted,
   resolveProspectForStart,
@@ -52,12 +52,6 @@ export async function POST(request: Request) {
 
   const { survey_id, respondent_phone, custom_field_values } = body;
 
-  // Never trust the client's own cleaning (InterviewFlow.tsx sanitizes
-  // ?src= for UX, but a direct caller could send anything) — re-sanitized
-  // independently here. Null when absent or when it sanitizes down to
-  // nothing, same as organic/untagged traffic.
-  const source = sanitizeSource(body.source);
-
   if (!survey_id || typeof survey_id !== "string") {
     return NextResponse.json({ error: "survey_id is required" }, { status: 400 });
   }
@@ -77,6 +71,16 @@ export async function POST(request: Request) {
   // anyone they could guess. Null for a missing, malformed, unknown, or
   // wrong-survey token, which is just the anonymous path.
   const prospect: ProspectForStart | null = await resolveProspectForStart(body.prospect_token, survey_id);
+
+  // Attribution. A resolved token is proof the person came through outbound,
+  // so the server sets the source itself and any ?src= on the URL is ignored:
+  // a query string is something anyone can edit, a token is not. Anonymous
+  // traffic keeps its tag. Never trust the client's own cleaning
+  // (InterviewFlow.tsx sanitizes ?src= for UX, but a direct caller could send
+  // anything) — re-sanitized independently here, and the value reserved for
+  // the outbound row is dropped so a hand-typed tag cannot pose as it. Null
+  // when absent or when it sanitizes down to nothing: untagged, "Direct".
+  const source = prospect ? OUTBOUND_SOURCE : reserveSystemSources(sanitizeSource(body.source));
 
   const respondent_name = prospect
     ? prospect.name
@@ -148,7 +152,7 @@ export async function POST(request: Request) {
   }
   if (!survey) {
     console.error(`[interview/start] survey not found for id=${survey_id}`);
-    return NextResponse.json({ error: "Survey not found" }, { status: 404 });
+    return NextResponse.json({ error: "Study not found" }, { status: 404 });
   }
 
   // A test run is only honored when the caller's cookie session belongs to
@@ -175,7 +179,7 @@ export async function POST(request: Request) {
   // point of previewing is doing it before the survey goes live.
   if (survey.status !== "live" && !isTest) {
     console.error(`[interview/start] survey_id=${survey_id} is not live (status=${survey.status})`);
-    return NextResponse.json({ error: "This survey isn't available" }, { status: 403 });
+    return NextResponse.json({ error: "This study isn't available" }, { status: 403 });
   }
 
   // A prospect who already began and came back — a reopened tab, a second

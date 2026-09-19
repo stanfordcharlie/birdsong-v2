@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveOrg } from "@/lib/org";
-import { prospectLinkFor } from "@/lib/prospects/link";
+import { prospectLinkFor, resolveAppOriginFromHost } from "@/lib/prospects/link";
 import { ProspectsView, type ProspectRow } from "./ProspectsView";
 
 // The prospects roster for one study.
@@ -46,11 +46,7 @@ export default async function StudyProspectsPage({
   // Built on the server so the roster and the exported CSV cannot disagree
   // about what a prospect's link is. NEXT_PUBLIC_APP_URL is canonical when
   // set; the request host is the local-development fallback.
-  const host = (await headers()).get("host");
-  const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  const origin =
-    configuredOrigin?.replace(/\/+$/, "") ??
-    (host ? `${host.startsWith("localhost") ? "http" : "https"}://${host}` : "");
+  const origin = resolveAppOriginFromHost((await headers()).get("host"));
 
   const rows: ProspectRow[] = (prospects ?? []).map((p) => ({
     id: p.id,
