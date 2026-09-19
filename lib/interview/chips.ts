@@ -51,9 +51,16 @@ function extractChipOptions(raw: string): string[] {
 // nothing and a chip on a story question costs the answer.
 export type AnswerType = "factual" | "story";
 
-const ANSWER_MARKER_PATTERN = /\|\|ANSWER:?\s*(factual|story)?\s*(\|\|)?/i;
+// The closing || is optional, but it is never the opener of a chips block
+// that follows on the same line ("||ANSWER: factual||CHIPS: ..." must leave
+// "||CHIPS: ..." intact for the chips parser, not a bare "CHIPS: ..." that
+// would read as prose).
+const ANSWER_MARKER_PATTERN = /\|\|\s*ANSWER:?\s*(factual|story)?\s*(\|\|(?!CHIPS))?/i;
+// Any further marker, however mangled ("||ANSWER", "|| answer: factual"),
+// anywhere in the text: the belt after the braces above.
+const ANY_ANSWER_MARKER_PATTERN = /\|\|\s*ANSWER\b[^|\n]*(\|\|(?!CHIPS))?/gi;
 // A truncated prefix of the marker at the very end, like "||AN" or "||ANSW".
-const TRUNCATED_ANSWER_PATTERN = /\|\|A(N(S(W(E(R)?)?)?)?)?$/;
+const TRUNCATED_ANSWER_PATTERN = /\s*\|\|A(N(S(W(E(R)?)?)?)?)?$/;
 
 /**
  * Options that are a one-tap exit with no signal in them. The prompt tells
@@ -82,7 +89,26 @@ function stripAnswerMarker(rawText: string): { text: string; answerType: AnswerT
     answerType = match[1]?.toLowerCase() === "factual" ? "factual" : "story";
     text = (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim();
   }
-  return { text: text.replace(TRUNCATED_ANSWER_PATTERN, "").trim(), answerType };
+  text = text.replace(ANY_ANSWER_MARKER_PATTERN, "").replace(TRUNCATED_ANSWER_PATTERN, "").trim();
+  return { text, answerType };
+}
+
+/**
+ * The last line of defence, applied where text is about to be shown to a
+ * respondent (InterviewFlow), independent of the parse above. If a marker
+ * or a chips block ever survives parsing, or reaches the client through a
+ * path that never parsed (an old stored message, a future streaming
+ * transport), it is removed here. Strips every ||ANSWER ...|| and
+ * ||CHIPS ...|| block, closed or not, and any truncated opener at the end.
+ * Pure, so it is safe in the client bundle.
+ */
+export function stripInterviewMarkers(text: string): string {
+  return text
+    .replace(/\|\|\s*CHIPS\b[^|]*(\|[^|]*)*?\|\|/gi, "")
+    .replace(/\|\|\s*CHIPS\b[\s\S]*$/i, "")
+    .replace(/\|\|\s*ANSWER\b[^|\n]*(\|\|)?/gi, "")
+    .replace(/\s*\|\|\s*(A(N(S(W(E(R)?)?)?)?)?|C(H(I(P(S)?)?)?)?)?$/i, "")
+    .trim();
 }
 
 export function parseChips(rawText: string): { text: string; chips: string[]; answerType: AnswerType } {

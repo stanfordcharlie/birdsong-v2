@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient as createCookieClient } from "@/lib/supabase/server";
 import {
-  describeModelError,
+  createInterviewTurn,
   describeModelResponse,
   getAnthropicClient,
   INTERVIEW_MODEL,
@@ -259,36 +258,21 @@ export async function POST(request: Request) {
     exchangeCount: 0,
   });
 
-  // Logged and rethrown, not handled: the route's behaviour on a model
-  // error is unchanged (an unhandled throw), but the log now says what the
-  // SDK actually reported instead of nothing at all.
-  let completion: Anthropic.Message;
-  try {
-    completion = await anthropic.messages.create({
+  // One retry on an empty reply or a retryable error, both attempts logged
+  // (createInterviewTurn). A non-retryable error still throws as before.
+  const { completion, rawText: rawOpeningQuestion } = await createInterviewTurn(
+    anthropic,
+    {
       model: INTERVIEW_MODEL,
       max_tokens: 512,
       system: systemPrompt,
       messages: [{ role: "user", content: buildKickoffMessage(respondent) }],
-    });
-  } catch (err) {
-    logModelFailure("interview/start", requestId, "model_call", {
-      surveyId: survey_id,
-      ...describeModelError(err),
-    });
-    throw err;
-  }
-
-  const rawOpeningQuestion = completion.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("")
-    .trim();
+    },
+    { scope: "interview/start", requestId, fields: { surveyId: survey_id } }
+  );
 
   if (!rawOpeningQuestion) {
-    logModelFailure("interview/start", requestId, "empty_reply", {
-      surveyId: survey_id,
-      ...describeModelResponse(completion, rawOpeningQuestion),
-    });
+    // Both attempts came back with no text; each is already in the log.
     return NextResponse.json({ error: "Failed to generate opening question" }, { status: 502 });
   }
 

@@ -3,7 +3,7 @@ import { waitUntil } from "@vercel/functions";
 import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  describeModelError,
+  createInterviewTurn,
   describeModelResponse,
   getAnthropicClient,
   INTERVIEW_MODEL,
@@ -185,40 +185,16 @@ export async function POST(request: Request) {
     ...updatedHistory.map((m) => ({ role: m.role, content: m.content })),
   ];
 
-  // Logged and rethrown, not handled: the route's behaviour on a model
-  // error is unchanged (an unhandled throw), but the log now says what the
-  // SDK actually reported instead of nothing at all.
-  let completion: Anthropic.Message;
-  try {
-    completion = await anthropic.messages.create({
-      model: INTERVIEW_MODEL,
-      max_tokens: 512,
-      system: systemPrompt,
-      messages: claudeMessages,
-    });
-  } catch (err) {
-    logModelFailure("interview/continue", requestId, "model_call", {
-      responseId: response_id,
-      exchangeCount,
-      ...describeModelError(err),
-    });
-    throw err;
-  }
-
-  const rawReply = completion.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("")
-    .trim();
+  // One retry on an empty reply or a retryable error, both attempts logged
+  // (createInterviewTurn). A non-retryable error still throws as before.
+  const { completion, rawText: rawReply } = await createInterviewTurn(
+    anthropic,
+    { model: INTERVIEW_MODEL, max_tokens: 512, system: systemPrompt, messages: claudeMessages },
+    { scope: "interview/continue", requestId, fields: { responseId: response_id, exchangeCount } }
+  );
 
   if (!rawReply) {
-    // The call succeeded and came back with no text at all: a refusal, a
-    // non-text block, or an empty completion. This was the silent path.
-    logModelFailure("interview/continue", requestId, "empty_reply", {
-      responseId: response_id,
-      exchangeCount,
-      ...describeModelResponse(completion, rawReply),
-    });
+    // Both attempts came back with no text; each is already in the log.
     return NextResponse.json({ error: "Failed to generate the next question" }, { status: 502 });
   }
 

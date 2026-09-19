@@ -91,3 +91,93 @@ export function logModelFailure(
 ): void {
   console.error(JSON.stringify({ scope, requestId, event: "failure", phase, ...fields }));
 }
+
+// ---------------------------------------------------------------------------
+// One interview turn with one retry.
+//
+// A turn can come back empty (a refusal, a non-text block, an empty
+// completion) or the call can fail in a way that will not fail again
+// (rate limit, overload, a dropped connection). Either used to end the
+// respondent's interview with an error on the first try. Both now get
+// exactly one retry, the same request again, before anything is surfaced.
+// A 400 or 401 is not retried: the same request will not succeed. The SDK
+// already retries connection and 429/5xx errors twice with backoff inside
+// each call; this is one more attempt on top, not a loop.
+
+export type InterviewTurnResult = {
+  completion: Anthropic.Message;
+  /** Text blocks joined and trimmed. Empty when both attempts came back empty. */
+  rawText: string;
+  attempts: 1 | 2;
+};
+
+/** A client with just the method this needs, so tests can hand in a fake. */
+export type MessagesClient = {
+  messages: { create: (params: Anthropic.MessageCreateParamsNonStreaming) => Promise<Anthropic.Message> };
+};
+
+export function isRetryableModelError(err: unknown): boolean {
+  if (err instanceof Anthropic.APIConnectionError) return true;
+  if (err instanceof Anthropic.RateLimitError) return true;
+  if (err instanceof Anthropic.APIError) {
+    return typeof err.status === "number" && (err.status === 429 || err.status === 529 || err.status >= 500);
+  }
+  return false;
+}
+
+export function textOf(completion: Anthropic.Message): string {
+  return completion.content
+    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("")
+    .trim();
+}
+
+export async function createInterviewTurn(
+  client: MessagesClient,
+  params: Anthropic.MessageCreateParamsNonStreaming,
+  log: { scope: string; requestId: string; fields: Record<string, unknown> }
+): Promise<InterviewTurnResult> {
+  let last: InterviewTurnResult | null = null;
+  for (const attempt of [1, 2] as const) {
+    const willRetry = attempt === 1;
+    let completion: Anthropic.Message;
+    try {
+      completion = await client.messages.create(params);
+    } catch (err) {
+      const retryable = isRetryableModelError(err);
+      logModelFailure(log.scope, log.requestId, "model_call", {
+        ...log.fields,
+        attempt,
+        retried: attempt === 2,
+        willRetry: willRetry && retryable,
+        retryable,
+        ...describeModelError(err),
+      });
+      if (willRetry && retryable) continue;
+      throw err;
+    }
+    const rawText = textOf(completion);
+    last = { completion, rawText, attempts: attempt };
+    if (rawText) {
+      if (attempt === 2) {
+        // The retry cleared it. Same shape, so the earlier failure line
+        // and this one can be matched by request id.
+        console.error(
+          JSON.stringify({ scope: log.scope, requestId: log.requestId, event: "recovered", phase: "retry", ...log.fields, attempt })
+        );
+      }
+      return last;
+    }
+    logModelFailure(log.scope, log.requestId, "empty_reply", {
+      ...log.fields,
+      attempt,
+      retried: attempt === 2,
+      willRetry,
+      ...describeModelResponse(completion, rawText),
+    });
+  }
+  // Both attempts returned a completion with no text. The caller surfaces
+  // its existing generic error; both attempts are already in the log.
+  return last as InterviewTurnResult;
+}

@@ -23,6 +23,7 @@ import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate, useFlybyGate } from "@/components/useLoadingGate";
 import { renderWithBold } from "@/lib/chat/render-with-bold";
 import { questionSegments, splitQuestion, stripBold } from "@/lib/interview/split-question";
+import { stripInterviewMarkers } from "@/lib/interview/chips";
 import { useStudyPresence } from "@/lib/presence/use-study-presence";
 import { giftCardPhrase } from "@/lib/studies/incentive";
 import { newsreader, bricolage } from "@/lib/fonts";
@@ -1986,7 +1987,7 @@ export function InterviewFlow({
                         )}
                         style={{ "--sw-bubble-delay": `${0.05 + i * 0.07}s` } as React.CSSProperties}
                       >
-                        {isInterviewer ? renderWithBold(m.content) : m.content}
+                        {isInterviewer ? renderWithBold(stripInterviewMarkers(m.content)) : m.content}
                       </div>
                     );
                   })}
@@ -2012,7 +2013,13 @@ export function InterviewFlow({
   // value (colours, radii, shadows, easings) is the handoff's, routed through
   // the --sv-* tokens so the dark theme still holds.
   const answeredCount = messages.filter((m) => m.role === "user").length;
-  const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant")?.content ?? "";
+  // stripInterviewMarkers is the render boundary: the server already strips
+  // the ||ANSWER|| marker and ||CHIPS|| block before this text is stored or
+  // sent, but nothing that reaches a respondent's screen relies on that
+  // having happened.
+  const lastAssistantMessage = stripInterviewMarkers(
+    [...messages].reverse().find((m) => m.role === "assistant")?.content ?? ""
+  );
   // Drives the progress pills and the "X of Y" counter. The same count the
   // welcome screen quotes and the server enforces, so all three agree.
   const targetQuestionCount = questionCount ?? DEFAULT_TARGET_QUESTION_COUNT;

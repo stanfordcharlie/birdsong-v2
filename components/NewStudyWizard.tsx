@@ -1286,7 +1286,7 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
           {step === STEP_QUESTION_COUNT && (
             <StepShell
               label="How many questions?"
-              helper="The total the respondent is promised, follow-ups included. Each is about a minute and a half."
+              helper={`The total the respondent is promised, follow-ups included. Each is about a minute and a half. Your guide has ${guide?.themes.length ?? 0} themes; the interviewer spreads the questions across them, so this is a different number.`}
               error={
                 questionCountBlocked && questionCountIssue(questionCount)?.kind === "blocked"
                   ? questionCountIssue(questionCount)?.message

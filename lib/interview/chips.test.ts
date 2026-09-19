@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MAX_CHIP_LENGTH, chipsFor, isDontKnowChip, parseChips } from "@/lib/interview/chips";
+import { MAX_CHIP_LENGTH, chipsFor, isDontKnowChip, parseChips, stripInterviewMarkers } from "@/lib/interview/chips";
 
 // The parser's two salvage paths log loudly by design; silenced here so a
 // passing run stays readable, and asserted on where the log is the point.
@@ -205,5 +205,47 @@ describe("answer type marker and chip gate", () => {
   it("caps at three where chips appear", () => {
     const parsed = parseChips("How many?\n||ANSWER: factual||\n||CHIPS: one | two | three | four||");
     expect(chipsFor(parsed)).toHaveLength(3);
+  });
+});
+
+describe("the answer marker can never reach a respondent", () => {
+  const cases: [string, string, string[]][] = [
+    ["marker on the same line as the chips", "Which channel?\n||ANSWER: factual||||CHIPS: phone | email||", ["phone", "email"]],
+    ["marker unclosed and run into the chips block", "Which channel? ||ANSWER: factual ||CHIPS: phone | email||", ["phone", "email"]],
+    ["marker after the chips block", "Which channel?\n||CHIPS: phone | email||\n||ANSWER: factual||", ["phone", "email"]],
+    ["marker twice", "Which channel?\n||ANSWER: factual||\n||ANSWER: factual||\n||CHIPS: phone | email||", ["phone", "email"]],
+    ["lowercase and spaced marker", "Which channel?\n|| answer: factual ||\n||CHIPS: phone | email||", ["phone", "email"]],
+    ["marker with no type", "Which channel?\n||ANSWER:||", []],
+    ["marker alone, unclosed", "Which channel?\n||ANSWER: story", []],
+  ];
+  for (const [label, raw, chips] of cases) {
+    it(label, () => {
+      const parsed = parseChips(raw);
+      expect(parsed.text).toBe("Which channel?");
+      expect(parsed.text).not.toMatch(/answer|chips|\|\|/i);
+      expect(chipsFor(parsed)).toEqual(chips);
+    });
+  }
+});
+
+describe("stripInterviewMarkers, the render boundary", () => {
+  it("removes any marker or chips block that reached the client, closed or not", () => {
+    const cases = [
+      "Which channel?\n||ANSWER: factual||\n||CHIPS: phone | email||",
+      "Which channel? ||ANSWER: story",
+      "Which channel?\n||CHIPS: phone | email",
+      "Which channel?\n||CHIPS: phone | email|| ||answer: factual||",
+      "Which channel?\n||ANSW",
+      "Which channel?\n||CHI",
+    ];
+    for (const raw of cases) {
+      const out = stripInterviewMarkers(raw);
+      expect(out).toBe("Which channel?");
+      expect(out).not.toMatch(/\|\|ANSWER|\|\|CHIPS|\|\|/i);
+    }
+  });
+
+  it("leaves ordinary text, bold and a lone pipe alone", () => {
+    expect(stripInterviewMarkers("Roughly **how many** techs, 5 | 10 | more?")).toBe("Roughly **how many** techs, 5 | 10 | more?");
   });
 });
