@@ -99,9 +99,9 @@ const FIELD_LABEL_CLASSES = "text-[13px] font-semibold text-survey-muted";
 // text-base (16px) is load-bearing on iOS, not just a type choice: Safari
 // auto-zooms the whole page on focus for any input under 16px and never
 // zooms back out. min-h-[48px] is the touch-target floor; on desktop the
-// py-[14px] + 16px line box already exceeds it, so it changes nothing there.
+// py-3 + 16px line box lands exactly on it, so it changes nothing there.
 const FIELD_INPUT_BASE =
-  "w-full min-w-0 min-h-[48px] rounded-[14px] border border-survey-border bg-survey-surface py-[14px] text-base text-survey-ink placeholder:text-survey-faint focus:border-survey-muted focus:outline-none focus:ring-[3px] focus:ring-survey-ink/[0.07] disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full min-w-0 min-h-[48px] rounded-[14px] border border-survey-border bg-survey-surface py-3 text-base text-survey-ink placeholder:text-survey-faint focus:border-survey-muted focus:outline-none focus:ring-[3px] focus:ring-survey-ink/[0.07] disabled:cursor-not-allowed disabled:opacity-60";
 
 // Same bird, different perch: 48x46 (vs the marketing default 40x38) and
 // its own two-note arrangement, per the handoff.
@@ -1563,13 +1563,18 @@ export function InterviewFlow({
         <AmbientBackdrop />
         <TestModeBadge isTest={isTest} />
         <StudyThemeToggle offsetForBadge={isTest} />
-        <div className="relative mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-10 sm:px-6 sm:py-16">
+        {/* Compressed hero (2026-09): the intake form is the point of this
+            screen, so the first field has to be on screen without scrolling
+            on a 1280x800 desktop. Sizes here are steps this surface already
+            uses elsewhere (28/34px are the question and completion heading
+            sizes); nothing new was added to the scale. */}
+        <div className="relative mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-8 sm:px-6 sm:py-10">
           {survey.sponsor && logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={logoUrl}
               alt={survey.sponsor}
-              className="survey-intro-rise-1 mb-6 h-8 w-auto object-contain"
+              className="survey-intro-rise-1 mb-4 h-8 w-auto object-contain"
             />
           )}
 
@@ -1579,7 +1584,7 @@ export function InterviewFlow({
           {/* Welcome-screen heading treatment (Bricolage 700, -0.025em,
               1.05 leading), held at the intro's smaller step size: the
               display size belongs to the welcome beat, the type does not. */}
-          <h1 className="survey-intro-rise-2 mb-3.5 text-balance break-words font-bricolage text-[31px] font-bold leading-[1.05] tracking-[-0.025em] sm:text-[44px]">
+          <h1 className="survey-intro-rise-2 mb-2.5 text-balance break-words font-bricolage text-[28px] font-bold leading-none tracking-[-0.025em] sm:text-[34px]">
             {surveyName}
           </h1>
 
@@ -1588,13 +1593,13 @@ export function InterviewFlow({
               present on PublicSurvey). When public_description is unset,
               nothing renders here; there is no fallback. */}
           {survey.public_description?.trim() && (
-            <p className="survey-intro-rise-3 text-pretty mb-7 text-[16px] leading-[1.6] text-survey-muted sm:mb-9 sm:text-[17px]">
+            <p className="survey-intro-rise-3 text-pretty mb-5 text-[15px] leading-[1.5] text-survey-muted sm:mb-6 sm:text-[16px]">
               {survey.public_description}
             </p>
           )}
 
           <form onSubmit={handleIntroSubmit}>
-            <div className="survey-intro-rise-4 flex flex-col gap-3">
+            <div className="survey-intro-rise-4 flex flex-col gap-2.5">
               {/* Hidden, not disabled-and-shown: a prospect has already told
                   us their name and address, and rendering them greyed out
                   invites "is that right?" on a screen with no way to change
@@ -1607,7 +1612,7 @@ export function InterviewFlow({
                   the bird was drawn for. */}
               {asksIdentity && (
                 <>
-                <div className="relative flex flex-col gap-1.5">
+                <div className="relative flex flex-col gap-1">
                   {/* The notes are absolutely placed up to ~64px right of the
                       bird's own left edge, so at 360–430px the default
                       right-[14px] perch pushes them against (and past) the
@@ -1641,7 +1646,7 @@ export function InterviewFlow({
                   {nameOk && <CheckIcon className="absolute bottom-4 right-[15px]" />}
                 </div>
 
-                <div className="relative flex flex-col gap-1.5">
+                <div className="relative flex flex-col gap-1">
                   <label htmlFor="respondent-email" className={FIELD_LABEL_CLASSES}>
                     Work email
                   </label>
@@ -1681,7 +1686,7 @@ export function InterviewFlow({
               )}
 
               {hasPhone && (
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
                   <label htmlFor="respondent-phone" className={FIELD_LABEL_CLASSES}>
                     {parsePresetFieldLabel(survey.custom_fields, "phone")}
                   </label>
@@ -1706,12 +1711,12 @@ export function InterviewFlow({
                 <div
                   className={
                     hasJobTitle && hasCompany
-                      ? "grid grid-cols-1 gap-3 sm:grid-cols-2"
-                      : "flex flex-col gap-3"
+                      ? "grid grid-cols-1 gap-2.5 sm:grid-cols-2"
+                      : "flex flex-col gap-2.5"
                   }
                 >
                   {hasJobTitle && (
-                    <div className="flex min-w-0 flex-col gap-1.5">
+                    <div className="flex min-w-0 flex-col gap-1">
                       <label htmlFor="respondent-job-title" className={FIELD_LABEL_CLASSES}>
                         {parsePresetFieldLabel(survey.custom_fields, "job_title")}
                       </label>
@@ -1731,7 +1736,7 @@ export function InterviewFlow({
                     </div>
                   )}
                   {hasCompany && (
-                    <div className="flex min-w-0 flex-col gap-1.5">
+                    <div className="flex min-w-0 flex-col gap-1">
                       <label htmlFor="respondent-company" className={FIELD_LABEL_CLASSES}>
                         {parsePresetFieldLabel(survey.custom_fields, "company")}
                       </label>
@@ -1754,7 +1759,7 @@ export function InterviewFlow({
               )}
 
               {hasLinkedin && (
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
                   <label htmlFor="respondent-linkedin" className={FIELD_LABEL_CLASSES}>
                     {parsePresetFieldLabel(survey.custom_fields, "linkedin")}
                   </label>
@@ -1779,7 +1784,7 @@ export function InterviewFlow({
               )}
 
               {customFieldDefs.map((field, i) => (
-                <div key={field.key} className="flex flex-col gap-1.5">
+                <div key={field.key} className="flex flex-col gap-1">
                   <label htmlFor={`respondent-custom-${field.key}`} className={FIELD_LABEL_CLASSES}>
                     {field.required ? `${field.label} *` : field.label}
                   </label>
@@ -1806,7 +1811,7 @@ export function InterviewFlow({
             <button
               type="submit"
               disabled={loading}
-              className={cn(PILL_BUTTON, "survey-intro-rise-5 mt-7 flex w-fit")}
+              className={cn(PILL_BUTTON, "survey-intro-rise-5 mt-5 flex w-fit")}
             >
               {loading ? "Starting…" : "Start"}
               <PillArrow />
@@ -1818,7 +1823,7 @@ export function InterviewFlow({
               an empty box under the button. The email field's own helper
               text already says where the gift card goes; nothing about the
               incentive is repeated here. */}
-          <div className="survey-intro-rise-6 mt-3.5 hidden text-balance text-[13.5px] text-survey-faint sm:block">
+          <div className="survey-intro-rise-6 mt-2.5 hidden text-balance text-[13.5px] text-survey-faint sm:block">
             <span>Press Enter to move between fields</span>
           </div>
         </div>
