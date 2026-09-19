@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
+import { getAnthropicClient, modelParams } from "@/lib/interview/anthropic";
 import type { GuideTheme, StructuredGuide } from "@/lib/studies/guide";
 import type { QuestionGuideProfileContext } from "@/lib/studies/question-guide";
 import { regenerateTheme, type ThemeDraftAttempt } from "./generate";
@@ -240,9 +240,9 @@ async function modelVerdicts(
     .join("\n");
 
   const result = await anthropic.messages.create({
-    model: INTERVIEW_MODEL,
-    max_tokens: 4096,
-    system: CRITIC_SYSTEM,
+        // Forced tool call: thinking is not allowed, so this is all verdicts.
+    ...modelParams({ maxTokens: 4096, thinking: "off" }),
+        system: CRITIC_SYSTEM,
     messages: [{ role: "user", content: `Questions to review:\n\n${listing}` }],
     tools: [CRITIC_TOOL],
     tool_choice: { type: "tool", name: "record_verdicts" },

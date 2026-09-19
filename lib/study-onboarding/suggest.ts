@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
+import { getAnthropicClient, modelParams } from "@/lib/interview/anthropic";
 import type { ExtractedSurveyDetails } from "./types";
 
 // AI suggestions for the two respondent-facing wizard steps (external name,
@@ -83,9 +83,8 @@ export async function suggestSurveyNames(
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     const result = await anthropic.messages.create({
-      model: INTERVIEW_MODEL,
-      max_tokens: 512,
-      system: NAME_SUGGESTION_SYSTEM_PROMPT,
+      ...modelParams({ maxTokens: 1024, thinking: "off" }),
+            system: NAME_SUGGESTION_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userMessage }],
       tools: [NAME_SUGGESTIONS_TOOL],
       tool_choice: { type: "tool", name: "record_title_suggestions" },
@@ -146,9 +145,8 @@ export async function suggestSurveyDescription(
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     const result = await anthropic.messages.create({
-      model: INTERVIEW_MODEL,
-      max_tokens: 300,
-      system: DESCRIPTION_SUGGESTION_SYSTEM_PROMPT,
+      ...modelParams({ maxTokens: 1024, thinking: "off" }),
+            system: DESCRIPTION_SUGGESTION_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userMessage }],
       tools: [DESCRIPTION_SUGGESTION_TOOL],
       tool_choice: { type: "tool", name: "record_description_suggestion" },

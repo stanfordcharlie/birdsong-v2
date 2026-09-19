@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
+import { getAnthropicClient, modelParams } from "@/lib/interview/anthropic";
 
 const SYSTEM_PROMPT = `You help B2B market researchers draft the research brief that drives an AI-moderated customer discovery interview. This brief is NOT a script and must not contain ready-to-ask questions — the interviewer improvises its own natural, conversational questions in the moment, in whatever order and phrasing fits how the conversation is actually going. Your job is to hand it ideas and direction, not lines to read.
 
@@ -43,9 +43,8 @@ export async function generateQuestionGuide(input: {
 
   const anthropic = getAnthropicClient();
   const completion = await anthropic.messages.create({
-    model: INTERVIEW_MODEL,
-    max_tokens: 512,
-    system: SYSTEM_PROMPT,
+    ...modelParams({ maxTokens: 2048, thinking: "off" }),
+        system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: contextLines }],
   });
 

@@ -4,9 +4,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   createInterviewTurn,
+  modelParams,
   describeModelResponse,
   getAnthropicClient,
-  INTERVIEW_MODEL,
   logModelFailure,
 } from "@/lib/interview/anthropic";
 import {
@@ -189,7 +189,10 @@ export async function POST(request: Request) {
   // (createInterviewTurn). A non-retryable error still throws as before.
   const { completion, rawText: rawReply } = await createInterviewTurn(
     anthropic,
-    { model: INTERVIEW_MODEL, max_tokens: 512, system: systemPrompt, messages: claudeMessages },
+    // No thinking on a turn that writes one conversational question: it is
+    // not a reasoning task and the respondent waits through every token.
+    // 1024 is the question, the answer marker and the chips with room over.
+    { ...modelParams({ maxTokens: 1024, thinking: "off" }), system: systemPrompt, messages: claudeMessages },
     { scope: "interview/continue", requestId, fields: { responseId: response_id, exchangeCount } }
   );
 

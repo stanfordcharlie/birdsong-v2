@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
+import { getAnthropicClient, INTERVIEW_MODEL, modelParams } from "@/lib/interview/anthropic";
 import { extractBrief } from "@/lib/brief/extract";
 import { loadProfileContext } from "@/lib/brief/profile";
 import { getActiveOrg, requireOrgPermission } from "@/lib/org";
@@ -53,8 +53,9 @@ const SCOPE = "brief/continue";
 // answers and the thinking counts against max_tokens. At 512 a longer
 // transcript spent the whole budget thinking and came back with no text
 // block at all, which is what the old "No reply from the model" 502 was.
-// Low effort keeps the thinking short; the ceiling makes starvation
-// impossible either way.
+// modelParams caps the thinking at an explicit budget and asserts this
+// ceiling leaves THINKING_HEADROOM for the reply, so starvation is
+// impossible by construction.
 const REPLY_MAX_TOKENS = 4096;
 
 export async function POST(request: Request) {
@@ -193,11 +194,8 @@ async function handle(request: Request, requestId: string, phase: { current: str
   let completion: Anthropic.Message;
   try {
     completion = await getAnthropicClient().messages.create({
-      model: INTERVIEW_MODEL,
-      max_tokens: REPLY_MAX_TOKENS,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "low" },
-      system,
+            ...modelParams({ maxTokens: REPLY_MAX_TOKENS, thinking: { effort: "low", budget: 2048 } }),
+            system,
       messages: claudeMessages,
     });
   } catch (err) {

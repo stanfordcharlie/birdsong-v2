@@ -4,6 +4,62 @@ import Anthropic from "@anthropic-ai/sdk";
 // extraction pass.
 export const INTERVIEW_MODEL = "claude-sonnet-5";
 
+// ---------------------------------------------------------------------------
+// One place that decides how much a call may think, and asserts the budget.
+//
+// Sonnet 5 thinks before it answers unless told not to, and the thinking
+// counts against max_tokens. Every call used to set its own max_tokens with
+// no thinking config at all, and at 512 a live interview turn spent the
+// whole budget on a thinking block and returned no text (stopReason
+// "max_tokens", blockTypes ["thinking"]), which ended the respondent's
+// interview with an error around exchange 3 or 4 as thinking grew with the
+// transcript. Every call now goes through modelParams: thinking is either
+// off, or on with an explicit budget that max_tokens must exceed by
+// THINKING_HEADROOM. A bad pairing throws at call time, naming both
+// numbers, so it fails loudly in development instead of silently in front
+// of a respondent. One API rule to know: thinking may not be enabled on a
+// call whose tool_choice forces a tool, so every forced-tool call (guide,
+// critic, extraction) is "off" and its max_tokens is all output.
+
+/** Output tokens that must remain after the thinking budget is spent. */
+export const THINKING_HEADROOM = 1024;
+
+/**
+ * "off" disables thinking outright. "on" is adaptive thinking (the only
+ * mode this model accepts; an explicit budget_tokens is rejected) at the
+ * given effort, with `budget` the planned ceiling for the thinking that
+ * effort produces. The API does not enforce that number; max_tokens is the
+ * only hard stop, which is exactly why max_tokens must exceed it by
+ * THINKING_HEADROOM. Keep effort "low" unless a call genuinely needs more.
+ */
+export type ThinkingSetting = "off" | { effort: "low" | "medium" | "high"; budget: number };
+
+export type ModelParams = Pick<Anthropic.MessageCreateParams, "model" | "max_tokens" | "thinking" | "output_config">;
+
+export function modelParams({ maxTokens, thinking }: { maxTokens: number; thinking: ThinkingSetting }): ModelParams {
+  if (!Number.isInteger(maxTokens) || maxTokens <= 0) {
+    throw new Error(`Model call misconfigured: max_tokens must be a positive integer, got ${maxTokens}`);
+  }
+  if (thinking === "off") {
+    return { model: INTERVIEW_MODEL, max_tokens: maxTokens, thinking: { type: "disabled" } };
+  }
+  const { budget, effort } = thinking;
+  if (!Number.isInteger(budget) || budget < 1024) {
+    throw new Error(`Model call misconfigured: thinking budget must be an integer of at least 1024, got ${budget}`);
+  }
+  if (maxTokens < budget + THINKING_HEADROOM) {
+    throw new Error(
+      `Model call misconfigured: max_tokens ${maxTokens} must exceed the thinking budget ${budget} by at least ${THINKING_HEADROOM} (need ${budget + THINKING_HEADROOM})`
+    );
+  }
+  return {
+    model: INTERVIEW_MODEL,
+    max_tokens: maxTokens,
+    thinking: { type: "adaptive" },
+    output_config: { effort },
+  };
+}
+
 let client: Anthropic | undefined;
 
 export function getAnthropicClient(): Anthropic {
@@ -139,6 +195,7 @@ export async function createInterviewTurn(
   log: { scope: string; requestId: string; fields: Record<string, unknown> }
 ): Promise<InterviewTurnResult> {
   let last: InterviewTurnResult | null = null;
+  let firstStopReason: string | null = null;
   for (const attempt of [1, 2] as const) {
     const willRetry = attempt === 1;
     let completion: Anthropic.Message;
@@ -169,13 +226,27 @@ export async function createInterviewTurn(
       }
       return last;
     }
+    const described = describeModelResponse(completion, rawText);
     logModelFailure(log.scope, log.requestId, "empty_reply", {
       ...log.fields,
       attempt,
       retried: attempt === 2,
       willRetry,
-      ...describeModelResponse(completion, rawText),
+      ...described,
     });
+    if (attempt === 1) {
+      firstStopReason = described.stopReason;
+    } else if (described.stopReason !== null && described.stopReason === firstStopReason) {
+      // Both attempts died the same way. A transient failure does not
+      // repeat identically; a budget or config problem does. Called out on
+      // its own line so it is recognisable at a glance.
+      logModelFailure(log.scope, log.requestId, "repeated_failure", {
+        ...log.fields,
+        stopReason: described.stopReason,
+        attempts: 2,
+        hint: "identical failure on both attempts: suspect max_tokens or thinking config, not a transient error",
+      });
+    }
   }
   // Both attempts returned a completion with no text. The caller surfaces
   // its existing generic error; both attempts are already in the log.

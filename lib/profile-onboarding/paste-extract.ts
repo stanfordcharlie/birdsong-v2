@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
+import { getAnthropicClient, modelParams } from "@/lib/interview/anthropic";
 import { PASTE_EXTRACTION_FIELDS } from "./company-profile-fields";
 
 // "Fill this out with your AI" flow: the admin copies a prompt (built by
@@ -67,9 +67,8 @@ function normalize(value: unknown): string | null {
 export async function extractProfileFromPaste(pastedText: string): Promise<PasteExtractionResult> {
   const anthropic = getAnthropicClient();
   const requestParams: Anthropic.MessageCreateParamsNonStreaming = {
-    model: INTERVIEW_MODEL,
-    max_tokens: 1024,
-    system: buildExtractionSystemPrompt(),
+    ...modelParams({ maxTokens: 2048, thinking: "off" }),
+        system: buildExtractionSystemPrompt(),
     messages: [{ role: "user", content: `<pasted_text>\n${pastedText}\n</pasted_text>` }],
     tools: [PASTE_EXTRACTION_TOOL],
     tool_choice: { type: "tool", name: "record_extracted_profile" },

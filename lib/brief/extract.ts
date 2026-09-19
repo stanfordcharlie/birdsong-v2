@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
+import { getAnthropicClient, modelParams } from "@/lib/interview/anthropic";
 import type { BriefMessage, ExtractedBrief } from "./types";
 
 export const EMPTY_BRIEF: ExtractedBrief = {
@@ -110,17 +110,12 @@ function str(input: Record<string, unknown>, key: string): string {
 export async function extractBrief(messages: BriefMessage[]): Promise<ExtractedBrief> {
   const anthropic = getAnthropicClient();
 
-  // Sonnet 5 thinks before the tool call and the thinking counts against
-  // max_tokens. At 1024 a long transcript could spend the budget thinking
-  // and produce no tool_use at all, which read as "nothing collected" and
-  // would keep the chat asking forever. Low effort keeps the thinking short;
-  // the ceiling makes starvation impossible either way.
+  // A forced tool call may not think (the API rejects the pairing), so the
+  // whole ceiling is the tool call itself; 4096 is far more than the brief
+  // fields need, and modelParams keeps the config explicit.
   const result = await anthropic.messages.create({
-    model: INTERVIEW_MODEL,
-    max_tokens: 4096,
-    thinking: { type: "adaptive" },
-    output_config: { effort: "low" },
-    system: SYSTEM_PROMPT,
+        ...modelParams({ maxTokens: 4096, thinking: "off" }),
+        system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: transcriptToText(messages) }],
     tools: [BRIEF_TOOL],
     tool_choice: { type: "tool", name: "record_brief" },

@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
+import { getAnthropicClient, modelParams } from "@/lib/interview/anthropic";
 import type { OnboardingMessage } from "./types";
 
 export type ExtractedProfile = {
@@ -53,9 +53,8 @@ export async function extractProfile(messages: OnboardingMessage[]): Promise<Ext
   const anthropic = getAnthropicClient();
 
   const result = await anthropic.messages.create({
-    model: INTERVIEW_MODEL,
-    max_tokens: 1024,
-    system: EXTRACTION_SYSTEM_PROMPT,
+    ...modelParams({ maxTokens: 2048, thinking: "off" }),
+        system: EXTRACTION_SYSTEM_PROMPT,
     messages: [{ role: "user", content: transcriptToText(messages) }],
     tools: [PROFILE_TOOL],
     tool_choice: { type: "tool", name: "record_company_profile" },

@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
+import { getAnthropicClient, modelParams } from "@/lib/interview/anthropic";
 import type { ResearchResult } from "./types";
 
 const MAX_SOURCES = 6;
@@ -14,9 +14,8 @@ export async function researchCompany(companyInput: string): Promise<ResearchRes
   const anthropic = getAnthropicClient();
 
   const completion = await anthropic.messages.create({
-    model: INTERVIEW_MODEL,
-    max_tokens: 1024,
-    system: RESEARCH_SYSTEM_PROMPT,
+    ...modelParams({ maxTokens: 2048, thinking: "off" }),
+        system: RESEARCH_SYSTEM_PROMPT,
     messages: [{ role: "user", content: `Research this company: ${companyInput}` }],
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }],
   });

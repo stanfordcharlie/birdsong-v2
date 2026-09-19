@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createInterviewTurn, isRetryableModelError, type MessagesClient } from "./anthropic";
+import { THINKING_HEADROOM, createInterviewTurn, isRetryableModelError, modelParams, type MessagesClient } from "./anthropic";
 
 const PARAMS = { model: "x", max_tokens: 1, messages: [] } as unknown as Anthropic.MessageCreateParamsNonStreaming;
 const LOG = { scope: "interview/test", requestId: "r1", fields: { responseId: "resp" } };
@@ -58,7 +58,13 @@ describe("createInterviewTurn", () => {
     const c = client(message(null), message(null));
     const r = await createInterviewTurn(c, PARAMS, LOG);
     expect(r).toMatchObject({ rawText: "", attempts: 2 });
-    expect(logged().map((l: Record<string, unknown>) => [l.phase, l.attempt, l.retried])).toEqual([["empty_reply", 1, false], ["empty_reply", 2, true]]);
+    // Both empty replies share a stop reason, so the third line is the
+    // identical-failure flag.
+    expect(logged().map((l: Record<string, unknown>) => [l.phase, l.attempt ?? null, l.retried ?? null])).toEqual([
+      ["empty_reply", 1, false],
+      ["empty_reply", 2, true],
+      ["repeated_failure", null, null],
+    ]);
   });
 
   it("retries a rate limit, an overload, a 5xx and a connection error", async () => {
@@ -85,5 +91,45 @@ describe("createInterviewTurn", () => {
     const c = client(apiError(529), apiError(529));
     await expect(createInterviewTurn(c, PARAMS, LOG)).rejects.toBeInstanceOf(Anthropic.APIError);
     expect(logged().map((l: Record<string, unknown>) => [l.phase, l.attempt, l.retried])).toEqual([["model_call", 1, false], ["model_call", 2, true]]);
+  });
+});
+
+describe("modelParams", () => {
+  it("disables thinking explicitly when off", () => {
+    expect(modelParams({ maxTokens: 1024, thinking: "off" })).toEqual({
+      model: expect.any(String),
+      max_tokens: 1024,
+      thinking: { type: "disabled" },
+    });
+  });
+
+  it("enables adaptive thinking at the given effort when max_tokens leaves headroom over the planned budget", () => {
+    expect(modelParams({ maxTokens: 2048 + THINKING_HEADROOM, thinking: { effort: "low", budget: 2048 } })).toEqual({
+      model: expect.any(String),
+      max_tokens: 2048 + THINKING_HEADROOM,
+      thinking: { type: "adaptive" },
+      output_config: { effort: "low" },
+    });
+  });
+
+  it("throws, naming both numbers, when max_tokens does not exceed the budget by the headroom", () => {
+    expect(() => modelParams({ maxTokens: 512, thinking: { effort: "low", budget: 2048 } })).toThrow(/max_tokens 512 .* thinking budget 2048 .* 1024/);
+    expect(() => modelParams({ maxTokens: 2048 + THINKING_HEADROOM - 1, thinking: { effort: "low", budget: 2048 } })).toThrow(/max_tokens/);
+  });
+
+  it("rejects a budget below the API minimum and a non-positive max_tokens", () => {
+    expect(() => modelParams({ maxTokens: 4096, thinking: { effort: "low", budget: 512 } })).toThrow(/at least 1024/);
+    expect(() => modelParams({ maxTokens: 0, thinking: "off" })).toThrow(/positive integer/);
+  });
+});
+
+describe("createInterviewTurn flags an identical failure on both attempts", () => {
+  it("logs repeated_failure when both empty replies share a stop reason", async () => {
+    const stalled = (): Anthropic.Message => ({ ...message(null), stop_reason: "max_tokens" } as Anthropic.Message);
+    const c = client(stalled(), stalled());
+    await createInterviewTurn(c, PARAMS, LOG);
+    const events = logged().map((l: Record<string, unknown>) => [l.event, l.phase]);
+    expect(events).toEqual([["failure", "empty_reply"], ["failure", "empty_reply"], ["failure", "repeated_failure"]]);
+    expect(logged()[2].stopReason).toBe("max_tokens");
   });
 });

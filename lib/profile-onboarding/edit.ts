@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
+import { getAnthropicClient, modelParams } from "@/lib/interview/anthropic";
 import type { CompanyProfileEditFields } from "./company-profile-fields";
 
 export type { CompanyProfileEditFields } from "./company-profile-fields";
@@ -75,9 +75,8 @@ export async function editProfile(
 Instruction: ${instruction}`;
 
   const result = await anthropic.messages.create({
-    model: INTERVIEW_MODEL,
-    max_tokens: 1024,
-    system: EDIT_SYSTEM_PROMPT,
+    ...modelParams({ maxTokens: 2048, thinking: "off" }),
+        system: EDIT_SYSTEM_PROMPT,
     messages: [{ role: "user", content: contextMessage }],
     tools: [EDIT_TOOL],
     tool_choice: { type: "tool", name: "record_company_profile" },

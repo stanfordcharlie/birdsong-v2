@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
+import { getAnthropicClient, modelParams } from "@/lib/interview/anthropic";
 import {
   GUIDE_SIGNALS,
   MAX_THEMES,
@@ -198,9 +198,10 @@ const RAW_TEXT_CAP = 2000;
 async function callGuideTool(system: string, userContent: string): Promise<GuideToolCall> {
   const anthropic = getAnthropicClient();
   const result = await anthropic.messages.create({
-    model: INTERVIEW_MODEL,
-    max_tokens: 4096,
-    system,
+        // Thinking may not be enabled when tool_choice forces a tool, so this is
+    // all output: a full guide is well under 8192 tokens.
+    ...modelParams({ maxTokens: 8192, thinking: "off" }),
+        system,
     messages: [{ role: "user", content: userContent }],
     tools: [GUIDE_TOOL],
     tool_choice: { type: "tool", name: "record_guide" },

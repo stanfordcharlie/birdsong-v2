@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getAnthropicClient, INTERVIEW_MODEL } from "./anthropic";
+import { getAnthropicClient, modelParams } from "./anthropic";
 import type { InterviewMessage } from "./types";
 import { parseCallScript, type CallScript } from "./call-script";
 
@@ -236,8 +236,7 @@ export async function extractInterviewInsights(
   const anthropic = getAnthropicClient();
   const system = buildExtractionSystemPrompt(companyProfile);
   const requestParams: Anthropic.MessageCreateParamsNonStreaming = {
-    model: INTERVIEW_MODEL,
-    // Was 1024, which a real interview came within 100 tokens of exhausting: a
+        // Was 1024, which a real interview came within 100 tokens of exhausting: a
     // 19-exchange transcript surfacing 6 pain points spends ~924 here. Past
     // roughly 7 pain points the tool call is cut off partway through
     // pain_points, so summary and call_script are never emitted, extractToolInput
@@ -252,8 +251,8 @@ export async function extractInterviewInsights(
     // This is a ceiling, not a spend commitment: output tokens are billed as
     // generated, so raising it costs nothing on the interviews that already
     // fit and only stops the ones that don't from being discarded.
-    max_tokens: 2048,
-    system,
+    ...modelParams({ maxTokens: 4096, thinking: "off" }),
+        system,
     messages: [{ role: "user", content: transcriptToText(messages) }],
     tools: [INSIGHTS_TOOL],
     tool_choice: { type: "tool", name: "record_interview_insights" },

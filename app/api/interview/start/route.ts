@@ -3,9 +3,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient as createCookieClient } from "@/lib/supabase/server";
 import {
   createInterviewTurn,
+  modelParams,
   describeModelResponse,
   getAnthropicClient,
-  INTERVIEW_MODEL,
   logModelFailure,
 } from "@/lib/interview/anthropic";
 import { buildInterviewSystemPrompt, buildKickoffMessage } from "@/lib/interview-prompt";
@@ -263,8 +263,8 @@ export async function POST(request: Request) {
   const { completion, rawText: rawOpeningQuestion } = await createInterviewTurn(
     anthropic,
     {
-      model: INTERVIEW_MODEL,
-      max_tokens: 512,
+      // No thinking, 1024 tokens: see the continue route.
+      ...modelParams({ maxTokens: 1024, thinking: "off" }),
       system: systemPrompt,
       messages: [{ role: "user", content: buildKickoffMessage(respondent) }],
     },

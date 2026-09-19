@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveOrg, orgErrorResponse, requireOrgPermission } from "@/lib/org";
-import { getAnthropicClient, INTERVIEW_MODEL } from "@/lib/interview/anthropic";
+import { getAnthropicClient, modelParams } from "@/lib/interview/anthropic";
 import {
   ALTERNATION_STANDIN,
   COMPLETE_TOKEN,
@@ -76,9 +76,8 @@ export async function POST(request: Request) {
     ];
 
     const completion = await anthropic.messages.create({
-      model: INTERVIEW_MODEL,
-      max_tokens: 512,
-      system: systemPrompt,
+      ...modelParams({ maxTokens: 1024, thinking: "off" }),
+            system: systemPrompt,
       messages: claudeMessages,
     });
 
