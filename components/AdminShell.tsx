@@ -9,11 +9,13 @@ export function AdminShell({
   children,
   userName,
   userRole,
+  logoUrl,
   sidebarCollapsed,
 }: {
   children: React.ReactNode;
   userName: string | null;
   userRole: string | null;
+  logoUrl: string | null;
   sidebarCollapsed: boolean;
 }) {
   // The browser paints overscroll/rubber-band regions with <body>'s actual
@@ -39,7 +41,7 @@ export function AdminShell({
 
   return (
     <div className={cn("font-archivo flex min-h-screen bg-page text-card-foreground", spectral.variable)}>
-      <AdminSidebar userName={userName} userRole={userRole} initialCollapsed={sidebarCollapsed} />
+      <AdminSidebar userName={userName} userRole={userRole} logoUrl={logoUrl} initialCollapsed={sidebarCollapsed} />
       {/* AdminSidebar is a normal (sticky, not fixed) flex sibling that owns
           its own width (240px expanded / 64px collapsed), so it always
           reserves exactly its own width — no padding value here needs to

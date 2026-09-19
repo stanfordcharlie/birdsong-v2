@@ -71,14 +71,26 @@ function initialsOf(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-// The account avatar: a 30px indigo squircle carrying the initials. Never
-// the logo mark — that identifies the product rather than the person whose
-// name sits beside it, and a dark tile on a near-black rail reads as a
-// smudge. The fill is the one saturated colour on the sidebar for exactly
-// that reason, but muted (#5f6bab, not the old #8ea4e8 circle) so it stops
-// being the loudest thing on a dark rail. Same 30px / rounded-control
-// geometry as the logo mark at the top of the rail, so the two agree.
-function AccountAvatar({ name }: { name: string }) {
+// The account avatar: the company's own logo from the profile page when one
+// is uploaded, otherwise a 30px indigo squircle carrying the initials. Never
+// the Birdsong mark — that identifies the product rather than the account,
+// and a dark tile on a near-black rail reads as a smudge. The initials fill
+// is the one saturated colour on the sidebar for exactly that reason, but
+// muted (#5f6bab, not the old #8ea4e8 circle) so it stops being the loudest
+// thing on a dark rail. Same 30px / rounded-control geometry as the mark at
+// the top of the rail, so the two agree, and the logo gets the same box.
+function AccountAvatar({ name, logoUrl }: { name: string; logoUrl: string | null }) {
+  if (logoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={logoUrl}
+        alt=""
+        aria-hidden
+        className="h-[30px] w-[30px] shrink-0 rounded-control bg-sidebar-avatar object-cover"
+      />
+    );
+  }
   return (
     <span
       aria-hidden
@@ -116,11 +128,14 @@ const NAV_ITEMS = [
 export function AdminSidebar({
   userName,
   userRole,
+  logoUrl,
   initialCollapsed,
 }: {
   userName: string | null;
   /** The person's role in the organization, already a display label. */
   userRole: string | null;
+  /** The company logo from the profile page; null shows initials instead. */
+  logoUrl: string | null;
   initialCollapsed: boolean;
 }) {
   const pathname = usePathname();
@@ -318,7 +333,7 @@ export function AdminSidebar({
             accountOpen && "bg-sidebar-plate/[0.06]"
           )}
         >
-          <AccountAvatar name={userName ?? "Account"} />
+          <AccountAvatar name={userName ?? "Account"} logoUrl={logoUrl} />
           {!collapsed && (
             <>
               {/* Archivo, not Spectral: a serif at 13.5px in a 240px rail

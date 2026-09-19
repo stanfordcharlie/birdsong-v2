@@ -35,11 +35,13 @@ export function AdminChrome({
   children,
   userName,
   userRole,
+  logoUrl,
   sidebarCollapsed,
 }: {
   children: React.ReactNode;
   userName: string | null;
   userRole: string | null;
+  logoUrl: string | null;
   sidebarCollapsed: boolean;
 }) {
   const pathname = usePathname();
@@ -47,7 +49,7 @@ export function AdminChrome({
     return <>{children}</>;
   }
   return (
-    <AdminShell userName={userName} userRole={userRole} sidebarCollapsed={sidebarCollapsed}>
+    <AdminShell userName={userName} userRole={userRole} logoUrl={logoUrl} sidebarCollapsed={sidebarCollapsed}>
       {children}
     </AdminShell>
   );

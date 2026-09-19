@@ -19,7 +19,7 @@ export default async function AdminLayout({
 
   // The company profile is the organization's row, one per org.
   const { data: profile } = org
-    ? await supabase.from("profiles").select("contact_name").eq("org_id", org.orgId).maybeSingle()
+    ? await supabase.from("profiles").select("contact_name, logo_url").eq("org_id", org.orgId).maybeSingle()
     : { data: null };
 
   // userFullName, not userDisplayName: the sidebar plate shows this as a
@@ -32,7 +32,12 @@ export default async function AdminLayout({
   const sidebarCollapsed = cookieStore.get("sidebar_collapsed")?.value === "1";
 
   return (
-    <AdminChrome userName={displayName} userRole={roleLabel} sidebarCollapsed={sidebarCollapsed}>
+    <AdminChrome
+      userName={displayName}
+      userRole={roleLabel}
+      logoUrl={profile?.logo_url ?? null}
+      sidebarCollapsed={sidebarCollapsed}
+    >
       {/* ⌘K on every signed-in admin route; not on the auth screens. */}
       {user && <SearchShortcut />}
       {children}
