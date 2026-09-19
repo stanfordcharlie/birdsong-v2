@@ -8,9 +8,12 @@ import { AuthScreen, AuthField, AuthPasswordField, AuthError, AuthSubmit } from 
 
 export function LoginForm({
   notice = null,
+  next = "/admin",
   inviteToken = null,
 }: {
   notice?: string | null;
+  /** Already passed through safeAdminNext on the server. */
+  next?: string;
   inviteToken?: string | null;
 }) {
   const [email, setEmail] = useState("");
@@ -36,8 +39,10 @@ export function LoginForm({
       await logLoginEvent(supabase, data.user.id, data.user.email ?? null);
     }
     // Full navigation so middleware re-reads the freshly set auth cookies.
-    // An invited login returns to the invite's accept page.
-    window.location.assign(inviteToken ? `/invite/${inviteToken}` : "/admin");
+    // An invited login returns to the invite's accept page; otherwise to
+    // wherever middleware sent them here from (`next`, validated server-side
+    // in page.tsx), or the app home.
+    window.location.assign(inviteToken ? `/invite/${inviteToken}` : next);
   }
 
   return (

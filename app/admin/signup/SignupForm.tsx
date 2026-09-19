@@ -4,7 +4,14 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { AuthScreen, AuthField, AuthPasswordField, AuthError, AuthSubmit } from "@/components/auth/AuthScreen";
 
-export function SignupForm({ inviteToken = null }: { inviteToken?: string | null }) {
+export function SignupForm({
+  inviteToken = null,
+  next = "/admin",
+}: {
+  inviteToken?: string | null;
+  /** Already passed through safeAdminNext on the server. */
+  next?: string;
+}) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -60,7 +67,10 @@ export function SignupForm({ inviteToken = null }: { inviteToken?: string | null
       // the route already has an active session and set its cookies, no
       // confirmation step needed. The signup itself is logged server-side
       // via a DB trigger.
-      window.location.assign(result.next || "/admin");
+      // The route's own `next` is only ever an invite accept page (an invited
+      // signup); anyone else goes where middleware sent them from, validated
+      // server-side in page.tsx.
+      window.location.assign(result.next?.startsWith("/invite/") ? result.next : next);
       return;
     }
     setCheckEmail(true);
