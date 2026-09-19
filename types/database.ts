@@ -797,6 +797,12 @@ export type Database = {
         Args: { target_org: string; new_owner: string };
         Returns: undefined;
       };
+      // Test cleanup for a prospect link (20260918000001_reset_prospect.sql).
+      // Service role only; raises completed_response / hubspot_synced.
+      reset_prospect: {
+        Args: { p_prospect_id: string };
+        Returns: { deleted_responses: number };
+      };
       user_org_ids: {
         Args: Record<string, never>;
         Returns: string[];

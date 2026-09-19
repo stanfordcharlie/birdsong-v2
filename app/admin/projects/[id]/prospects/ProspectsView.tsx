@@ -2,6 +2,8 @@
 
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Dialog } from "@/components/ui/dialog";
 import {
   Badge,
   Button,
@@ -54,6 +56,12 @@ const STATUS_VARIANTS: Record<string, AdminBadgeProps["variant"]> = {
   completed: "live",
 };
 
+// Rows that need attention first: someone mid-interview outranks the
+// finished, sent and untouched ones, and within a status the newest is
+// first. This is the order the "All" tab shows; the status tabs inherit it
+// too, where it reduces to newest first.
+const STATUS_ORDER: Record<string, number> = { started: 0, completed: 1, sent: 2, pending: 3 };
+
 function statusLabel(status: string) {
   return STATUS_LABELS[status] ?? status;
 }
@@ -61,8 +69,37 @@ function statusLabel(status: string) {
 // Copy and open, side by side, on every row. This is the testing affordance
 // the whole surface exists for: an operator needs to take one prospect's
 // link and walk it end to end without touching the database or the export.
+//
+// Reset is the way back from that walk. A test click on a personal link
+// creates a response and stamps the prospect as started, so the link then
+// resumes the tester's abandoned session for the real person. Reset deletes
+// that response and returns the row to pending, after a confirmation that
+// names the prospect and says the transcript goes. It is refused for a
+// completed interview, server-side as well as here: that is real data.
 function RowLinkActions({ row }: { row: ProspectRow }) {
+  const router = useRouter();
   const [copied, setCopied] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const displayName = row.name ?? row.email;
+  const canReset = row.status !== "pending" && row.status !== "completed";
+
+  async function handleReset() {
+    setResetting(true);
+    setResetError(null);
+    try {
+      const res = await fetch(`/api/prospects/${row.id}/reset`, { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Couldn't reset that prospect");
+      setResetOpen(false);
+      router.refresh();
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : "Couldn't reset that prospect");
+    } finally {
+      setResetting(false);
+    }
+  }
 
   async function handleCopy() {
     try {
@@ -77,13 +114,24 @@ function RowLinkActions({ row }: { row: ProspectRow }) {
   }
 
   return (
-    <div className="flex items-center justify-end gap-1">
+    <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+      {canReset && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setResetOpen(true)}
+          aria-label={`Reset ${displayName} to pending`}
+        >
+          Reset
+        </Button>
+      )}
       <Button
         type="button"
         variant="ghost"
         size="sm"
         onClick={handleCopy}
-        aria-label={`Copy study link for ${row.name ?? row.email}`}
+        aria-label={`Copy study link for ${displayName}`}
       >
         <span aria-live="polite">{copied ? "Copied" : "Copy"}</span>
       </Button>
@@ -92,11 +140,30 @@ function RowLinkActions({ row }: { row: ProspectRow }) {
           href={row.link}
           target="_blank"
           rel="noreferrer"
-          aria-label={`Open study link for ${row.name ?? row.email} in a new tab`}
+          aria-label={`Open study link for ${displayName} in a new tab`}
         >
           Open
         </a>
       </Button>
+
+      <Dialog
+        open={resetOpen}
+        onClose={() => !resetting && setResetOpen(false)}
+        title={`Reset ${displayName}?`}
+        description={`Their interview transcript will be deleted and their link will start a fresh interview next time it is opened. The prospect record itself stays.`}
+      >
+        <div className="flex flex-col gap-3">
+          {resetError && <p className="type-body text-destructive">{resetError}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setResetOpen(false)} disabled={resetting}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleReset} disabled={resetting}>
+              {resetting ? "Resetting..." : "Delete transcript and reset"}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }
@@ -123,9 +190,19 @@ export function ProspectsView({
     return byStatus;
   }, [rows]);
 
+  const ordered = useMemo(
+    () =>
+      [...rows].sort(
+        (a, b) =>
+          (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9) ||
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [rows]
+  );
+
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return rows.filter((row) => {
+    return ordered.filter((row) => {
       if (status !== "all" && row.status !== status) return false;
       if (!needle) return true;
       // Name, email and company, as briefed. Title is deliberately not
@@ -135,7 +212,7 @@ export function ProspectsView({
         field?.toLowerCase().includes(needle)
       );
     });
-  }, [rows, status, query]);
+  }, [ordered, status, query]);
 
   async function handleFileChosen(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -185,11 +262,17 @@ export function ProspectsView({
     })),
   ];
 
+  // Widths are fractions that sum to 1, so the table uses the whole row
+  // before any cell truncates; the fixed steps it used to mix in left a
+  // third of the width idle while emails were cut short. Email and company
+  // get the most room, title the least: title is the noisiest column.
+  // Every truncating column also carries `title`, which DataTable puts on
+  // the cell as a native tooltip, so a long value is still one hover away.
   const columns: Column<ProspectRow>[] = [
     {
       key: "name",
       header: "Name",
-      width: 0.2,
+      width: 0.19,
       truncate: true,
       rowLabel: true,
       sortable: true,
@@ -200,7 +283,7 @@ export function ProspectsView({
     {
       key: "title",
       header: "Title",
-      width: 0.18,
+      width: 0.14,
       truncate: true,
       title: (row) => row.title ?? undefined,
       cell: (row) => row.title ?? EMPTY_VALUE,
@@ -216,7 +299,7 @@ export function ProspectsView({
     {
       key: "email",
       header: "Email",
-      width: 0.22,
+      width: 0.25,
       truncate: true,
       title: (row) => row.email,
       cell: (row) => row.email,
@@ -224,13 +307,13 @@ export function ProspectsView({
     {
       key: "status",
       header: "Status",
-      width: "md",
+      width: 0.08,
       cell: (row) => <Badge variant={STATUS_VARIANTS[row.status] ?? "count"}>{statusLabel(row.status)}</Badge>,
     },
     {
       key: "created",
       header: "Added",
-      width: "md",
+      width: 0.07,
       sortable: true,
       sortValue: (row) => new Date(row.createdAt).getTime(),
       cell: (row) => <RelativeTime date={row.createdAt} />,
@@ -239,7 +322,7 @@ export function ProspectsView({
       key: "link",
       header: <span className="sr-only">Study link</span>,
       align: "right",
-      width: "lg",
+      width: 0.11,
       cell: (row) => <RowLinkActions row={row} />,
     },
   ];
