@@ -47,11 +47,12 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
 // the grid then contradicts.
 function matchesStatus(survey: StudyListItem, filter: StatusFilter): boolean {
   const isArchived = survey.archivedAt !== null;
-  // "Live" and "Draft" exclude archived studies; "All" is everything the
-  // account holds, which is the number the page header also states.
+  // Archived studies live only under their own tab. "All" is everything
+  // still in play (live plus draft), so an archived study never sits beside
+  // the ones being worked on.
   if (filter === "archived") return isArchived;
-  if (filter === "all") return true;
   if (isArchived) return false;
+  if (filter === "all") return true;
   if (filter === "live") return survey.status === "live";
   return survey.status !== "live";
 }
@@ -259,7 +260,14 @@ export function StudiesList({
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState className="py-2" title="No studies match." />
+        <EmptyState
+          className="py-2"
+          title={
+            statusFilter === "all" && !query && statusCounts.archived > 0
+              ? "Nothing live or in draft. Archived studies are under the Archived tab."
+              : "No studies match."
+          }
+        />
       ) : (
         <ul className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {filtered.map((survey) => (
