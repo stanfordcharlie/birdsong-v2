@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { HomeShell } from "@/components/marketing/home/v2/HomeShell";
+import { HeroIntroGate } from "@/components/marketing/home/v2/HeroIntroGate";
 import { HomeNav } from "@/components/marketing/home/v2/HomeNav";
 import { HomeHero } from "@/components/marketing/home/v2/HomeHero";
 import { ProductSection } from "@/components/marketing/home/v2/ProductSection";
@@ -66,14 +67,20 @@ export default async function RootPage({
   }
 
   return (
-    <HomeShell>
-      <HomeNav bookDemoUrl={BOOK_DEMO_URL} />
-      <HomeHero bookDemoUrl={BOOK_DEMO_URL} />
-      <ProductSection />
-      <CtaBanner bookDemoUrl={BOOK_DEMO_URL} />
-      <LeadComparison />
-      <FinalCta />
-      <HomeFooter bookDemoUrl={BOOK_DEMO_URL} />
-    </HomeShell>
+    <>
+      {/* Must precede the nav and hero in the HTML: it decides, while the
+          document is still parsing, whether they render hidden for the intro
+          or in their final state. */}
+      <HeroIntroGate />
+      <HomeShell>
+        <HomeNav bookDemoUrl={BOOK_DEMO_URL} />
+        <HomeHero bookDemoUrl={BOOK_DEMO_URL} />
+        <ProductSection />
+        <CtaBanner bookDemoUrl={BOOK_DEMO_URL} />
+        <LeadComparison />
+        <FinalCta />
+        <HomeFooter bookDemoUrl={BOOK_DEMO_URL} />
+      </HomeShell>
+    </>
   );
 }

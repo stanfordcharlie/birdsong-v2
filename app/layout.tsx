@@ -42,7 +42,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn(inter.variable, youngSerif.variable, archivo.variable)}>
+    // suppressHydrationWarning: on `/`, HeroIntroGate stamps data-intro on
+    // <html> before React hydrates it (see components/marketing/home/v2/
+    // heroIntro.ts). Without this, dev builds log "Extra attributes from the
+    // server" on every first visit. Scoped to this one element's attributes.
+    <html
+      lang="en"
+      className={cn(inter.variable, youngSerif.variable, archivo.variable)}
+      suppressHydrationWarning
+    >
       <body className="font-sans antialiased">{children}</body>
     </html>
   );

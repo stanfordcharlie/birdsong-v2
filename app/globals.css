@@ -1860,3 +1860,412 @@ select {
     opacity: 1 !important;
   }
 }
+
+/* ── Home hero page-load intro (hp-i-*) ──────────────────────────────────
+   The page assembles, the bird swoops in from off-screen left, lands on the
+   "T" of "Turn", sings four notes, flies up into the nav pill's logo slot,
+   and the wordmark wipes in beside it. ~4.5s total. Markup hooks live in
+   HomeHero / HomeNav / HeroIntroBird; measurement in useHeroIntro; the
+   lifecycle is described in components/marketing/home/v2/heroIntro.ts.
+
+   Two selectors carry everything:
+     html[data-intro="play"] …               start state. Set before first
+                                             paint by HeroIntroGate, so the
+                                             hero never flashes its final
+                                             state first. Opacity or clip
+                                             only, never a transform: the
+                                             perch is measured in this state
+                                             and its rect has to be true.
+     html[data-intro="play"].hp-intro-go …   the keyframes. Added once the
+                                             perch and nav slot are measured.
+   Without the attribute none of this applies and the SSR'd hero is final.
+
+   Every animation is `both`: the 0% frame holds during the delay, the 100%
+   frame holds after. That is why each layer of the bird has exactly one
+   transform animation (HeroIntroBird explains), why the nav bird's instant
+   appear is its own two-frame opacity animation rather than a frame on the
+   bounce, and why every clip-path wipe ends on `none` (an inset that
+   stayed behind would clip the pill's shadow and the hand text's overhang).
+
+   The bird's box is 72×66. margin:-64px 0 0 -30px puts its feet on the
+   perch point; useHeroIntro's CENTRE_DX/DY encode the same offsets. */
+
+/* Reveal from below through a clipped wrapper. The reference rises 108%;
+   here the clip reaches .2em below the line (Instrument Serif's descenders
+   overhang a line-height:1 box), so the start offset is 100% + .22em to
+   begin fully outside it. */
+@keyframes hp-i-lift {
+  0% {
+    opacity: 1;
+    transform: translateY(calc(100% + 0.22em));
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hp-i-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Left-to-right wipe. The insets are generous so glyph overhang (the hand
+   face, the pill's shadow) is inside the clip from the first frame; 110%
+   on the right starts it empty. Ends on `none`, see above. */
+@keyframes hp-i-wipe {
+  0% {
+    clip-path: inset(-30% 110% -30% -10%);
+  }
+  99% {
+    clip-path: inset(-30% -10% -30% -10%);
+  }
+  100% {
+    clip-path: none;
+  }
+}
+
+@keyframes hp-i-pill-open {
+  0% {
+    clip-path: inset(-40px calc(100% + 40px) -40px -40px round 999px);
+  }
+  99% {
+    clip-path: inset(-40px -40px -40px -40px round 999px);
+  }
+  100% {
+    clip-path: none;
+  }
+}
+
+/* Sticky notes spring in from a smaller, further-tilted version of
+   themselves. --rot is the note's resting tilt and must match the Tailwind
+   rotate-[…] on the same element: the utility's transform is what shows
+   outside the intro, this is what shows during and after it. */
+@keyframes hp-i-note {
+  0% {
+    opacity: 0;
+    transform: rotate(calc(var(--rot) - 16deg)) scale(0.3);
+    animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+  35% {
+    opacity: 1;
+  }
+  60% {
+    transform: rotate(var(--rot)) scale(1.06);
+    animation-timing-function: ease-out;
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(var(--rot)) scale(1);
+  }
+}
+
+/* Bird: off-screen upper-left, glides down to perch height, lifts a touch,
+   then settles on the T. */
+@keyframes hp-i-arrive {
+  0% {
+    transform: translate(var(--ax), var(--ay)) scale(0.55) rotate(6deg);
+  }
+  55% {
+    transform: translate(calc(var(--ax) * 0.4), calc(var(--ay) * 0.3 + 40px)) scale(0.82) rotate(-5deg);
+  }
+  85% {
+    transform: translate(-6px, -14px) scale(1.03) rotate(-2deg);
+  }
+  100% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes hp-i-land {
+  0% {
+    transform: none;
+  }
+  40% {
+    transform: translateY(3px) scaleY(0.93);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes hp-i-chirp {
+  0% {
+    transform: rotate(0deg);
+  }
+  15% {
+    transform: rotate(-8deg) translateY(-1px);
+  }
+  30% {
+    transform: rotate(3deg);
+  }
+  50% {
+    transform: rotate(-7deg) translateY(-1px);
+  }
+  65% {
+    transform: rotate(2deg);
+  }
+  80% {
+    transform: rotate(-5deg) translateY(-1px);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes hp-i-glyph {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.5) rotate(0deg);
+  }
+  16% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(1) rotate(var(--dr));
+  }
+}
+
+/* Up and to the nav slot. Opacity holds until the last frames so the nav
+   bird's step-in reads as the same bird arriving. */
+@keyframes hp-i-fly {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  30% {
+    transform: translate(calc(var(--tx) * 0.2), calc(var(--ty) * 0.5 - 60px)) scale(0.8) rotate(-14deg);
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx), var(--ty)) scale(var(--sc)) rotate(0deg);
+  }
+}
+
+/* An instant appear that fill-mode both can hold: 0 through the delay and
+   the whole of its 20ms, 1 from the last frame on. Not `step-end`, which
+   Chrome leaves at its 0% value once the animation has finished. */
+@keyframes hp-i-step-in {
+  0%,
+  99% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes hp-i-bounce {
+  0% {
+    transform: scale(1.25);
+  }
+  55% {
+    transform: scale(0.94);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes hp-i-navnote {
+  0% {
+    opacity: 0;
+    transform: translate(0, 4px) rotate(0deg);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(6px, -16px) rotate(10deg);
+  }
+}
+
+/* Intro-only elements. Absent from layout until the intro is armed. */
+.hp-i-bird,
+.hp-i-notes,
+.hp-i-navnote {
+  display: none;
+}
+
+/* H1 line wrappers. Blocks from 900px, where the balanced headline already
+   broke after "Audience"; inline below so the phone wrap is unchanged. The
+   inner span is always a block so text-wrap: balance still has one
+   formatting context to work in. */
+.hp-i-h1in {
+  display: block;
+}
+@media (min-width: 900px) {
+  .hp-i-line {
+    display: block;
+  }
+}
+
+/* ── Start state ──────────────────────────────────────────────────────── */
+
+html[data-intro="play"] .hp-i-pill {
+  clip-path: inset(-40px calc(100% + 40px) -40px -40px round 999px);
+}
+html[data-intro="play"] .hp-i-word,
+html[data-intro="play"] .hp-i-hand {
+  clip-path: inset(-30% 110% -30% -10%);
+}
+html[data-intro="play"] .hp-i-navbird,
+html[data-intro="play"] .hp-i-navlinks,
+html[data-intro="play"] .hp-i-navcta,
+html[data-intro="play"] .hp-i-eyebrow,
+html[data-intro="play"] .hp-i-sub,
+html[data-intro="play"] .hp-i-ctas,
+html[data-intro="play"] .hp-i-note {
+  opacity: 0;
+}
+
+/* The clipped wrappers. A clip-path rather than overflow:hidden so the clip
+   can reach .1em above and .2em below the box, where Instrument Serif's
+   ascenders and descenders overhang a line-height:1 line, without touching
+   layout (padding + negative margin would collapse between the two lines
+   and grow the H1 by .1em). The resting layout stays exactly the SSR one. */
+@media (min-width: 900px) {
+  html[data-intro="play"] .hp-i-line {
+    clip-path: inset(-0.1em -0.1em -0.2em);
+  }
+  html[data-intro="play"] .hp-i-linein {
+    display: block;
+    opacity: 0;
+  }
+}
+@media (max-width: 899px) {
+  html[data-intro="play"] .hp-i-h1 {
+    clip-path: inset(-0.1em -0.1em -0.2em);
+  }
+  html[data-intro="play"] .hp-i-h1in {
+    opacity: 0;
+  }
+}
+
+html[data-intro="play"] .hp-i-bird,
+html[data-intro="play"] .hp-i-notes {
+  display: block;
+  position: absolute;
+  left: var(--px, 50%);
+  top: var(--py, 50%);
+  width: 72px;
+  height: 66px;
+  margin: -64px 0 0 -30px;
+  pointer-events: none;
+  /* Above the sticky nav (z-50) so the flight ends on top of the pill, not
+     blurred behind its glass. The hero creates no stacking context of its
+     own, so this competes at the root. */
+  z-index: 60;
+  /* Until measurement has run the bird has no coordinates; keep it out of
+     sight rather than perched at the fallback. */
+  visibility: hidden;
+}
+html[data-intro="play"] .hp-i-bird-arrive,
+html[data-intro="play"] .hp-i-bird-land,
+html[data-intro="play"] .hp-i-bird-chirp {
+  width: 100%;
+  height: 100%;
+}
+html[data-intro="play"] .hp-i-bird-land {
+  transform-origin: 50% 100%;
+}
+html[data-intro="play"] .hp-i-bird-chirp {
+  transform-origin: 35% 90%;
+}
+html[data-intro="play"] .hp-i-glyph {
+  position: absolute;
+  left: 56px;
+  top: 30px;
+  line-height: 1;
+  opacity: 0;
+}
+html[data-intro="play"] .hp-i-navnote {
+  display: block;
+  position: absolute;
+  left: 22px;
+  top: -8px;
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Timeline ─────────────────────────────────────────────────────────── */
+
+html[data-intro="play"].hp-intro-go .hp-i-pill {
+  animation: hp-i-pill-open 0.55s cubic-bezier(0.2, 0.7, 0.1, 1) 0s both;
+}
+html[data-intro="play"].hp-intro-go .hp-i-eyebrow {
+  animation: hp-i-rise 0.6s cubic-bezier(0.2, 0.7, 0.1, 1) 0.1s both;
+}
+@media (min-width: 900px) {
+  html[data-intro="play"].hp-intro-go .hp-i-linein {
+    animation: hp-i-lift 0.75s cubic-bezier(0.2, 0.7, 0.1, 1) var(--i-delay) both;
+  }
+}
+@media (max-width: 899px) {
+  html[data-intro="play"].hp-intro-go .hp-i-h1in {
+    animation: hp-i-lift 0.75s cubic-bezier(0.2, 0.7, 0.1, 1) 0.15s both;
+  }
+}
+html[data-intro="play"].hp-intro-go .hp-i-navlinks {
+  animation: hp-i-rise 0.6s cubic-bezier(0.2, 0.7, 0.1, 1) 0.25s both;
+}
+html[data-intro="play"].hp-intro-go .hp-i-navcta {
+  animation: hp-i-rise 0.6s cubic-bezier(0.2, 0.7, 0.1, 1) 0.35s both;
+}
+html[data-intro="play"].hp-intro-go .hp-i-sub {
+  animation: hp-i-rise 0.6s cubic-bezier(0.2, 0.7, 0.1, 1) 0.5s both;
+}
+html[data-intro="play"].hp-intro-go .hp-i-ctas {
+  animation: hp-i-rise 0.6s cubic-bezier(0.2, 0.7, 0.1, 1) 0.65s both;
+}
+html[data-intro="play"].hp-intro-go .hp-i-note {
+  animation: hp-i-note 0.7s cubic-bezier(0.34, 1.4, 0.64, 1) var(--i-delay) both;
+}
+html[data-intro="play"].hp-intro-go .hp-i-hand {
+  animation: hp-i-wipe 0.6s cubic-bezier(0.2, 0.7, 0.1, 1) var(--i-delay) both;
+}
+
+html[data-intro="play"].hp-intro-go .hp-i-bird,
+html[data-intro="play"].hp-intro-go .hp-i-notes {
+  visibility: visible;
+}
+html[data-intro="play"].hp-intro-go .hp-i-bird {
+  animation: hp-i-fly 0.6s cubic-bezier(0.55, 0.05, 0.35, 1) 2.75s both;
+}
+html[data-intro="play"].hp-intro-go .hp-i-bird-arrive {
+  animation: hp-i-arrive 0.9s cubic-bezier(0.3, 0.6, 0.25, 1) 0.75s both;
+}
+html[data-intro="play"].hp-intro-go .hp-i-bird-land {
+  animation: hp-i-land 0.3s ease-out 1.6s both;
+}
+html[data-intro="play"].hp-intro-go .hp-i-bird-chirp {
+  animation: hp-i-chirp 0.7s ease-in-out 1.9s both;
+}
+html[data-intro="play"].hp-intro-go .hp-i-glyph {
+  animation: hp-i-glyph 0.9s cubic-bezier(0.2, 0.7, 0.1, 1) var(--i-delay) both;
+}
+
+html[data-intro="play"].hp-intro-go .hp-i-navbird {
+  animation:
+    hp-i-step-in 0.02s linear 3.35s both,
+    hp-i-bounce 0.4s cubic-bezier(0.34, 1.4, 0.64, 1) 3.35s both;
+}
+html[data-intro="play"].hp-intro-go .hp-i-word {
+  animation: hp-i-wipe 0.4s cubic-bezier(0.2, 0.7, 0.1, 1) 3.45s both;
+}
+html[data-intro="play"].hp-intro-go .hp-i-navnote {
+  animation: hp-i-navnote 1s ease-out 3.9s both;
+}
