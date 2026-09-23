@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/ui/dialog";
@@ -77,46 +77,17 @@ function statusLabel(status: string) {
 // names the prospect and says the transcript goes. It is refused for a
 // completed interview, server-side as well as here: that is real data.
 //
-// Delete takes the prospect off the roster altogether: a bad import row, a
-// colleague who slipped into the list, someone who asked not to be
-// contacted. Offered on every status, after a confirmation that names the
-// prospect. A finished interview is not lost with it: the route keeps a
-// completed or HubSpot-synced response and only clears unfinished test
-// sessions, and the dialog says which case applies to this row.
+// Deleting is not a row action. It is a selection: check rows, or the
+// header box for everything the current filter shows, and the bar that
+// appears above the table deletes them together. See ProspectsView.
 function RowLinkActions({ row }: { row: ProspectRow }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const displayName = row.name ?? row.email;
   const canReset = row.status !== "pending" && row.status !== "completed";
-
-  const deleteDescription =
-    row.status === "completed"
-      ? "They come off the roster and their link stops working. Their finished interview stays in Leads."
-      : row.status === "started"
-        ? "They come off the roster and their link stops working. Their unfinished interview is deleted with them."
-        : "They come off the roster and their link stops working. This cannot be undone.";
-
-  async function handleDelete() {
-    setDeleting(true);
-    setDeleteError(null);
-    try {
-      const res = await fetch(`/api/prospects/${row.id}`, { method: "DELETE" });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Couldn't delete that prospect");
-      setDeleteOpen(false);
-      router.refresh();
-    } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Couldn't delete that prospect");
-    } finally {
-      setDeleting(false);
-    }
-  }
 
   async function handleReset() {
     setResetting(true);
@@ -148,19 +119,6 @@ function RowLinkActions({ row }: { row: ProspectRow }) {
 
   return (
     <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={() => {
-          setDeleteError(null);
-          setDeleteOpen(true);
-        }}
-        aria-label={`Delete ${displayName} from this study`}
-        className="text-destructive hover:text-destructive"
-      >
-        Delete
-      </Button>
       {canReset && (
         <Button
           type="button"
@@ -211,25 +169,170 @@ function RowLinkActions({ row }: { row: ProspectRow }) {
         </div>
       </Dialog>
 
+    </div>
+  );
+}
+
+// A native checkbox tinted with the primary colour. The admin kit has no
+// checkbox primitive yet, and one input with accent-color is not worth
+// forking one for: every evergreen browser themes it consistently enough.
+function SelectBox({
+  checked,
+  indeterminate = false,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  // `indeterminate` is a DOM property, not an attribute, so it has to be set
+  // imperatively. The header box uses it for "some of these rows".
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      onChange={(event) => onChange(event.target.checked)}
+      aria-label={label}
+      className="focus-ring block h-4 w-4 cursor-pointer rounded accent-primary"
+    />
+  );
+}
+
+// The bar that replaces the filter row while something is checked. One
+// count, one action, one way out. Delete runs one request per prospect
+// against the same route a single delete would use, so the ownership check
+// and the response rules are applied per row and a partial failure is
+// reported as such rather than hidden behind an all-or-nothing message.
+//
+// The dialog does not ask for typed confirmation. Prospects are roster
+// entries, not studies: what a delete can cost is one import row and,
+// server-side, an unfinished test session. A finished interview survives it.
+function SelectionBar({
+  selected,
+  onDone,
+}: {
+  selected: ProspectRow[];
+  onDone: () => void;
+}) {
+  const router = useRouter();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const count = selected.length;
+  const noun = count === 1 ? "prospect" : "prospects";
+  const finished = selected.filter((row) => row.status === "completed").length;
+  const inProgress = selected.filter((row) => row.status === "started").length;
+
+  const description = [
+    count === 1
+      ? `${selected[0].name ?? selected[0].email} comes off the roster and their link stops working.`
+      : `${count} prospects come off the roster and their links stop working.`,
+    finished > 0 &&
+      (finished === 1 ? "One finished interview stays in Leads." : `${finished} finished interviews stay in Leads.`),
+    inProgress > 0 &&
+      (inProgress === 1
+        ? "One unfinished interview is deleted with them."
+        : `${inProgress} unfinished interviews are deleted with them.`),
+    "This cannot be undone.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  async function handleDelete() {
+    setPending(true);
+    setError(null);
+    const results = await Promise.all(
+      selected.map(async (row) => {
+        const res = await fetch(`/api/prospects/${row.id}`, { method: "DELETE" });
+        if (res.ok) return { ok: true as const, row };
+        const body = await res.json().catch(() => ({}));
+        return { ok: false as const, row, error: body.error as string | undefined };
+      })
+    );
+    setPending(false);
+
+    const failures = results.filter((result) => !result.ok);
+    if (failures.length > 0) {
+      setError(
+        failures.length === results.length
+          ? failures[0].error || "Couldn't delete those prospects"
+          : `${results.length - failures.length} of ${results.length} deleted. Not deleted: ${failures
+              .map((failure) => failure.row.name ?? failure.row.email)
+              .join(", ")}`
+      );
+      // The rows that did go are gone; the roster should say so even while
+      // the failures are still on screen.
+      router.refresh();
+      return;
+    }
+
+    setDialogOpen(false);
+    onDone();
+    router.refresh();
+  }
+
+  return (
+    <>
+      <div
+        className="flex items-center gap-3 rounded-card border border-primary/30 bg-primary/[0.06] px-4 py-2.5"
+        role="region"
+        aria-label="Selected prospects"
+      >
+        <span className="type-body font-semibold text-card-foreground">
+          {count} selected
+        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setError(null);
+              setDialogOpen(true);
+            }}
+            disabled={pending}
+            className="text-destructive"
+          >
+            Delete {count === 1 ? "" : count} {noun}
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={onDone} disabled={pending}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+      {error && (
+        <p className="type-body text-destructive" role="status">
+          {error}
+        </p>
+      )}
+
       <Dialog
-        open={deleteOpen}
-        onClose={() => !deleting && setDeleteOpen(false)}
-        title={`Delete ${displayName}?`}
-        description={deleteDescription}
+        open={dialogOpen}
+        onClose={() => !pending && setDialogOpen(false)}
+        title={count === 1 ? `Delete ${selected[0].name ?? selected[0].email}?` : `Delete ${count} prospects?`}
+        description={description}
       >
         <div className="flex flex-col gap-3">
-          {deleteError && <p className="type-body text-destructive">{deleteError}</p>}
+          {error && <p className="type-body text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+            <Button type="button" variant="secondary" onClick={() => setDialogOpen(false)} disabled={pending}>
               Cancel
             </Button>
-            <Button type="button" onClick={handleDelete} disabled={deleting}>
-              {deleting ? "Deleting..." : "Delete prospect"}
+            <Button type="button" onClick={handleDelete} disabled={pending}>
+              {pending ? "Deleting..." : `Delete ${count === 1 ? "prospect" : `${count} prospects`}`}
             </Button>
           </div>
         </div>
       </Dialog>
-    </div>
+    </>
   );
 }
 
@@ -244,6 +347,10 @@ export function ProspectsView({
 }) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
+  // Ids, not rows: the roster is server-rendered and refreshes after every
+  // mutation, so a held row object would go stale. Anything checked that is
+  // no longer on the roster is dropped when `rows` changes.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -278,6 +385,41 @@ export function ProspectsView({
       );
     });
   }, [ordered, status, query]);
+
+  useEffect(() => {
+    setSelectedIds((current) => {
+      const present = new Set(rows.map((row) => row.id));
+      const next = new Set(Array.from(current).filter((id) => present.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [rows]);
+
+  const selectedRows = useMemo(() => rows.filter((row) => selectedIds.has(row.id)), [rows, selectedIds]);
+  // The header box speaks for the rows on screen, not the whole roster: with
+  // a filter or a search applied, "all" means all of these. Rows checked
+  // under an earlier filter stay checked, and the count in the bar says so.
+  const visibleSelectedCount = visible.filter((row) => selectedIds.has(row.id)).length;
+  const allVisibleSelected = visible.length > 0 && visibleSelectedCount === visible.length;
+
+  function toggleRow(id: string, checked: boolean) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function toggleVisible(checked: boolean) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const row of visible) {
+        if (checked) next.add(row.id);
+        else next.delete(row.id);
+      }
+      return next;
+    });
+  }
 
   async function handleFileChosen(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -331,11 +473,34 @@ export function ProspectsView({
   // before any cell truncates; the fixed steps it used to mix in left a
   // third of the width idle while emails were cut short. Email gets the
   // most room, title the least (it is the noisiest column), and the
-  // actions column is sized for four buttons on one line (Delete, Reset,
-  // Copy, Open on a started row).
+  // actions column is sized for three buttons on one line. The checkbox
+  // column is the one fixed step in front of them.
   // Every truncating column also carries `title`, which DataTable puts on
   // the cell as a native tooltip, so a long value is still one hover away.
   const columns: Column<ProspectRow>[] = [
+    {
+      key: "select",
+      header: (
+        <SelectBox
+          checked={allVisibleSelected}
+          indeterminate={!allVisibleSelected && visibleSelectedCount > 0}
+          onChange={toggleVisible}
+          label={
+            visible.length === rows.length
+              ? "Select all prospects"
+              : `Select all ${visible.length} prospects shown`
+          }
+        />
+      ),
+      width: "xxs",
+      cell: (row) => (
+        <SelectBox
+          checked={selectedIds.has(row.id)}
+          onChange={(checked) => toggleRow(row.id, checked)}
+          label={`Select ${row.name ?? row.email}`}
+        />
+      ),
+    },
     {
       key: "name",
       header: "Name",
@@ -366,7 +531,7 @@ export function ProspectsView({
     {
       key: "email",
       header: "Email",
-      width: 0.21,
+      width: 0.24,
       truncate: true,
       title: (row) => row.email,
       cell: (row) => row.email,
@@ -393,7 +558,7 @@ export function ProspectsView({
       key: "link",
       header: <span className="sr-only">Study link</span>,
       align: "right",
-      width: 0.19,
+      width: 0.16,
       cell: (row) => <RowLinkActions row={row} />,
     },
   ];
@@ -484,6 +649,10 @@ export function ProspectsView({
                   label="Search prospects"
                 />
               </div>
+
+              {selectedRows.length > 0 && (
+                <SelectionBar selected={selectedRows} onDone={() => setSelectedIds(new Set())} />
+              )}
 
               <DataTable
                 columns={columns}
