@@ -76,14 +76,47 @@ function statusLabel(status: string) {
 // that response and returns the row to pending, after a confirmation that
 // names the prospect and says the transcript goes. It is refused for a
 // completed interview, server-side as well as here: that is real data.
+//
+// Delete takes the prospect off the roster altogether: a bad import row, a
+// colleague who slipped into the list, someone who asked not to be
+// contacted. Offered on every status, after a confirmation that names the
+// prospect. A finished interview is not lost with it: the route keeps a
+// completed or HubSpot-synced response and only clears unfinished test
+// sessions, and the dialog says which case applies to this row.
 function RowLinkActions({ row }: { row: ProspectRow }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const displayName = row.name ?? row.email;
   const canReset = row.status !== "pending" && row.status !== "completed";
+
+  const deleteDescription =
+    row.status === "completed"
+      ? "They come off the roster and their link stops working. Their finished interview stays in Leads."
+      : row.status === "started"
+        ? "They come off the roster and their link stops working. Their unfinished interview is deleted with them."
+        : "They come off the roster and their link stops working. This cannot be undone.";
+
+  async function handleDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/prospects/${row.id}`, { method: "DELETE" });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Couldn't delete that prospect");
+      setDeleteOpen(false);
+      router.refresh();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Couldn't delete that prospect");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function handleReset() {
     setResetting(true);
@@ -115,6 +148,19 @@ function RowLinkActions({ row }: { row: ProspectRow }) {
 
   return (
     <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          setDeleteError(null);
+          setDeleteOpen(true);
+        }}
+        aria-label={`Delete ${displayName} from this study`}
+        className="text-destructive hover:text-destructive"
+      >
+        Delete
+      </Button>
       {canReset && (
         <Button
           type="button"
@@ -160,6 +206,25 @@ function RowLinkActions({ row }: { row: ProspectRow }) {
             </Button>
             <Button type="button" onClick={handleReset} disabled={resetting}>
               {resetting ? "Resetting..." : "Delete transcript and reset"}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={deleteOpen}
+        onClose={() => !deleting && setDeleteOpen(false)}
+        title={`Delete ${displayName}?`}
+        description={deleteDescription}
+      >
+        <div className="flex flex-col gap-3">
+          {deleteError && <p className="type-body text-destructive">{deleteError}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleDelete} disabled={deleting}>
+              {deleting ? "Deleting..." : "Delete prospect"}
             </Button>
           </div>
         </div>
@@ -266,7 +331,8 @@ export function ProspectsView({
   // before any cell truncates; the fixed steps it used to mix in left a
   // third of the width idle while emails were cut short. Email gets the
   // most room, title the least (it is the noisiest column), and the
-  // actions column is sized for three buttons on one line.
+  // actions column is sized for four buttons on one line (Delete, Reset,
+  // Copy, Open on a started row).
   // Every truncating column also carries `title`, which DataTable puts on
   // the cell as a native tooltip, so a long value is still one hover away.
   const columns: Column<ProspectRow>[] = [
@@ -300,7 +366,7 @@ export function ProspectsView({
     {
       key: "email",
       header: "Email",
-      width: 0.24,
+      width: 0.21,
       truncate: true,
       title: (row) => row.email,
       cell: (row) => row.email,
@@ -327,7 +393,7 @@ export function ProspectsView({
       key: "link",
       header: <span className="sr-only">Study link</span>,
       align: "right",
-      width: 0.16,
+      width: 0.19,
       cell: (row) => <RowLinkActions row={row} />,
     },
   ];
