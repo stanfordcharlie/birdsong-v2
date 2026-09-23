@@ -200,3 +200,25 @@ export async function loadProspectContact(
     linkedinUrl: text(data.linkedin_url),
   };
 }
+
+// Marks the invite as completed. The counterpart of markProspectStarted,
+// called from the interview completion path once the response row is
+// completed. Idempotent on completed_at the same way, and swallowed by the
+// caller for the same reason: the respondent has finished, and the invite's
+// bookkeeping must not turn that into an error.
+export async function markProspectCompleted(prospectId: string, completedAt: string): Promise<void> {
+  const supabase = createAdminClient();
+
+  const { error: stampError } = await supabase
+    .from("prospects")
+    .update({ completed_at: completedAt })
+    .eq("id", prospectId)
+    .is("completed_at", null);
+  if (stampError) console.error("[prospects/lookup] completed_at stamp failed:", stampError);
+
+  const { error: statusError } = await supabase
+    .from("prospects")
+    .update({ status: "completed" })
+    .eq("id", prospectId);
+  if (statusError) console.error("[prospects/lookup] status update failed:", statusError);
+}

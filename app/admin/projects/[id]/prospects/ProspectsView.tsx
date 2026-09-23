@@ -15,6 +15,7 @@ import {
   RelativeTime,
   SearchInput,
   StatRow,
+  StatusDot,
   type AdminBadgeProps,
   type Column,
   type FilterTab,
@@ -30,6 +31,10 @@ export type ProspectRow = {
   email: string;
   status: string;
   createdAt: string;
+  /** When completion moved them out of their Instantly campaign. */
+  instantlyRemovedAt: string | null;
+  /** Why the last move attempt failed, when it did. */
+  instantlyError: string | null;
   /** The absolute tokenized survey URL, built server-side. */
   link: string;
 };
@@ -504,7 +509,7 @@ export function ProspectsView({
     {
       key: "name",
       header: "Name",
-      width: 0.17,
+      width: 0.15,
       truncate: true,
       rowLabel: true,
       sortable: true,
@@ -515,7 +520,7 @@ export function ProspectsView({
     {
       key: "title",
       header: "Title",
-      width: 0.13,
+      width: 0.11,
       truncate: true,
       title: (row) => row.title ?? undefined,
       cell: (row) => row.title ?? EMPTY_VALUE,
@@ -523,7 +528,7 @@ export function ProspectsView({
     {
       key: "company",
       header: "Company",
-      width: 0.13,
+      width: 0.12,
       truncate: true,
       title: (row) => row.company ?? undefined,
       cell: (row) => row.company ?? EMPTY_VALUE,
@@ -531,7 +536,7 @@ export function ProspectsView({
     {
       key: "email",
       header: "Email",
-      width: 0.24,
+      width: 0.19,
       truncate: true,
       title: (row) => row.email,
       cell: (row) => row.email,
@@ -553,6 +558,28 @@ export function ProspectsView({
           <RelativeTime date={row.createdAt} />
         </span>
       ),
+    },
+    // What happened in Instantly at completion. Read-only: a dot and a word
+    // when they were moved out of their campaign, the failure text (full
+    // text on hover) when the move failed, nothing until then. Fixing a
+    // failure is a manual job in Instantly, so there is no button here.
+    {
+      key: "instantly",
+      header: "Sequence",
+      width: 0.10,
+      truncate: true,
+      title: (row) => row.instantlyError ?? undefined,
+      cell: (row) =>
+        row.instantlyRemovedAt ? (
+          <span className="flex items-center gap-1.5 whitespace-nowrap">
+            <StatusDot live />
+            Removed
+          </span>
+        ) : row.instantlyError ? (
+          <span className="text-destructive">{row.instantlyError}</span>
+        ) : (
+          EMPTY_VALUE
+        ),
     },
     {
       key: "link",

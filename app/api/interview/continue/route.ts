@@ -30,7 +30,8 @@ import { MESSAGE_MAX_LENGTH } from "@/lib/interview/validation";
 import { sendLeadNotification } from "@/lib/email/lead-notification";
 import { sendLeadNotificationToSlack } from "@/lib/slack/lead-notification";
 import { syncResponseToHubSpot } from "@/lib/hubspot-sync";
-import { loadProspectContact } from "@/lib/prospects/lookup";
+import { loadProspectContact, markProspectCompleted } from "@/lib/prospects/lookup";
+import { moveCompletedProspectOutOfCampaign } from "@/lib/instantly/sync";
 import { selectCallScriptOpener, selectTopPainPoint } from "@/lib/lead-content";
 import type { InterviewMessage } from "@/lib/interview/types";
 import type { Database, Json } from "@/types/database";
@@ -291,6 +292,23 @@ async function completeInterview(
   // drift by however long extraction took.
   const completedAt = new Date().toISOString();
   console.log(`[interview/continue] response_id=${responseId} completed; extraction deferred to background`);
+
+  // The invite behind this response, if there is one: stamp it completed,
+  // then take the person out of their Instantly campaign so the follow-up
+  // emails stop. Both are awaited here, before the closing message goes
+  // back, and both are contained: markProspectCompleted logs and swallows
+  // its own write errors, and moveCompletedProspectOutOfCampaign returns
+  // every failure as a value behind a 5s timeout. Neither can change what
+  // this route returns or what the background tasks below do.
+  if (response.prospect_id) {
+    await markProspectCompleted(response.prospect_id, completedAt);
+    await moveCompletedProspectOutOfCampaign({
+      supabase,
+      responseId,
+      prospectId: response.prospect_id,
+      campaignId: survey.instantly_campaign_id,
+    });
+  }
 
   const respondentCustomValues =
     (response.custom_field_values as Record<string, unknown> | null) ?? {};

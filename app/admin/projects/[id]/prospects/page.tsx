@@ -39,7 +39,9 @@ export default async function StudyProspectsPage({
   // cannot leak them into a client bundle.
   const { data: prospects } = await supabase
     .from("prospects")
-    .select("id, token, first_name, last_name, email, title, company_name, status, created_at")
+    .select(
+      "id, token, first_name, last_name, email, title, company_name, status, created_at, instantly_removed_at, instantly_error"
+    )
     .eq("survey_id", id)
     .order("created_at", { ascending: false });
 
@@ -56,6 +58,8 @@ export default async function StudyProspectsPage({
     email: p.email,
     status: p.status,
     createdAt: p.created_at,
+    instantlyRemovedAt: p.instantly_removed_at,
+    instantlyError: p.instantly_error,
     link: prospectLinkFor(origin, survey.slug, p.token),
   }));
 

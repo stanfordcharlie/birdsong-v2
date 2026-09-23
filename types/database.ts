@@ -26,6 +26,9 @@ export type Database = {
           num_questions: number | null;
           gift_card_amount: number | null;
           gift_card_brand: string | null;
+          // Instantly campaign the study's prospects are emailed from. Set by
+          // hand; NULL means completion never calls Instantly.
+          instantly_campaign_id: string | null;
           custom_fields: Json;
           status: string;
           is_sample: boolean;
@@ -54,6 +57,7 @@ export type Database = {
           num_questions?: number | null;
           gift_card_amount?: number | null;
           gift_card_brand?: string | null;
+          instantly_campaign_id?: string | null;
           custom_fields?: Json;
           status?: string;
           is_sample?: boolean;
@@ -82,6 +86,7 @@ export type Database = {
           num_questions?: number | null;
           gift_card_amount?: number | null;
           gift_card_brand?: string | null;
+          instantly_campaign_id?: string | null;
           custom_fields?: Json;
           status?: string;
           is_sample?: boolean;
@@ -738,6 +743,11 @@ export type Database = {
           // load — see 20260905000000_prospects.sql.
           started_at: string | null;
           completed_at: string | null;
+          // Outcome of the Instantly move at completion; see
+          // 20260923000000_instantly_campaign.sql.
+          instantly_removed_at: string | null;
+          instantly_job_id: string | null;
+          instantly_error: string | null;
           created_at: string;
         };
         Insert: {
@@ -758,6 +768,9 @@ export type Database = {
           sent_at?: string | null;
           started_at?: string | null;
           completed_at?: string | null;
+          instantly_removed_at?: string | null;
+          instantly_job_id?: string | null;
+          instantly_error?: string | null;
           created_at?: string;
         };
         Update: {
@@ -778,6 +791,9 @@ export type Database = {
           sent_at?: string | null;
           started_at?: string | null;
           completed_at?: string | null;
+          instantly_removed_at?: string | null;
+          instantly_job_id?: string | null;
+          instantly_error?: string | null;
           created_at?: string;
         };
         Relationships: [
