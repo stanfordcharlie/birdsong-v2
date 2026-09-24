@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/ui/dialog";
 import {
-  Badge,
   Button,
   DataTable,
   EmptyState,
@@ -15,13 +14,12 @@ import {
   RelativeTime,
   SearchInput,
   StatRow,
-  StatusDot,
-  type AdminBadgeProps,
   type Column,
   type FilterTab,
 } from "@/components/admin/ui";
 import { EMPTY_VALUE } from "@/lib/format";
 import type { ImportResult } from "@/app/api/prospects/import/route";
+import { PROSPECT_STATUSES, ProspectSequenceCell, ProspectStatusBadge, prospectStatusLabel } from "./cells";
 
 export type ProspectRow = {
   id: string;
@@ -39,27 +37,10 @@ export type ProspectRow = {
   link: string;
 };
 
-// The five states a prospect moves through. Ordered as the funnel runs, so
-// the filter tabs and the stat row read left to right in the same order.
-const STATUSES = ["pending", "sent", "started", "completed"] as const;
+// The statuses, their labels and their badges live in ./cells, shared with
+// the study page's preview.
+const STATUSES = PROSPECT_STATUSES;
 type StatusFilter = "all" | (typeof STATUSES)[number];
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: "Pending",
-  sent: "Sent",
-  started: "Started",
-  completed: "Completed",
-};
-
-// Existing Badge variants only. Nothing new is invented for a fifth state:
-// the funnel gets flatter as it goes, so the two ends are the two that carry
-// colour and the middle stays neutral.
-const STATUS_VARIANTS: Record<string, AdminBadgeProps["variant"]> = {
-  pending: "draft",
-  sent: "outline",
-  started: "accent",
-  completed: "live",
-};
 
 // Rows that need attention first: someone mid-interview outranks the
 // finished, sent and untouched ones, and within a status the newest is
@@ -67,9 +48,7 @@ const STATUS_VARIANTS: Record<string, AdminBadgeProps["variant"]> = {
 // too, where it reduces to newest first.
 const STATUS_ORDER: Record<string, number> = { started: 0, completed: 1, sent: 2, pending: 3 };
 
-function statusLabel(status: string) {
-  return STATUS_LABELS[status] ?? status;
-}
+const statusLabel = prospectStatusLabel;
 
 // Copy and open, side by side, on every row. This is the testing affordance
 // the whole surface exists for: an operator needs to take one prospect's
@@ -474,14 +453,16 @@ export function ProspectsView({
     })),
   ];
 
-  // Widths are fractions that sum to 1, so the table uses the whole row
-  // before any cell truncates; the fixed steps it used to mix in left a
-  // third of the width idle while emails were cut short. Email gets the
-  // most room, title the least (it is the noisiest column), and the
-  // actions column is sized for three buttons on one line. The checkbox
-  // column is the one fixed step in front of them.
-  // Every truncating column also carries `title`, which DataTable puts on
-  // the cell as a native tooltip, so a long value is still one hover away.
+  // Two kinds of column. The ones whose content has a known size take a
+  // named step and never grow: the checkbox (xxs), the status badge and the
+  // sequence cell (md fits "Completed" and the dot plus "Removed" with a
+  // clear gap either side), the relative time (sm) and the two row actions
+  // (lg is Copy plus Open and no more). The four text columns take
+  // fractions, which the fixed layout scales to share whatever width is
+  // left, so at a narrow window they truncate and at a wide one they get
+  // every spare pixel instead of the actions column. Every truncating
+  // column carries `title`, which DataTable puts on the cell as a native
+  // tooltip, so a long value is still one hover away.
   const columns: Column<ProspectRow>[] = [
     {
       key: "select",
@@ -509,7 +490,7 @@ export function ProspectsView({
     {
       key: "name",
       header: "Name",
-      width: 0.15,
+      width: 0.26,
       truncate: true,
       rowLabel: true,
       sortable: true,
@@ -520,7 +501,7 @@ export function ProspectsView({
     {
       key: "title",
       header: "Title",
-      width: 0.11,
+      width: 0.24,
       truncate: true,
       title: (row) => row.title ?? undefined,
       cell: (row) => row.title ?? EMPTY_VALUE,
@@ -528,7 +509,7 @@ export function ProspectsView({
     {
       key: "company",
       header: "Company",
-      width: 0.12,
+      width: 0.24,
       truncate: true,
       title: (row) => row.company ?? undefined,
       cell: (row) => row.company ?? EMPTY_VALUE,
@@ -536,7 +517,7 @@ export function ProspectsView({
     {
       key: "email",
       header: "Email",
-      width: 0.19,
+      width: 0.26,
       truncate: true,
       title: (row) => row.email,
       cell: (row) => row.email,
@@ -544,13 +525,13 @@ export function ProspectsView({
     {
       key: "status",
       header: "Status",
-      width: 0.08,
-      cell: (row) => <Badge variant={STATUS_VARIANTS[row.status] ?? "count"}>{statusLabel(row.status)}</Badge>,
+      width: "md",
+      cell: (row) => <ProspectStatusBadge status={row.status} />,
     },
     {
       key: "created",
       header: "Added",
-      width: 0.09,
+      width: "sm",
       sortable: true,
       sortValue: (row) => new Date(row.createdAt).getTime(),
       cell: (row) => (
@@ -559,33 +540,19 @@ export function ProspectsView({
         </span>
       ),
     },
-    // What happened in Instantly at completion. Read-only: a dot and a word
-    // when they were moved out of their campaign, the failure text (full
-    // text on hover) when the move failed, nothing until then. Fixing a
-    // failure is a manual job in Instantly, so there is no button here.
     {
       key: "instantly",
       header: "Sequence",
-      width: 0.10,
+      width: "md",
       truncate: true,
       title: (row) => row.instantlyError ?? undefined,
-      cell: (row) =>
-        row.instantlyRemovedAt ? (
-          <span className="flex items-center gap-1.5 whitespace-nowrap">
-            <StatusDot live />
-            Removed
-          </span>
-        ) : row.instantlyError ? (
-          <span className="text-destructive">{row.instantlyError}</span>
-        ) : (
-          EMPTY_VALUE
-        ),
+      cell: (row) => <ProspectSequenceCell removedAt={row.instantlyRemovedAt} error={row.instantlyError} />,
     },
     {
       key: "link",
       header: <span className="sr-only">Study link</span>,
       align: "right",
-      width: 0.16,
+      width: "lg",
       cell: (row) => <RowLinkActions row={row} />,
     },
   ];

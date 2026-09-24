@@ -12,7 +12,7 @@ import {
   type Column,
 } from "@/components/admin/ui";
 import { EMPTY_VALUE } from "@/lib/format";
-import { isWorthACall } from "@/lib/leads";
+import { scoresWorthACall } from "@/lib/leads";
 
 /**
  * The study's responses, directly under its stat row.
@@ -117,7 +117,7 @@ export function ResponsesTable({ responses }: { responses: ResponseTableRow[] })
     () => ({
       all: responses.length,
       worth_a_call: responses.filter((r) =>
-        isWorthACall({ leadScore: r.leadScore, status: r.status, completed: r.completed })
+        scoresWorthACall({ leadScore: r.leadScore, completed: r.completed })
       ).length,
       in_progress: responses.filter((r) => !r.completed).length,
     }),
@@ -127,7 +127,7 @@ export function ResponsesTable({ responses }: { responses: ResponseTableRow[] })
   const filtered = useMemo(() => {
     if (filter === "worth_a_call") {
       return responses.filter((r) =>
-        isWorthACall({ leadScore: r.leadScore, status: r.status, completed: r.completed })
+        scoresWorthACall({ leadScore: r.leadScore, completed: r.completed })
       );
     }
     if (filter === "in_progress") return responses.filter((r) => !r.completed);

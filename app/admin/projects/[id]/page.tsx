@@ -7,6 +7,8 @@ import { isSystemSource } from "@/lib/interview/source";
 import { type SurveyReportRow } from "./ReportSection";
 import { type StudyFormValues } from "@/components/StudyForm";
 import { countWorthACall } from "@/lib/leads";
+import { loadProspectRoster, prospectDisplayName, prospectLastActivity } from "./prospects/query";
+import type { ProspectsPreviewData } from "./ProspectsPreview";
 import {
   parseCustomRespondentFieldDefs,
   parseEnabledRespondentFields,
@@ -30,7 +32,7 @@ export default async function StudyDetailPage({
   // The survey lookup carries an explicit org filter: surveys_public_read
   // makes every survey row readable, so without it another organization's
   // study would render here (with an empty response list) instead of 404ing.
-  const [{ data: survey }, { data: responses }, { data: latestReport }] = await Promise.all([
+  const [{ data: survey }, { data: responses }, { data: latestReport }, prospects] = await Promise.all([
     supabase.from("surveys").select("*").eq("id", id).eq("org_id", orgId).maybeSingle(),
     supabase.from("responses").select("*").eq("survey_id", id).order("created_at", { ascending: false }),
     supabase
@@ -40,6 +42,7 @@ export default async function StudyDetailPage({
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    loadProspectRoster(supabase, id),
   ]);
 
   if (!survey) {
@@ -59,8 +62,7 @@ export default async function StudyDetailPage({
     targetJobTitle: survey.target_job_title ?? "",
     targetCompanySize: survey.target_company_size ?? "",
     questionGuide: survey.question_guide ?? "",
-    tone: survey.tone ?? "",
-    numQuestions: survey.num_questions != null ? String(survey.num_questions) : "",
+    interviewLength: survey.interview_length,
     giftCardAmount: survey.gift_card_amount != null ? String(survey.gift_card_amount) : "",
     giftCardBrand: survey.gift_card_brand ?? "",
     collectPhone: enabledFields.includes("phone"),
@@ -110,10 +112,51 @@ export default async function StudyDetailPage({
       ? Math.round((completedResponses.length / responseList.length) * 100)
       : null;
 
-  // created_at is the moment the interview started; there is no completed_at
-  // column, and the Leads queue's own "Completed" column already reads this
-  // field. Rows arrive newest-first from the query above.
+  // created_at is the moment the interview started, and the Leads queue's
+  // own "Completed" column reads this field too. Rows arrive newest-first
+  // from the query above.
   const lastResponseAt = completedResponses[0]?.created_at ?? null;
+
+  // Outreach at a glance: the funnel counts and the five prospects with the
+  // most recent activity, drawn with the roster page's own cells.
+  const byActivity = [...prospects].sort(
+    (x, y) => new Date(prospectLastActivity(y)).getTime() - new Date(prospectLastActivity(x)).getTime()
+  );
+  const prospectsPreview: ProspectsPreviewData = {
+    total: prospects.length,
+    counts: {
+      pending: prospects.filter((p) => p.status === "pending").length,
+      started: prospects.filter((p) => p.status === "started").length,
+      completed: prospects.filter((p) => p.status === "completed").length,
+      removed: prospects.filter((p) => p.instantly_removed_at !== null).length,
+    },
+    rows: byActivity.slice(0, 5).map((p) => ({
+      id: p.id,
+      name: prospectDisplayName(p),
+      company: p.company_name,
+      status: p.status,
+      instantlyRemovedAt: p.instantly_removed_at,
+      instantlyError: p.instantly_error,
+      lastActivity: prospectLastActivity(p),
+    })),
+  };
+
+  // How long a real interview takes, to check the length preset's promise
+  // against. completed_at exists only on rows finished since it was added,
+  // and seeded interviews are excluded (their timing is the script's, not a
+  // person's). Null until three rows qualify: a median of one or two is a
+  // sample, not a figure.
+  const completionMs = completedResponses
+    .filter((r) => r.completed_at && r.source !== "seed")
+    .map((r) => new Date(r.completed_at as string).getTime() - new Date(r.created_at).getTime())
+    .filter((ms) => Number.isFinite(ms) && ms >= 0)
+    .sort((x, y) => x - y);
+  const medianCompletionMs =
+    completionMs.length >= 3
+      ? completionMs.length % 2 === 1
+        ? completionMs[(completionMs.length - 1) / 2]
+        : (completionMs[completionMs.length / 2 - 1] + completionMs[completionMs.length / 2]) / 2
+      : null;
 
   // Company, in the order the Leads queue resolves it: the collected field
   // first, then the value derived from a work email domain. The email domain
@@ -184,8 +227,7 @@ export default async function StudyDetailPage({
         targetAudience: [survey.target_industry, survey.target_job_title, survey.target_company_size]
           .filter((segment) => segment && segment.trim())
           .join(" · "),
-        tone: survey.tone ?? "",
-        numQuestions: survey.num_questions != null ? String(survey.num_questions) : "",
+        interviewLength: survey.interview_length,
         questionGuide: survey.question_guide ?? "",
         respondentChips,
         publishPublic: survey.publish_public ?? false,
@@ -196,6 +238,8 @@ export default async function StudyDetailPage({
       worthACallCount={worthACallCount}
       completionRate={completionRate}
       lastResponseAt={lastResponseAt}
+      medianCompletionMs={medianCompletionMs}
+      prospects={prospectsPreview}
       sourceBreakdown={sourceBreakdown}
       initialValues={initialValues}
       latestReport={

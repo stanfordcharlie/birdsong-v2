@@ -1,26 +1,23 @@
 /**
- * The one definition of "worth a call".
+ * The one definition of "worth a call", and the one score threshold.
  *
- * This existed twice, inline, in two different shapes. The Leads page's
- * survey cards counted `lead_score >= 7 && status === "new"` over completed
- * responses; the study detail page counted `status === "qualified"` and
- * labelled the result "Qualified leads". A study whose responses scored 9, 9,
- * 8 and 7 therefore read "6 worth a call" on Leads and "Qualified leads: 0"
- * on its own page, because the two numbers were never measuring the same
- * thing.
+ * Two questions share the phrase, and they are kept apart here on purpose:
  *
- * `qualified` is a manual status a human sets after reading a transcript. It
- * cannot double as a score threshold, so the study page's stat is now the
- * Leads page's number, computed here and imported by both.
+ * - scoresWorthACall: did this interview score high enough to be worth a
+ *   call at all? Threshold only. This is what a study reports about its own
+ *   yield (the study page's stat and its "Worth a call" filter): a lead a
+ *   rep has since contacted still came from that study and still scored 7.
+ * - isWorthACall: is this lead waiting on someone right now? Threshold plus
+ *   `status === "new"`. This is what a work queue wants (the Leads page and
+ *   the admin home), where a contacted lead has left the pile.
  *
- * The `status === "new"` clause is part of the definition, not an accident of
- * where it came from: the figure answers "how many people are waiting on
- * someone", so a lead you have already contacted has left the set. Dropping
- * the clause would let the two surfaces disagree again the moment a rep marks
- * a lead contacted.
+ * The study page used to use the queue definition, so a study whose only
+ * strong lead had been marked contacted read "Worth a call: 0" next to a
+ * response scored 7. Both definitions read the same threshold below, which
+ * is the only place the number 7 lives on the admin side.
  */
 
-/** The cutoff the Slack notification, the HubSpot deal threshold and the admin home all use. */
+/** The cutoff every admin surface uses. lib/hubspot.ts and lib/slack keep their own, matching, constants. */
 export const WORTH_A_CALL_SCORE_MIN = 7;
 
 export type WorthACallRow = {
@@ -34,11 +31,18 @@ export type WorthACallRow = {
   completed?: boolean | null;
 };
 
-export function isWorthACall(row: WorthACallRow): boolean {
+/** Scored at or above the threshold, whatever has happened to the lead since. */
+export function scoresWorthACall(row: Pick<WorthACallRow, "leadScore" | "completed">): boolean {
   if (row.completed === false) return false;
-  return (row.leadScore ?? 0) >= WORTH_A_CALL_SCORE_MIN && (row.status ?? "new") === "new";
+  return (row.leadScore ?? 0) >= WORTH_A_CALL_SCORE_MIN;
 }
 
+/** Scored at or above the threshold and still waiting on someone. */
+export function isWorthACall(row: WorthACallRow): boolean {
+  return scoresWorthACall(row) && (row.status ?? "new") === "new";
+}
+
+/** How many of a study's responses scored worth a call. Yield, not queue. */
 export function countWorthACall(rows: WorthACallRow[]): number {
-  return rows.reduce((total, row) => total + (isWorthACall(row) ? 1 : 0), 0);
+  return rows.reduce((total, row) => total + (scoresWorthACall(row) ? 1 : 0), 0);
 }

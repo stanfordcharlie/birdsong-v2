@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireActiveOrg } from "@/lib/org";
 import { prospectLinkFor, resolveAppOriginFromHost } from "@/lib/prospects/link";
 import { ProspectsView, type ProspectRow } from "./ProspectsView";
+import { loadProspectRoster, prospectDisplayName } from "./query";
 
 // The prospects roster for one study.
 //
@@ -34,25 +35,17 @@ export default async function StudyProspectsPage({
     notFound();
   }
 
-  // Explicit columns. firmographics and apollo_id are deliberately not read:
-  // nothing on this screen renders them, and a page that does not fetch them
-  // cannot leak them into a client bundle.
-  const { data: prospects } = await supabase
-    .from("prospects")
-    .select(
-      "id, token, first_name, last_name, email, title, company_name, status, created_at, instantly_removed_at, instantly_error"
-    )
-    .eq("survey_id", id)
-    .order("created_at", { ascending: false });
+  // The same read the study page's preview uses (see ./query.ts).
+  const prospects = await loadProspectRoster(supabase, id);
 
   // Built on the server so the roster and the exported CSV cannot disagree
   // about what a prospect's link is. NEXT_PUBLIC_APP_URL is canonical when
   // set; the request host is the local-development fallback.
   const origin = resolveAppOriginFromHost((await headers()).get("host"));
 
-  const rows: ProspectRow[] = (prospects ?? []).map((p) => ({
+  const rows: ProspectRow[] = prospects.map((p) => ({
     id: p.id,
-    name: [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || null,
+    name: prospectDisplayName(p),
     title: p.title,
     company: p.company_name,
     email: p.email,

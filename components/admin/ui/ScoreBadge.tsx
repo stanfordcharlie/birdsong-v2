@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { WORTH_A_CALL_SCORE_MIN } from "@/lib/leads";
 import { EMPTY_VALUE } from "@/lib/format";
 
 /**
@@ -15,8 +16,8 @@ import { EMPTY_VALUE } from "@/lib/format";
  * quietly low.
  */
 
-/** The accent band. Matches lib/leads.ts's WORTH_A_CALL_SCORE_MIN by intent. */
-const HOT_MIN = 7;
+/** The accent band: the one threshold lib/leads.ts defines. */
+const HOT_MIN = WORTH_A_CALL_SCORE_MIN;
 
 export function ScoreBadge({
   score,

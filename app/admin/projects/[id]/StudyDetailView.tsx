@@ -14,10 +14,12 @@ import {
   StatRow,
   type Column,
 } from "@/components/admin/ui";
-import { EMPTY_VALUE, formatPercent } from "@/lib/format";
+import { EMPTY_VALUE, formatMinutes, formatPercent } from "@/lib/format";
+import { coverageAdvisory, interviewLengthPreset, interviewLengthSummary } from "@/lib/studies/interview-length";
 import { StudyForm, type StudyFormValues } from "@/components/StudyForm";
 import { ReportSection, type SurveyReportRow } from "./ReportSection";
 import { ResponsesTable, type ResponseTableRow } from "./ResponsesTable";
+import { ProspectsPreview, type ProspectsPreviewData } from "./ProspectsPreview";
 
 export type SourceBreakdownRow = {
   source: string;
@@ -42,8 +44,7 @@ export type StudyDetailData = {
   slug: string;
   topic: string;
   targetAudience: string;
-  tone: string;
-  numQuestions: string;
+  interviewLength: string;
   questionGuide: string;
   respondentChips: RespondentChip[];
   publishPublic: boolean;
@@ -148,6 +149,8 @@ export function StudyDetailView({
   survey,
   responses,
   responseCount,
+  medianCompletionMs,
+  prospects,
   inProgressCount,
   worthACallCount,
   completionRate,
@@ -162,6 +165,9 @@ export function StudyDetailView({
   responses: ResponseTableRow[];
   /** Completed responses. In-progress interviews are counted separately. */
   responseCount: number;
+  /** Median interview duration from completed_at, null until three rows have one. */
+  medianCompletionMs: number | null;
+  prospects: ProspectsPreviewData;
   inProgressCount: number;
   worthACallCount: number;
   completionRate: number | null;
@@ -232,7 +238,8 @@ export function StudyDetailView({
     .filter(Boolean)
     .join(" ");
 
-  const questionCount = questions.length || Number(survey.numQuestions) || 0;
+  const lengthPreset = interviewLengthPreset(survey.interviewLength);
+  const coverage = coverageAdvisory(lengthPreset, questions.length);
   const optionalFieldCount = survey.respondentChips.length;
 
   return (
@@ -293,10 +300,15 @@ export function StudyDetailView({
               label: "Last response",
               value: lastResponseAt ? <RelativeTime date={lastResponseAt} /> : EMPTY_VALUE,
             },
+            // Real completion time against the preset's promise. EMPTY_VALUE
+            // until three completed, non-seed interviews carry completed_at.
+            { label: "Median time", value: medianCompletionMs === null ? EMPTY_VALUE : formatMinutes(medianCompletionMs) },
           ]}
         />
 
         <ResponsesTable responses={responses} />
+
+        <ProspectsPreview surveyId={survey.id} data={prospects} />
 
         <section>
           <SectionHeader title="Setup" />
@@ -312,9 +324,9 @@ export function StudyDetailView({
 
               <CollapsibleSection
                 title="Questions"
-                // The count is a hard total, follow-ups included; the
-                // interviewer decides where to spend them.
-                summary={`${questionCount} ${questionCount === 1 ? "question" : "questions"}, follow-ups included`}
+                // The preset paces the interview; the guide's topics are
+                // covered in order until the preset's count is reached.
+                summary={`${interviewLengthSummary(lengthPreset)} · ${questions.length} ${questions.length === 1 ? "topic" : "topics"}${coverage ? ` · covers the first ${lengthPreset.topics}` : ""}`}
                 action={editAction}
               >
                 {questions.length === 0 ? (
