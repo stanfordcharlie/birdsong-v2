@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/admin/ui";
 import { formatRelativeTime } from "@/lib/format";
@@ -27,7 +27,15 @@ export function HubSpotSyncControl({
   const router = useRouter();
   const [syncedAt, setSyncedAt] = useState(initialSyncedAt);
   const [loading, setLoading] = useState(false);
+  const [justSynced, setJustSynced] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   async function handleSync() {
     setError(null);
@@ -37,8 +45,11 @@ export function HubSpotSyncControl({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || data.reason || "Failed to sync to HubSpot");
       setSyncedAt(typeof data.syncedAt === "string" ? data.syncedAt : new Date().toISOString());
+      setJustSynced(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setJustSynced(false), 2000);
       // The push wrote to the activity trail and may have advanced the lead
-      // (lib/hubspot-sync.ts); the workflow panel below re-reads both.
+      // (lib/hubspot-sync.ts); the activity card below re-reads both.
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -47,25 +58,23 @@ export function HubSpotSyncControl({
     }
   }
 
+  // The last sync is a fact worth one tooltip, not a line of chrome beside
+  // the button: the trail at the foot of the page records every push.
+  const state = disabledReason ?? (syncedAt ? `Synced ${formatRelativeTime(syncedAt)}` : "Not synced");
+
   return (
     // Sits in the page header's action group, so it carries no padding of its
     // own; the header owns the spacing around it.
     <div className="flex flex-wrap items-center gap-2">
       <Button
         type="button"
-        variant="secondary"
+        title={state}
         onClick={handleSync}
         disabled={loading || Boolean(disabledReason)}
       >
-        {loading ? "Syncing" : "Sync to HubSpot"}
+        {loading ? "Syncing" : justSynced ? "Synced" : "Sync to HubSpot"}
       </Button>
-      {error ? (
-        <span className="type-body-sm text-destructive">{error}</span>
-      ) : (
-        <span className="type-meta">
-          {disabledReason ?? (syncedAt ? `Synced ${formatRelativeTime(syncedAt)}` : "Not synced")}
-        </span>
-      )}
+      {error && <span className="type-body-sm text-destructive">{error}</span>}
     </div>
   );
 }

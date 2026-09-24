@@ -6,20 +6,27 @@ export type SortDirection = "asc" | "desc";
 export type SortState = { key: string; direction: SortDirection };
 
 /**
- * Named fixed column widths, on the Tailwind width scale rather than as raw
- * px. `xxs` fits a bare checkbox, `xs` a score badge or a row menu, `sm` a
- * short count or a relative time, `md` a status select or a relative time
- * with its sort chevron, `lg` a short phrase like "4 of 8". Fluid columns
- * take a fraction instead.
+ * Named fixed column widths. `xxs` fits a bare checkbox, `xs` a score badge
+ * or a row menu, `sm` a short count or a relative time, `md` a status select
+ * or a relative time with its sort chevron, `lg` a status select beside a
+ * button. Fluid columns take a fraction instead.
+ *
+ * The steps are the Tailwind scale's 10 / 16 / 24 / 32 / 44 written in px
+ * rather than rem. A fixed column is a budget the fluid columns get what is
+ * left of, and a rem budget grows with the visitor's browser font setting
+ * while the container (1140px) does not: at a 20px root the named columns
+ * took 25% more of the table and the name column truncated "Charlie Cohen"
+ * with half the page empty. Same reasoning as the px type roles in
+ * app/globals.css.
  */
 export type ColumnWidth = "xxs" | "xs" | "sm" | "md" | "lg";
 
 const WIDTH_CLASSES: Record<ColumnWidth, string> = {
-  xxs: "w-10",
-  xs: "w-16",
-  sm: "w-24",
-  md: "w-32",
-  lg: "w-44",
+  xxs: "w-[40px]",
+  xs: "w-[64px]",
+  sm: "w-[96px]",
+  md: "w-[128px]",
+  lg: "w-[176px]",
 };
 
 export type Column<Row> = {
@@ -101,8 +108,10 @@ export function DataTable<Row>({
   /**
    * `fixed` makes the declared column widths authoritative, which is what a
    * truncating column needs: under auto layout the longest cell still widens
-   * its column and the ellipsis never appears. Only for tables where every
-   * column declares a `width`.
+   * its column and the ellipsis never appears. Every column should declare a
+   * `width` except, at most, the one that is the row's label: with none it
+   * takes whatever the others leave, which is the only way a mix of px steps
+   * and fractions can be made to add up at every table width.
    */
   layout?: "auto" | "fixed";
   /** Header sticks to the top of the scroll container, on the card fill. */
@@ -119,7 +128,8 @@ export function DataTable<Row>({
 
   // Row height is set here and the cell padding derives from it, so a table
   // cannot end up denser than another table by having picked its own py-*.
-  const rowHeight = density === "compact" ? "h-10" : "h-12";
+  // px for the same reason as the column widths above.
+  const rowHeight = density === "compact" ? "h-[40px]" : "h-[48px]";
   const labelIndex = Math.max(
     0,
     columns.findIndex((column) => column.rowLabel)
@@ -155,7 +165,7 @@ export function DataTable<Row>({
                   }
                   style={widthStyle(column.width)}
                   className={cn(
-                    "type-table-head h-9 whitespace-nowrap px-3 align-middle [&_button]:uppercase",
+                    "type-table-head h-[36px] whitespace-nowrap px-[12px] align-middle [&_button]:uppercase",
                     stickyHeader && "sticky top-0 z-20 bg-card",
                     widthClass(column.width),
                     alignClasses(column.align)
@@ -195,7 +205,7 @@ export function DataTable<Row>({
                     key={column.key}
                     title={column.title?.(row)}
                     className={cn(
-                      "px-3 align-middle font-archivo text-sm tabular-nums",
+                      "px-[12px] align-middle font-archivo text-[14px] tabular-nums",
                       alignClasses(column.align)
                     )}
                   >

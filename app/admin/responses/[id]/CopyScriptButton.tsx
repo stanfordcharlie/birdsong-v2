@@ -3,20 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, type AdminButtonProps } from "@/components/admin/ui";
 
-// The call script card's Copy button, and the only copy control on the page:
-// the header used to carry a second one copying the identical payload.
-// Imports the admin Button per DESIGN.md's import boundary, since this renders
-// only inside /admin.
+// The opening line card's Copy button, and the only copy control on the
+// page. Imports the admin Button per DESIGN.md's import boundary, since this
+// renders only inside /admin.
 export function CopyScriptButton({
   text,
   label = "Copy",
   variant,
   size = "sm",
+  className,
 }: {
   text: string;
   label?: string;
   variant?: AdminButtonProps["variant"];
   size?: AdminButtonProps["size"];
+  className?: string;
 }) {
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -40,7 +41,7 @@ export function CopyScriptButton({
   }
 
   return (
-    <Button type="button" variant={variant} size={size} onClick={handleCopy}>
+    <Button type="button" variant={variant} size={size} onClick={handleCopy} className={className}>
       {copied ? "Copied" : label}
     </Button>
   );

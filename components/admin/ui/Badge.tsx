@@ -11,7 +11,10 @@ import { cn } from "@/lib/utils";
  * survey imports and this pass does not touch.
  */
 const adminBadgeVariants = cva(
-  "inline-flex items-center gap-1.5 rounded-pill font-archivo font-semibold",
+  // A status label never wraps, and its padding is px so the pill is the
+  // same size at any browser font setting (the table column it sits in is
+  // a px budget; see DataTable).
+  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-pill font-archivo font-semibold",
   {
     variants: {
       variant: {
@@ -24,8 +27,8 @@ const adminBadgeVariants = cva(
         outline: "border border-border text-muted-foreground",
       },
       size: {
-        default: "px-2.5 py-1 text-control",
-        sm: "px-2 py-0.5 text-micro",
+        default: "px-[10px] py-[4px] text-control",
+        sm: "px-[8px] py-[2px] text-micro",
       },
     },
     defaultVariants: { variant: "count", size: "default" },

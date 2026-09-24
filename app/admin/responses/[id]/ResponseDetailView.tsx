@@ -1,32 +1,30 @@
 import Link from "next/link";
 import type { InterviewMessage } from "@/lib/interview/types";
-import { callScriptToText, isPairedPoint, type CallScript } from "@/lib/interview/call-script";
-import { Badge, PageHeader, PageShell, StatRow } from "@/components/admin/ui";
-import { LeadStatusBadge } from "@/components/admin/LeadStatusBadge";
-import { EMPTY_VALUE, formatDate } from "@/lib/format";
+import { callScriptToText, type CallScript } from "@/lib/interview/call-script";
+import { Badge, Card, PageHeader, PageShell } from "@/components/admin/ui";
+import { formatDayMonth } from "@/lib/format";
 import type { DisqualifyReason, LeadStatus } from "@/lib/leads/state";
 import type { LeadActivityEntry } from "@/lib/leads/activity";
-import { CopyScriptButton } from "./CopyScriptButton";
+import { ActivityCard } from "./ActivityCard";
 import { HubSpotSyncControl } from "./HubSpotSyncControl";
-import { LeadWorkflowPanel, type WorkflowMember, type WorkflowPermissions } from "./LeadWorkflowPanel";
-import { Section } from "./Section";
+import { LeadHeaderControls, type WorkflowMember, type WorkflowPermissions } from "./LeadHeaderControls";
+import { OpeningLineCard } from "./OpeningLineCard";
+import { SummaryCard } from "./SummaryCard";
 
 // The page a rep reads in the minute before dialling, in the order they need
-// it: who this is, whether the lead is worth the call, why they qualify, what
-// to actually say, and the evidence behind all of it on demand.
+// it: who this is, whether the lead is worth the call, what hurts, what to
+// say first, and the evidence behind all of it on demand.
 //
 // The rules:
 //
-//   - The header carries the HubSpot control and the status as a badge; the
-//     status control itself, assignment, notes and the trail live together
-//     in the workflow panel above the transcript, because that is the part
-//     of the page a rep writes to, and it sits after everything they read.
+//   - The header carries the lead's stage and owner as controls, and the
+//     HubSpot push as the one primary action. Notes and the trail live in
+//     the activity card at the foot of the page, after everything a rep
+//     reads.
 //   - Nothing a rep reads on a call renders below `.type-body`. Only labels
 //     and the header's meta line go smaller.
-//   - Scores are one `StatRow`, the same stat treatment as every other admin
-//     page.
-//   - Sections are ruled, not carded: whitespace and a hairline separate
-//     them. A quote gets a left rule, never a filled block.
+//   - The opening line is the one filled block on the page. Everything else
+//     is a white card on the canvas.
 //
 // Split from page.tsx (the shape app/admin/projects/[id] also uses) so the
 // rendering is one pure function of plain data.
@@ -40,6 +38,9 @@ const NON_LIVE_SOURCE_LABELS: Record<string, string> = {
   seed: "Seeded",
   "test-hubspot-sync": "Sync test",
 };
+
+/** The transcript card's scroll height. Long interviews scroll inside it. */
+const TRANSCRIPT_HEIGHT = "max-h-[440px]";
 
 export type ResponseDetailData = {
   responseId: string;
@@ -68,7 +69,7 @@ export type ResponseDetailData = {
   callScript: CallScript | null;
   signals: { label: string; value: string }[];
   messages: InterviewMessage[];
-  /** Everything the workflow panel needs. Rendered above the transcript. */
+  /** Everything the header controls and the activity card need. */
   workflow: {
     leadStatus: LeadStatus;
     assignedTo: string | null;
@@ -117,19 +118,23 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
   // reasoning is only worth a line when it actually produced one.
   const fitNote = fitScored && fitReasoning ? fitReasoning : null;
 
+  // The verdict card: the summary's first sentence is the headline, and the
+  // rest of it plus the two score rationales open beneath it.
+  const { headline, rest } = splitHeadline(summary);
+  const detail = [rest, fitReason, fitNote].filter((part): part is string => Boolean(part));
+
   const metaParts: React.ReactNode[] = [
-    [role, company].filter(Boolean).join(" · ") || null,
+    [role, company].filter(Boolean).join(", ") || null,
     email ? (
       <a
         key="email"
         href={`mailto:${email}`}
-        className="focus-ring rounded-control underline underline-offset-2 hover:text-card-foreground"
+        className="focus-ring rounded-control text-card-foreground underline-offset-2 hover:underline"
       >
         {email}
       </a>
     ) : null,
-    `${completed ? "Completed" : "Started"} ${formatDate(createdAt)}`,
-    `${messageCount} ${messageCount === 1 ? "message" : "messages"}`,
+    completed ? formatDayMonth(createdAt) : `Started ${formatDayMonth(createdAt)}`,
     source ? NON_LIVE_SOURCE_LABELS[source] : null,
   ].filter(Boolean);
 
@@ -137,142 +142,95 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
     <PageShell>
       <PageHeader
         eyebrow={
-          survey ? (
-            <Link
-              href={`/admin/projects/${survey.id}`}
-              className="focus-ring rounded-control transition-colors hover:text-card-foreground"
-            >
-              {survey.title}
-            </Link>
-          ) : (
-            <Link href="/admin/leads" className="focus-ring rounded-control hover:text-card-foreground">
+          <span className="flex items-center gap-2">
+            <Link href="/admin/leads" className="focus-ring rounded-control transition-colors hover:text-card-foreground">
               Leads
             </Link>
-          )
+            {survey && (
+              <>
+                <span aria-hidden className="text-faint">
+                  /
+                </span>
+                <Link
+                  href={`/admin/projects/${survey.id}`}
+                  className="focus-ring rounded-control normal-case tracking-normal text-card-foreground transition-colors hover:underline"
+                >
+                  {survey.title}
+                </Link>
+              </>
+            )}
+          </span>
         }
         title={respondentName || "Unnamed respondent"}
-        // The lead's stage, and the test marker when it applies: the two
-        // things about this record that change what a rep should do with it.
-        badge={
-          <>
-            <LeadStatusBadge status={workflow.leadStatus} />
-            {isTest && <Badge variant="warning">Test</Badge>}
-          </>
-        }
+        badge={isTest ? <Badge variant="warning">Test</Badge> : undefined}
         meta={
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {metaParts.map((part, i) => (
-              <span key={i} className="inline-flex items-center gap-x-2">
-                {i > 0 && <span aria-hidden>·</span>}
-                {part}
-              </span>
+              <span key={i}>{part}</span>
             ))}
           </span>
         }
         actions={
-          // CRM sync. Runs automatically when the interview completes; this
-          // is the manual retry for when that background run failed.
-          <HubSpotSyncControl
-            responseId={responseId}
-            initialSyncedAt={hubspotSyncedAt}
-            disabledReason={isTest ? "Test response" : !completed ? "Interview in progress" : null}
-          />
+          <>
+            <LeadHeaderControls
+              responseId={responseId}
+              leadStatus={workflow.leadStatus}
+              assignedTo={workflow.assignedTo}
+              assigneeName={workflow.assigneeName}
+              members={workflow.members}
+              currentUserId={workflow.currentUserId}
+              permissions={workflow.permissions}
+            />
+            {/* CRM sync. Runs automatically when the interview completes;
+                this is the manual retry for when that background run failed. */}
+            <HubSpotSyncControl
+              responseId={responseId}
+              initialSyncedAt={hubspotSyncedAt}
+              disabledReason={isTest ? "Test response" : !completed ? "Interview in progress" : null}
+            />
+          </>
         }
       />
 
-      <div className="flex flex-col gap-8">
-        {/* Two independent questions a rep weighs together: did this person
-            show friction, and is the company worth the hour. Neither is
-            allowed to read as the headline, which is what one shared stat row
-            enforces. */}
-        <StatRow
-          stats={[
-            {
-              label: "Lead score",
-              value: leadScore === null ? EMPTY_VALUE : `${leadScore}/10`,
-            },
-            {
-              label: "Company fit",
-              value: fitScored ? `${fitScore}/10` : EMPTY_VALUE,
-              delta: fitUnavailable
-                ? "Research unavailable"
-                : fitConfidence === "low"
-                  ? "Low confidence"
-                  : undefined,
-            },
-          ]}
+      <div className="flex flex-col gap-6">
+        <SummaryCard
+          leadScore={leadScore}
+          fitScore={fitScored ? fitScore : null}
+          fitNote={
+            fitUnavailable
+              ? "research unavailable"
+              : fitConfidence === "low"
+                ? "low confidence"
+                : null
+          }
+          headline={headline}
+          detail={detail}
         />
 
-        {(summary || fitReason || fitNote) && (
-          <Section label="Summary">
-            <div className="admin-measure flex flex-col gap-2">
-              {summary && <p className="type-body">{summary}</p>}
-              {/* The lead score's own rationale: a different field from the
-                  summary, saying why the person is or is not a fit. Muted,
-                  because it supports the paragraph above. */}
-              {fitReason && <p className="type-body text-muted-foreground">{fitReason}</p>}
-              {fitNote && <p className="type-body text-muted-foreground">{fitNote}</p>}
-            </div>
-          </Section>
-        )}
-
         {painPoints.length > 0 && (
-          <Section label="Pain points">
-            <ul className="admin-measure flex flex-col gap-3">
+          <section>
+            <h2 className="type-eyebrow mb-3">Pain points</h2>
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {painPoints.map((point, i) => {
                 const { label, quote } = splitPainPoint(point);
                 return (
-                  <li key={i}>
-                    <p className="type-body">{label}</p>
-                    {quote && (
-                      <p className="type-body mt-1 border-l border-border pl-3 italic text-muted-foreground">
-                        {quote}
-                      </p>
-                    )}
+                  <li key={i} className="min-w-0">
+                    <Card padding="compact" className="flex h-full flex-col gap-1.5 px-5 py-4">
+                      <p className="type-body">{label}</p>
+                      {quote && <p className="type-body-sm italic text-muted-foreground">{quote}</p>}
+                    </Card>
                   </li>
                 );
               })}
             </ul>
-          </Section>
+          </section>
         )}
 
-        {callScript && (
-          <Section label="Call script" action={<CopyScriptButton text={scriptText} variant="secondary" />}>
-            {callScript.opener && (
-              <p className="admin-measure type-body mb-4">&ldquo;{callScript.opener}&rdquo;</p>
-            )}
-
-            {callScript.talkingPoints.length > 0 && (
-              <ul className="flex flex-col">
-                {callScript.talkingPoints.map((point, i) =>
-                  isPairedPoint(point) ? (
-                    // The respondent's words on the left, the rep's move on
-                    // the right. Stacks on narrow screens so the quote never
-                    // compresses into a column too thin to read.
-                    <li
-                      key={i}
-                      className="grid grid-cols-1 gap-x-6 gap-y-2 border-t border-border py-3 first:border-t-0 first:pt-0 sm:grid-cols-2"
-                    >
-                      <p className="type-body border-l border-border pl-3 italic text-muted-foreground">
-                        {point.said}
-                      </p>
-                      <p className="type-body">{point.angle}</p>
-                    </li>
-                  ) : (
-                    // Extracted before points carried a quote, so there is
-                    // no left-hand side to render.
-                    <li key={i} className="border-t border-border py-3 first:border-t-0 first:pt-0">
-                      <p className="type-body">{point.angle}</p>
-                    </li>
-                  )
-                )}
-              </ul>
-            )}
-          </Section>
-        )}
+        {callScript && <OpeningLineCard script={callScript} scriptText={scriptText} />}
 
         {signals.length > 0 && (
-          <Section label="Signals">
+          <Card>
+            <h2 className="type-eyebrow mb-4">Signals</h2>
             <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
               {signals.map((signal) => (
                 <div key={signal.label} className="flex flex-col gap-0.5">
@@ -281,37 +239,59 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
                 </div>
               ))}
             </dl>
-          </Section>
+          </Card>
         )}
-
-        {/* Where the rep writes: status, assignment, notes, and the trail
-            of everything that has happened to this lead. */}
-        <LeadWorkflowPanel responseId={responseId} {...workflow} />
 
         {/* The source everything above was derived from, worth reaching for
             when a rep doubts one of those derivations. */}
         {messages.length > 0 && (
-          <section className="border-t border-border pt-4">
-            <details>
-              <summary className="focus-ring type-eyebrow cursor-pointer list-none rounded-control tabular-nums hover:text-card-foreground">
-                Transcript · {messages.length} messages
-              </summary>
-              <div className="admin-measure mt-3 flex flex-col gap-4 border-l border-border pl-4">
-                {messages.map((m, i) => (
-                  <div key={i} className="flex flex-col gap-1">
-                    <span className="type-eyebrow">
-                      {m.role === "assistant" ? "Interviewer" : "Respondent"}
-                    </span>
-                    <p className="type-body whitespace-pre-wrap">{m.content}</p>
-                  </div>
-                ))}
-              </div>
-            </details>
-          </section>
+          <Card padding="flush">
+            <div className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
+              <h2 className="type-heading">Interview</h2>
+              <span className="type-meta tabular-nums">
+                {messageCount} {messageCount === 1 ? "message" : "messages"} ·{" "}
+                {completed ? "Completed" : "In progress"}
+              </span>
+            </div>
+            <div className={`${TRANSCRIPT_HEIGHT} flex flex-col gap-5 overflow-y-auto px-6 py-5`}>
+              {messages.map((m, i) => (
+                <div key={i} className="flex flex-col gap-1">
+                  <span className="type-eyebrow">{m.role === "assistant" ? "Interviewer" : "Respondent"}</span>
+                  <p className="type-body whitespace-pre-wrap">{m.content}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
         )}
+
+        <ActivityCard
+          responseId={responseId}
+          currentUserId={workflow.currentUserId}
+          canNote={workflow.permissions.note}
+          activity={workflow.activity}
+        />
       </div>
     </PageShell>
   );
+}
+
+/**
+ * The summary's first sentence as the headline, the remainder as detail.
+ *
+ * A summary is written as a short paragraph whose first sentence states the
+ * situation; the rest qualifies it. The card shows only the first sentence
+ * until asked. A first sentence too long to read as a headline (or a summary
+ * with no sentence break at all) is shown whole, with no detail to open.
+ */
+const HEADLINE_MAX_LENGTH = 180;
+
+function splitHeadline(summary: string | null): { headline: string | null; rest: string | null } {
+  const trimmed = summary?.trim() ?? "";
+  if (!trimmed) return { headline: null, rest: null };
+  const match = /^([^]+?[.!?])(?:\s+|$)/.exec(trimmed);
+  if (!match || match[1].length > HEADLINE_MAX_LENGTH) return { headline: trimmed, rest: null };
+  const rest = trimmed.slice(match[0].length).trim();
+  return { headline: match[1], rest: rest || null };
 }
 
 /**
@@ -322,7 +302,7 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
  *   No qualification step before leads go to partners - "Everything just
  *   flows through. No qualification step, honestly."
  *
- * Splitting on the first spaced dash gives the row a label line and a quote
+ * Splitting on the first spaced dash gives the card a label line and a quote
  * line instead of one long sentence a rep has to parse mid-dial. Display only:
  * nothing is written back, and a point with no dash simply has no second line.
  */
@@ -331,7 +311,7 @@ function splitPainPoint(raw: string): { label: string; quote: string | null } {
   // Hyphen or U+2014, written as an escape so the character itself stays out
   // of the source, spaced on both sides. An unspaced hyphen is a compound
   // word, not a separator.
-  const match = /\s(?:-|\u2014)\s/.exec(trimmed);
+  const match = /\s(?:-|—)\s/.exec(trimmed);
   if (!match) return { label: trimmed, quote: null };
 
   const label = trimmed.slice(0, match.index).trim();

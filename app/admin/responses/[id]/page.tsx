@@ -7,7 +7,7 @@ import type { InterviewMessage } from "@/lib/interview/types";
 import { parseCallScript } from "@/lib/interview/call-script";
 import { EMPTY_VALUE } from "@/lib/format";
 import { ResponseDetailView, type ResponseDetailData } from "./ResponseDetailView";
-import type { WorkflowMember, WorkflowPermissions } from "./LeadWorkflowPanel";
+import type { WorkflowMember, WorkflowPermissions } from "./LeadHeaderControls";
 
 export default async function ResponseDetailPage({
   params,

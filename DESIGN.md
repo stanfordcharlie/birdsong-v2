@@ -304,12 +304,12 @@ Beyond header/rows/empty state it now owns:
 
 | Prop | Meaning |
 |---|---|
-| `density` | `default` rows are `h-12` (48px), `compact` `h-10` (40px). Header is `h-9`. Cell padding is `px-3`. |
+| `density` | `default` rows are 48px, `compact` 40px. Header is 36px. Cell padding is 12px, cell text 14px. All px, not rem (see the 2026-09-23 decision). |
 | `layout` | `fixed` makes declared widths authoritative. Required for a truncating column. |
 | `stickyHeader` | Default on. Header sticks to its scroll container on the card fill. |
 | `sort` / `onSort` | Sort state, rendered as a chevron in the header. |
 | `empty` | `{ title, action? }`. With no rows the table renders `EmptyState` bare: no column headers, no frame. |
-| Column `width` | A named step `xxs` / `xs` / `sm` / `md` / `lg` (`w-10` / `w-16` / `w-24` / `w-32` / `w-44`) or a fraction below 1 (`0.28`). `xxs` is for a bare checkbox. No px strings. |
+| Column `width` | A named step `xxs` / `xs` / `sm` / `md` / `lg` (40 / 64 / 96 / 128 / 176px, the Tailwind 10 / 16 / 24 / 32 / 44 steps written in px) or a fraction below 1 (`0.28`). `xxs` is for a bare checkbox. No px strings at the call site. At most one column, the row's label, declares no width and takes what is left. |
 | Column `truncate` / `title` | One line, ellipsis, full value on the cell's `title`. |
 | Column `sortable` / `sortValue` | Client-side sort over loaded rows. Nulls always last, both directions. |
 | Column `align` | `left` / `right` / `center`. Numbers and times go right. Every cell carries tabular figures. |
@@ -408,6 +408,25 @@ Comments are not copy. The rule governs user-visible prose.
 
 Newest first. One line each, dated. A decision lands here when a future session would
 otherwise have to re-litigate it.
+
+- **2026-09-23** — **Response detail is built from a Claude Design comp, and it breaks
+  three standing rules on purpose.** The opening line sits on a `--ds-accent` fill with
+  `--ds-primary-foreground` text: it is the one thing the page exists to hand a rep, and
+  the fill is what makes it findable mid-dial. The summary headline and the opening line
+  are set in Young Serif at 24 and 26px, the only admin text outside the H1 in the
+  display face. The two scores are rings (`ScoreRing`), not a `StatRow`: 7+ takes the
+  accent, below it amber (`--ds-warning`), null an empty track. Pain points are one
+  compact `Card` each. Status and assignment are controls in the page header
+  (`LeadHeaderControls`); notes and the trail are the `ActivityCard` at the foot. No
+  token was added. Nothing here is a licence for another page: the accent still appears
+  once per region everywhere else.
+- **2026-09-23** — **`DataTable` geometry is px, not rem.** Column steps, row heights,
+  header height, cell padding and cell text are written as px arbitrary values. A rem
+  width is a budget that grows with the visitor's browser font setting while the 1140px
+  container does not; at a 20px root the Leads queue's fixed columns took a quarter more
+  of the table and the name column truncated with half the page empty. Same reasoning as
+  the px type roles. The Leads queue's Assignee and Assign columns are one column: the
+  select's value is the assignee, and "Me" claims.
 
 - **2026-09-05** — **Home answers "what should I do now", in this order: greeting, composer,
   the most active study, what needs attention, the launch checklist.** Rebuilt from a

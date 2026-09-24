@@ -711,9 +711,10 @@ export function DataTableStates() {
           empty={{ title: "Nothing here." }}
         />
         <p className="type-body-sm mt-2 text-faint">
-          Widths are fractions (0.26, 0.34) or one of the named steps xxs / xs / sm / md / lg (w-10,
-          w-16, w-24, w-32, w-44) for columns whose content has a known size; layout=&quot;fixed&quot;
-          is what makes the truncating column actually truncate.
+          Widths are fractions (0.26, 0.34) or one of the named steps xxs / xs / sm / md / lg (40,
+          64, 96, 128, 176px) for columns whose content has a known size; layout=&quot;fixed&quot;
+          is what makes the truncating column actually truncate. A column with no width takes
+          what the others leave.
         </p>
       </div>
 

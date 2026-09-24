@@ -322,7 +322,7 @@ export function LeadsQueue({
   const studyColumn: Column<LeadItem> = {
     key: "survey",
     header: "Study",
-    width: 0.14,
+    width: 0.13,
     truncate: true,
     title: (lead) => lead.surveyTitle,
     cell: (lead) => <span className="text-muted-foreground">{lead.surveyTitle}</span>,
@@ -348,33 +348,40 @@ export function LeadsQueue({
     ),
   };
 
+  // Who holds the lead, and the control to change that, in one column: the
+  // name and the select that sets it were two columns saying the same thing.
+  // With the assign-others permission the cell is the select (its value is
+  // the assignee; "Me" claims); with only the claim permission it is the
+  // name, or a Claim button while nobody holds it. The select and the button
+  // together did not fit a column, and the select already covers the claim.
+  //
   // The documented pattern for an interactive cell inside a linked row: the
   // control keeps its pointer events (DataTable) and the click stops here.
   // See the DataTable entry on /admin/styleguide.
-  const actionColumn: Column<LeadItem> = {
-    key: "assign",
-    header: "Assign",
+  const assigneeColumn: Column<LeadItem> = {
+    key: "assignee",
+    header: "Assignee",
     width: "lg",
+    truncate: !showActionColumn,
+    title: (lead) => (showActionColumn ? undefined : (lead.assigneeName ?? undefined)),
     cell: (lead) => {
       const pending = pendingId === lead.id;
+      const name =
+        lead.assignedTo === currentUserId ? (
+          "Me"
+        ) : lead.assigneeName ? (
+          lead.assigneeName
+        ) : (
+          <span className="text-muted-foreground">{EMPTY_VALUE}</span>
+        );
+      if (!showActionColumn) return name;
       return (
         <span
           className="flex items-center gap-2"
           onClick={(event) => event.stopPropagation()}
           onKeyDown={(event) => event.stopPropagation()}
         >
-          {permissions.claim && !lead.assignedTo && (
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              disabled={pending}
-              onClick={() => runAction(lead.id, () => claimLead(lead.id))}
-            >
-              {pending ? "Claiming" : "Claim"}
-            </Button>
-          )}
-          {permissions.assignOthers && (
+          {permissions.assignOthers ? (
             <select
               value={lead.assignedTo ?? ""}
               disabled={pending}
@@ -389,17 +396,34 @@ export function LeadsQueue({
                 </option>
               ))}
             </select>
+          ) : lead.assignedTo ? (
+            <span className="truncate">{name}</span>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={pending}
+              onClick={() => runAction(lead.id, () => claimLead(lead.id))}
+            >
+              {pending ? "Claiming" : "Claim"}
+            </Button>
           )}
         </span>
       );
     },
   };
 
+  // The named steps are fixed px and the fractions are shares of the table,
+  // so together they can ask for more than the table has and push it into a
+  // horizontal scroll. The name column declares no width on purpose: under
+  // the fixed layout it takes whatever the others leave, which at the 1140px
+  // container is about a quarter of the table and on a narrower one is still
+  // enough for a name.
   const columns: Column<LeadItem>[] = [
     {
       key: "name",
       header: "Respondent",
-      width: showStudyColumn ? 0.18 : 0.26,
       truncate: true,
       title: (lead) => lead.name ?? undefined,
       cell: (lead) => (
@@ -416,7 +440,7 @@ export function LeadsQueue({
     {
       key: "company",
       header: "Company",
-      width: showStudyColumn ? 0.14 : 0.2,
+      width: showStudyColumn ? 0.14 : 0.19,
       truncate: true,
       title: (lead) => lead.company ?? undefined,
       cell: (lead) => (
@@ -440,18 +464,7 @@ export function LeadsQueue({
       width: "md",
       cell: (lead) => <LeadStatusBadge status={lead.leadStatus} size="sm" />,
     },
-    {
-      key: "assignee",
-      header: "Assignee",
-      width: 0.12,
-      truncate: true,
-      title: (lead) => lead.assigneeName ?? undefined,
-      cell: (lead) => (
-        <span className={lead.assigneeName ? undefined : "text-muted-foreground"}>
-          {lead.assignedTo === currentUserId ? "Me" : (lead.assigneeName ?? EMPTY_VALUE)}
-        </span>
-      ),
-    },
+    assigneeColumn,
     {
       key: "activity",
       header: "Last activity",
@@ -465,7 +478,6 @@ export function LeadsQueue({
         <RelativeTime date={lead.lastActivityAt} align="right" className="text-muted-foreground" />
       ),
     },
-    ...(showActionColumn ? [actionColumn] : []),
   ];
 
   // The server hands rows back score-desc, then most recently touched, which
