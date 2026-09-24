@@ -6,20 +6,25 @@ import type { InterviewMessage } from "./types";
 
 // The stored transcript is a jsonb column, so it can hold anything a past
 // version of this app (or a future bug) put there. This rebuilds it as a
-// fresh array of exactly two fields per message: nothing else on a stored
-// message object survives, so an internal field added to the transcript
-// shape later cannot leak by default. Malformed entries are dropped rather
-// than repaired, since a half-parsed question is worse than a shorter
-// transcript.
+// fresh array of at most three fields per message: role, content, and on an
+// interviewer turn the topic number the progress bar restores from. Nothing
+// else on a stored message object survives, so an internal field added to
+// the transcript shape later cannot leak by default. Malformed entries are
+// dropped rather than repaired, since a half-parsed question is worse than
+// a shorter transcript.
 export function toPublicTranscript(raw: unknown): InterviewMessage[] {
   if (!Array.isArray(raw)) return [];
   const messages: InterviewMessage[] = [];
   for (const entry of raw) {
     if (!entry || typeof entry !== "object") continue;
-    const { role, content } = entry as { role?: unknown; content?: unknown };
+    const { role, content, topic } = entry as { role?: unknown; content?: unknown; topic?: unknown };
     if (role !== "user" && role !== "assistant") continue;
     if (typeof content !== "string" || !content) continue;
-    messages.push({ role, content });
+    if (role === "assistant" && typeof topic === "number" && Number.isInteger(topic) && topic >= 1) {
+      messages.push({ role, content, topic });
+    } else {
+      messages.push({ role, content });
+    }
   }
   return messages;
 }
@@ -50,5 +55,5 @@ export function withLastAssistantContent(
 ): InterviewMessage[] {
   const index = lastAssistantIndex(messages);
   if (index === -1) return messages;
-  return messages.map((message, i) => (i === index ? { role: message.role, content } : message));
+  return messages.map((message, i) => (i === index ? { ...message, content } : message));
 }

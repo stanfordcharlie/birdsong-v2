@@ -21,8 +21,8 @@ export type StudyListItem = {
   title: string;
   slug: string;
   status: string;
-  /** survey.num_questions, the target topic count, null on older rows. */
-  questionCount: number | null;
+  /** The length preset, as "Standard · about 10 min". */
+  lengthSummary: string;
   responseCount: number;
   completedCount: number;
   /** Completed and scored at or above the worth-a-call line. */
@@ -104,10 +104,6 @@ function ActivityBars({ activity, live }: { activity: number[]; live: boolean })
   );
 }
 
-function plural(count: number, noun: string): string {
-  return `${count} ${count === 1 ? noun : `${noun}s`}`;
-}
-
 function StudyCard({ survey, canManage }: { survey: StudyListItem; canManage: boolean }) {
   const status = statusOf(survey);
   const completion = survey.responseCount > 0 ? survey.completedCount / survey.responseCount : null;
@@ -141,7 +137,7 @@ function StudyCard({ survey, canManage }: { survey: StudyListItem; canManage: bo
           </div>
         </div>
         <p className="type-meta">
-          {survey.questionCount !== null ? plural(survey.questionCount, "question") : EMPTY_VALUE}
+          {survey.lengthSummary}
           {" · "}created {formatDate(survey.createdAt)}
         </p>
       </div>

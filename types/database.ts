@@ -29,6 +29,8 @@ export type Database = {
           // Instantly campaign the study's prospects are emailed from. Set by
           // hand; NULL means completion never calls Instantly.
           instantly_campaign_id: string | null;
+          // Length preset that paces the interview. See lib/studies/interview-length.ts.
+          interview_length: string;
           custom_fields: Json;
           status: string;
           is_sample: boolean;
@@ -58,6 +60,7 @@ export type Database = {
           gift_card_amount?: number | null;
           gift_card_brand?: string | null;
           instantly_campaign_id?: string | null;
+          interview_length?: string;
           custom_fields?: Json;
           status?: string;
           is_sample?: boolean;
@@ -87,6 +90,7 @@ export type Database = {
           gift_card_amount?: number | null;
           gift_card_brand?: string | null;
           instantly_campaign_id?: string | null;
+          interview_length?: string;
           custom_fields?: Json;
           status?: string;
           is_sample?: boolean;
@@ -131,6 +135,8 @@ export type Database = {
           fit_reasoning: string | null;
           fit_confidence: string | null;
           completed: boolean;
+          // Written by the completion path; null for older rows and in-progress interviews.
+          completed_at: string | null;
           custom_field_values: Json;
           status: string;
           call_script: Json | null;
@@ -179,6 +185,7 @@ export type Database = {
           fit_reasoning?: string | null;
           fit_confidence?: string | null;
           completed?: boolean;
+          completed_at?: string | null;
           custom_field_values?: Json;
           status?: string;
           call_script?: Json | null;
@@ -220,6 +227,7 @@ export type Database = {
           fit_reasoning?: string | null;
           fit_confidence?: string | null;
           completed?: boolean;
+          completed_at?: string | null;
           custom_field_values?: Json;
           status?: string;
           call_script?: Json | null;

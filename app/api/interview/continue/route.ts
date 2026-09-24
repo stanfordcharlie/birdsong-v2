@@ -14,8 +14,10 @@ import {
   KICKOFF_MESSAGE,
   CLOSING_MESSAGE,
   COMPLETE_TOKEN,
-  questionBudgetFor,
+  MAX_EXCHANGES,
 } from "@/lib/interview-prompt";
+import { clampTopic, interviewPacing } from "@/lib/interview/pacing";
+import { interviewLengthPreset } from "@/lib/studies/interview-length";
 import { extractInterviewInsights } from "@/lib/interview/extract";
 import { runCompanyFitScoring } from "@/lib/interview/company-fit";
 import { chipsFor, parseChips } from "@/lib/interview/chips";
@@ -148,12 +150,14 @@ export async function POST(request: Request) {
   const history = (response.messages as unknown as InterviewMessage[] | null) ?? [];
   const updatedHistory: InterviewMessage[] = [...history, { role: "user", content: message }];
 
-  // The question budget is enforced here rather than trusted to the model:
-  // the respondent has been shown "N of N", so once they have answered the
-  // Nth question the interview is over whether or not Claude would have
-  // asked another. No call to Claude is made on this path.
-  const exchangeCount = updatedHistory.filter((m) => m.role === "user").length;
-  if (exchangeCount >= questionBudgetFor(survey.num_questions)) {
+  // Length is enforced here rather than trusted to the model. Two stops,
+  // neither of which calls Claude: the preset's last topic has had its
+  // opening question and every follow-up (pacing.done), or the interview
+  // has hit the hard exchange cap whatever the topics say.
+  const preset = interviewLengthPreset(survey.interview_length);
+  const pacing = interviewPacing(updatedHistory, preset);
+  const exchangeCount = pacing.exchangeCount;
+  if (pacing.done || exchangeCount >= MAX_EXCHANGES) {
     return completeInterview(supabase, response_id, updatedHistory, survey, response);
   }
 
@@ -177,9 +181,9 @@ export async function POST(request: Request) {
       name: response.respondent_name,
       customFieldValues: (response.custom_field_values as Record<string, unknown> | null) ?? {},
     },
-    // User turns only. The prompt's "N of total" line reads from this one
-    // counter, the same one the budget check above uses, so they agree.
-    exchangeCount,
+    // Read off the same transcript the stop above reads, so the prompt's
+    // "topic k of T" and the server's wrap-up agree.
+    pacing,
   });
 
   const claudeMessages: Anthropic.MessageParam[] = [
@@ -235,9 +239,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to generate the next question" }, { status: 502 });
   }
 
+  // The topic the model says this question belongs to, held to the rules:
+  // stay or step forward by one, never back, never past the total, and a
+  // missing marker stays put. Stored on the message so the next turn's
+  // pacing and the respondent's progress bar read it back.
+  const topic = clampTopic(pacing.topic, parsed.topic, preset.topics);
+
   const finalHistory: InterviewMessage[] = [
     ...updatedHistory,
-    { role: "assistant", content: reply },
+    { role: "assistant", content: reply, topic },
   ];
 
   const { error: updateError } = await supabase
@@ -250,13 +260,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  console.log(`[interview/continue] response_id=${response_id} exchange=${exchangeCount} persisted`);
+  console.log(`[interview/continue] response_id=${response_id} exchange=${exchangeCount} topic=${topic}/${preset.topics} persisted`);
 
   return NextResponse.json({
     response_id,
     message: reply,
     complete: false,
     chips,
+    topic,
+    topicCount: preset.topics,
   });
 }
 
@@ -276,21 +288,23 @@ async function completeInterview(
   // the top of this route reads exactly this write to reject a replayed
   // final turn. Deferring it would open a window where the same turn could
   // be submitted twice and extracted twice.
+  // Captured the instant completion is confirmed rather than whenever the
+  // Slack message eventually gets built — that now happens behind extraction
+  // in the background task below, so "Completed X min ago" would otherwise
+  // drift by however long extraction took. The same instant is written to
+  // completed_at, which the study page's median time reads against
+  // created_at.
+  const completedAt = new Date().toISOString();
+
   const { error: completionError } = await supabase
     .from("responses")
-    .update({ messages: history as unknown as Json, completed: true })
+    .update({ messages: history as unknown as Json, completed: true, completed_at: completedAt })
     .eq("id", responseId);
 
   if (completionError) {
     console.error("[interview/continue] completion update failed:", completionError);
     return NextResponse.json({ error: completionError.message }, { status: 500 });
   }
-
-  // Captured the instant completion is confirmed rather than whenever the
-  // Slack message eventually gets built — that now happens behind extraction
-  // in the background task below, so "Completed X min ago" would otherwise
-  // drift by however long extraction took.
-  const completedAt = new Date().toISOString();
   console.log(`[interview/continue] response_id=${responseId} completed; extraction deferred to background`);
 
   // The invite behind this response, if there is one: stamp it completed,

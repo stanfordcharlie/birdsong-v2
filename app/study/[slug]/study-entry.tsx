@@ -27,16 +27,17 @@ import { StudyThemeProvider } from "./StudyTheme";
 // client must be deliberate. The genuinely sensitive internal fields (topic,
 // question_guide, tone, target_*) are NOT selected, so they can never leak
 // even by accident. status and user_id are selected for server-only gating
-// and are never forwarded to the client (see publicSurvey). num_questions is
-// selected only to derive the welcome screen's "N questions / M minutes"
-// display line; it is passed as the questionCount prop, never on publicSurvey.
+// and are never forwarded to the client (see publicSurvey). interview_length
+// is selected only for the welcome screen's "About N minutes" line and the
+// progress bar's size; it is passed as the interviewLength prop, never on
+// publicSurvey.
 // Keep this list minimal; never widen it to select("*").
 export const getStudy = cache(async (slug: string) => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("surveys")
     .select(
-      "id, slug, title, external_title, sponsor, public_description, gift_card_amount, gift_card_brand, custom_fields, num_questions, status, user_id, archived_at"
+      "id, slug, title, external_title, sponsor, public_description, gift_card_amount, gift_card_brand, custom_fields, interview_length, status, user_id, archived_at"
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -206,7 +207,7 @@ export async function StudyEntry({
         isTest={isTest}
         testEmail={testEmail}
         source={source}
-        questionCount={survey.num_questions}
+        interviewLength={survey.interview_length}
         prospect={prospect}
       />
     </StudyThemeProvider>

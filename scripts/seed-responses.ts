@@ -63,6 +63,8 @@ import {
 } from "@/lib/interview-prompt";
 import { extractInterviewInsights, type CompanyProfile } from "@/lib/interview/extract";
 import { parseChips } from "@/lib/interview/chips";
+import { clampTopic, interviewPacing } from "@/lib/interview/pacing";
+import { interviewLengthPreset } from "@/lib/studies/interview-length";
 import { generateSessionToken } from "@/lib/interview/token";
 import { slugify, randomSlugSuffix } from "@/lib/studies/slugify";
 import { extractEmailDomain, deriveCompanyNameFromDomain, isFreeEmailDomain } from "@/lib/interview/work-email";
@@ -479,20 +481,21 @@ async function runInterview(
   const anthropic = getAnthropicClient();
   const respondent = { name: persona.name, customFieldValues };
   const personaSystem = buildPersonaSystemPrompt(persona);
+  const preset = interviewLengthPreset(survey.interview_length);
 
   // --- opening question (the /api/interview/start half) ---
   const openingCompletion = await withRetry(`${persona.name} opening`, () =>
     anthropic.messages.create({
       model: INTERVIEW_MODEL,
       max_tokens: 512,
-      system: buildInterviewSystemPrompt({ survey, companyProfile: profile, respondent, exchangeCount: 0 }),
+      system: buildInterviewSystemPrompt({ survey, companyProfile: profile, respondent, pacing: interviewPacing([], preset) }),
       messages: [{ role: "user", content: buildKickoffMessage(respondent) }],
     })
   );
   const { text: openingQuestion } = parseChips(textOf(openingCompletion));
   if (!openingQuestion) throw new Error(`${persona.name}: opening question was empty after chip parsing`);
 
-  const history: InterviewMessage[] = [{ role: "assistant", content: openingQuestion }];
+  const history: InterviewMessage[] = [{ role: "assistant", content: openingQuestion, topic: 1 }];
 
   // --- the /api/interview/continue half, until the model calls it ---
   for (;;) {
@@ -517,16 +520,17 @@ async function runInterview(
 
     history.push({ role: "user", content: answer });
 
-    // Hard ceiling, enforced here rather than trusted to the model, exactly
-    // as /api/interview/continue enforces it.
-    const exchangeCount = history.filter((m) => m.role === "user").length;
-    if (exchangeCount >= MAX_EXCHANGES) return history;
+    // The two stops /api/interview/continue enforces rather than trusting
+    // the model: the preset's last topic is spent, or the hard ceiling.
+    const pacing = interviewPacing(history, preset);
+    const exchangeCount = pacing.exchangeCount;
+    if (pacing.done || exchangeCount >= MAX_EXCHANGES) return history;
 
     const nextCompletion = await withRetry(`${persona.name} turn ${exchangeCount}`, () =>
       anthropic.messages.create({
         model: INTERVIEW_MODEL,
         max_tokens: 512,
-        system: buildInterviewSystemPrompt({ survey, companyProfile: profile, respondent, exchangeCount }),
+        system: buildInterviewSystemPrompt({ survey, companyProfile: profile, respondent, pacing }),
         messages: [
           { role: "user", content: KICKOFF_MESSAGE },
           ...history.map((m) => ({ role: m.role, content: m.content })),
@@ -541,10 +545,10 @@ async function runInterview(
     // finished transcript ends on the respondent's last answer.
     if (rawReply.includes(COMPLETE_TOKEN)) return history;
 
-    const { text: reply } = parseChips(rawReply);
+    const { text: reply, topic: reportedTopic } = parseChips(rawReply);
     if (!reply) throw new Error(`${persona.name}: reply was empty after chip parsing`);
 
-    history.push({ role: "assistant", content: reply });
+    history.push({ role: "assistant", content: reply, topic: clampTopic(pacing.topic, reportedTopic, preset.topics) });
   }
 }
 

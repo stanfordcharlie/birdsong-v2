@@ -249,3 +249,25 @@ describe("stripInterviewMarkers, the render boundary", () => {
     expect(stripInterviewMarkers("Roughly **how many** techs, 5 | 10 | more?")).toBe("Roughly **how many** techs, 5 | 10 | more?");
   });
 });
+
+describe("topic marker", () => {
+  it("reads the topic and strips the marker before the answer marker and chips", () => {
+    const parsed = parseChips("Who touches a lead first?\n||TOPIC: 3||\n||ANSWER: factual||\n||CHIPS: a rep | the SDR | nobody||");
+    expect(parsed.topic).toBe(3);
+    expect(parsed.text).toBe("Who touches a lead first?");
+    expect(parsed.answerType).toBe("factual");
+    expect(parsed.chips).toEqual(["a rep", "the SDR", "nobody"]);
+  });
+
+  it("returns null for a missing or unreadable topic", () => {
+    expect(parseChips("Who touches a lead first?\n||ANSWER: story||").topic).toBeNull();
+    expect(parseChips("Who touches a lead first?\n||TOPIC: soon||").topic).toBeNull();
+    expect(parseChips("Who touches a lead first?\n||TOPIC: soon||").text).toBe("Who touches a lead first?");
+  });
+
+  it("strips a topic marker at the render boundary, closed, open or truncated", () => {
+    expect(stripInterviewMarkers("Who first? ||TOPIC: 2||")).toBe("Who first?");
+    expect(stripInterviewMarkers("Who first? ||TOPIC: 2")).toBe("Who first?");
+    expect(stripInterviewMarkers("Who first? ||TOP")).toBe("Who first?");
+  });
+});

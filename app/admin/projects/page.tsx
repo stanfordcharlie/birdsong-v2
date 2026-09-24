@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { interviewLengthPreset, interviewLengthSummary } from "@/lib/studies/interview-length";
 import { createClient } from "@/lib/supabase/server";
 import { can, requireActiveOrg } from "@/lib/org";
 import { WORTH_A_CALL_SCORE_MIN } from "@/lib/leads";
@@ -29,7 +30,7 @@ export default async function AdminDashboardPage({
   // filtered explicitly rather than left to RLS.
   const { data: surveys, error } = await supabase
     .from("surveys")
-    .select("id, title, slug, status, num_questions, created_at, archived_at")
+    .select("id, title, slug, status, interview_length, created_at, archived_at")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false });
 
@@ -80,7 +81,7 @@ export default async function AdminDashboardPage({
       title: survey.title,
       slug: survey.slug,
       status: survey.status,
-      questionCount: survey.num_questions,
+      lengthSummary: interviewLengthSummary(interviewLengthPreset(survey.interview_length)),
       responseCount: own.length,
       completedCount: own.filter((r) => r.completed).length,
       qualifiedCount: own.filter((r) => r.completed && (r.lead_score ?? 0) >= WORTH_A_CALL_SCORE_MIN).length,

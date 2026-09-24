@@ -3,6 +3,8 @@
 // representative survey: the Supabase reads and the Anthropic opening-question
 // call. Read-only — creates no rows.
 import "dotenv/config";
+import { interviewPacing } from "@/lib/interview/pacing";
+import { interviewLengthPreset } from "@/lib/studies/interview-length";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { buildInterviewSystemPrompt, buildKickoffMessage } from "../lib/interview-prompt";
@@ -37,7 +39,7 @@ async function main() {
       ? { whatWeSell: profile.what_we_sell, targetIcp: profile.target_icp, valueProp: profile.value_prop }
       : null,
     respondent,
-    exchangeCount: 0,
+    pacing: interviewPacing([], interviewLengthPreset(survey.interview_length)),
   });
 
   console.log(`survey: "${survey.title}"  status=${survey.status}`);

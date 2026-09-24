@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { interviewLengthPreset } from "@/lib/studies/interview-length";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveOrg } from "@/lib/org";
 import { PageHeader, PageShell } from "@/components/admin/ui";
@@ -19,7 +20,7 @@ export default async function LivePage() {
   // alone would return every organization's surveys.
   const { data: surveys, error } = await supabase
     .from("surveys")
-    .select("id, title, slug, num_questions")
+    .select("id, title, slug, interview_length")
     .eq("org_id", orgId)
     .eq("status", "live")
     .is("archived_at", null)
@@ -29,7 +30,7 @@ export default async function LivePage() {
     id: survey.id,
     title: survey.title,
     slug: survey.slug,
-    questionTarget: survey.num_questions,
+    questionTarget: interviewLengthPreset(survey.interview_length).topics,
   }));
 
   return (

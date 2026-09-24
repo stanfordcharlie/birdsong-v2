@@ -14,12 +14,12 @@ function csvCell(value: string | number | null): string {
 
 export function ExportStudiesButton({ surveys }: { surveys: StudyListItem[] }) {
   function download() {
-    const header = ["Title", "Status", "Questions", "Responses", "Completed", "Qualified", "Created", "Last response"];
+    const header = ["Title", "Status", "Length", "Responses", "Completed", "Qualified", "Created", "Last response"];
     const lines = surveys.map((s) =>
       [
         s.title,
         s.archivedAt !== null ? "archived" : s.status === "live" ? "live" : "draft",
-        s.questionCount,
+        s.lengthSummary,
         s.responseCount,
         s.completedCount,
         s.qualifiedCount,

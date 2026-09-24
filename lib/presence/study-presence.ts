@@ -17,10 +17,9 @@ export type StudyPresence = {
   response_id: string;
   slug: string;
   respondent_name: string | null;
-  // How many questions the interviewer has asked so far, i.e. the count of
-  // assistant messages in the transcript. Not a fixed denominator: the model
-  // can genuinely run past a survey's num_questions (a soft target, not a
-  // cap), which the admin view accounts for when it renders "4 of 8".
+  // The topic the respondent is on, as their progress bar shows it: the
+  // topic of the interviewer's latest question, out of the length preset's
+  // topic count. Follow-ups do not move it.
   current_step: number;
   // ISO timestamp, refreshed on every heartbeat and on every step change.
   // A stale value means the tab stopped beating (backgrounded, asleep,

@@ -9,6 +9,8 @@ import {
   logModelFailure,
 } from "@/lib/interview/anthropic";
 import { buildInterviewSystemPrompt, buildKickoffMessage } from "@/lib/interview-prompt";
+import { interviewPacing } from "@/lib/interview/pacing";
+import { interviewLengthPreset } from "@/lib/studies/interview-length";
 import { chipsFor, parseChips } from "@/lib/interview/chips";
 import { generateSessionToken } from "@/lib/interview/token";
 import { getClientIp, isRateLimited, startRateLimiter } from "@/lib/interview/rate-limit";
@@ -247,15 +249,16 @@ export async function POST(request: Request) {
   };
 
   const anthropic = getAnthropicClient();
+  const preset = interviewLengthPreset(survey.interview_length);
   const systemPrompt = buildInterviewSystemPrompt({
     survey,
     companyProfile: profile
       ? { whatWeSell: profile.what_we_sell, targetIcp: profile.target_icp, valueProp: profile.value_prop }
       : null,
     respondent,
-    // Zero, not one: this call generates the opening question, so the
-    // respondent hasn't answered anything yet and no exchange is complete.
-    exchangeCount: 0,
+    // An empty transcript: this call generates the opening question, which
+    // is topic 1 whatever the model reports.
+    pacing: interviewPacing([], preset),
   });
 
   // One retry on an empty reply or a retryable error, both attempts logged
@@ -296,7 +299,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to generate opening question" }, { status: 502 });
   }
 
-  const messages: InterviewMessage[] = [{ role: "assistant", content: openingQuestion }];
+  const messages: InterviewMessage[] = [{ role: "assistant", content: openingQuestion, topic: 1 }];
 
   // Bound to this row and required on every /api/interview/continue call
   // from here on, so a guessable response_id UUID alone is never enough to
@@ -342,5 +345,7 @@ export async function POST(request: Request) {
     message: openingQuestion,
     chips,
     token: sessionToken,
+    topic: 1,
+    topicCount: preset.topics,
   });
 }

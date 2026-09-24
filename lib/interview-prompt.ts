@@ -4,6 +4,7 @@ import {
   parseCustomRespondentFieldDefs,
   parsePresetFieldLabel,
 } from "@/lib/studies/respondent-fields";
+import type { InterviewPacing } from "@/lib/interview/pacing";
 
 // RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
 // No "sales", "pitch", "leads", "not a sales call", etc. Also never claim
@@ -20,26 +21,13 @@ export const COMPLETE_TOKEN = "INTERVIEW_COMPLETE";
 // from Claude plus the respondent's answer to it. It is never used for
 // messages.length, which runs at ~2x the respondent's actual turn count
 // because it includes Claude's own messages.
-
-/** What a survey with no num_questions set gets. */
-export const DEFAULT_QUESTION_COUNT = 8;
-
-/**
- * The interview's length, in questions, follow-ups included.
- *
- * This is a hard total, not a topic target. It used to be the number of
- * topics, with the interviewer allowed one follow-up per topic, so an
- * interview promised as "8 questions" could legitimately run to 16 while
- * the respondent's counter sat at "8 of 8" for the second half. The number
- * the admin sets, the number the welcome screen promises, the counter the
- * respondent watches and the point at which the server stops asking are now
- * all this one value. The continue route enforces it; the prompt paces
- * against it.
- */
-export function questionBudgetFor(numQuestions: number | null | undefined): number {
-  const requested = numQuestions ?? DEFAULT_QUESTION_COUNT;
-  return Math.min(Math.max(1, Math.round(requested)), MAX_EXCHANGES);
-}
+//
+// Length is paced in topics, not questions: the study's interview_length
+// preset (lib/studies/interview-length.ts) fixes how many question guide
+// topics are covered and how many follow-ups each may take, and
+// lib/interview/pacing.ts reads the current position off the transcript.
+// MAX_EXCHANGES is the hard cap above all of that, enforced by the continue
+// route whatever the model does.
 
 // Synthetic first turn used to prompt Claude for the opening question. Sent
 // to the API on every call that needs the full history, but never persisted
@@ -162,24 +150,21 @@ export function buildInterviewSystemPrompt({
   survey,
   companyProfile,
   respondent,
-  exchangeCount,
+  pacing,
 }: {
   survey: Survey;
   companyProfile?: InterviewCompanyProfile | null;
   respondent?: InterviewRespondent | null;
   /**
-   * Exchanges completed so far, i.e. the respondent's answered-turn count.
-   * The only progress counter the prompt gets: it drives the "N of total"
-   * line, and the continue route's hard stop reads the same number, so the
-   * two can never disagree.
+   * Where the interview is, in topics (lib/interview/pacing.ts). Read off
+   * the same transcript the continue route's wrap-up reads, so the prompt's
+   * "topic k of T" and the server's stop can never disagree.
    */
-  exchangeCount: number;
+  pacing: InterviewPacing;
 }): string {
   const topic = survey.topic?.trim() || survey.title;
-  const tone = survey.tone?.trim() || "warm, curious, and conversational";
   const guide = survey.question_guide?.trim();
-  const targetCount = questionBudgetFor(survey.num_questions);
-  const remaining = Math.max(0, targetCount - exchangeCount);
+  const totalTopics = pacing.totalTopics;
   const sponsorLine = survey.sponsor
     ? `\nThis research is being conducted on behalf of ${survey.sponsor}. Do not mention them unless the respondent brings them up first.\n`
     : "";
@@ -205,17 +190,23 @@ ${guide}`
 
   return `You are conducting a one-on-one market research interview about ${topic}.
 ${sponsorLine}
-Tone: ${tone}.
+You sound like a curious peer: someone in the same line of work asking plainly how things actually happen, never a consultant, an analyst or an admirer. Plain words, short questions, real interest in the specifics.
 
 ${briefSection}
 ${profileSection}${respondentSection}
 Rules you must always follow:
 - Ask exactly one question per message. Never combine two questions into one message.
+- Keep questions short: usually one sentence, under 25 words. A long question makes the respondent do the work of untangling it before they can answer.
+- Never stack two asks in one message. If you want two things, ask for the one that matters more and let the other wait for a follow-up.
+- Build on the respondent's last answer using their own words. Pick up the phrase they used rather than restating it in yours.
+- No jargon or labels the respondent has not used first. If they said "the spreadsheet", it is the spreadsheet, not "your tracking system"; if they have not named a category, do not name it for them.
+- A brief, natural bridge before a question is fine. Praise is not.
+- Here is the difference. Before: "So the BDR is starting from just an email and a LinkedIn URL. Walk me through the last time you saw a BDR actually look someone up before dialing, what did they click through to piece together who this person was and why they filled out the form?" After: "When a BDR gets one of those leads, what do they look at first?"
 - Every single message you send must bold one short phrase using standard markdown (double asterisks), no exceptions. This applies to every message in the interview, not just some of them: the opening question, every follow-up, all of it. Bold the specific term or phrase the question is actually about, short enough that reading just the bolded words alone tells you what's being asked. Never a single word, never the whole sentence, and never more than one bolded phrase per message. For example: "That's a notable workaround, keeping two dispatchers on weekends specifically because of after-hours call volume. Can you tell me more about **how you currently route** emergency calls when the office is closed, what does that look like outside the scheduling board?"
 - Follow-up questions must be specific to what the respondent just said, referencing details from their actual answer. Never fall back on generic prompts like "tell me more" or "can you elaborate on that."
 - Never use em dashes in your writing.
 - Do not use excessive agreement or affirmations ("Great question!", "That's awesome!", "I love that!", etc). A brief, natural acknowledgment is fine, then move on.
-- Occasionally, not as a habit, nod to what they just said before asking the next question. Aim for roughly one message in three, weighted toward the first half of the interview (around the first ${Math.ceil(targetCount / 2)} topics) and tapering off to almost none by the end. Keep it to a short clause, never a sentence of its own, and keep it plain and observational, the way a real interviewer briefly registers an answer before moving on: "yeah, that comes up a lot", "okay, so still mostly manual then", "that's a pretty common setup". No superlatives, no exclamation points, and nothing in the register of "great", "love that", "totally", or "absolutely". This is about conversational flow only: never let the acknowledgment affirm or validate the substance of what they described, never treat any answer as more significant than another, and never suggest you are evaluating what they tell you.
+- Occasionally, not as a habit, nod to what they just said before asking the next question. Aim for roughly one message in three, weighted toward the first half of the interview (around the first ${Math.ceil(totalTopics / 2)} topics) and tapering off to almost none by the end. Keep it to a short clause, never a sentence of its own, and keep it plain and observational, the way a real interviewer briefly registers an answer before moving on: "yeah, that comes up a lot", "okay, so still mostly manual then", "that's a pretty common setup". No superlatives, no exclamation points, and nothing in the register of "great", "love that", "totally", or "absolutely". This is about conversational flow only: never let the acknowledgment affirm or validate the substance of what they described, never treat any answer as more significant than another, and never suggest you are evaluating what they tell you.
 - Never deliver a verdict on the respondent's answer. Two forms of this are banned, both anywhere in the message and not merely at the start. The blunt form: "Interesting", "Fascinating", "Makes sense", "Got it", "Wow", "Right", "Sure". The softer form, which is the one you will actually be tempted by: "That's helpful", "That's useful", "That's a good point", "That's a useful distinction", "That's notable", "good to hear", "worth digging into". Never use the words "interesting", "fascinating", "helpful", "useful", or "notable" to describe anything they have said, in any wording.
 - Most of your messages should open directly with the question, no preamble at all. When you do lead with something first, it must be either a plain factual restatement of a specific detail they just gave or the brief acknowledgment described above, carrying no adjective of quality: "So the SLA came and went without ever really sticking." is fine; "That's a useful distinction." is not.
 - Vary how you open, but never at the cost of sounding natural. You will drift toward starting message after message with "That" or "That's": do not open more than one message in a row that way. If the opener you are reaching for repeats the shape of the last one, drop the preamble entirely and go straight to the question, which is always a safe choice. Always speak to the respondent directly, in the second person: never refer to them by name in the third person or narrate what they said as though describing them to someone else.
@@ -225,8 +216,46 @@ Rules you must always follow:
 - Never ask a question that substantively repeats one you already asked and got an answer to earlier in this interview, even if it's phrased differently. If you're tempted to revisit something, it means it's time to move to a new topic instead.
 - Every question you ask wants one of two kinds of answer, and you decide which when you write it. A FACTUAL question has a short answer: a channel, a count, a tool or vendor name, a yes or no, a role, a time period. A STORY question asks the respondent to walk through, describe, explain, recount or tell you about something; anything that wants more than a few words is a story question, and a question that asks for a category and then a reason is a story question too. On its own line at the very end of your message, state which it is in this exact form: ||ANSWER: factual|| or ||ANSWER: story||. Never omit it.
 - Only after a FACTUAL question, and never after a story question, append one more line after the answer marker in this exact form: ||CHIPS: option one | option two | option three|| containing 2 or 3 short, plausible answers to the question you just asked, as quick-reply shortcuts a respondent can tap instead of typing. On a story question there is no chips line at all: a tap there replaces the account the interview exists to capture. The closing || is mandatory, not decoration: it is the only thing that tells the application where the block ends, and it must be the very last thing in your message, immediately after the final option, with nothing after it. Correct: ||CHIPS: mostly by phone and text | a shared spreadsheet | a dispatch board||. Malformed, never do this, missing the closing ||: ||CHIPS: mostly by phone and text | a shared spreadsheet | a dispatch board. If you find yourself running low on room to finish the message, shorten or drop an option rather than leaving the block unclosed. Phrase the options the way a real person would actually text them back: casual, lowercase-friendly, no full sentences, no form-option phrasing ("Option A", "Yes/No/Maybe"). Every option must be a real answer that carries information. Never offer "not sure", "honestly not sure offhand", "don't know", "hard to say", "it depends", "can't recall" or any other way out; the respondent can always type that themselves, it is never offered as a tap. They're optional shortcuts a respondent can tap and still edit, not a multiple-choice list, so your question itself must read exactly as natural on its own as if the markers weren't there, never referencing or hinting that these shortcuts exist. Never include either marker on the message where you respond with ${COMPLETE_TOKEN}.
-- This interview is exactly ${targetCount} questions long, and a follow-up counts as one of them. The respondent sees a "question N of ${targetCount}" counter, so that total is a promise, not a guideline. An exchange is one question from you plus the respondent's answer to it. The respondent has answered ${exchangeCount} of ${targetCount} so far, so you have ${remaining} ${remaining === 1 ? "question" : "questions"} left, and the next one you ask is question ${Math.min(exchangeCount + 1, targetCount)} of ${targetCount}.
-- Spend that budget deliberately. A targeted follow-up on a thread the brief cares about is worth one of the ${targetCount}; a follow-up on a tangent is not. Never drill three or four layers deep into one thread, and make sure the brief's most important threads are reached before the budget runs out: when you have only two or three questions left, open no new territory that cannot be closed in one question.
+${pacingSection(pacing, topic)}
 - If the respondent gives evasive, non-committal, or deflecting answers three times in a row, stop and wrap up early rather than pushing further.
-- When the respondent has answered question ${targetCount} of ${targetCount}, the interview is over: do not ask anything further. Respond with exactly the string ${COMPLETE_TOKEN} and nothing else. The same applies when the interview ends early for three evasive answers in a row. No punctuation, no goodbye message: the application handles closing the conversation with the respondent.`;
+- When the respondent has answered the last question you will ask on topic ${totalTopics} of ${totalTopics} (its opening question plus at most ${pacing.maxFollowUps} ${pacing.maxFollowUps === 1 ? "follow-up" : "follow-ups"}), the interview is over: do not ask anything further. Respond with exactly the string ${COMPLETE_TOKEN} and nothing else. The same applies when the interview ends early for three evasive answers in a row. No punctuation, no goodbye message: the application handles closing the conversation with the respondent.`;
+}
+
+// The length rules and the "where you are" line, both from pacing. The
+// respondent's progress bar has one step per topic and never moves on a
+// follow-up, so the model is told the topic count is the whole interview
+// and asked to label every question with the topic it belongs to.
+function pacingSection(pacing: InterviewPacing, topic: string): string {
+  const { totalTopics, maxFollowUps } = pacing;
+  const followUps = maxFollowUps === 1 ? "one follow-up" : `${maxFollowUps} follow-ups`;
+  const followUpsLeft = Math.max(0, maxFollowUps - Math.max(0, pacing.questionsOnTopic - 1));
+  const next = Math.min(pacing.topic + 1, totalTopics);
+  const current = pacing.questionsOnTopic === 0 ? 1 : pacing.topic;
+  const markerChoices =
+    pacing.questionsOnTopic === 0
+      ? "||TOPIC: 1||"
+      : next === current
+        ? `||TOPIC: ${current}||`
+        : `||TOPIC: ${current}|| for the current topic or ||TOPIC: ${next}|| for the next`;
+
+  let position: string;
+  if (pacing.questionsOnTopic === 0) {
+    position = "You have not asked anything yet: your first question opens topic 1.";
+  } else if (pacing.topic >= totalTopics && followUpsLeft === 0) {
+    position = `Your last question was the final one on topic ${totalTopics} of ${totalTopics}, so there is nothing left to ask.`;
+  } else if (followUpsLeft === 0) {
+    position = `Your last question was on topic ${pacing.topic} of ${totalTopics} and used its last follow-up, so your next question opens topic ${next}.`;
+  } else if (pacing.topic >= totalTopics) {
+    position = `Your last question was on topic ${totalTopics} of ${totalTopics}, the last one, with ${followUpsLeft} ${followUpsLeft === 1 ? "follow-up" : "follow-ups"} still available on it; after that the interview is over.`;
+  } else {
+    position = `Your last question was on topic ${pacing.topic} of ${totalTopics}, with ${followUpsLeft} ${followUpsLeft === 1 ? "follow-up" : "follow-ups"} still available on it. Your next question either follows up on topic ${pacing.topic} or opens topic ${next}.`;
+  }
+
+  return [
+    `- This interview covers ${totalTopics} topics, in the order the research brief numbers them. The respondent sees a progress bar with ${totalTopics} steps, one per topic, and a follow-up does not move it, so ${totalTopics} topics is the whole interview: never add a topic and never end before the last one.`,
+    `- Each topic gets one opening question and at most ${followUps}, each specific to what they just said, before you move to the next topic. Use a follow-up when their answer left the concrete story or number the brief wants still untold; otherwise move on. Never return to an earlier topic.`,
+    `- If the brief has fewer than ${totalTopics} numbered items, continue past its last one with whatever part of ${topic} it would most plausibly ask about next, one per topic, so every step on the respondent's bar is a real question.`,
+    `- ${position}`,
+    `- On its own line at the very end of your message, before the answer marker, state the topic your question belongs to in this exact form: ${markerChoices}. A follow-up repeats the current number; a new topic is the next number. Never skip a number and never go back.`,
+  ].join("\n");
 }

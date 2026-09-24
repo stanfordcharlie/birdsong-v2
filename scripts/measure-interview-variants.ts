@@ -3,6 +3,8 @@
 // THINKING BY DEFAULT when `thinking` is omitted (a change from Sonnet 4.6),
 // and defaults to effort "high" — the start route sets neither.
 import Anthropic from "@anthropic-ai/sdk";
+import { interviewPacing } from "@/lib/interview/pacing";
+import { interviewLengthPreset } from "@/lib/studies/interview-length";
 import { createClient } from "@supabase/supabase-js";
 import { buildInterviewSystemPrompt, buildKickoffMessage } from "../lib/interview-prompt";
 
@@ -27,7 +29,7 @@ async function main() {
       ? { whatWeSell: profile.what_we_sell, targetIcp: profile.target_icp, valueProp: profile.value_prop }
       : null,
     respondent,
-    exchangeCount: 0,
+    pacing: interviewPacing([], interviewLengthPreset(survey.interview_length)),
   });
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
   const kickoff = buildKickoffMessage(respondent);

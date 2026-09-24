@@ -10,7 +10,14 @@ import {
   type CustomRespondentFieldDef,
 } from "@/lib/studies/respondent-fields";
 import { slugify, randomSlugSuffix } from "@/lib/studies/slugify";
-import { QUESTION_COUNT_DEFAULT, QUESTION_COUNT_MIN, questionCountIssue } from "@/lib/studies/question-count";
+import {
+  DEFAULT_INTERVIEW_LENGTH,
+  INTERVIEW_LENGTHS,
+  INTERVIEW_LENGTH_PRESETS,
+  coverageAdvisory,
+  interviewLengthSummary,
+  type InterviewLength,
+} from "@/lib/studies/interview-length";
 import {
   GIFT_CARD_BRANDS,
   GIFT_CARD_BRAND_MAX_LENGTH,
@@ -43,10 +50,10 @@ const STEP_BRIEF = 2;
 // Reviewing and editing the guide it generated. Generation happens at the
 // end of the brief; this step is where the admin decides anything about it.
 const STEP_GUIDE = 3;
-// How long the interview runs, as a total of exchanges (follow-ups count).
-// Used to be silently set to the theme count, which made 4 to 6 question
-// studies; see lib/studies/question-count.ts for the floor and the range.
-const STEP_QUESTION_COUNT = 4;
+// How long the interview runs: one of the three presets in
+// lib/studies/interview-length.ts, each a promise in minutes backed by a
+// topic count and a follow-up allowance.
+const STEP_LENGTH = 4;
 const STEP_GIFT_CARD = 5;
 const STEP_RESPONDENT_INFO = 6;
 const STEP_EXTERNAL_NAME = 7;
@@ -61,7 +68,6 @@ const invalidBorder = "border-destructive focus-visible:ring-destructive";
 // theme count IS the question count, and a peer-level research register is
 // the only one the moderator prompt is written for. Both remain editable on
 // the study afterwards through StudyForm.
-const DEFAULT_TONE = "Conversational";
 
 function StepShell({
   label,
@@ -650,9 +656,7 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
   const [publicDescription, setPublicDescription] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
-  const [questionCount, setQuestionCount] = useState(String(QUESTION_COUNT_DEFAULT));
-  const [questionCountBlocked, setQuestionCountBlocked] = useState(false);
-  const questionCountInputRef = useRef<HTMLInputElement>(null);
+  const [interviewLength, setInterviewLength] = useState<InterviewLength>(DEFAULT_INTERVIEW_LENGTH);
   const [giftCardAmount, setGiftCardAmount] = useState("");
   // A brand from the fixed list, or "Other" with whatever was typed. Only
   // asked once an amount exists, and only stored when one does.
@@ -736,7 +740,6 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
   // change with nothing animating over it.
   useEffect(() => {
     if (step === STEP_GIFT_CARD) giftCardInputRef.current?.focus();
-    if (step === STEP_QUESTION_COUNT) questionCountInputRef.current?.focus();
   }, [step]);
 
   useEffect(() => {
@@ -753,7 +756,8 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
           targetIndustry: brief.icpIndustry,
           targetJobTitle: brief.icpRoles,
           targetCompanySize: brief.icpCompanyProfile,
-          tone: DEFAULT_TONE,
+          // The interviewer's voice is fixed; nothing to pass on.
+          tone: "",
         }
       : null;
 
@@ -830,15 +834,6 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
 
   function goNext() {
     setStep((s) => Math.min(TOTAL_STEPS - 1, s + 1));
-  }
-
-  function handleQuestionCountNext() {
-    if (questionCountIssue(questionCount)?.kind === "blocked") {
-      setQuestionCountBlocked(true);
-      questionCountInputRef.current?.focus();
-      return;
-    }
-    goNext();
   }
 
   function handleTitleNext() {
@@ -930,8 +925,7 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
         brief_transcript: (briefTranscript ?? []) as unknown as Json,
         // Captured and stored. Nothing reads it in this build.
         qualification_criteria: finalBrief.qualificationCriteria || null,
-        tone: DEFAULT_TONE,
-        num_questions: Number(questionCount),
+        interview_length: interviewLength,
         gift_card_amount: giftCardAmount ? Number(giftCardAmount) : null,
         gift_card_brand: giftCardBrand,
         // Presets stay bare strings; admin-defined fields are {key, label}
@@ -1283,33 +1277,39 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
             />
           )}
 
-          {step === STEP_QUESTION_COUNT && (
+          {step === STEP_LENGTH && (
             <StepShell
-              label="How many questions?"
-              helper={`The total the respondent is promised, follow-ups included. Each is about a minute and a half. Your guide has ${guide?.themes.length ?? 0} themes; the interviewer spreads the questions across them, so this is a different number.`}
-              error={
-                questionCountBlocked && questionCountIssue(questionCount)?.kind === "blocked"
-                  ? questionCountIssue(questionCount)?.message
-                  : null
-              }
+              label="How long should the interview be?"
+              helper="What the respondent is promised on the welcome screen. The interviewer works through your guide's topics in order and wraps up when the time is spent."
               onBack={goBack}
-              footer={<StepFooter onNext={handleQuestionCountNext} />}
+              footer={<StepFooter onNext={goNext} />}
             >
-              <Input
-                ref={questionCountInputRef}
-                type="number"
-                min={QUESTION_COUNT_MIN}
-                step={1}
-                value={questionCount}
-                onChange={(e) => {
-                  setQuestionCount(e.target.value);
-                  setQuestionCountBlocked(false);
-                }}
-                onKeyDown={(e) => handleEnterKey(e, handleQuestionCountNext)}
-              />
-              {questionCountIssue(questionCount)?.kind === "warning" && (
-                <p className="mt-2 text-sm text-warning-foreground" role="status">
-                  {questionCountIssue(questionCount)?.message}
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Interview length">
+                {INTERVIEW_LENGTHS.map((value) => {
+                  const preset = INTERVIEW_LENGTH_PRESETS[value];
+                  const selected = interviewLength === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setInterviewLength(value)}
+                      className={cn(
+                        "rounded-full border px-4 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        selected
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-card text-card-foreground hover:bg-secondary"
+                      )}
+                    >
+                      {preset.label} <span className={selected ? "opacity-80" : "text-muted-foreground"}>· about {preset.minutes} min</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {coverageAdvisory(INTERVIEW_LENGTH_PRESETS[interviewLength], guide?.themes.length ?? 0) && (
+                <p className="mt-3 text-sm text-muted-foreground" role="status">
+                  {coverageAdvisory(INTERVIEW_LENGTH_PRESETS[interviewLength], guide?.themes.length ?? 0)}
                 </p>
               )}
             </StepShell>
@@ -1555,8 +1555,10 @@ export function NewStudyWizard({ orgId }: { orgId: string }) {
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between gap-4">
-                  <span className="shrink-0 text-muted-foreground">Questions</span>
-                  <span className="text-right text-card-foreground">{questionCount}</span>
+                  <span className="shrink-0 text-muted-foreground">Length</span>
+                  <span className="text-right text-card-foreground">
+                    {interviewLengthSummary(INTERVIEW_LENGTH_PRESETS[interviewLength])}
+                  </span>
                 </div>
                 <div className="flex items-baseline justify-between gap-4">
                   <span className="shrink-0 text-muted-foreground">Gift card</span>

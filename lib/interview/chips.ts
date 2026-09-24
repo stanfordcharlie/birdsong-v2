@@ -107,16 +107,48 @@ export function stripInterviewMarkers(text: string): string {
     .replace(/\|\|\s*CHIPS\b[^|]*(\|[^|]*)*?\|\|/gi, "")
     .replace(/\|\|\s*CHIPS\b[\s\S]*$/i, "")
     .replace(/\|\|\s*ANSWER\b[^|\n]*(\|\|)?/gi, "")
-    .replace(/\s*\|\|\s*(A(N(S(W(E(R)?)?)?)?)?|C(H(I(P(S)?)?)?)?)?$/i, "")
+    .replace(/\|\|\s*TOPIC\b[^|\n]*(\|\|)?/gi, "")
+    .replace(/\s*\|\|\s*(A(N(S(W(E(R)?)?)?)?)?|C(H(I(P(S)?)?)?)?|T(O(P(I(C)?)?)?)?)?$/i, "")
     .trim();
 }
 
-export function parseChips(rawText: string): { text: string; chips: string[]; answerType: AnswerType } {
-  // The answer marker sits on its own line before the chips block. Taken
-  // off first so the chips parser below sees exactly what it always has.
-  const stripped = stripAnswerMarker(rawText);
+// Which question guide topic the question belongs to, 1-based, stated by
+// the interviewer in a marker of its own: ||TOPIC: 3||. Pacing and the
+// respondent's progress bar count topics rather than messages, and this is
+// the only way to know whether a question opened a new topic or followed
+// up on the current one. Null when the marker is missing or unreadable;
+// the caller then keeps the previous topic, which never advances the bar
+// on a guess.
+const TOPIC_MARKER_PATTERN = /\|\|\s*TOPIC:?\s*(\d{1,2})?[^|\n]*(\|\|(?!CHIPS|ANSWER))?/i;
+const ANY_TOPIC_MARKER_PATTERN = /\|\|\s*TOPIC\b[^|\n]*(\|\|(?!CHIPS|ANSWER))?/gi;
+const TRUNCATED_TOPIC_PATTERN = /\s*\|\|T(O(P(I(C)?)?)?)?$/;
+
+function stripTopicMarker(rawText: string): { text: string; topic: number | null } {
+  const match = rawText.match(TOPIC_MARKER_PATTERN);
+  let topic: number | null = null;
+  let text = rawText;
+  if (match && match.index !== undefined) {
+    const parsed = match[1] ? Number(match[1]) : NaN;
+    topic = Number.isInteger(parsed) && parsed >= 1 ? parsed : null;
+    text = (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim();
+  }
+  text = text.replace(ANY_TOPIC_MARKER_PATTERN, "").replace(TRUNCATED_TOPIC_PATTERN, "").trim();
+  return { text, topic };
+}
+
+export function parseChips(rawText: string): {
+  text: string;
+  chips: string[];
+  answerType: AnswerType;
+  topic: number | null;
+} {
+  // The topic and answer markers sit on their own lines before the chips
+  // block. Taken off first so the chips parser below sees exactly what it
+  // always has.
+  const topicStripped = stripTopicMarker(rawText);
+  const stripped = stripAnswerMarker(topicStripped.text);
   const parsed = parseChipBlock(stripped.text);
-  return { ...parsed, answerType: stripped.answerType };
+  return { ...parsed, answerType: stripped.answerType, topic: topicStripped.topic };
 }
 
 function parseChipBlock(rawText: string): { text: string; chips: string[] } {

@@ -114,3 +114,14 @@ export function formatPercent(ratio: number | null | undefined): string {
   if (ratio === null || ratio === undefined || Number.isNaN(ratio)) return EMPTY_VALUE;
   return `${Math.round(ratio * 100)}%`;
 }
+
+/**
+ * A duration in whole minutes, for the study page's median time: "9 min".
+ * Anything under a minute reads as "<1 min" rather than as zero, and a
+ * null or non-finite input is the empty value.
+ */
+export function formatMinutes(ms: number | null | undefined): string {
+  if (ms == null || !Number.isFinite(ms) || ms < 0) return EMPTY_VALUE;
+  const minutes = Math.round(ms / 60_000);
+  return minutes < 1 ? "<1 min" : `${minutes} min`;
+}

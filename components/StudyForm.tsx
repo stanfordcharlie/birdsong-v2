@@ -10,7 +10,16 @@ import {
   type CustomRespondentFieldDef,
 } from "@/lib/studies/respondent-fields";
 import { StudyOnboardingChat } from "@/components/StudyOnboardingChat";
-import { SURVEY_TONE_OPTIONS, type ExtractedSurveyDetails } from "@/lib/study-onboarding/types";
+import type { ExtractedSurveyDetails } from "@/lib/study-onboarding/types";
+import {
+  DEFAULT_INTERVIEW_LENGTH,
+  INTERVIEW_LENGTHS,
+  INTERVIEW_LENGTH_PRESETS,
+  countGuideTopics,
+  coverageAdvisory,
+  interviewLengthPreset,
+  isInterviewLength,
+} from "@/lib/studies/interview-length";
 import { slugify, randomSlugSuffix } from "@/lib/studies/slugify";
 import { GIFT_CARD_BRAND_MAX_LENGTH, normalizeGiftCardBrand } from "@/lib/studies/incentive";
 import { Input } from "@/components/ui/input";
@@ -30,8 +39,8 @@ export type StudyFormValues = {
   targetJobTitle: string;
   targetCompanySize: string;
   questionGuide: string;
-  tone: string;
-  numQuestions: string;
+  /** One of lib/studies/interview-length.ts's presets. */
+  interviewLength: string;
   giftCardAmount: string;
   giftCardBrand: string;
   collectPhone: boolean;
@@ -60,8 +69,7 @@ const EMPTY_VALUES: StudyFormValues = {
   targetJobTitle: "",
   targetCompanySize: "",
   questionGuide: "",
-  tone: "",
-  numQuestions: "",
+  interviewLength: DEFAULT_INTERVIEW_LENGTH,
   giftCardAmount: "",
   giftCardBrand: "",
   collectPhone: false,
@@ -122,8 +130,9 @@ export function StudyForm(props: StudyFormProps) {
   const [targetJobTitle, setTargetJobTitle] = useState(initial.targetJobTitle);
   const [targetCompanySize, setTargetCompanySize] = useState(initial.targetCompanySize);
   const [questionGuide, setQuestionGuide] = useState(initial.questionGuide);
-  const [tone, setTone] = useState(initial.tone);
-  const [numQuestions, setNumQuestions] = useState(initial.numQuestions);
+  const [interviewLength, setInterviewLength] = useState(
+    isInterviewLength(initial.interviewLength) ? initial.interviewLength : DEFAULT_INTERVIEW_LENGTH
+  );
   const [giftCardAmount, setGiftCardAmount] = useState(initial.giftCardAmount);
   const [giftCardBrand, setGiftCardBrand] = useState(initial.giftCardBrand);
   const [collectPhone, setCollectPhone] = useState(initial.collectPhone);
@@ -165,15 +174,14 @@ export function StudyForm(props: StudyFormProps) {
   const externalTitleInvalid = attemptedSubmit && !externalTitle.trim();
   const slugInvalid = attemptedSubmit && !slugify(slug);
   const guideInvalid = attemptedSubmit && !questionGuide.trim();
-  const numQuestionsInvalid = attemptedSubmit && !numQuestions.trim();
 
   function handleDetailsGenerated(extracted: ExtractedSurveyDetails) {
     setTopic(extracted.topic);
     setTargetIndustry(extracted.targetIndustry);
     setTargetJobTitle(extracted.targetJobTitle);
     setTargetCompanySize(extracted.targetCompanySize);
-    setTone(extracted.tone);
-    setNumQuestions(String(extracted.numQuestions));
+    // The chat may still describe a tone and a count; neither is a study
+    // setting any more, so both are left where they are.
     setQuestionGuide(extracted.questionGuide);
     setShowDetailsChat(false);
   }
@@ -215,7 +223,6 @@ export function StudyForm(props: StudyFormProps) {
         body: JSON.stringify({
           title,
           topic,
-          tone,
           existing_guide: questionGuide,
         }),
       });
@@ -240,8 +247,7 @@ export function StudyForm(props: StudyFormProps) {
       !title.trim() ||
       !externalTitle.trim() ||
       !baseSlug ||
-      !questionGuide.trim() ||
-      !numQuestions.trim()
+      !questionGuide.trim()
     ) {
       setError("Please fill in all required fields.");
       return;
@@ -304,8 +310,7 @@ export function StudyForm(props: StudyFormProps) {
         target_job_title: targetJobTitle || null,
         target_company_size: targetCompanySize || null,
         question_guide: questionGuide || null,
-        tone: tone || null,
-        num_questions: numQuestions ? Number(numQuestions) : null,
+        interview_length: interviewLength,
         gift_card_amount: giftCardAmount ? Number(giftCardAmount) : null,
         // Brand is a label beside the amount; without an amount it is not kept.
         gift_card_brand: giftCardAmount ? normalizeGiftCardBrand(giftCardBrand) : null,
@@ -660,7 +665,7 @@ export function StudyForm(props: StudyFormProps) {
           <div className="flex flex-col gap-1">
             <h3 className="text-sm font-semibold text-card-foreground">Study details</h3>
             <p className="text-xs text-muted-foreground">
-              Research theme, target audience, tone, question count, and the question guide.
+              Research theme, target audience, and the question guide.
             </p>
           </div>
 
@@ -711,44 +716,27 @@ export function StudyForm(props: StudyFormProps) {
                 </div>
               </div>
 
-              <div className="flex gap-4">
-                <label className="flex flex-1 flex-col gap-1">
-                  <span className="text-sm font-medium text-card-foreground">Tone</span>
-                  <select
-                    value={tone}
-                    onChange={(e) => setTone(e.target.value)}
-                    className={selectClasses}
-                  >
-                    <option value="" disabled>
-                      Select a tone
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-card-foreground">Interview length</span>
+                <select
+                  value={interviewLength}
+                  onChange={(e) => {
+                    if (isInterviewLength(e.target.value)) setInterviewLength(e.target.value);
+                  }}
+                  className={selectClasses}
+                >
+                  {INTERVIEW_LENGTHS.map((value) => (
+                    <option key={value} value={value}>
+                      {INTERVIEW_LENGTH_PRESETS[value].label} · about {INTERVIEW_LENGTH_PRESETS[value].minutes} min
                     </option>
-                    {SURVEY_TONE_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                    {tone && !(SURVEY_TONE_OPTIONS as readonly string[]).includes(tone) && (
-                      <option value={tone}>{tone}</option>
-                    )}
-                  </select>
-                </label>
-
-                <label className="flex flex-1 flex-col gap-1">
-                  <span className="text-sm font-medium text-card-foreground">
-                    Number of questions <span className="text-destructive">*</span>
+                  ))}
+                </select>
+                {coverageAdvisory(interviewLengthPreset(interviewLength), countGuideTopics(questionGuide)) && (
+                  <span className="text-xs text-muted-foreground" role="status">
+                    {coverageAdvisory(interviewLengthPreset(interviewLength), countGuideTopics(questionGuide))}
                   </span>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={numQuestions}
-                    onChange={(e) => setNumQuestions(e.target.value)}
-                    className={numQuestionsInvalid ? invalidBorder : ""}
-                  />
-                  {numQuestionsInvalid && (
-                    <span className="text-xs text-destructive">Required</span>
-                  )}
-                </label>
-              </div>
+                )}
+              </label>
 
               <label className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">

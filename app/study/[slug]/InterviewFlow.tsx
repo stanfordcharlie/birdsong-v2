@@ -21,8 +21,10 @@ import { AmbientBackdrop, Footer, PillArrow, PoweredBy, TestModeBadge, WelcomeBi
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate, useFlybyGate } from "@/components/useLoadingGate";
-import { renderWithBold } from "@/lib/chat/render-with-bold";
-import { questionSegments, splitQuestion, stripBold } from "@/lib/interview/split-question";
+import { emphasisSegments, extractEmphasis } from "@/lib/chat/emphasis";
+import { renderEmphasis } from "@/lib/chat/render-emphasis";
+import { splitQuestion, stripBold } from "@/lib/interview/split-question";
+import { interviewDurationLabel, interviewLengthPreset } from "@/lib/studies/interview-length";
 import { stripInterviewMarkers } from "@/lib/interview/chips";
 import { useStudyPresence } from "@/lib/presence/use-study-presence";
 import { giftCardPhrase } from "@/lib/studies/incentive";
@@ -116,17 +118,12 @@ const INTRO_BIRD_NOTES = [
 // interviewer's existing evasive-answer handling can react to normally.
 const SKIP_MESSAGE_CONTENT = "I'd rather not answer that one.";
 
-// The chat progress bar and "X of Y" counter read the survey's real question
-// count (the questionCount prop, the same number the welcome screen quotes).
-// The server enforces that count as a hard total, so the counter is a
-// promise the interview keeps: "8 of 8" is the last question. This fallback
-// only covers a survey with no count set, and matches the prompt's default.
-const DEFAULT_TARGET_QUESTION_COUNT = 8;
-
-// Rough minutes-per-question used only to render the welcome screen's time
-// estimate from the (display-only) questionCount prop. 6 questions -> ~9 min,
-// matching the design handoff.
-const MINUTES_PER_QUESTION = 1.5;
+// The chat progress bar and "X of Y" counter count topics, not messages:
+// the study's length preset (lib/studies/interview-length.ts) fixes how
+// many topics the interview covers, every interviewer message carries the
+// topic it belongs to, and a follow-up never moves the bar. The same preset
+// supplies the welcome screen's "About N minutes", so the promise and the
+// progress cannot disagree.
 
 const EMAIL_LIVE_CHECK_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -228,11 +225,13 @@ const DOTS_FADE_MS = 150;
 // until they've paused typing for this long.
 const TYPING_PAUSE_MS = 10000;
 
-// The question currently on screen. `answered` can equal `target` only on
-// the completion screen (which does not render this), and an early wrap-up
-// leaves it below; the clamp is belt and braces against a stale count.
-function displayedQuestionNumber(answered: number, target: number): number {
-  return Math.min(answered + 1, Math.max(1, target));
+// The topic on screen: the one the last interviewer message belongs to,
+// held inside the bar. A transcript from before topics existed reads as
+// topic 1 throughout, which is the honest thing to show for it.
+function displayedTopicNumber(messages: InterviewMessage[], total: number): number {
+  const last = [...messages].reverse().find((m) => m.role === "assistant");
+  const topic = typeof last?.topic === "number" && last.topic >= 1 ? last.topic : 1;
+  return Math.min(topic, Math.max(1, total));
 }
 
 // Respondents are one-and-done: a survey they've already finished should
@@ -302,7 +301,7 @@ export function InterviewFlow({
   isTest = false,
   testEmail = null,
   source = null,
-  questionCount = null,
+  interviewLength = null,
   prospect = null,
 }: {
   survey: PublicSurvey;
@@ -324,12 +323,12 @@ export function InterviewFlow({
   // anywhere — just carried through to the start call unchanged, however
   // long the respondent takes to fill in the intro form.
   source?: string | null;
-  // The survey's planned question count, passed as a dedicated display prop
-  // (not on the PublicSurvey allowlist) purely to render the welcome's
-  // "N questions · about M minutes" line. It's a benign integer, kept off the
-  // survey object so that allowlist stays free of internal fields; the
-  // genuinely-sensitive fields never cross to the client either way.
-  questionCount?: number | null;
+  // The survey's length preset (surveys.interview_length), passed as a
+  // dedicated display prop rather than on the PublicSurvey allowlist. It
+  // renders the welcome's "About N minutes" line and sizes the progress
+  // bar; a benign word, kept off the survey object so that allowlist stays
+  // free of internal fields.
+  interviewLength?: string | null;
   // Resolved server-side from the [token] segment, null on the generic link.
   // When present the flow opens on the landing beat instead of the welcome
   // screen, and the name/email intake is already answered.
@@ -337,6 +336,7 @@ export function InterviewFlow({
 }) {
   const enabledFields = parseEnabledRespondentFields(survey.custom_fields);
   const customFieldDefs = parseCustomRespondentFieldDefs(survey.custom_fields);
+  const lengthPreset = interviewLengthPreset(interviewLength);
   const hasPhone = enabledFields.includes("phone");
   const hasJobTitle = enabledFields.includes("job_title");
   const hasCompany = enabledFields.includes("company");
@@ -474,7 +474,7 @@ export function InterviewFlow({
     respondentName: name,
     // Questions asked so far. Derived from the transcript that is already in
     // state, so nothing new needs tracking on this side.
-    currentStep: messages.filter((m) => m.role === "assistant").length,
+    currentStep: displayedTopicNumber(messages, lengthPreset.topics),
   });
 
   useEffect(() => {
@@ -679,7 +679,7 @@ export function InterviewFlow({
   // mid-keystroke on a follow-up, then hands off from indicator to question:
   // the dots fade out, and the full question arrives in one motion (per
   // QUESTION_REVEAL).
-  async function revealAssistantMessage(content: string, nextChips: string[] = []) {
+  async function revealAssistantMessage(content: string, nextChips: string[] = [], topic: number | null = null) {
     await waitForRespondentToPauseTyping();
     if (!isMountedRef.current) return;
 
@@ -700,7 +700,7 @@ export function InterviewFlow({
     // flash). Chips land in the same commit, part of the same arrival.
     setIsTyping(false);
     setDotsLeaving(false);
-    setMessages((prev) => [...prev, { role: "assistant", content }]);
+    setMessages((prev) => [...prev, { role: "assistant", content, ...(topic ? { topic } : {}) }]);
     setLoading(false);
     setChips(nextChips);
   }
@@ -846,7 +846,7 @@ export function InterviewFlow({
         writeActiveSession(data.response_id, data.token);
       }
       setStage("chat");
-      await revealAssistantMessage(data.message, data.chips ?? []);
+      await revealAssistantMessage(data.message, data.chips ?? [], typeof data.topic === "number" ? data.topic : null);
     } catch (err) {
       setIsTyping(false);
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -917,7 +917,7 @@ export function InterviewFlow({
         setStage("complete");
         setLoading(false);
       } else {
-        await revealAssistantMessage(data.message, data.chips ?? []);
+        await revealAssistantMessage(data.message, data.chips ?? [], typeof data.topic === "number" ? data.topic : null);
       }
     } catch (err) {
       // Deliberately not removed from `messages` and not silently dropped:
@@ -1034,12 +1034,8 @@ export function InterviewFlow({
   // than written fresh, so the two screens cannot drift into making different
   // promises about the same study. The one addition is the greeting.
   if (stage === "prospect" && prospect) {
-    const minutes =
-      questionCount != null ? Math.max(3, Math.round(questionCount * MINUTES_PER_QUESTION)) : null;
-    const metaLine =
-      questionCount != null && minutes != null
-        ? `${questionCount} question${questionCount === 1 ? "" : "s"} · about ${minutes} minutes`
-        : null;
+    // The preset's minutes, and nothing derived from a question count.
+    const metaLine: string | null = interviewDurationLabel(lengthPreset);
 
     // Same continuous-clamp treatment the welcome heading uses, so a long
     // study name behaves identically on both screens.
@@ -1282,12 +1278,8 @@ export function InterviewFlow({
   }
 
   if (stage === "welcome") {
-    const minutes =
-      questionCount != null ? Math.max(3, Math.round(questionCount * MINUTES_PER_QUESTION)) : null;
-    const metaLine =
-      questionCount != null && minutes != null
-        ? `${questionCount} question${questionCount === 1 ? "" : "s"} · about ${minutes} minutes`
-        : null;
+    // The preset's minutes, and nothing derived from a question count.
+    const metaLine: string | null = interviewDurationLabel(lengthPreset);
 
     // Titles are usually short (the AI suggestion flow caps at ~8 words),
     // but an admin can type anything here, and this heading is set at a
@@ -1987,7 +1979,7 @@ export function InterviewFlow({
                         )}
                         style={{ "--sw-bubble-delay": `${0.05 + i * 0.07}s` } as React.CSSProperties}
                       >
-                        {isInterviewer ? renderWithBold(stripInterviewMarkers(m.content)) : m.content}
+                        {isInterviewer ? renderEmphasis(stripInterviewMarkers(m.content)) : m.content}
                       </div>
                     );
                   })}
@@ -2012,7 +2004,6 @@ export function InterviewFlow({
   // chips, a two-row answer box, then Send / Skip. Every
   // value (colours, radii, shadows, easings) is the handoff's, routed through
   // the --sv-* tokens so the dark theme still holds.
-  const answeredCount = messages.filter((m) => m.role === "user").length;
   // stripInterviewMarkers is the render boundary: the server already strips
   // the ||ANSWER|| marker and ||CHIPS|| block before this text is stored or
   // sent, but nothing that reaches a respondent's screen relies on that
@@ -2020,10 +2011,11 @@ export function InterviewFlow({
   const lastAssistantMessage = stripInterviewMarkers(
     [...messages].reverse().find((m) => m.role === "assistant")?.content ?? ""
   );
-  // Drives the progress pills and the "X of Y" counter. The same count the
-  // welcome screen quotes and the server enforces, so all three agree.
-  const targetQuestionCount = questionCount ?? DEFAULT_TARGET_QUESTION_COUNT;
-  const currentQuestionNumber = displayedQuestionNumber(answeredCount, targetQuestionCount);
+  // Drives the progress pills and the "X of Y" counter, in topics. The
+  // preset the welcome screen quotes and the server paces on, so all three
+  // agree.
+  const targetQuestionCount = lengthPreset.topics;
+  const currentQuestionNumber = displayedTopicNumber(messages, targetQuestionCount);
   const hasAnswer = pickedChipIndex !== null || answer.trim().length > 0;
   // A restored question was already on screen before the reload, so replaying
   // its entrance would animate in something the respondent has been reading
@@ -2039,8 +2031,13 @@ export function InterviewFlow({
       ? {}
       : { className: "sq-rev", style: { "--sq-delay": `${delaySeconds}s` } as React.CSSProperties };
 
-  const { lead, question } = splitQuestion(lastAssistantMessage);
-  const segments = questionSegments(question);
+  // The bolded phrase is a hint for the marker highlight, not part of the
+  // question: extractEmphasis drops it when the model left it standing on
+  // its own, splitQuestion then finds the question sentence as before, and
+  // emphasisSegments bolds the phrase in place only if it is really there.
+  const emphasis = extractEmphasis(lastAssistantMessage);
+  const { lead, question } = splitQuestion(emphasis.message);
+  const segments = emphasisSegments(stripBold(question), emphasis.phrase);
 
   return (
     <div
@@ -2106,7 +2103,7 @@ export function InterviewFlow({
             aria-valuemin={1}
             aria-valuemax={targetQuestionCount}
             aria-valuenow={currentQuestionNumber}
-            aria-label={`Question ${currentQuestionNumber} of ${targetQuestionCount}`}
+            aria-label={`Topic ${currentQuestionNumber} of ${targetQuestionCount}`}
           >
             <div aria-hidden="true" className="flex h-1.5 flex-1 gap-[5px]">
               {Array.from({ length: targetQuestionCount }, (_, k) => (
@@ -2166,9 +2163,15 @@ export function InterviewFlow({
                         </div>
                       )}
                       <h1 className="m-0 text-balance break-words font-bricolage text-[24px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[28px] short:sm:text-[24px] xshort:sm:text-[22px]">
-                        {segments.pre}
-                        {segments.highlight && <span className="sq-mark">{segments.highlight}</span>}
-                        {segments.post}
+                        {segments.map((segment, i) =>
+                          segment.bold ? (
+                            <span key={i} className="sq-mark">
+                              {segment.text}
+                            </span>
+                          ) : (
+                            segment.text
+                          )
+                        )}
                       </h1>
                     </>
                   )}
