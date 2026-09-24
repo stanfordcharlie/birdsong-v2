@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { InterviewMessage } from "@/lib/interview/types";
-import { renderWithBold } from "@/lib/chat/render-with-bold";
+import { renderEmphasis } from "@/lib/chat/render-emphasis";
 import { createClient } from "@/lib/supabase/client";
 import { StatusDot } from "@/components/admin/ui";
 
@@ -140,7 +140,7 @@ export function LiveTranscript({
                 <div key={i} className="flex flex-col gap-1">
                   <span className="type-eyebrow">{isInterviewer ? "Interviewer" : "Respondent"}</span>
                   <p className="type-body whitespace-pre-wrap break-words">
-                    {isInterviewer ? renderWithBold(message.content) : message.content}
+                    {isInterviewer ? renderEmphasis(message.content) : message.content}
                   </p>
                 </div>
               );
