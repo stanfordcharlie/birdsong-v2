@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sidebar, final shell</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<aside style="width: 240px; height: 960px; box-sizing: border-box; background: #F8FAFC; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; padding: 18px 14px 14px; gap: 18px; font-family: 'Manrope', 'Helvetica Neue', system-ui, sans-serif; color: #0F172A; font-size: 14px">
+<a href="Home.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 4px 8px; color: #0F172A; text-decoration: none">
+<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="7" fill="#0F172A"></rect><rect x="5" y="10" width="2.4" height="4" rx="1.2" fill="#5EEAD4"></rect><rect x="9" y="6" width="2.4" height="12" rx="1.2" fill="#5EEAD4"></rect><rect x="13" y="8.5" width="2.4" height="7" rx="1.2" fill="#5EEAD4"></rect><rect x="17" y="11" width="2.4" height="2" rx="1" fill="#5EEAD4"></rect></svg>
+<span style="font-size: 16px; font-weight: 800; letter-spacing: -0.02em">Birdsong</span>
+</a>
+<label style="display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border: 1px solid #E2E8F0; border-radius: 10px; background: #FFFFFF; box-sizing: border-box; color: #64748B">
+<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"></circle><path d="m10.5 10.5 3 3"></path></svg>
+<input type="search" placeholder="Search or jump" aria-label="Search or jump" style="border: 0; outline: 0; font: inherit; font-size: 13px; flex-grow: 1; background: transparent; color: #0F172A; min-width: 0">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #94A3B8">⌘K</span>
+</label>
+<nav aria-label="Main" style="display: flex; flex-direction: column; gap: 2px">
+<a href="Home.dc.html" style="{{nav.home}}"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 7 8 2.5 13.5 7v6.5h-11z"></path></svg>Home</a>
+<a href="Home.dc.html" style="{{nav.live}}"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="2"></circle><path d="M4.5 4.5a5 5 0 0 0 0 7M11.5 4.5a5 5 0 0 1 0 7"></path></svg>Live<span style="margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #0F766E; background: #DDF3EF; padding: 1px 7px; border-radius: 10px">2</span></a>
+<a href="Leads.dc.html" style="{{nav.leads}}"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5.5" r="2.5"></circle><path d="M1.5 13.5a4.5 4.5 0 0 1 9 0M10.5 3.5a2.5 2.5 0 0 1 0 4M12 9.5a4 4 0 0 1 2.5 4"></path></svg>Leads<span style="margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #64748B">4</span></a>
+<a href="Projects.dc.html" style="{{nav.projects}}"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5"></rect><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3"></path></svg>Projects</a>
+</nav>
+<div style="display: flex; flex-direction: column; gap: 2px">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 0 10px 6px"><span style="font-size: 11px; font-weight: 700; color: #94A3B8; letter-spacing: 0.06em; text-transform: uppercase">Active studies</span><a href="NewStudy.dc.html" aria-label="New study" style="width: 20px; height: 20px; border-radius: 6px; border: 1px solid #E2E8F0; background: #FFFFFF; display: flex; align-items: center; justify-content: center; color: #475569; text-decoration: none"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg></a></div>
+<a href="Study.dc.html" style="{{nav.study}}"><span style="width: 6px; height: 6px; border-radius: 3px; background: #0F766E; flex-shrink: 0"></span><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Birdsong Dogfood interview</span><span style="margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #64748B">14</span></a>
+<a href="NewStudy.dc.html" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 13px; color: #475569"><span style="width: 6px; height: 6px; border-radius: 3px; background: #CBD5E1; flex-shrink: 0"></span><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Attribution Habits</span><span style="margin-left: auto; font-size: 11px; color: #94A3B8">Draft</span></a>
+</div>
+<div style="margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 6px 0; border-top: 1px solid #E2E8F0">
+<span style="width: 30px; height: 30px; border-radius: 15px; background: #5EEAD4; color: #0F172A; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0">CC</span>
+<div style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Charlie Cohen</span><span style="font-size: 12px; color: #64748B">Birdsong</span></div>
+<a href="Profile.dc.html" aria-label="Settings" style="{{nav.settings}}"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="2.2"></circle><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2"></path></svg></a>
+</div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["home","live","leads","projects","study","settings"],"default":"home"},"$preview":{"width":240,"height":960}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const active = this.props.active ?? 'home';
+    const base = 'display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; text-decoration: none; font-weight: 600; color: #475569;';
+    const on = 'display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; text-decoration: none; font-weight: 700; color: #0F172A; background: #FFFFFF; box-shadow: 0 0 0 1px #E2E8F0, 0 1px 2px rgba(15,23,42,.05);';
+    const studyBase = 'display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 13px; color: #334155;';
+    const studyOn = studyBase + ' background: #FFFFFF; box-shadow: 0 0 0 1px #E2E8F0; color: #0F172A; font-weight: 700;';
+    const gearBase = 'margin-left: auto; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #64748B; text-decoration: none; flex-shrink: 0;';
+    const gearOn = gearBase + ' background: #FFFFFF; box-shadow: 0 0 0 1px #E2E8F0; color: #0F172A;';
+    const nav = {};
+    ['home', 'live', 'leads', 'projects'].forEach((k) => { nav[k] = k === active ? on : base; });
+    nav.study = active === 'study' ? studyOn : studyBase;
+    nav.settings = active === 'settings' ? gearOn : gearBase;
+    return { nav };
+  }
+}
+</script>
+</body>
+</html>

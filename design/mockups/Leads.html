@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Leads, final</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ffffff}
+a{color:#0F172A;text-decoration:none}a:hover{color:#0F766E}
+</style>
+</helmet>
+<div style="width: 1440px; height: 960px; display: flex; font-family: 'Manrope', 'Helvetica Neue', system-ui, sans-serif; color: #0F172A; background: #FFFFFF; font-size: 14px; overflow: hidden">
+<dc-import name="Sidebar" active="leads" hint-size="240px,960px"></dc-import>
+<main style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; position: relative">
+<div style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #E2E8F0; display: flex; align-items: center; justify-content: space-between; padding: 0 32px">
+<span style="font-size: 13px; font-weight: 700">Leads</span>
+<div style="display: flex; align-items: center; gap: 8px">
+<button style="display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border: 1px solid #E2E8F0; border-radius: 10px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700; color: #0F766E; cursor: pointer"><span style="width: 8px; height: 8px; border-radius: 4px; background: #0F766E"></span>2 live</button>
+<button style="height: 34px; padding: 0 12px; border: 1px solid #E2E8F0; border-radius: 10px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700; color: #334155; cursor: pointer">Export</button>
+<button style="height: 34px; padding: 0 14px; border: 0; border-radius: 10px; background: #0F766E; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer">Triage 4 unworked</button>
+</div>
+</div>
+
+<div style="padding: 28px 32px; display: flex; flex-direction: column; gap: 20px">
+<h1 style="margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -0.03em">Leads</h1>
+
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid #E2E8F0; border-radius: 14px">
+<div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 600; color: #64748B">Unworked</span><span style="font-size: 24px; font-weight: 800; letter-spacing: -0.03em; color: #0F766E">4</span></div>
+<div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 4px; border-left: 1px solid #E2E8F0"><span style="font-size: 12px; font-weight: 600; color: #64748B">Assigned to me</span><span style="font-size: 24px; font-weight: 800; letter-spacing: -0.03em">2</span></div>
+<div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 4px; border-left: 1px solid #E2E8F0"><span style="font-size: 12px; font-weight: 600; color: #64748B">Contacted</span><span style="font-size: 24px; font-weight: 800; letter-spacing: -0.03em">2</span></div>
+<div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 4px; border-left: 1px solid #E2E8F0"><span style="font-size: 12px; font-weight: 600; color: #64748B">Meetings booked</span><span style="font-size: 24px; font-weight: 800; letter-spacing: -0.03em">1</span></div>
+<div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 4px; border-left: 1px solid #E2E8F0"><span style="font-size: 12px; font-weight: 600; color: #64748B">Qualified</span><span style="font-size: 24px; font-weight: 800; letter-spacing: -0.03em">7</span></div>
+</div>
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; gap: 4px; padding: 3px; background: #F1F5F9; border-radius: 10px; font-size: 13px; font-weight: 700">
+<button style="height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(15,23,42,.08); font: inherit; cursor: pointer">All <span style="color: #64748B; font-weight: 600">7</span></button>
+<button style="height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font: inherit; color: #475569; cursor: pointer">Unworked <span style="color: #94A3B8">4</span></button>
+<button style="height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font: inherit; color: #475569; cursor: pointer">Mine <span style="color: #94A3B8">2</span></button>
+<button style="height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font: inherit; color: #475569; cursor: pointer">Contacted <span style="color: #94A3B8">2</span></button>
+<button style="height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font: inherit; color: #475569; cursor: pointer">Meetings <span style="color: #94A3B8">1</span></button>
+<button style="height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font: inherit; color: #475569; cursor: pointer">Closed <span style="color: #94A3B8">0</span></button>
+</div>
+<div style="display: flex; gap: 8px; align-items: center">
+<label style="display: flex; align-items: center; gap: 8px; width: 220px; height: 34px; padding: 0 10px; border: 1px solid #E2E8F0; border-radius: 10px; box-sizing: border-box; color: #64748B"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"></circle><path d="m10.5 10.5 3 3"></path></svg><input type="search" placeholder="Name, email, company" aria-label="Search leads" style="border: 0; outline: 0; font: inherit; font-size: 13px; flex-grow: 1; background: transparent; color: #0F172A; min-width: 0"></label>
+<button style="height: 34px; padding: 0 12px; border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 600; color: #334155; cursor: pointer">All studies</button>
+<button style="height: 34px; padding: 0 12px; border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 600; color: #334155; cursor: pointer">All sources</button>
+<button style="height: 34px; padding: 0 12px; border: 1px solid #0F766E; background: #DDF3EF; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 700; color: #0F766E; cursor: pointer">Score 7+</button>
+<button style="height: 34px; padding: 0 12px; border: 1px dashed #CBD5E1; background: #FFFFFF; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer">Fit 7+</button>
+</div>
+</div>
+
+<div style="border: 1px solid #E2E8F0; border-radius: 14px; overflow: hidden">
+<div style="display: grid; grid-template-columns: 24px minmax(0, 1.6fr) minmax(0, 1.3fr) 56px 56px 120px 150px 110px; gap: 16px; align-items: center; height: 42px; padding: 0 20px; background: #F8FAFC; font-size: 12px; font-weight: 700; color: #64748B">
+<input type="checkbox" aria-label="Select all" style="width: 15px; height: 15px; margin: 0; accent-color: #0F766E">
+<span>Respondent</span><span>Company</span><span>Score</span><span>Fit</span><span>Status</span><span>Assignee</span><span style="text-align: right">Last activity</span>
+</div>
+<sc-for list="{{leads}}" as="l" hint-placeholder-count="7">
+<div style="display: grid; grid-template-columns: 24px minmax(0, 1.6fr) minmax(0, 1.3fr) 56px 56px 120px 150px 110px; gap: 16px; align-items: center; height: 62px; padding: 0 20px; border-top: 1px solid #E2E8F0">
+<input type="checkbox" aria-label="Select {{l.name}}" defaultChecked="{{l.checked}}" style="width: 15px; height: 15px; margin: 0; accent-color: #0F766E">
+<div style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><a href="Lead.dc.html" style="font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{l.name}}</a><span style="font-size: 12px; color: #64748B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{l.title}}</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{l.company}}</span><span style="font-size: 12px; color: #64748B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{l.study}}</span></div>
+<span style="display: inline-flex; width: 32px; height: 28px; align-items: center; justify-content: center; border-radius: 8px; background: {{l.chipBg}}; color: {{l.chipFg}}; font-family: 'IBM Plex Mono', monospace; font-size: 14px">{{l.score}}</span>
+<span style="display: inline-flex; width: 32px; height: 28px; align-items: center; justify-content: center; border-radius: 8px; background: #F1F5F9; color: #334155; font-family: 'IBM Plex Mono', monospace; font-size: 14px">{{l.fit}}</span>
+<span style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 8px; background: {{l.stBg}}; color: {{l.stFg}}; font-size: 12px; font-weight: 700; justify-self: start"><span style="width: 6px; height: 6px; border-radius: 3px; background: {{l.stDot}}"></span>{{l.status}}</span>
+<button style="display: flex; align-items: center; justify-content: space-between; height: 32px; padding: 0 10px; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; font: inherit; font-size: 12px; font-weight: 600; color: {{l.asgColor}}; cursor: pointer">{{l.assignee}}<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#94A3B8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4"></path></svg></button>
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #64748B; text-align: right">{{l.age}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="position: absolute; left: 0; right: 0; bottom: 28px; display: flex; justify-content: center; pointer-events: none">
+<div style="display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 18px; background: #0F172A; border-radius: 999px; box-shadow: 0 10px 30px rgba(15,23,42,.28); pointer-events: auto">
+<span style="font-size: 13px; font-weight: 700; color: #FFFFFF; margin-right: 10px">2 selected</span>
+<button style="height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Assign to me</button>
+<button style="height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Mark contacted</button>
+<button style="height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: #FFFFFF; color: #0F172A; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer">Push to HubSpot</button>
+<button aria-label="Clear selection" style="width: 36px; height: 36px; border: 0; border-radius: 999px; background: transparent; color: #94A3B8; font: inherit; font-size: 16px; cursor: pointer">×</button>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":960}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = { New: ['#EEF2FF', '#3730A3', '#4F46E5'], Contacted: ['#F1F5F9', '#334155', '#64748B'], Meeting: ['#FEF3C7', '#92400E', '#D97706'], 'In HubSpot': ['#DDF3EF', '#0F766E', '#0F766E'] };
+    const raw = [
+      ['Priya Raman', 'Director, Demand Gen', 'Loopwork', 'Birdsong Dogfood interview', '9', '8', 'New', 'Unassigned', '12m ago'],
+      ['Marcus Hale', 'VP Marketing', 'Tessellate', 'Birdsong Dogfood interview', '9', '7', 'New', 'Unassigned', '1h ago'],
+      ['Elena Brooks', 'Head of Growth', 'Carbonpath', 'Birdsong Dogfood interview', '8', '9', 'Contacted', 'Charlie Cohen', '3h ago'],
+      ['Tomás Ferreira', 'Sr. Manager, Demand Gen', 'Relay Health', 'Birdsong Dogfood interview', '8', '6', 'New', 'Unassigned', '5h ago'],
+      ['Grace Oyelaran', 'Marketing Ops Lead', 'Quillbase', 'Birdsong Dogfood interview', '7', '8', 'In HubSpot', 'Charlie Cohen', '1d ago'],
+      ['Ben Albright', 'Director, Revenue Marketing', 'Parcelwise', 'Birdsong Dogfood interview', '7', '5', 'New', 'Unassigned', '1d ago'],
+      ['Jordan Pike', 'VP Growth', 'Meridian Ops', 'Birdsong Dogfood interview', '9', '9', 'Meeting', 'Charlie Cohen', '2d ago']
+    ];
+    return {
+      leads: raw.map((r, i) => ({
+        name: r[0], title: r[1], company: r[2], study: r[3], score: r[4], fit: r[5], status: r[6], assignee: r[7], age: r[8],
+        chipBg: r[4] === '9' ? '#0F766E' : '#DDF3EF', chipFg: r[4] === '9' ? '#FFFFFF' : '#0F766E',
+        stBg: st[r[6]][0], stFg: st[r[6]][1], stDot: st[r[6]][2],
+        asgColor: r[7] === 'Unassigned' ? '#94A3B8' : '#0F172A',
+        checked: i < 2
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>
