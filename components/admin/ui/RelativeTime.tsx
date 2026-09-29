@@ -39,7 +39,8 @@ export function RelativeTime({
       dateTime={parsed.toISOString()}
       title={formatAbsolute(parsed)}
       suppressHydrationWarning
-      className={cn(align === "right" && "block text-right", className)}
+      // Mono, like every timestamp in admin. The size is the call site's.
+      className={cn("font-mono", align === "right" && "block text-right", className)}
     >
       {prefix && <span className="text-faint">{prefix} </span>}
       {formatRelativeTime(parsed)}

@@ -3,16 +3,23 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, EmptyState, RelativeTime } from "@/components/admin/ui";
+import { bg, border, radius, text } from "@/components/admin/ui/tokens";
+import { cn } from "@/lib/utils";
 import { DISQUALIFY_REASON_LABELS, LEAD_STATUS_LABELS } from "@/lib/leads/state";
 import type { LeadActivityEntry } from "@/lib/leads/activity";
 import { addLeadNote, type LeadActionResult } from "@/lib/leads/actions";
 
-// The foot of the response detail page: what has happened to this lead, and
-// a box to add to it. Status and ownership moved up to the header
+// The lead page's Activity tab: what has happened to this lead, and a box
+// to add to it. Status and ownership live in the top bar
 // (LeadHeaderControls); this card is the record of them.
 
-const TEXTAREA_CLASSES =
-  "focus-ring w-full rounded-control border border-input bg-card px-3 py-2 font-archivo text-sm text-card-foreground placeholder:text-faint disabled:opacity-60";
+const TEXTAREA_CLASSES = cn(
+  "focus-ring w-full border px-3 py-2 text-[13px] leading-[1.45] placeholder:text-[color:hsl(var(--ds-muted-3))] disabled:opacity-60",
+  radius.control,
+  border.base,
+  bg.base,
+  text.ink
+);
 
 export function ActivityCard({
   responseId,
@@ -46,16 +53,16 @@ export function ActivityCard({
   }
 
   return (
-    <Card padding="flush">
-      <div className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-        <h2 className="type-heading">Activity</h2>
-        <span className="type-meta tabular-nums">
-          {activity.length} {activity.length === 1 ? "event" : "events"}
-        </span>
-      </div>
-
+    <Card
+      padding="flush"
+      header={
+        <>
+          Activity <span className={cn("ds-mono-count ml-1", text.muted2)}>{activity.length}</span>
+        </>
+      }
+    >
       {canNote && (
-        <form onSubmit={submitNote} className="flex flex-col gap-2 border-b border-border px-6 py-4">
+        <form onSubmit={submitNote} className={cn("flex flex-col gap-2 border-b px-5 py-4", border.base)}>
           <textarea
             value={noteDraft}
             disabled={pending}
@@ -71,7 +78,7 @@ export function ActivityCard({
               {pending ? "Saving" : "Add note"}
             </Button>
             {error && (
-              <p role="alert" className="type-body-sm text-destructive">
+              <p role="alert" className={cn("ds-small", text.ink)}>
                 {error}
               </p>
             )}
@@ -80,9 +87,9 @@ export function ActivityCard({
       )}
 
       {activity.length === 0 ? (
-        <EmptyState title="Nothing has happened to this lead yet." className="px-6 py-6" />
+        <EmptyState title="Nothing has happened to this lead yet." className="px-5 py-5" />
       ) : (
-        <ol className="divide-y divide-border">
+        <ol>
           {activity.map((entry) => (
             <ActivityRow key={entry.id} entry={entry} currentUserId={currentUserId} />
           ))}
@@ -119,20 +126,24 @@ function ActivityRow({ entry, currentUserId }: { entry: LeadActivityEntry; curre
     : "Birdsong";
   // "You claimed this lead" rather than "You assigned this lead to You".
   const self = entry.type === "assigned" && entry.actorId !== null && entry.assigneeName === entry.actorName;
-  const text = self ? "claimed this lead" : describe(entry);
+  const line = self ? "claimed this lead" : describe(entry);
   // A status change's body is its disqualification note; a note's body is
   // the note. Either way it reads as the person's words under the line.
   const quote = entry.type === "note" || entry.type === "status_change" ? entry.body : null;
 
   return (
-    <li className="flex flex-col gap-1 px-6 py-3">
+    <li className={cn("flex flex-col gap-1 border-t px-5 py-3 first:border-t-0", border.base)}>
       <div className="flex items-baseline justify-between gap-4">
-        <p className="type-body">
-          <span className="font-medium">{actor}</span> {text}
+        <p className="ds-body">
+          <span className="font-bold">{actor}</span> {line}
         </p>
-        <RelativeTime date={entry.createdAt} align="right" className="type-meta shrink-0" />
+        <RelativeTime
+          date={entry.createdAt}
+          align="right"
+          className={cn("ds-mono-count shrink-0", text.muted2)}
+        />
       </div>
-      {quote && <p className="type-body whitespace-pre-wrap text-muted-foreground">{quote}</p>}
+      {quote && <p className={cn("ds-body whitespace-pre-wrap", text.muted2)}>{quote}</p>}
     </li>
   );
 }

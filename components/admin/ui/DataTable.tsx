@@ -1,6 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "./EmptyState";
+import { bg, border, radius, text } from "./tokens";
 
 export type SortDirection = "asc" | "desc";
 export type SortState = { key: string; direction: SortDirection };
@@ -11,13 +12,10 @@ export type SortState = { key: string; direction: SortDirection };
  * or a relative time with its sort chevron, `lg` a status select beside a
  * button. Fluid columns take a fraction instead.
  *
- * The steps are the Tailwind scale's 10 / 16 / 24 / 32 / 44 written in px
- * rather than rem. A fixed column is a budget the fluid columns get what is
- * left of, and a rem budget grows with the visitor's browser font setting
- * while the container (1140px) does not: at a 20px root the named columns
- * took 25% more of the table and the name column truncated "Charlie Cohen"
- * with half the page empty. Same reasoning as the px type roles in
- * app/globals.css.
+ * The steps are px rather than rem. A fixed column is a budget the fluid
+ * columns get what is left of, and a rem budget grows with the visitor's
+ * browser font setting while the page does not. Same reasoning as the px
+ * type styles in app/globals.css.
  */
 export type ColumnWidth = "xxs" | "xs" | "sm" | "md" | "lg";
 
@@ -68,6 +66,31 @@ export type Column<Row> = {
 };
 
 /**
+ * The two-line cell: a primary line over a secondary one, both on one line
+ * each and ellipsized. Name over title, company over study. Use it in a
+ * `density="stacked"` table, and pass `title` on the column if the full value
+ * has to stay reachable.
+ */
+export function StackedCell({
+  primary,
+  secondary,
+  className,
+}: {
+  primary: React.ReactNode;
+  secondary?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <span className={cn("flex min-w-0 flex-col gap-0.5", className)}>
+      <span className={cn("ds-row-primary block truncate", text.ink)}>{primary}</span>
+      {secondary !== undefined && secondary !== null && (
+        <span className={cn("block truncate text-[12px] leading-[1.4]", text.muted2)}>{secondary}</span>
+      )}
+    </span>
+  );
+}
+
+/**
  * Header, rows, empty state. Owns column alignment, density, the frame and
  * the row link.
  *
@@ -90,6 +113,7 @@ export function DataTable<Row>({
   rowClassName,
   density = "default",
   layout = "auto",
+  gridTemplate,
   stickyHeader = true,
   sort,
   onSort,
@@ -103,8 +127,13 @@ export function DataTable<Row>({
   rowHref?: (row: Row) => string | null;
   /** Per-row modifier, e.g. dimming a row that has gone stale. */
   rowClassName?: (row: Row) => string | undefined;
-  /** `default` rows are h-12, `compact` h-10. The header is h-9 either way. */
-  density?: "default" | "compact";
+  /**
+   * `stacked` rows are 60px, for two-line cells (StackedCell). `default` rows
+   * are 54px, one line. `compact` is the older name for the dense table and
+   * now renders as `default`; Ledger II has two row heights, not three. The
+   * header is 42px either way.
+   */
+  density?: "default" | "compact" | "stacked";
   /**
    * `fixed` makes the declared column widths authoritative, which is what a
    * truncating column needs: under auto layout the longest cell still widens
@@ -114,6 +143,14 @@ export function DataTable<Row>({
    * and fractions can be made to add up at every table width.
    */
   layout?: "auto" | "fixed";
+  /**
+   * A `grid-template-columns` value, for a table whose columns are specified
+   * as a grid (`24px minmax(0,1.6fr) 56px`). Every row, the header included,
+   * is laid out on it with 16px between columns and 20px at the two ends, so
+   * a column is exactly the width the template says. Column `width` and
+   * `layout` are ignored. One track per column, in order.
+   */
+  gridTemplate?: string;
   /** Header sticks to the top of the scroll container, on the card fill. */
   stickyHeader?: boolean;
   sort?: SortState;
@@ -129,30 +166,47 @@ export function DataTable<Row>({
   // Row height is set here and the cell padding derives from it, so a table
   // cannot end up denser than another table by having picked its own py-*.
   // px for the same reason as the column widths above.
-  const rowHeight = density === "compact" ? "h-[40px]" : "h-[48px]";
+  const rowHeight = density === "stacked" ? "h-[60px]" : "h-[54px]";
   const labelIndex = Math.max(
     0,
     columns.findIndex((column) => column.rowLabel)
   );
+  // Grid rows take the table elements out of table layout, which also takes
+  // their implicit roles with it in some browsers; the roles are restated.
+  const grid = gridTemplate !== undefined;
+  const gridStyle: React.CSSProperties | undefined = grid
+    ? { gridTemplateColumns: gridTemplate }
+    : undefined;
+  const cellPad = grid ? "block min-w-0 p-0" : CELL_PAD;
 
   return (
     <div
-      className={cn(
-        "relative w-full overflow-auto rounded-card border border-border bg-card",
-        className
-      )}
+      className={cn("relative w-full overflow-auto border", radius.card, border.base, bg.base, className)}
     >
       <table
-        className={cn("w-full caption-bottom border-collapse", layout === "fixed" && "table-fixed")}
+        role={grid ? "table" : undefined}
+        className={cn(
+          "w-full caption-bottom border-collapse",
+          grid ? "block" : layout === "fixed" && "table-fixed"
+        )}
       >
-        <thead className="border-b border-border">
-          <tr>
+        <thead role={grid ? "rowgroup" : undefined} className={grid ? "block" : undefined}>
+          <tr
+            role={grid ? "row" : undefined}
+            style={gridStyle}
+            className={
+              grid
+                ? cn(GRID_ROW, "h-[42px]", bg.sidebar, stickyHeader && "sticky top-0 z-20")
+                : undefined
+            }
+          >
             {columns.map((column) => {
               const active = sort?.key === column.key;
               return (
                 <th
                   key={column.key}
                   scope="col"
+                  role={grid ? "columnheader" : undefined}
                   aria-sort={
                     column.ariaSort ??
                     (column.sortable
@@ -163,11 +217,15 @@ export function DataTable<Row>({
                         : "none"
                       : undefined)
                   }
-                  style={widthStyle(column.width)}
+                  style={grid ? undefined : widthStyle(column.width)}
                   className={cn(
-                    "type-table-head h-[36px] whitespace-nowrap px-[12px] align-middle [&_button]:uppercase",
-                    stickyHeader && "sticky top-0 z-20 bg-card",
-                    widthClass(column.width),
+                    "whitespace-nowrap align-middle text-[12px] font-bold leading-none",
+                    cellPad,
+                    text.muted2,
+                    !grid && "h-[42px]",
+                    !grid && bg.sidebar,
+                    !grid && stickyHeader && "sticky top-0 z-20",
+                    !grid && widthClass(column.width),
                     alignClasses(column.align)
                   )}
                 >
@@ -187,16 +245,20 @@ export function DataTable<Row>({
             })}
           </tr>
         </thead>
-        <tbody>
+        <tbody role={grid ? "rowgroup" : undefined} className={grid ? "block" : undefined}>
           {rows.map((row) => {
             const href = rowHref?.(row) ?? null;
             return (
               <tr
                 key={rowKey(row)}
+                role={grid ? "row" : undefined}
+                style={gridStyle}
                 className={cn(
-                  "group/row border-b border-border transition-colors last:border-b-0",
+                  "group/row border-t transition-colors",
+                  grid && GRID_ROW,
+                  border.base,
                   rowHeight,
-                  href && "relative cursor-pointer hover:bg-secondary",
+                  href && "relative cursor-pointer hover:bg-[color:hsl(var(--ds-bg-sidebar))]",
                   rowClassName?.(row)
                 )}
               >
@@ -204,8 +266,11 @@ export function DataTable<Row>({
                   <td
                     key={column.key}
                     title={column.title?.(row)}
+                    role={grid ? "cell" : undefined}
                     className={cn(
-                      "px-[12px] align-middle font-archivo text-[14px] tabular-nums",
+                      "ds-body align-middle tabular-nums",
+                      cellPad,
+                      text.ink3,
                       alignClasses(column.align)
                     )}
                   >
@@ -225,6 +290,9 @@ export function DataTable<Row>({
                     <span
                       className={cn(
                         "relative",
+                        // A grid cell's content fills its track, so a
+                        // stacked cell inside it can ellipsize.
+                        grid && "block min-w-0",
                         href &&
                           "z-10 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto [&_input]:pointer-events-auto [&_label]:pointer-events-auto [&_select]:pointer-events-auto [&_textarea]:pointer-events-auto",
                         column.truncate && "block truncate",
@@ -245,6 +313,11 @@ export function DataTable<Row>({
     </div>
   );
 }
+
+// 16px between columns, 20px at the row's two ends.
+const CELL_PAD = "px-[8px] first:pl-[20px] last:pr-[20px]";
+// The same two numbers for a row laid out on `gridTemplate`.
+const GRID_ROW = "grid items-center gap-x-[16px] px-[20px]";
 
 function alignClasses(align: Column<unknown>["align"]) {
   if (align === "right") return "text-right";
@@ -277,7 +350,7 @@ function SortButton({
     <button
       type="button"
       onClick={onClick}
-      className="focus-ring inline-flex items-center gap-1 rounded-control font-[inherit] text-inherit hover:text-card-foreground"
+      className="focus-ring inline-flex items-center gap-1 rounded-control font-[inherit] text-inherit hover:text-[color:hsl(var(--ds-ink))]"
     >
       {children}
       <SortChevron active={active} direction={direction} />
@@ -297,7 +370,7 @@ function SortChevron({ active, direction }: { active: boolean; direction: SortDi
       strokeLinejoin="round"
       className={cn(
         "h-3 w-3 shrink-0 transition-transform",
-        active ? "text-card-foreground" : "text-faint",
+        active ? text.ink : text.muted3,
         active && direction === "asc" && "rotate-180"
       )}
     >

@@ -1,46 +1,50 @@
 import Link from "next/link";
 import type { InterviewMessage } from "@/lib/interview/types";
 import { callScriptToText, type CallScript } from "@/lib/interview/call-script";
-import { Badge, Card, PageHeader, PageShell } from "@/components/admin/ui";
-import { formatDayMonth } from "@/lib/format";
+import { renderEmphasis } from "@/lib/chat/render-emphasis";
+import { Badge, Card, PageShell, PageTopBar, ScoreChip } from "@/components/admin/ui";
+import { border, dot, text } from "@/components/admin/ui/tokens";
+import { formatAbsolute, formatRelativeTime } from "@/lib/format";
 import type { DisqualifyReason, LeadStatus } from "@/lib/leads/state";
 import type { LeadActivityEntry } from "@/lib/leads/activity";
+import { cn } from "@/lib/utils";
 import { ActivityCard } from "./ActivityCard";
-import { HubSpotSyncControl } from "./HubSpotSyncControl";
+import { LeadActionBar } from "./LeadActionBar";
 import { LeadHeaderControls, type WorkflowMember, type WorkflowPermissions } from "./LeadHeaderControls";
+import { LeadTabs, type LeadTab } from "./LeadTabs";
 import { OpeningLineCard } from "./OpeningLineCard";
 import { SummaryCard } from "./SummaryCard";
 
-// The page a rep reads in the minute before dialling, in the order they need
-// it: who this is, whether the lead is worth the call, what hurts, what to
-// say first, and the evidence behind all of it on demand.
+// The page a rep reads in the minute before dialling. Built from
+// design/mockups/Lead.html:
 //
-// The rules:
-//
-//   - The header carries the lead's stage and owner as controls, and the
-//     HubSpot push as the one primary action. Notes and the trail live in
-//     the activity card at the foot of the page, after everything a rep
-//     reads.
-//   - Nothing a rep reads on a call renders below `.type-body`. Only labels
-//     and the header's meta line go smaller.
-//   - The opening line is the one filled block on the page. Everything else
-//     is a white card on the canvas.
+//   - The top bar carries the lead's stage and owner.
+//   - The score tile and the name head the page; the interview and what was
+//     made of it sit under tabs, transcript first.
+//   - The right column holds the facts (Details) and the reason for the
+//     score.
+//   - The floating bar holds the two things a rep does with a lead: copy the
+//     call script, push to HubSpot.
 //
 // Split from page.tsx (the shape app/admin/projects/[id] also uses) so the
 // rendering is one pure function of plain data.
 
 /**
  * Source values that mean "this response is not real traffic". A live response
- * carries either no source or a `?src=` campaign value, and neither belongs in
- * a meta line a rep skims before a call.
+ * carries either no source or a `?src=` campaign value, and neither belongs
+ * among the facts a rep skims before a call.
  */
 const NON_LIVE_SOURCE_LABELS: Record<string, string> = {
   seed: "Seeded",
   "test-hubspot-sync": "Sync test",
 };
 
-/** The transcript card's scroll height. Long interviews scroll inside it. */
-const TRANSCRIPT_HEIGHT = "max-h-[440px]";
+/**
+ * The longest gap between start and completion that is shown as the
+ * interview's length. A respondent who came back the next day did not give a
+ * nineteen-hour interview, so past this the header says nothing.
+ */
+const DURATION_MAX_MINUTES = 180;
 
 export type ResponseDetailData = {
   responseId: string;
@@ -52,8 +56,10 @@ export type ResponseDetailData = {
   email: string | null;
   isTest: boolean;
   completed: boolean;
-  /** When the interview was taken. Displayed in the header's meta line. */
+  /** When the interview was started. */
   createdAt: string;
+  /** When it was completed. Null while in progress, and on older rows. */
+  completedAt: string | null;
   messageCount: number;
   /** Last successful HubSpot sync, or null if it has never synced. */
   hubspotSyncedAt: string | null;
@@ -69,7 +75,7 @@ export type ResponseDetailData = {
   callScript: CallScript | null;
   signals: { label: string; value: string }[];
   messages: InterviewMessage[];
-  /** Everything the header controls and the activity card need. */
+  /** Everything the top bar controls and the activity card need. */
   workflow: {
     leadStatus: LeadStatus;
     assignedTo: string | null;
@@ -83,6 +89,10 @@ export type ResponseDetailData = {
   };
 };
 
+const MONO = "font-mono";
+
+type DetailRow = { label: string; value: React.ReactNode; title?: string };
+
 export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
   const {
     responseId,
@@ -94,6 +104,7 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
     isTest,
     completed,
     createdAt,
+    completedAt,
     messageCount,
     hubspotSyncedAt,
     source,
@@ -118,161 +129,323 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
   // reasoning is only worth a line when it actually produced one.
   const fitNote = fitScored && fitReasoning ? fitReasoning : null;
 
-  // The verdict card: the summary's first sentence is the headline, and the
-  // rest of it plus the two score rationales open beneath it.
+  // The summary's first sentence is the headline, and the rest of it plus
+  // the two score rationales open beneath it.
   const { headline, rest } = splitHeadline(summary);
   const detail = [rest, fitReason, fitNote].filter((part): part is string => Boolean(part));
 
-  const metaParts: React.ReactNode[] = [
-    [role, company].filter(Boolean).join(", ") || null,
-    email ? (
-      <a
-        key="email"
-        href={`mailto:${email}`}
-        className="focus-ring rounded-control text-card-foreground underline-offset-2 hover:underline"
-      >
-        {email}
-      </a>
-    ) : null,
-    completed ? formatDayMonth(createdAt) : `Started ${formatDayMonth(createdAt)}`,
-    source ? NON_LIVE_SOURCE_LABELS[source] : null,
-  ].filter(Boolean);
+  // No H1 carries a terminal period (the rule PageHeader enforces).
+  const name = (respondentName || "Unnamed respondent").replace(/\.$/, "");
+  const firstName = respondentName?.trim().split(/\s+/)[0] || "Respondent";
 
-  return (
-    <PageShell>
-      <PageHeader
-        eyebrow={
-          <span className="flex items-center gap-2">
-            <Link href="/admin/leads" className="focus-ring rounded-control transition-colors hover:text-card-foreground">
-              Leads
+  const durationMinutes = interviewMinutes(createdAt, completedAt);
+  const who = role && company ? `${role} at ${company}` : (role ?? company);
+  const rationale = leadScore !== null ? splitSentences(fitReason) : [];
+  const sourceLabel = source ? NON_LIVE_SOURCE_LABELS[source] : undefined;
+
+  const detailRows: (DetailRow | null)[] = [
+    company ? { label: "Company", value: company, title: company } : null,
+    role ? { label: "Title", value: role, title: role } : null,
+    email
+      ? {
+          label: "Email",
+          title: email,
+          value: (
+            <a
+              href={`mailto:${email}`}
+              className="focus-ring rounded-[var(--ds-radius-chip)] hover:text-[color:hsl(var(--ds-accent))]"
+            >
+              {email}
+            </a>
+          ),
+        }
+      : null,
+    fitScored
+      ? {
+          label: "Fit",
+          value: (
+            <>
+              <span className={MONO}>{fitScore}</span> of <span className={MONO}>10</span>
+              {fitConfidence === "low" && <span className={text.muted2}>, low confidence</span>}
+            </>
+          ),
+        }
+      : fitUnavailable
+        ? { label: "Fit", value: <span className={text.muted2}>Research unavailable</span> }
+        : null,
+    survey
+      ? {
+          label: "Study",
+          title: survey.title,
+          value: (
+            <Link
+              href={`/admin/projects/${survey.id}`}
+              className="focus-ring rounded-[var(--ds-radius-chip)] hover:text-[color:hsl(var(--ds-accent))]"
+            >
+              {survey.title}
             </Link>
-            {survey && (
-              <>
-                <span aria-hidden className="text-faint">
-                  /
-                </span>
-                <Link
-                  href={`/admin/projects/${survey.id}`}
-                  className="focus-ring rounded-control normal-case tracking-normal text-card-foreground transition-colors hover:underline"
-                >
-                  {survey.title}
-                </Link>
-              </>
-            )}
-          </span>
+          ),
         }
-        title={respondentName || "Unnamed respondent"}
-        badge={isTest ? <Badge variant="warning">Test</Badge> : undefined}
-        meta={
-          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            {metaParts.map((part, i) => (
-              <span key={i}>{part}</span>
-            ))}
-          </span>
-        }
-        actions={
-          <>
-            <LeadHeaderControls
-              responseId={responseId}
-              leadStatus={workflow.leadStatus}
-              assignedTo={workflow.assignedTo}
-              assigneeName={workflow.assigneeName}
-              members={workflow.members}
-              currentUserId={workflow.currentUserId}
-              permissions={workflow.permissions}
-            />
-            {/* CRM sync. Runs automatically when the interview completes;
-                this is the manual retry for when that background run failed. */}
-            <HubSpotSyncControl
-              responseId={responseId}
-              initialSyncedAt={hubspotSyncedAt}
-              disabledReason={isTest ? "Test response" : !completed ? "Interview in progress" : null}
-            />
-          </>
-        }
-      />
+      : null,
+    {
+      label: completed ? "Completed" : "Started",
+      value: <span className={MONO}>{formatAbsolute(completed ? (completedAt ?? createdAt) : createdAt)}</span>,
+    },
+    sourceLabel ? { label: "Source", value: sourceLabel } : null,
+    {
+      label: "HubSpot",
+      value: hubspotSyncedAt ? (
+        <span title={formatAbsolute(hubspotSyncedAt)}>
+          Pushed <span className={MONO}>{formatRelativeTime(hubspotSyncedAt)}</span>
+        </span>
+      ) : (
+        <span className={text.muted2}>Not pushed</span>
+      ),
+    },
+  ];
+  const details = detailRows.filter((row): row is DetailRow => row !== null);
 
-      <div className="flex flex-col gap-6">
+  const tabs: { value: LeadTab; label: string; panel: React.ReactNode }[] = [];
+
+  if (messages.length > 0) {
+    tabs.push({
+      value: "transcript",
+      label: "Transcript",
+      panel: (
+        <div className="flex max-w-[720px] flex-col gap-5">
+          {messages.map((message, i) => {
+            const interviewer = message.role === "assistant";
+            return (
+              <div key={i} className="grid grid-cols-[84px_minmax(0,1fr)] items-baseline gap-4">
+                <span className={cn("text-[12px] font-bold", interviewer ? text.muted2 : text.ink)}>
+                  {interviewer ? "Birdsong" : firstName}
+                </span>
+                <p
+                  className={cn(
+                    "ds-transcript whitespace-pre-wrap break-words",
+                    interviewer ? text.muted : text.ink
+                  )}
+                >
+                  {interviewer ? renderEmphasis(message.content) : message.content}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      ),
+    });
+  }
+
+  tabs.push({
+    value: "summary",
+    label: "Summary",
+    panel: (
+      <div className="flex flex-col gap-5">
         <SummaryCard
           leadScore={leadScore}
           fitScore={fitScored ? fitScore : null}
           fitNote={
-            fitUnavailable
-              ? "research unavailable"
-              : fitConfidence === "low"
-                ? "low confidence"
-                : null
+            fitUnavailable ? "research unavailable" : fitConfidence === "low" ? "low confidence" : null
           }
           headline={headline}
           detail={detail}
         />
 
         {painPoints.length > 0 && (
-          <section>
-            <h2 className="type-eyebrow mb-3">Pain points</h2>
-            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Card header="Pain points" padding="flush">
+            <ul>
               {painPoints.map((point, i) => {
                 const { label, quote } = splitPainPoint(point);
                 return (
-                  <li key={i} className="min-w-0">
-                    <Card padding="compact" className="flex h-full flex-col gap-1.5 px-5 py-4">
-                      <p className="type-body">{label}</p>
-                      {quote && <p className="type-body-sm italic text-muted-foreground">{quote}</p>}
-                    </Card>
+                  <li
+                    key={i}
+                    className={cn("flex flex-col gap-1 px-5 py-3", i > 0 && "border-t", border.base)}
+                  >
+                    <p className="ds-body">{label}</p>
+                    {quote && <p className={cn("ds-small italic", text.muted2)}>{quote}</p>}
                   </li>
                 );
               })}
             </ul>
-          </section>
+          </Card>
         )}
 
-        {callScript && <OpeningLineCard script={callScript} scriptText={scriptText} />}
-
         {signals.length > 0 && (
-          <Card>
-            <h2 className="type-eyebrow mb-4">Signals</h2>
-            <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-              {signals.map((signal) => (
-                <div key={signal.label} className="flex flex-col gap-0.5">
-                  <dt className="font-archivo text-micro text-muted-foreground">{signal.label}</dt>
-                  <dd className="type-body">{signal.value}</dd>
+          <Card header="Signals" padding="flush">
+            <dl>
+              {signals.map((signal, i) => (
+                <div
+                  key={signal.label}
+                  className={cn(
+                    "grid grid-cols-[140px_minmax(0,1fr)] gap-3 px-5 py-[10px]",
+                    i > 0 && "border-t",
+                    border.base
+                  )}
+                >
+                  <dt className={cn("ds-small", text.muted2)}>{signal.label}</dt>
+                  <dd className="ds-body">{signal.value}</dd>
                 </div>
               ))}
             </dl>
           </Card>
         )}
+      </div>
+    ),
+  });
 
-        {/* The source everything above was derived from, worth reaching for
-            when a rep doubts one of those derivations. */}
-        {messages.length > 0 && (
-          <Card padding="flush">
-            <div className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-              <h2 className="type-heading">Interview</h2>
-              <span className="type-meta tabular-nums">
-                {messageCount} {messageCount === 1 ? "message" : "messages"} ·{" "}
-                {completed ? "Completed" : "In progress"}
-              </span>
+  if (callScript) {
+    tabs.push({
+      value: "script",
+      label: "Call script",
+      panel: <OpeningLineCard script={callScript} scriptText={scriptText} />,
+    });
+  }
+
+  tabs.push({
+    value: "activity",
+    label: "Activity",
+    panel: (
+      <ActivityCard
+        responseId={responseId}
+        currentUserId={workflow.currentUserId}
+        canNote={workflow.permissions.note}
+        activity={workflow.activity}
+      />
+    ),
+  });
+
+  return (
+    // 110px at the foot, so the last line scrolls clear of the floating bar.
+    <PageShell className="pb-[110px]">
+      <PageTopBar
+        crumbs={[{ label: "Leads", href: "/admin/leads" }, { label: name }]}
+        actions={
+          <LeadHeaderControls
+            responseId={responseId}
+            leadStatus={workflow.leadStatus}
+            assignedTo={workflow.assignedTo}
+            assigneeName={workflow.assigneeName}
+            members={workflow.members}
+            currentUserId={workflow.currentUserId}
+            permissions={workflow.permissions}
+          />
+        }
+      />
+
+      <div className="grid grid-cols-1 items-start gap-7 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section aria-label="Interview" className="flex min-w-0 flex-col gap-[22px]">
+          <div className="flex items-center gap-4">
+            <ScoreChip score={leadScore} size="hero" />
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className={cn("ds-h1 text-[28px]", text.ink)}>{name}</h1>
+                {isTest && <Badge variant="warning">Test</Badge>}
+              </div>
+              <p className={cn("ds-body", text.muted2)}>
+                {[
+                  who,
+                  survey?.title,
+                  <span key="length">
+                    {durationMinutes !== null && (
+                      <>
+                        <span className={MONO}>{durationMinutes}</span> min,{" "}
+                      </>
+                    )}
+                    <span className={MONO}>{messageCount}</span> {messageCount === 1 ? "turn" : "turns"}
+                    {!completed && ", in progress"}
+                  </span>,
+                ]
+                  .filter(Boolean)
+                  .map((part, i) => (
+                    <span key={i}>
+                      {i > 0 && " · "}
+                      {part}
+                    </span>
+                  ))}
+              </p>
             </div>
-            <div className={`${TRANSCRIPT_HEIGHT} flex flex-col gap-5 overflow-y-auto px-6 py-5`}>
-              {messages.map((m, i) => (
-                <div key={i} className="flex flex-col gap-1">
-                  <span className="type-eyebrow">{m.role === "assistant" ? "Interviewer" : "Respondent"}</span>
-                  <p className="type-body whitespace-pre-wrap">{m.content}</p>
+          </div>
+
+          <LeadTabs tabs={tabs} />
+        </section>
+
+        <aside aria-label="Details" className="flex flex-col gap-4 pt-1">
+          <Card header="Details" padding="flush">
+            <dl>
+              {details.map((row, i) => (
+                <div
+                  key={row.label}
+                  className={cn(
+                    "grid grid-cols-[100px_minmax(0,1fr)] gap-3 px-5 py-[10px] text-[13px]",
+                    i > 0 && "border-t",
+                    border.base
+                  )}
+                >
+                  <dt className={text.muted2}>{row.label}</dt>
+                  <dd title={row.title} className="truncate font-semibold">
+                    {row.value}
+                  </dd>
                 </div>
               ))}
-            </div>
+            </dl>
           </Card>
-        )}
 
-        <ActivityCard
-          responseId={responseId}
-          currentUserId={workflow.currentUserId}
-          canNote={workflow.permissions.note}
-          activity={workflow.activity}
-        />
+          {rationale.length > 0 && (
+            <Card
+              header={
+                <>
+                  Why it scored <span className={MONO}>{leadScore}</span>
+                </>
+              }
+              padding="flush"
+            >
+              <ul className="flex flex-col gap-[10px] px-5 py-[14px] text-[13px] leading-[1.5]">
+                {rationale.map((line, i) => (
+                  <li key={i} className="flex gap-[10px]">
+                    <span
+                      aria-hidden
+                      className={cn("mt-[7px] h-[6px] w-[6px] shrink-0 rounded-full", dot.accent)}
+                    />
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </aside>
       </div>
+
+      <LeadActionBar
+        responseId={responseId}
+        scriptText={scriptText}
+        canPush={workflow.permissions.pushToCrm}
+        disabledReason={isTest ? "Test response" : !completed ? "Interview in progress" : null}
+      />
     </PageShell>
   );
+}
+
+/** Whole minutes between start and completion, or null when that is not a length. */
+function interviewMinutes(startedAt: string, completedAt: string | null): number | null {
+  if (!completedAt) return null;
+  const ms = new Date(completedAt).getTime() - new Date(startedAt).getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  return minutes > DURATION_MAX_MINUTES ? null : minutes;
+}
+
+/**
+ * The score rationale as one line per sentence. It is stored as a single
+ * string; this only breaks it where it already ends a sentence, so each
+ * reason gets its own bullet. Display only.
+ */
+function splitSentences(reason: string | null): string[] {
+  const trimmed = reason?.trim() ?? "";
+  if (!trimmed) return [];
+  return trimmed
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9"'])/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
 }
 
 /**
@@ -302,7 +475,7 @@ function splitHeadline(summary: string | null): { headline: string | null; rest:
  *   No qualification step before leads go to partners - "Everything just
  *   flows through. No qualification step, honestly."
  *
- * Splitting on the first spaced dash gives the card a label line and a quote
+ * Splitting on the first spaced dash gives the row a label line and a quote
  * line instead of one long sentence a rep has to parse mid-dial. Display only:
  * nothing is written back, and a point with no dash simply has no second line.
  */

@@ -57,7 +57,7 @@ export function CollapsibleSection({
         >
           <span className="type-eyebrow shrink-0">{title}</span>
           {!open && summary && (
-            <span className="min-w-0 flex-1 truncate font-archivo text-control text-muted-foreground">
+            <span className="ds-small min-w-0 flex-1 truncate text-muted-foreground">
               {summary}
             </span>
           )}

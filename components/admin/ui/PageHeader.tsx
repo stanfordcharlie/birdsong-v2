@@ -4,8 +4,9 @@ import { cn } from "@/lib/utils";
  * The page masthead. Owns the header layout and the action alignment.
  *
  * Title row first, with the actions optically centred on the title; then one
- * optional meta line. The whole block stays under the height of two stat
- * cells, which is what keeps the first content block above the fold.
+ * optional meta line. The H1 is 30px/800 and carries no subtitle. Where the
+ * page is, and its primary actions, belong to the top bar (PageTopBar); this
+ * is the title inside the content.
  *
  * - `eyebrow` is for detail pages only, where it names the parent object
  *   (usually as a link back to the list). Top-level pages pass none: the
@@ -38,14 +39,14 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <header className={cn("mb-8 flex flex-col gap-1", className)}>
+    <header className={cn("mb-5 flex flex-col gap-1", className)}>
       {eyebrow && <p className="type-eyebrow">{eyebrow}</p>}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           {/* Stripped rather than asserted: a title passed in with a period
               would otherwise reintroduce the one inconsistency this role
               exists to prevent. */}
-          <h1 className="type-page-title">{typeof title === "string" ? title.replace(/\.$/, "") : title}</h1>
+          <h1 className="ds-h1 text-[color:hsl(var(--ds-ink))]">{typeof title === "string" ? title.replace(/\.$/, "") : title}</h1>
           {badge}
         </div>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}

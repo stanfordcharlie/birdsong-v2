@@ -6,11 +6,11 @@ import {
   DataTableStates,
   Elevation,
   FocusDemo,
-  FontSteps,
   Primitives,
   RadiusScale,
   Section,
   SpacingScale,
+  Timing,
   TypeScale,
 } from "./Specimens";
 
@@ -25,15 +25,15 @@ import {
 export const metadata = { title: "Styleguide · Birdsong" };
 
 const CONTENTS = [
-  ["type", "Type scale"],
-  ["font-steps", "Named font sizes"],
+  ["type", "Type"],
   ["color", "Color"],
   ["buttons", "Buttons"],
   ["primitives", "Primitives"],
-  ["datatable", "DataTable states"],
+  ["datatable", "DataTable"],
   ["spacing", "Spacing"],
   ["radius", "Radius"],
-  ["elevation", "Elevation"],
+  ["shadow", "Shadow"],
+  ["timing", "Timing"],
   ["focus", "Focus"],
 ] as const;
 
@@ -47,16 +47,20 @@ export default async function StyleguidePage() {
         title="Styleguide"
         meta={
           <>
-            Every token and primitive the admin surface is built from.{" "}
+            Ledger II. Every token and primitive the admin surface is built from.{" "}
             <code className="type-code text-muted-foreground">app/globals.css</code> is the source
             of truth; DESIGN.md mirrors it.
           </>
         }
       />
 
-      <nav aria-label="Contents" className="mb-2 flex flex-wrap gap-x-4 gap-y-1">
+      <nav aria-label="Contents" className="mb-6 flex flex-wrap gap-x-4 gap-y-1">
         {CONTENTS.map(([id, label]) => (
-          <a key={id} href={`#${id}`} className="focus-ring type-body-sm rounded-control text-muted-foreground underline underline-offset-2">
+          <a
+            key={id}
+            href={`#${id}`}
+            className="focus-ring ds-small rounded-[var(--ds-radius-chip)] text-[color:hsl(var(--ds-accent))] underline underline-offset-2"
+          >
             {label}
           </a>
         ))}
@@ -64,29 +68,21 @@ export default async function StyleguidePage() {
 
       <Section
         id="type"
-        title="Type scale"
-        note="Pages reference these roles, never a raw size. Young Serif is page-title only; everything else is Archivo."
+        title="Type"
+        note="Manrope sets every word. IBM Plex Mono sets every number, score, count, timestamp and keyboard hint. The ds styles carry size, weight, line height and tracking, never a colour."
       >
         <TypeScale />
       </Section>
 
       <Section
-        id="font-steps"
-        title="Named font sizes"
-        note="For controls, which need a size without a colour and a line height. count and control carry tabular figures."
+        id="color"
+        title="Color"
+        note="One accent. Status colours are for badges and dots and nowhere else. No beige, cream or gradient."
       >
-        <FontSteps />
-      </Section>
-
-      <Section id="color" title="Color" note="No beige, cream, tan or gradient. Accent appears at most once per visible region.">
         <Colors />
       </Section>
 
-      <Section
-        id="buttons"
-        title="Buttons"
-        note="Three variants, one shape. Hover and focus columns apply the classes those states produce; tab through the table to check the live ring."
-      >
+      <Section id="buttons" title="Buttons" note="One shape, 34px, on the control radius. Never a pill.">
         <Buttons />
       </Section>
 
@@ -100,13 +96,13 @@ export default async function StyleguidePage() {
 
       <Section
         id="datatable"
-        title="DataTable states"
-        note="Density, alignment, truncation, sorting, the row link and the empty state, on one table. Every admin table is this component with different columns."
+        title="DataTable"
+        note="42px header on the sidebar ground, 60px two-line rows or 54px one-line rows, 20px at the ends and 16px between columns."
       >
         <DataTableStates />
       </Section>
 
-      <Section id="spacing" title="Spacing">
+      <Section id="spacing" title="Spacing" note="A 4px scale, and the four shell and control sizes.">
         <SpacingScale />
       </Section>
 
@@ -114,8 +110,12 @@ export default async function StyleguidePage() {
         <RadiusScale />
       </Section>
 
-      <Section id="elevation" title="Elevation">
+      <Section id="shadow" title="Shadow" note="Borders, not shadows. These three are the only ones.">
         <Elevation />
+      </Section>
+
+      <Section id="timing" title="Timing" note="Motion means live. Enters run once per page load.">
+        <Timing />
       </Section>
 
       <Section id="focus" title="Focus">

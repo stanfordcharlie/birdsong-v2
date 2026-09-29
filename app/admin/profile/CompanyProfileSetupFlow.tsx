@@ -475,7 +475,7 @@ export function CompanyProfileSetupFlow({
             <Card className="flex min-h-[540px] flex-col p-11">
               {isReview ? (
                 <div className="flex flex-1 flex-col">
-                  <h2 className="mb-2 font-serif text-display-sm font-normal text-card-foreground">
+                  <h2 className="mb-2 text-display-sm font-normal text-card-foreground">
                     {current.title}
                   </h2>
                   <p className="type-body mb-8 text-muted-foreground">{current.subtitle}</p>
@@ -558,7 +558,7 @@ export function CompanyProfileSetupFlow({
                   <div className="type-section-label mb-2.5">
                     {current.section}
                   </div>
-                  <h2 className="mb-2 font-serif text-display-sm font-normal text-card-foreground">
+                  <h2 className="mb-2 text-display-sm font-normal text-card-foreground">
                     {current.title}
                   </h2>
                   <p className="type-body mb-8 text-muted-foreground">{current.subtitle}</p>

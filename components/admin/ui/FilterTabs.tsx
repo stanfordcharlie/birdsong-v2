@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { bg, radius, shadow, text } from "./tokens";
 
 export type FilterTab<T extends string> = {
   value: T;
@@ -11,13 +12,10 @@ export type FilterTab<T extends string> = {
 /**
  * Segmented control with counts.
  *
- * Extracted as-is, not redesigned: Leads and Surveys already rendered this
- * byte-for-byte identically, which made it the one pattern on the surface
- * that did not need a decision, only a home.
- *
- * One segmented track rather than separate bordered chips, because these are
- * a single either/or choice, and the counts make the shape of the account
- * readable without opening each tab.
+ * One track rather than separate bordered chips, because these are a single
+ * either/or choice, and the counts make the shape of the account readable
+ * without opening each tab. For the sections of a page (Responses, Prospects,
+ * Report) use SectionTabs instead.
  */
 export function FilterTabs<T extends string>({
   tabs,
@@ -29,7 +27,7 @@ export function FilterTabs<T extends string>({
   tabs: FilterTab<T>[];
   value: T;
   onChange: (value: T) => void;
-  /** Names the group for screen readers, e.g. "Filter surveys by status". */
+  /** Names the group for screen readers, e.g. "Filter studies by status". */
   label: string;
   className?: string;
 }) {
@@ -37,7 +35,7 @@ export function FilterTabs<T extends string>({
     <div
       role="group"
       aria-label={label}
-      className={cn("flex items-center gap-0.5 rounded-control bg-chip p-1", className)}
+      className={cn("inline-flex items-center gap-1 p-[3px]", radius.control, bg.track, className)}
     >
       {tabs.map((tab) => {
         const active = value === tab.value;
@@ -48,17 +46,16 @@ export function FilterTabs<T extends string>({
             onClick={() => onChange(tab.value)}
             aria-pressed={active}
             className={cn(
-              "focus-ring flex h-7 items-center gap-1.5 rounded-control px-2.5 font-archivo text-control font-medium transition-colors",
+              "ds-control focus-ring flex h-[30px] items-center gap-1.5 whitespace-nowrap px-[12px] transition-colors",
+              radius.chip,
               active
-                ? "bg-card text-card-foreground shadow-sm"
-                : "text-muted-foreground hover:text-card-foreground"
+                ? cn(bg.base, text.ink, shadow.activeNav)
+                : cn(text.muted, "hover:text-[color:hsl(var(--ds-ink))]")
             )}
           >
             {tab.label}
             {tab.count !== undefined && (
-              <span className={cn("text-count", active ? "text-muted-foreground" : "text-faint")}>
-                {tab.count}
-              </span>
+              <span className={cn("ds-mono-count", active ? text.muted2 : text.muted3)}>{tab.count}</span>
             )}
           </button>
         );

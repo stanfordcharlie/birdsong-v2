@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/admin/ui";
-import { LeadStatusBadge } from "@/components/admin/LeadStatusBadge";
+import { Badge, Button, LEAD_STATUS_BADGE_STATE } from "@/components/admin/ui";
+import { bg, border, dot, radius, shadow, text } from "@/components/admin/ui/tokens";
+import { SelectControl } from "@/app/admin/leads/controls";
 import { cn } from "@/lib/utils";
 import {
   DISQUALIFY_REASONS,
@@ -21,9 +22,9 @@ import {
   type LeadActionResult,
 } from "@/lib/leads/actions";
 
-// The lead's stage and its owner, as two controls in the page header: the
-// two things a rep changes about a lead, next to the name they belong to.
-// Notes and the trail stay in the activity card at the foot of the page.
+// The lead's stage and its owner, in the top bar: the status badge, the
+// assignee control, and a menu holding the moves a lead can make from the
+// stage it is in. Notes and the trail live on the Activity tab.
 //
 // Every value shown here comes from the server render. An action runs, then
 // router.refresh() re-renders the page from the database inside the same
@@ -37,28 +38,30 @@ export type WorkflowPermissions = {
   assignOthers: boolean;
   setStatus: boolean;
   note: boolean;
+  pushToCrm: boolean;
 };
 
-// The dot inside the status control: forward motion takes the accent, work
-// in progress takes amber, and a lead nobody has touched or that is out of
-// play takes the faint grey. Same three readings as the status badge's
-// three variants, drawn as a dot because the control is a select.
-const DOT: Record<LeadStatus, string> = {
-  new: "bg-faint",
-  assigned: "bg-warning",
-  contacted: "bg-warning",
-  nurture: "bg-warning",
-  meeting_booked: "bg-brand",
-  qualified: "bg-brand",
-  disqualified: "bg-faint",
-};
+const FIELD = cn(
+  "focus-ring w-full border px-3 text-[13px] disabled:opacity-60",
+  radius.control,
+  border.base,
+  bg.base,
+  text.ink
+);
+const POPOVER = cn(
+  "absolute right-0 top-full z-40 mt-2 flex flex-col border",
+  radius.control,
+  border.base,
+  bg.base,
+  shadow.input
+);
 
-const PILL_SELECT =
-  "focus-ring h-10 max-w-full appearance-none rounded-pill border border-border bg-card pr-9 font-archivo text-sm font-semibold text-card-foreground hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50";
-const INPUT_CLASSES =
-  "focus-ring flex h-9 w-full rounded-control border border-input bg-card px-3 font-archivo text-sm text-card-foreground disabled:opacity-60";
-const TEXTAREA_CLASSES =
-  "focus-ring w-full rounded-control border border-input bg-card px-3 py-2 font-archivo text-sm text-card-foreground placeholder:text-faint disabled:opacity-60";
+/** What the menu calls the move to each status. */
+function moveLabel(from: LeadStatus, to: LeadStatus): string {
+  if (to === "disqualified") return "Disqualify";
+  if (to === "new" && from === "disqualified") return "Reopen";
+  return `Move to ${LEAD_STATUS_LABELS[to]}`;
+}
 
 export function LeadHeaderControls({
   responseId,
@@ -80,21 +83,24 @@ export function LeadHeaderControls({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  // Disqualifying needs a reason, so that one move opens a small form under
-  // the control instead of applying on change.
+  // Disqualifying needs a reason, so that one move opens a small form in
+  // place of the menu instead of applying on click.
   const [disqualifying, setDisqualifying] = useState(false);
   const [reason, setReason] = useState<DisqualifyReason | "">("");
   const [reasonNote, setReasonNote] = useState("");
-  const popoverRef = useRef<HTMLFormElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  const open = menuOpen || disqualifying;
 
   useEffect(() => {
-    if (!disqualifying) return;
+    if (!open) return;
     function onPointerDown(event: PointerEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) closeDisqualify();
+      if (moreRef.current && !moreRef.current.contains(event.target as Node)) closeAll();
     }
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") closeDisqualify();
+      if (event.key === "Escape") closeAll();
     }
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -102,9 +108,10 @@ export function LeadHeaderControls({
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [disqualifying]);
+  }, [open]);
 
-  function closeDisqualify() {
+  function closeAll() {
+    setMenuOpen(false);
     setDisqualifying(false);
     setReason("");
     setReasonNote("");
@@ -127,13 +134,14 @@ export function LeadHeaderControls({
     });
   }
 
-  function handleStatusSelect(value: string) {
-    if (value === leadStatus) return;
-    if (value === "disqualified") {
+  function handleMove(status: LeadStatus) {
+    if (status === "disqualified") {
+      setMenuOpen(false);
       setDisqualifying(true);
       return;
     }
-    run(() => setLeadStatus(responseId, value));
+    closeAll();
+    run(() => setLeadStatus(responseId, status));
   }
 
   function submitDisqualify(e: FormEvent) {
@@ -145,7 +153,7 @@ export function LeadHeaderControls({
           disqualifyReason: reason,
           disqualifyNote: reasonNote,
         }),
-      closeDisqualify
+      closeAll
     );
   }
 
@@ -158,50 +166,117 @@ export function LeadHeaderControls({
   const disqualifyReady = reason !== "" && (reason !== "other" || reasonNote.trim().length > 0);
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {/* Stage. A select drawn as the status pill, with the dot inside it,
-          so the header shows the status once and that one showing is the
-          control. Without the permission it is the plain badge. */}
-      {permissions.setStatus && options.length > 0 ? (
-        <div className="relative">
-          <span
-            aria-hidden
-            className={cn(
-              "pointer-events-none absolute left-4 top-1/2 h-2 w-2 -translate-y-1/2 rounded-pill",
-              DOT[leadStatus]
-            )}
-          />
-          <select
-            value={leadStatus}
+    <>
+      {/* An error is a sentence, so it leads the group rather than pushing
+          the three controls apart. */}
+      {error && (
+        <p role="alert" className={cn("ds-small flex max-w-[360px] items-center gap-2", text.ink)}>
+          <span aria-hidden className={cn("h-[6px] w-[6px] shrink-0 rounded-full", dot.danger)} />
+          <span className="truncate" title={error}>
+            {error}
+          </span>
+        </p>
+      )}
+
+      <Badge state={LEAD_STATUS_BADGE_STATE[leadStatus]} className="h-[34px] px-[12px]" />
+
+      {/* Owner. With the assign-others permission the control is the select;
+          with only the claim permission it is Claim while nobody holds the
+          lead, and the holder's name after. */}
+      {permissions.assignOthers ? (
+        <SelectControl
+          muted={!assignedTo}
+          value={assignedTo ?? ""}
+          disabled={pending}
+          onChange={(e) => handleAssignSelect(e.target.value)}
+          aria-label="Assign this lead to a teammate"
+          className="max-w-[200px]"
+        >
+          <option value="">Unassigned</option>
+          {members.map((member) => (
+            <option key={member.id} value={member.id}>
+              {member.id === currentUserId ? "Me" : member.name}
+            </option>
+          ))}
+          {assignedTo && !members.some((member) => member.id === assignedTo) && (
+            <option value={assignedTo}>{assigneeName ?? "Former teammate"}</option>
+          )}
+        </SelectControl>
+      ) : assignedTo ? (
+        <>
+          <span className={cn("ds-small", text.muted2)}>
+            {mine ? "Assigned to you" : `Assigned to ${assigneeName ?? "a former teammate"}`}
+          </span>
+          {canUnassign && (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={pending}
+              onClick={() => run(() => unassignLead(responseId))}
+            >
+              Unassign
+            </Button>
+          )}
+        </>
+      ) : (
+        permissions.claim && (
+          <Button
+            type="button"
+            variant="secondary"
             disabled={pending}
-            onChange={(e) => handleStatusSelect(e.target.value)}
-            aria-label="Lead status"
-            className={cn(PILL_SELECT, "pl-9")}
+            onClick={() => run(() => claimLead(responseId))}
           >
-            <option value={leadStatus}>{LEAD_STATUS_LABELS[leadStatus]}</option>
-            {options.map((status) => (
-              <option key={status} value={status}>
-                {LEAD_STATUS_LABELS[status]}
-              </option>
-            ))}
-          </select>
-          <Chevron />
+            Claim
+          </Button>
+        )
+      )}
+
+      {permissions.setStatus && options.length > 0 && (
+        <div ref={moreRef} className="relative">
+          <Button
+            type="button"
+            variant="secondary"
+            aria-label="More"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            disabled={pending}
+            onClick={() => (open ? closeAll() : setMenuOpen(true))}
+            className={cn("w-[34px] px-0 text-[16px] font-extrabold", text.muted)}
+          >
+            ···
+          </Button>
+
+          {menuOpen && (
+            <div role="menu" className={cn(POPOVER, "w-[220px] p-1")}>
+              {options.map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => handleMove(status)}
+                  className={cn(
+                    "focus-ring flex h-[34px] items-center px-[10px] text-left text-[13px] font-semibold hover:bg-[color:hsl(var(--ds-bg-sidebar))]",
+                    radius.chip,
+                    text.ink3
+                  )}
+                >
+                  {moveLabel(leadStatus, status)}
+                </button>
+              ))}
+            </div>
+          )}
 
           {disqualifying && (
-            <form
-              ref={popoverRef}
-              onSubmit={submitDisqualify}
-              className="absolute right-0 top-full z-30 mt-2 flex w-80 flex-col gap-3 rounded-card border border-border bg-card p-4 shadow-card"
-            >
-              <p className="type-body font-medium">Disqualify this lead</p>
-              <select
+            <form onSubmit={submitDisqualify} className={cn(POPOVER, "w-[320px] gap-3 p-4")}>
+              <p className="ds-body-strong">Disqualify this lead</p>
+              <SelectControl
                 value={reason}
                 disabled={pending}
                 required
                 autoFocus
                 onChange={(e) => setReason(e.target.value as DisqualifyReason | "")}
                 aria-label="Reason for disqualifying"
-                className={INPUT_CLASSES}
+                className="w-full"
               >
                 <option value="">Choose a reason</option>
                 {DISQUALIFY_REASONS.map((value) => (
@@ -209,10 +284,10 @@ export function LeadHeaderControls({
                     {DISQUALIFY_REASON_LABELS[value]}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
               {reason === "other" && (
                 <label className="flex flex-col gap-1.5">
-                  <span className="font-archivo text-micro text-muted-foreground">Why this lead is out</span>
+                  <span className={cn("ds-caption", text.muted2)}>Why this lead is out</span>
                   <textarea
                     value={reasonNote}
                     disabled={pending}
@@ -220,12 +295,12 @@ export function LeadHeaderControls({
                     rows={2}
                     maxLength={4000}
                     onChange={(e) => setReasonNote(e.target.value)}
-                    className={TEXTAREA_CLASSES}
+                    className={cn(FIELD, "py-2 leading-[1.45]")}
                   />
                 </label>
               )}
               <div className="flex justify-end gap-2">
-                <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={closeDisqualify}>
+                <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={closeAll}>
                   Cancel
                 </Button>
                 <Button type="submit" size="sm" disabled={pending || !disqualifyReady}>
@@ -235,94 +310,7 @@ export function LeadHeaderControls({
             </form>
           )}
         </div>
-      ) : (
-        <LeadStatusBadge status={leadStatus} />
       )}
-
-      {/* Owner. Claim is the one-click move for a rep; the select is for
-          handing a lead to someone else. */}
-      {permissions.claim && !assignedTo && (
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={pending}
-          onClick={() => run(() => claimLead(responseId))}
-        >
-          <PlusIcon />
-          Claim
-        </Button>
-      )}
-      {permissions.assignOthers ? (
-        <div className="relative">
-          <select
-            value={assignedTo ?? ""}
-            disabled={pending}
-            onChange={(e) => handleAssignSelect(e.target.value)}
-            aria-label="Assign this lead to a teammate"
-            className={cn(PILL_SELECT, "pl-4")}
-          >
-            <option value="">Unassigned</option>
-            {members.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.id === currentUserId ? "Me" : member.name}
-              </option>
-            ))}
-          </select>
-          <Chevron />
-        </div>
-      ) : (
-        assignedTo && (
-          <>
-            <span className="type-meta">
-              {mine ? "Assigned to you" : `Assigned to ${assigneeName ?? "a former teammate"}`}
-            </span>
-            {canUnassign && (
-              <Button type="button" variant="secondary" disabled={pending} onClick={() => run(() => unassignLead(responseId))}>
-                Unassign
-              </Button>
-            )}
-          </>
-        )
-      )}
-
-      {error && (
-        <p role="alert" className="type-body-sm basis-full text-destructive">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function Chevron() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="pointer-events-none absolute right-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
-    >
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 5v14M5 12h14" />
-    </svg>
+    </>
   );
 }

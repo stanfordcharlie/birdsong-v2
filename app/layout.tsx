@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { inter, youngSerif, archivo } from "@/lib/fonts";
+import { inter, manrope } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -48,7 +48,7 @@ export default function RootLayout({
     // server" on every first visit. Scoped to this one element's attributes.
     <html
       lang="en"
-      className={cn(inter.variable, youngSerif.variable, archivo.variable)}
+      className={cn(inter.variable, manrope.variable)}
       suppressHydrationWarning
     >
       <body className="font-sans antialiased">{children}</body>

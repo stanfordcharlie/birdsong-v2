@@ -26,6 +26,8 @@ export default async function LeadsPage({
   const permissions = {
     claim: can(role, "lead:claim"),
     assignOthers: can(role, "lead:assignOthers"),
+    setStatus: can(role, "lead:setStatus"),
+    pushToCrm: can(role, "response:pushToCrm"),
   };
   const canCreateStudy = can(role, "study:create");
 
@@ -52,6 +54,7 @@ export default async function LeadsPage({
       id: r.id,
       name: r.respondent_name,
       email: r.respondent_email,
+      title: typeof customValues.job_title === "string" ? customValues.job_title : null,
       company:
         typeof customValues.company === "string"
           ? customValues.company
@@ -92,14 +95,10 @@ export default async function LeadsPage({
 
   return (
     <PageShell>
-      <PageHeader
-        title="Leads"
-        actions={
-          <Button asChild variant="secondary" size="sm">
-            <Link href="/admin/live">Live now</Link>
-          </Button>
-        }
-      />
+      {/* The top bar's actions belong to the queue (LeadsQueue renders the
+          PageTopBar), because the one action there counts the leads the
+          queue is holding. With no leads the shell's own crumb is the bar. */}
+      <PageHeader title="Leads" />
 
       {error && <p className="type-body text-destructive">{error.message}</p>}
 

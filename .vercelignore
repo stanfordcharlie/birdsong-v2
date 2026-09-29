@@ -23,3 +23,6 @@ public/birdsong_logo_mark_v2.png
 
 # Standalone marketing site — its own repo and Vercel project
 birdsong-site
+
+# Stray audio files at the repo root. Untracked, and 100MB the build never reads.
+/*.mp3

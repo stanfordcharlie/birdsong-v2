@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { text } from "./tokens";
 
 /**
  * One sentence, one optional action, no chrome of its own.
@@ -20,7 +21,7 @@ export function EmptyState({
 }) {
   return (
     <div className={cn("flex flex-col items-start gap-3 py-6", className)}>
-      <p className="type-body text-muted-foreground">{title}</p>
+      <p className={cn("ds-body", text.muted2)}>{title}</p>
       {action}
     </div>
   );

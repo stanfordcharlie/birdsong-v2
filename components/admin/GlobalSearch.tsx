@@ -82,7 +82,13 @@ function toRows(results: SearchResults): { studies: Row[]; respondents: Row[] } 
   };
 }
 
-export function GlobalSearch({ className }: { className?: string }) {
+export function GlobalSearch({
+  className,
+  placeholder = "Search studies, respondents",
+}: {
+  className?: string;
+  placeholder?: string;
+}) {
   const router = useRouter();
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -236,7 +242,7 @@ export function GlobalSearch({ className }: { className?: string }) {
           setValue(next);
           setOpen(true);
         }}
-        placeholder="Search studies, respondents"
+        placeholder={placeholder}
         label="Search studies and respondents"
         hint="⌘K"
         inputRef={inputRef}

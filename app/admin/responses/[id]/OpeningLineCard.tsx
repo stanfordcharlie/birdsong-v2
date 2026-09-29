@@ -28,7 +28,7 @@ export function OpeningLineCard({ script, scriptText }: { script: CallScript; sc
       </div>
 
       {script.opener && (
-        <p className="font-serif text-[28px] leading-[1.35] tracking-[-0.01em]">
+        <p className="text-[28px] leading-[1.35] tracking-[-0.01em]">
           &ldquo;{script.opener}&rdquo;
         </p>
       )}

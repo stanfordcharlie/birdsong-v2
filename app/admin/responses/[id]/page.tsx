@@ -49,6 +49,7 @@ export default async function ResponseDetailPage({
     assignOthers: can(role, "lead:assignOthers"),
     setStatus: can(role, "lead:setStatus"),
     note: can(role, "lead:note"),
+    pushToCrm: can(role, "response:pushToCrm"),
   };
 
   const customValues = (response.custom_field_values as Record<string, unknown> | null) ?? {};
@@ -94,9 +95,10 @@ export default async function ResponseDetailPage({
     email: response.respondent_email,
     isTest: response.is_test,
     completed: response.completed,
-    // There is no completed_at column; created_at is the stamp the Leads
-    // queue already labels "Completed" for a finished response.
     createdAt: response.created_at,
+    // Written by the completion path; null for older rows, which fall back
+    // to created_at for the date and show no duration.
+    completedAt: typeof response.completed_at === "string" ? response.completed_at : null,
     messageCount: messages.length,
     // Null until the first successful sync, and absent entirely on databases
     // without the response_hubspot_sync migration, so read defensively the

@@ -1,17 +1,23 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { bg, border, radius, text } from "./tokens";
 
 function SearchIcon() {
   return (
     <svg
       aria-hidden
-      viewBox="0 0 20 20"
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
       fill="none"
-      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      className="pointer-events-none shrink-0"
     >
-      <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M13.2 13.2L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="m10.5 10.5 3 3" />
     </svg>
   );
 }
@@ -19,11 +25,14 @@ function SearchIcon() {
 /**
  * Icon plus input. The search affordance, identical wherever it appears.
  *
- * `hint` is a keyboard shortcut shown at the right edge (Home's global
+ * `hint` is a keyboard shortcut shown at the right edge in mono (the global
  * search, focused with ⌘K); `inputRef` is what lets the shortcut focus it.
  * `inputProps` passes through the rest of what a combobox needs on the
  * input itself (aria attributes, key handlers). All three are optional and
  * change nothing for the list filters that omit them.
+ *
+ * The frame is the label, so a click anywhere in it focuses the field, and
+ * the focus ring is drawn on the frame rather than on the bare input.
  */
 export function SearchInput({
   value,
@@ -40,7 +49,7 @@ export function SearchInput({
   placeholder: string;
   /** aria-label; the visible placeholder is usually too terse on its own. */
   label: string;
-  /** A keyboard shortcut, rendered as a kbd at the right edge. */
+  /** A keyboard shortcut, rendered in mono at the right edge. */
   hint?: string;
   inputRef?: React.Ref<HTMLInputElement>;
   className?: string;
@@ -51,7 +60,17 @@ export function SearchInput({
   >;
 }) {
   return (
-    <div className={cn("relative max-w-xs flex-1 basis-56", className)}>
+    <label
+      className={cn(
+        "flex h-[34px] max-w-xs flex-1 basis-56 items-center gap-2 border px-[10px]",
+        radius.control,
+        border.base,
+        bg.base,
+        text.muted2,
+        "focus-within:ring-2 focus-within:ring-[hsl(var(--ds-focus))] focus-within:ring-offset-2",
+        className
+      )}
+    >
       <SearchIcon />
       <input
         {...inputProps}
@@ -62,19 +81,15 @@ export function SearchInput({
         placeholder={placeholder}
         aria-label={label}
         className={cn(
-          "focus-ring flex h-9 w-full rounded-control border border-input bg-card pl-9",
-          hint ? "pr-12" : "pr-3",
-          "font-archivo text-sm text-card-foreground placeholder:text-faint"
+          "ds-small min-w-0 flex-1 border-0 bg-transparent outline-none placeholder:text-[color:hsl(var(--ds-muted-3))]",
+          text.ink
         )}
       />
       {hint && (
-        <kbd
-          aria-hidden
-          className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-control border border-border bg-chip px-1.5 py-0.5 font-archivo text-micro text-muted-foreground"
-        >
+        <kbd aria-hidden className={cn("ds-mono-kbd pointer-events-none shrink-0", text.muted3)}>
           {hint}
         </kbd>
       )}
-    </div>
+    </label>
   );
 }

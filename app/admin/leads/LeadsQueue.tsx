@@ -1,31 +1,48 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Badge,
   Button,
+  Card,
   DataTable,
   FilterTabs,
+  FloatingBar,
+  FloatingBarButton,
+  LEAD_STATUS_BADGE_STATE,
+  PageTopBar,
   RelativeTime,
-  ScoreBadge,
+  ScoreChip,
   SearchInput,
+  StackedCell,
   StatRow,
   useTableSort,
   type Column,
+  type Stat,
 } from "@/components/admin/ui";
-import { LeadStatusBadge } from "@/components/admin/LeadStatusBadge";
-import { StudyFilterCards, type StudyFilterCard } from "./StudyFilterCards";
+import { dot, text } from "@/components/admin/ui/tokens";
 import { EMPTY_VALUE } from "@/lib/format";
-import { isWorthACall, WORTH_A_CALL_SCORE_MIN } from "@/lib/leads";
+import { WORTH_A_CALL_SCORE_MIN } from "@/lib/leads";
 import { isClosedStatus, type LeadStatus } from "@/lib/leads/state";
-import { assignLead, claimLead, unassignLead, type LeadActionResult } from "@/lib/leads/actions";
-import { QUEUE_TABS, type QueueTab } from "./queue-tabs";
+import {
+  assignLead,
+  claimLead,
+  setLeadStatus,
+  unassignLead,
+  type LeadActionResult,
+} from "@/lib/leads/actions";
+import { cn } from "@/lib/utils";
+import { SelectControl, ToggleChip } from "./controls";
+import { isQueueTab, QUEUE_TABS, type QueueTab } from "./queue-tabs";
 
 export type LeadItem = {
   id: string;
   name: string | null;
   email: string | null;
+  /** Job title, from the respondent's custom fields. */
+  title: string | null;
   company: string | null;
   surveyId: string;
   surveyTitle: string;
@@ -51,6 +68,8 @@ export type QueueMember = { id: string; name: string };
 export type QueuePermissions = {
   claim: boolean;
   assignOthers: boolean;
+  setStatus: boolean;
+  pushToCrm: boolean;
 };
 
 const TAB_LABELS: Record<QueueTab, string> = {
@@ -91,12 +110,11 @@ function tabMatches(lead: LeadItem, tab: QueueTab, me: string): boolean {
   }
 }
 
-// Same select styling as the team settings' native selects, at the in-row
-// size the queue's status select used to take.
-const SELECT_CLASSES =
-  "focus-ring flex h-9 rounded-control border border-input bg-card px-3 py-2 font-archivo text-sm text-card-foreground";
-const ROW_SELECT_CLASSES =
-  "focus-ring flex h-8 max-w-full rounded-pill border border-border bg-card px-3 font-archivo text-control text-card-foreground disabled:cursor-not-allowed disabled:opacity-50";
+// The mockup's grid: checkbox, Respondent, Company, Score, Fit, Status,
+// Assignee, Last activity.
+const GRID_TEMPLATE = "24px minmax(0,1.6fr) minmax(0,1.3fr) 56px 56px 120px 150px 110px";
+
+const ALL_STUDIES_VALUE = "__all__";
 
 // The sources select doubles as the data-source switch. "Include test
 // responses" used to be a third chip sitting beside the two lead filters,
@@ -104,9 +122,35 @@ const ROW_SELECT_CLASSES =
 // which leads are hot.
 const TEST_SOURCE_VALUE = "__include_test__";
 
-// Fit uses the same threshold and the same banding as the lead score, so the
-// two columns read consistently and the "Fit 7+" filter mirrors "Score 7+".
+// Fit uses the same threshold as the lead score, so the "Fit 7+" filter
+// mirrors "Score 7+".
 const HOT_FIT_MIN = 7;
+
+const CHECKBOX = "h-[15px] w-[15px] cursor-pointer accent-[hsl(var(--ds-accent))]";
+
+type BulkKind = "assign" | "contacted" | "push";
+
+type BulkReport = {
+  kind: BulkKind;
+  total: number;
+  failures: { id: string; name: string; error: string }[];
+};
+
+const BULK_DONE: Record<BulkKind, (ok: number, total: number) => string> = {
+  assign: (ok, total) => `Assigned ${ok} of ${total} to you`,
+  contacted: (ok, total) => `Marked ${ok} of ${total} contacted`,
+  push: (ok, total) => `Pushed ${ok} of ${total} to HubSpot`,
+};
+
+const BULK_RUNNING: Record<BulkKind, string> = {
+  assign: "Assigning",
+  contacted: "Marking",
+  push: "Pushing",
+};
+
+function leadName(lead: LeadItem): string {
+  return lead.name || lead.email || "Unnamed respondent";
+}
 
 export function LeadsQueue({
   items,
@@ -124,14 +168,14 @@ export function LeadsQueue({
   initialTab: QueueTab;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   // Local copy so a claim or assignment is reflected in the row the moment
   // the action returns, ahead of the server re-render router.refresh asks for.
   const [leads, setLeads] = useState(items);
   useEffect(() => setLeads(items), [items]);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<QueueTab>(initialTab);
-  // null = the "All studies" chip. Driven by StudyFilterCards above the
-  // queue, which replaced the toolbar's survey <select>.
+  // null = all studies.
   const [surveyFilter, setSurveyFilter] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [hotOnly, setHotOnly] = useState(false);
@@ -139,6 +183,19 @@ export function LeadsQueue({
   const [showTest, setShowTest] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [bulkRunning, setBulkRunning] = useState<{ kind: BulkKind; done: number; total: number } | null>(
+    null
+  );
+  const [bulkReport, setBulkReport] = useState<BulkReport | null>(null);
+
+  // A ?tab= link followed while the queue is already on screen (the top
+  // bar's Triage button, the sidebar) re-renders the page without remounting
+  // this component, so the tab follows the parameter when it changes.
+  const tabParam = searchParams.get("tab");
+  useEffect(() => {
+    if (isQueueTab(tabParam)) setTab(tabParam);
+  }, [tabParam]);
 
   // "All" is the no-filter choice, so clicking it also releases the Score 7+
   // and Fit 7+ toggles sitting beside it. Without that, All can be lit up
@@ -153,64 +210,39 @@ export function LeadsQueue({
     }
   }
 
-  // Everything the chips, the stats and the tabs count is measured against
-  // this set: every lead the user can currently see, before any of the
-  // narrowing filters. Only the test toggle applies, because a hidden test
-  // row shouldn't be counted in a number sitting next to visible rows.
+  // Everything the stats and the tabs count is measured against this set:
+  // every lead the user can currently see, before any of the narrowing
+  // filters. Only the test toggle applies, because a hidden test row
+  // shouldn't be counted in a number sitting next to visible rows.
   const visibleLeads = useMemo(
     () => (showTest ? leads : leads.filter((lead) => !lead.isTest)),
     [leads, showTest]
   );
 
-  // Only surveys that actually have completed responses can produce rows, so
-  // the chips are derived from the rows themselves rather than from the
-  // survey list: a survey nobody has finished has nothing to show here.
-  const surveyCards = useMemo<StudyFilterCard[]>(() => {
-    const bySurvey = new Map<string, StudyFilterCard>();
+  // Only studies that actually have completed responses can produce rows, so
+  // the options are derived from the rows themselves rather than from the
+  // study list. Most leads first.
+  const studyOptions = useMemo(() => {
+    const byStudy = new Map<string, { id: string; title: string; leadCount: number }>();
     for (const lead of visibleLeads) {
-      let card = bySurvey.get(lead.surveyId);
-      if (!card) {
-        card = {
-          id: lead.surveyId,
-          title: lead.surveyTitle,
-          leadCount: 0,
-          worthACall: 0,
-        };
-        bySurvey.set(lead.surveyId, card);
-      }
-      card.leadCount += 1;
-      if (isWorthACall({ leadScore: lead.leadScore, status: lead.leadStatus })) card.worthACall += 1;
+      const option = byStudy.get(lead.surveyId);
+      if (option) option.leadCount += 1;
+      else byStudy.set(lead.surveyId, { id: lead.surveyId, title: lead.surveyTitle, leadCount: 1 });
     }
-
-    // Most leads first: the survey producing the most pipeline is the one
-    // worth landing on, and it keeps the row's order stable as statuses
-    // change underneath it (which worth-a-call ordering would not).
-    const cards = Array.from(bySurvey.values()).sort((a, b) => b.leadCount - a.leadCount);
-
-    return [
-      {
-        id: null,
-        title: "All studies",
-        leadCount: visibleLeads.length,
-        worthACall: visibleLeads.filter((lead) =>
-          isWorthACall({ leadScore: lead.leadScore, status: lead.leadStatus })
-        ).length,
-      },
-      ...cards,
-    ];
+    return Array.from(byStudy.values()).sort((a, b) => b.leadCount - a.leadCount);
   }, [visibleLeads]);
 
-  // A selected study that has since disappeared from the cards (archived,
+  // A selected study that has since disappeared from the options (archived,
   // or its last lead switched to test) would leave the queue scoped to
-  // nothing. Fall back to the all-studies view instead of an empty state.
+  // nothing. Fall back to all studies instead of an empty state.
   useEffect(() => {
-    if (surveyFilter !== null && !surveyCards.some((card) => card.id === surveyFilter)) {
+    if (surveyFilter !== null && !studyOptions.some((option) => option.id === surveyFilter)) {
       setSurveyFilter(null);
     }
-  }, [surveyCards, surveyFilter]);
+  }, [studyOptions, surveyFilter]);
 
-  // The study chip is the outermost filter: the stats and every tab count
-  // restate whatever it has selected.
+  // The study is the outermost filter: the stats and every tab count restate
+  // whatever it has selected.
   const scopedLeads = useMemo(
     () =>
       surveyFilter === null
@@ -229,11 +261,11 @@ export function LeadsQueue({
     return counts;
   }, [scopedLeads, currentUserId]);
 
-  const stats = useMemo(() => {
+  const stats = useMemo<Stat[]>(() => {
     const byStatus = (status: LeadStatus) =>
       scopedLeads.filter((lead) => lead.leadStatus === status).length;
     return [
-      { label: "Unworked", value: byStatus("new") },
+      { label: "Unworked", value: byStatus("new"), emphasis: true },
       { label: "Assigned to me", value: tabCounts.mine },
       { label: "Contacted", value: byStatus("contacted") },
       { label: "Meetings booked", value: byStatus("meeting_booked") },
@@ -241,10 +273,17 @@ export function LeadsQueue({
     ];
   }, [scopedLeads, tabCounts.mine]);
 
+  // What the top bar's Triage button counts: every unworked lead in view,
+  // across studies, because the link it follows clears no filter.
+  const unworkedTotal = useMemo(
+    () => visibleLeads.filter((lead) => lead.leadStatus === "new").length,
+    [visibleLeads]
+  );
+
   // Distinct, non-null source values actually present in this user's data.
   // Most accounts won't have any ?src= traffic yet, so the source options are
   // hidden until at least one exists, but the select itself stays, because
-  // it now also carries the include-test-responses switch.
+  // it also carries the include-test-responses switch.
   const sourceOptions = useMemo(() => {
     const seen = new Set<string>();
     for (const lead of items) {
@@ -270,6 +309,22 @@ export function LeadsQueue({
     });
   }, [scopedLeads, query, tab, currentUserId, sourceFilter, hotOnly, fitHotOnly]);
 
+  function applyResult(leadId: string, result: Extract<LeadActionResult, { ok: true }>) {
+    setLeads((prev) =>
+      prev.map((lead) =>
+        lead.id === leadId
+          ? {
+              ...lead,
+              leadStatus: result.status,
+              assignedTo: result.assignedTo,
+              assigneeName: result.assigneeName,
+              lastActivityAt: new Date().toISOString(),
+            }
+          : lead
+      )
+    );
+  }
+
   // One action in flight at a time per row. The row updates from the
   // action's own result, then the page re-renders from the server so the
   // trail, the stats and every other tab agree with it.
@@ -282,19 +337,7 @@ export function LeadsQueue({
         setActionError(result.error);
         return;
       }
-      setLeads((prev) =>
-        prev.map((lead) =>
-          lead.id === leadId
-            ? {
-                ...lead,
-                leadStatus: result.status,
-                assignedTo: result.assignedTo,
-                assigneeName: result.assigneeName,
-                lastActivityAt: new Date().toISOString(),
-              }
-            : lead
-        )
-      );
+      applyResult(leadId, result);
       router.refresh();
     } finally {
       setPendingId(null);
@@ -307,87 +350,154 @@ export function LeadsQueue({
     return runAction(lead.id, () => assignLead(lead.id, value));
   }
 
-  // A column that is the same dash on every row is not a column. Fit is shown
-  // only once something in scope has actually been scored for it (it was
-  // seventeen dashes on this account), and Study goes away the moment a
-  // single study card is selected, because the study is already the context.
-  //
-  // Measured against the study scope rather than the fully filtered rows on
-  // purpose: keying it off the filtered set lets the Fit 7+ toggle empty the
-  // table, hide the Fit column, and take its own off-switch with it.
-  const showFitColumn = scopedLeads.some((lead) => lead.fitScore !== null);
-  const showStudyColumn = surveyFilter === null;
-  const showActionColumn = permissions.claim || permissions.assignOthers;
+  // The same push the lead page's button makes, one lead at a time. Anything
+  // but a 2xx is a failure with the route's own words.
+  async function pushToHubSpot(lead: LeadItem): Promise<void> {
+    const res = await fetch(`/api/responses/${lead.id}/hubspot-sync`, { method: "POST" });
+    const data = (await res.json().catch(() => null)) as {
+      error?: string;
+      reason?: string;
+      advancedTo?: string | null;
+    } | null;
+    if (!res.ok) {
+      throw new Error(data?.error || data?.reason || `HubSpot returned ${res.status}`);
+    }
+    if (data?.advancedTo === "contacted") {
+      setLeads((prev) =>
+        prev.map((row) =>
+          row.id === lead.id
+            ? { ...row, leadStatus: "contacted", lastActivityAt: new Date().toISOString() }
+            : row
+        )
+      );
+    }
+  }
 
-  const studyColumn: Column<LeadItem> = {
-    key: "survey",
-    header: "Study",
-    width: 0.13,
-    truncate: true,
-    title: (lead) => lead.surveyTitle,
-    cell: (lead) => <span className="text-muted-foreground">{lead.surveyTitle}</span>,
-  };
-
-  const fitColumn: Column<LeadItem> = {
-    key: "fit",
-    header: "Fit",
-    align: "center",
-    width: "xs",
-    sortable: true,
-    sortValue: (lead) => lead.fitScore,
-    cell: (lead) => (
-      <span
-        title={
-          lead.fitConfidence === "unavailable"
-            ? "Company fit research was unavailable."
-            : (lead.fitReasoning ?? undefined)
+  // Bulk actions run the single-lead action for each selected lead, in
+  // sequence, and report every lead that did not go through by name. A lead
+  // that failed stays selected, so the retry is one click.
+  async function runBulk(kind: BulkKind, targets: LeadItem[]) {
+    if (targets.length === 0 || bulkRunning) return;
+    setActionError(null);
+    setBulkReport(null);
+    setBulkRunning({ kind, done: 0, total: targets.length });
+    const failures: BulkReport["failures"] = [];
+    for (let i = 0; i < targets.length; i += 1) {
+      const lead = targets[i];
+      try {
+        if (kind === "push") {
+          await pushToHubSpot(lead);
+        } else {
+          const result =
+            kind === "assign" ? await claimLead(lead.id) : await setLeadStatus(lead.id, "contacted");
+          if (!result.ok) throw new Error(result.error);
+          applyResult(lead.id, result);
         }
-      >
-        <ScoreBadge score={lead.fitScore} />
-      </span>
-    ),
-  };
+      } catch (err) {
+        failures.push({
+          id: lead.id,
+          name: leadName(lead),
+          error: err instanceof Error ? err.message : "Something went wrong.",
+        });
+      }
+      setBulkRunning({ kind, done: i + 1, total: targets.length });
+    }
+    setBulkRunning(null);
+    setBulkReport({ kind, total: targets.length, failures });
+    setSelected(new Set(failures.map((failure) => failure.id)));
+    router.refresh();
+  }
 
-  // Who holds the lead, and the control to change that, in one column: the
-  // name and the select that sets it were two columns saying the same thing.
-  // With the assign-others permission the cell is the select (its value is
-  // the assignee; "Me" claims); with only the claim permission it is the
-  // name, or a Claim button while nobody holds it. The select and the button
-  // together did not fit a column, and the select already covers the claim.
-  //
-  // The documented pattern for an interactive cell inside a linked row: the
-  // control keeps its pointer events (DataTable) and the click stops here.
-  // See the DataTable entry on /admin/styleguide.
-  const assigneeColumn: Column<LeadItem> = {
-    key: "assignee",
-    header: "Assignee",
-    width: "lg",
-    truncate: !showActionColumn,
-    title: (lead) => (showActionColumn ? undefined : (lead.assigneeName ?? undefined)),
-    cell: (lead) => {
-      const pending = pendingId === lead.id;
-      const name =
-        lead.assignedTo === currentUserId ? (
-          "Me"
-        ) : lead.assigneeName ? (
-          lead.assigneeName
-        ) : (
-          <span className="text-muted-foreground">{EMPTY_VALUE}</span>
-        );
-      if (!showActionColumn) return name;
-      return (
+  const canAssign = permissions.claim || permissions.assignOthers;
+
+  const columnsWithoutSelect: Column<LeadItem>[] = [
+    {
+      key: "name",
+      header: "Respondent",
+      rowLabel: true,
+      title: (lead) => lead.name ?? undefined,
+      cell: (lead) => (
+        <StackedCell
+          primary={
+            <>
+              <Link
+                href={`/admin/responses/${lead.id}`}
+                className="focus-ring rounded-[var(--ds-radius-chip)] hover:text-[color:hsl(var(--ds-accent))]"
+              >
+                {lead.name || EMPTY_VALUE}
+              </Link>
+              {lead.isTest && (
+                <Badge variant="warning" size="sm" className="ml-2 align-middle">
+                  Test
+                </Badge>
+              )}
+            </>
+          }
+          secondary={lead.title ?? lead.email}
+        />
+      ),
+    },
+    {
+      key: "company",
+      header: "Company",
+      title: (lead) => lead.company ?? undefined,
+      cell: (lead) => (
+        <StackedCell
+          primary={<span className="text-[14px] font-semibold">{lead.company || EMPTY_VALUE}</span>}
+          secondary={lead.surveyTitle}
+        />
+      ),
+    },
+    {
+      key: "score",
+      header: "Score",
+      sortable: true,
+      sortValue: (lead) => lead.leadScore,
+      cell: (lead) => <ScoreChip score={lead.leadScore} />,
+    },
+    {
+      key: "fit",
+      header: "Fit",
+      sortable: true,
+      sortValue: (lead) => lead.fitScore,
+      cell: (lead) => (
         <span
-          className="flex items-center gap-2"
-          onClick={(event) => event.stopPropagation()}
-          onKeyDown={(event) => event.stopPropagation()}
+          title={
+            lead.fitConfidence === "unavailable"
+              ? "Company fit research was unavailable."
+              : (lead.fitReasoning ?? undefined)
+          }
         >
-          {permissions.assignOthers ? (
-            <select
+          <ScoreChip score={lead.fitScore} variant="fit" />
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (lead) => <Badge state={LEAD_STATUS_BADGE_STATE[lead.leadStatus]} />,
+    },
+    // Who holds the lead, and the control to change that, in one column.
+    // With the assign-others permission the cell is the select (its value is
+    // the assignee; "Me" claims); with only the claim permission it is the
+    // name, or a Claim button while nobody holds it.
+    {
+      key: "assignee",
+      header: "Assignee",
+      title: (lead) => (canAssign ? undefined : (lead.assigneeName ?? undefined)),
+      cell: (lead) => {
+        const pending = pendingId === lead.id || bulkRunning !== null;
+        const name = lead.assignedTo === currentUserId ? "Me" : lead.assigneeName;
+        if (permissions.assignOthers) {
+          return (
+            <SelectControl
+              size="row"
+              muted={!lead.assignedTo}
               value={lead.assignedTo ?? ""}
               disabled={pending}
               onChange={(event) => handleAssignSelect(lead, event.target.value)}
               aria-label={`Assign ${lead.name || "this lead"} to a teammate`}
-              className={ROW_SELECT_CLASSES}
+              className="w-full"
             >
               <option value="">Unassigned</option>
               {members.map((member) => (
@@ -395,87 +505,46 @@ export function LeadsQueue({
                   {member.id === currentUserId ? "Me" : member.name}
                 </option>
               ))}
-            </select>
-          ) : lead.assignedTo ? (
-            <span className="truncate">{name}</span>
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              disabled={pending}
-              onClick={() => runAction(lead.id, () => claimLead(lead.id))}
-            >
-              {pending ? "Claiming" : "Claim"}
-            </Button>
-          )}
-        </span>
-      );
+              {/* Held by someone who has since left the team: still held,
+                  and the select has to be able to say so. */}
+              {lead.assignedTo && !members.some((member) => member.id === lead.assignedTo) && (
+                <option value={lead.assignedTo}>{lead.assigneeName ?? "Former teammate"}</option>
+              )}
+            </SelectControl>
+          );
+        }
+        if (lead.assignedTo || !permissions.claim) {
+          return (
+            <span className={cn("block truncate text-[12px] font-semibold", name ? text.ink : text.muted3)}>
+              {name ?? "Unassigned"}
+            </span>
+          );
+        }
+        return (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={pending}
+            onClick={() => runAction(lead.id, () => claimLead(lead.id))}
+          >
+            {pendingId === lead.id ? "Claiming" : "Claim"}
+          </Button>
+        );
+      },
     },
-  };
-
-  // The named steps are fixed px and the fractions are shares of the table,
-  // so together they can ask for more than the table has and push it into a
-  // horizontal scroll. The name column declares no width on purpose: under
-  // the fixed layout it takes whatever the others leave, which at the 1140px
-  // container is about a quarter of the table and on a narrower one is still
-  // enough for a name.
-  const columns: Column<LeadItem>[] = [
-    {
-      key: "name",
-      header: "Respondent",
-      truncate: true,
-      title: (lead) => lead.name ?? undefined,
-      cell: (lead) => (
-        <span className="whitespace-nowrap">
-          <span className="align-middle font-medium">{lead.name || EMPTY_VALUE}</span>
-          {lead.isTest && (
-            <Badge variant="warning" size="sm" className="ml-2 align-middle">
-              Test
-            </Badge>
-          )}
-        </span>
-      ),
-    },
-    {
-      key: "company",
-      header: "Company",
-      width: showStudyColumn ? 0.14 : 0.19,
-      truncate: true,
-      title: (lead) => lead.company ?? undefined,
-      cell: (lead) => (
-        <span className="text-muted-foreground">{lead.company || EMPTY_VALUE}</span>
-      ),
-    },
-    ...(showStudyColumn ? [studyColumn] : []),
-    {
-      key: "score",
-      header: "Score",
-      align: "center",
-      width: "xs",
-      sortable: true,
-      sortValue: (lead) => lead.leadScore,
-      cell: (lead) => <ScoreBadge score={lead.leadScore} />,
-    },
-    ...(showFitColumn ? [fitColumn] : []),
-    {
-      key: "status",
-      header: "Status",
-      width: "md",
-      cell: (lead) => <LeadStatusBadge status={lead.leadStatus} size="sm" />,
-    },
-    assigneeColumn,
     {
       key: "activity",
       header: "Last activity",
       align: "right",
-      // md, not sm: the header is sortable, and its chevron plus the
-      // uppercase tracked label does not fit in the smaller step.
-      width: "md",
       sortable: true,
       sortValue: (lead) => new Date(lead.lastActivityAt).getTime(),
       cell: (lead) => (
-        <RelativeTime date={lead.lastActivityAt} align="right" className="text-muted-foreground" />
+        <RelativeTime
+          date={lead.lastActivityAt}
+          align="right"
+          className={cn("ds-mono-count", text.muted2)}
+        />
       ),
     },
   ];
@@ -483,24 +552,84 @@ export function LeadsQueue({
   // The server hands rows back score-desc, then most recently touched, which
   // is the order this queue is meant to be worked in, so the default sort is
   // no sort.
-  const { rows, sort, onSort } = useTableSort(filtered, columns);
+  const { rows, sort, onSort } = useTableSort(filtered, columnsWithoutSelect);
+
+  // Selection is of rows on screen: a lead a filter has hidden is not acted
+  // on by a bar that says "2 selected" over a table that shows neither.
+  const selectedRows = rows.filter((lead) => selected.has(lead.id));
+  const allSelected = rows.length > 0 && selectedRows.length === rows.length;
+
+  function toggleRow(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(rows.map((lead) => lead.id)));
+  }
+
+  const columns: Column<LeadItem>[] = [
+    {
+      key: "select",
+      header: (
+        <input
+          type="checkbox"
+          aria-label="Select all"
+          checked={allSelected}
+          ref={(element) => {
+            if (element) element.indeterminate = selectedRows.length > 0 && !allSelected;
+          }}
+          onChange={toggleAll}
+          disabled={bulkRunning !== null}
+          className={cn(CHECKBOX, "block")}
+        />
+      ),
+      cell: (lead) => (
+        <input
+          type="checkbox"
+          aria-label={`Select ${leadName(lead)}`}
+          checked={selected.has(lead.id)}
+          onChange={() => toggleRow(lead.id)}
+          disabled={bulkRunning !== null}
+          className={cn(CHECKBOX, "block")}
+        />
+      ),
+    },
+    ...columnsWithoutSelect,
+  ];
 
   // The tab's own sentence when the tab is genuinely empty; the filter
   // sentence when it is the search or a toggle that emptied it.
   const emptyTitle = tabCounts[tab] === 0 ? TAB_EMPTY[tab] : "No leads match these filters.";
 
+  const showBar = selectedRows.length > 0 || bulkRunning !== null;
+  const bulkOk = bulkReport ? bulkReport.total - bulkReport.failures.length : 0;
+
   return (
     <>
-      <StatRow stats={stats} className="mb-6" />
+      <PageTopBar
+        crumbs={[{ label: "Leads" }]}
+        actions={
+          unworkedTotal > 0 ? (
+            <Button asChild>
+              <Link href="/admin/leads?tab=unworked" onClick={() => selectTab("unworked")}>
+                Triage <span className="font-mono font-medium">{unworkedTotal}</span> unworked
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
 
-      <div className="mb-4">
-        <StudyFilterCards cards={surveyCards} selectedId={surveyFilter} onSelect={setSurveyFilter} />
-      </div>
+      <StatRow stats={stats} className="mb-5" />
 
-      {/* One toolbar row: which leads (tabs) on the left, search, source and
+      {/* One row: which leads (tabs) on the left; search, study, source and
           the two narrowing toggles on the right. Wraps below the container
           width rather than reserving a second row of chrome. */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <FilterTabs
           label="Filter leads by stage"
           tabs={QUEUE_TABS.map((value) => ({ value, label: TAB_LABELS[value], count: tabCounts[value] }))}
@@ -514,13 +643,29 @@ export function LeadsQueue({
             onChange={setQuery}
             placeholder="Name, email, company"
             label="Search leads by name, email, or company"
-            className="w-64 max-w-none flex-none"
+            className="w-[220px] max-w-none flex-none basis-auto"
           />
 
-          <select
+          <SelectControl
+            value={surveyFilter ?? ALL_STUDIES_VALUE}
+            onChange={(event) =>
+              setSurveyFilter(event.target.value === ALL_STUDIES_VALUE ? null : event.target.value)
+            }
+            aria-label="Filter the queue by study"
+            className="max-w-[220px]"
+          >
+            <option value={ALL_STUDIES_VALUE}>All studies</option>
+            {studyOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.title}
+              </option>
+            ))}
+          </SelectControl>
+
+          <SelectControl
             value={showTest ? TEST_SOURCE_VALUE : sourceFilter}
-            onChange={(e) => {
-              const value = e.target.value;
+            onChange={(event) => {
+              const value = event.target.value;
               if (value === TEST_SOURCE_VALUE) {
                 setShowTest(true);
                 setSourceFilter("all");
@@ -530,7 +675,7 @@ export function LeadsQueue({
               setSourceFilter(value);
             }}
             aria-label="Choose which responses the queue reads from"
-            className={SELECT_CLASSES}
+            className="max-w-[220px]"
           >
             <option value="all">All sources</option>
             {sourceOptions.map((source) => (
@@ -539,49 +684,123 @@ export function LeadsQueue({
               </option>
             ))}
             <option value={TEST_SOURCE_VALUE}>Include test responses</option>
-          </select>
+          </SelectControl>
 
-          <Button
-            type="button"
-            size="sm"
-            variant={hotOnly ? "primary" : "secondary"}
-            onClick={() => setHotOnly((p) => !p)}
-            aria-pressed={hotOnly}
-          >
+          <ToggleChip active={hotOnly} onToggle={() => setHotOnly((previous) => !previous)}>
             Score {WORTH_A_CALL_SCORE_MIN}+
-          </Button>
-          {/* Only offered when at least one row in view has a fit score. A
-              filter for a value nothing has is a dead control. */}
-          {showFitColumn && (
-            <Button
-              type="button"
-              size="sm"
-              variant={fitHotOnly ? "primary" : "secondary"}
-              onClick={() => setFitHotOnly((p) => !p)}
-              aria-pressed={fitHotOnly}
-            >
-              Fit {HOT_FIT_MIN}+
-            </Button>
-          )}
+          </ToggleChip>
+          <ToggleChip active={fitHotOnly} onToggle={() => setFitHotOnly((previous) => !previous)}>
+            Fit {HOT_FIT_MIN}+
+          </ToggleChip>
         </div>
       </div>
 
       {actionError && (
-        <p role="alert" className="type-body-sm mb-3 text-destructive">
+        <p role="alert" className={cn("ds-small mb-3 flex items-center gap-2", text.ink)}>
+          <span aria-hidden className={cn("h-[6px] w-[6px] shrink-0 rounded-full", dot.danger)} />
           {actionError}
         </p>
+      )}
+
+      {bulkReport && (
+        <Card
+          padding="compact"
+          role={bulkReport.failures.length > 0 ? "alert" : "status"}
+          className="mb-3 flex items-start justify-between gap-4"
+        >
+          <div className="flex min-w-0 flex-col gap-2">
+            <p className="ds-body-strong">{BULK_DONE[bulkReport.kind](bulkOk, bulkReport.total)}</p>
+            {bulkReport.failures.length > 0 && (
+              <ul className="flex flex-col gap-1.5">
+                {bulkReport.failures.map((failure) => (
+                  <li key={failure.id} className={cn("ds-small flex gap-2", text.ink3)}>
+                    <span
+                      aria-hidden
+                      className={cn("mt-[7px] h-[6px] w-[6px] shrink-0 rounded-full", dot.danger)}
+                    />
+                    <span className="min-w-0 break-words">
+                      <span className={cn("font-bold", text.ink)}>{failure.name}</span> failed: {failure.error}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setBulkReport(null)}>
+            Dismiss
+          </Button>
+        </Card>
       )}
 
       <DataTable
         columns={columns}
         rows={rows}
         rowKey={(lead) => lead.id}
-        rowHref={(lead) => `/admin/responses/${lead.id}`}
-        layout="fixed"
+        density="stacked"
+        gridTemplate={GRID_TEMPLATE}
         sort={sort}
         onSort={onSort}
         empty={{ title: emptyTitle }}
       />
+
+      {showBar && (
+        <>
+          {/* Room for the last row to scroll clear of the bar. */}
+          <div aria-hidden className="h-[82px]" />
+          <FloatingBar
+            label={
+              bulkRunning ? (
+                <>
+                  {BULK_RUNNING[bulkRunning.kind]}{" "}
+                  <span className="font-mono font-medium">
+                    {Math.min(bulkRunning.done + 1, bulkRunning.total)}
+                  </span>{" "}
+                  of <span className="font-mono font-medium">{bulkRunning.total}</span>
+                </>
+              ) : (
+                <>
+                  <span className="font-mono font-medium">{selectedRows.length}</span> selected
+                </>
+              )
+            }
+            className="fixed left-[var(--ds-shell-sidebar)] right-0"
+          >
+            {permissions.claim && (
+              <FloatingBarButton
+                disabled={bulkRunning !== null}
+                onClick={() => runBulk("assign", selectedRows)}
+              >
+                Assign to me
+              </FloatingBarButton>
+            )}
+            {permissions.setStatus && (
+              <FloatingBarButton
+                disabled={bulkRunning !== null}
+                onClick={() => runBulk("contacted", selectedRows)}
+              >
+                Mark contacted
+              </FloatingBarButton>
+            )}
+            {permissions.pushToCrm && (
+              <FloatingBarButton
+                primary
+                disabled={bulkRunning !== null}
+                onClick={() => runBulk("push", selectedRows)}
+              >
+                Push to HubSpot
+              </FloatingBarButton>
+            )}
+            <FloatingBarButton
+              aria-label="Clear selection"
+              disabled={bulkRunning !== null}
+              onClick={() => setSelected(new Set())}
+              className={cn("w-[38px] px-0 text-[16px]", text.onInkMuted)}
+            >
+              ×
+            </FloatingBarButton>
+          </FloatingBar>
+        </>
+      )}
     </>
   );
 }

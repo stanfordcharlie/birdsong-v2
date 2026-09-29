@@ -3,43 +3,59 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
+import { bg, border, radius, text } from "./tokens";
 
 /**
- * The admin button. Three variants, one shape.
+ * The admin button. One shape, 34px tall, on the control radius. Never a
+ * pill: the floating bar is the only pill in admin and has its own buttons.
  *
- * Every button is a pill. The surface previously carried nine distinct button
- * shapes across two radii and five heights, including "primary actions" that
- * were bare anchors. A bare text link that triggers navigation is a `ghost`
- * button here, not an anchor styled at the call site.
+ * - `primary` is the accent fill. One per bar, and it is the rightmost.
+ * - `secondary` is the bordered white button beside it.
+ * - `dashed` adds something that is not there yet: a filter, a field.
+ * - `ink` is the dark fill, for the one action on a light hero card.
+ * - `ghost` has no border and no fill, so it can sit inline next to a
+ *   heading without reading as a second primary action.
  *
  * Deliberately separate from components/ui/button.tsx rather than replacing
- * it: that one is shared with the respondent survey, the marketing pages and
- * NewStudyWizard, which are out of scope for this pass. Admin imports from
- * here; respondent and marketing import from there; neither edits the other.
+ * it: that one is shared with the respondent study, the marketing pages and
+ * NewStudyWizard. Admin imports from here; respondent and marketing import
+ * from there; neither edits the other.
  */
 const adminButtonVariants = cva(
   cn(
-    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-pill",
-    "font-archivo font-semibold transition-colors",
+    "ds-control inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap transition-colors",
     // The one focus treatment. Never remove an outline without this.
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-page",
+    "focus-ring",
     "disabled:pointer-events-none disabled:opacity-50",
     "[&_svg]:pointer-events-none [&_svg]:shrink-0"
   ),
   {
     variants: {
       variant: {
-        primary: "bg-primary text-primary-foreground hover:bg-primary-hover",
-        secondary: "border border-border bg-card text-card-foreground hover:bg-secondary",
-        // No border and no fill, so it can sit inline next to a heading
-        // without reading as a second primary action.
-        ghost: "text-muted-foreground hover:text-card-foreground hover:underline",
+        primary: cn(bg.accent, text.onInk, "hover:bg-[color:hsl(var(--ds-accent)/0.9)]"),
+        secondary: cn(
+          "border",
+          border.base,
+          bg.base,
+          text.ink3,
+          "hover:bg-[color:hsl(var(--ds-bg-sidebar))]"
+        ),
+        dashed: cn(
+          "border border-dashed",
+          border.dashed,
+          bg.base,
+          text.muted,
+          "hover:bg-[color:hsl(var(--ds-bg-sidebar))]"
+        ),
+        ink: cn(bg.ink, text.onInk, "hover:bg-[color:hsl(var(--ds-ink-2))]"),
+        ghost: cn(text.muted2, "hover:text-[color:hsl(var(--ds-ink))]"),
       },
       size: {
-        default: "h-10 px-5 text-sm [&_svg]:size-4",
-        sm: "h-8 px-3.5 text-control [&_svg]:size-3.5",
+        default: cn("h-[34px] px-[12px] [&_svg]:size-[14px]", radius.control),
+        sm: cn("h-[30px] px-[10px] text-[12px] [&_svg]:size-[12px]", radius.chip),
       },
     },
+    compoundVariants: [{ variant: "primary", size: "default", className: "px-[14px]" }],
     defaultVariants: { variant: "primary", size: "default" },
   }
 );
@@ -49,17 +65,32 @@ export interface AdminButtonProps
     VariantProps<typeof adminButtonVariants> {
   /** Render as the single child element (e.g. a next/link) instead of a button. */
   asChild?: boolean;
+  /**
+   * A keyboard hint after the label, in mono. Not rendered with `asChild`,
+   * where the child element owns its own content.
+   */
+  kbd?: string;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, AdminButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
+  ({ className, variant, size, asChild = false, kbd, children, ...props }, ref) => {
+    const classes = cn(adminButtonVariants({ variant, size }), className);
+    if (asChild) {
+      return (
+        <Slot className={classes} ref={ref} {...props}>
+          {children}
+        </Slot>
+      );
+    }
     return (
-      <Comp
-        className={cn(adminButtonVariants({ variant, size }), className)}
-        ref={ref}
-        {...props}
-      />
+      <button className={classes} ref={ref} {...props}>
+        {children}
+        {kbd && (
+          <kbd aria-hidden className="ds-mono-kbd opacity-70">
+            {kbd}
+          </kbd>
+        )}
+      </button>
     );
   }
 );

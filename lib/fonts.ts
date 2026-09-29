@@ -1,16 +1,16 @@
 import {
-  Archivo,
   Bricolage_Grotesque,
   Caveat,
   DM_Sans,
+  IBM_Plex_Mono,
   Instrument_Sans,
   Instrument_Serif,
   Inter,
+  Manrope,
   Newsreader,
   Plus_Jakarta_Sans,
   Source_Serif_4,
   Spectral,
-  Young_Serif,
 } from "next/font/google";
 import localFont from "next/font/local";
 
@@ -36,23 +36,22 @@ export const newsreader = Newsreader({
   display: "swap",
 });
 
-// Platform design system (admin + respondent survey) — see
-// design_handoff_birdsong_platform. Young Serif for display headings, big
-// numbers, and the wordmark only; Archivo for everything else. Wired into
-// tailwind.config.ts as font-serif / font-archivo. Applied at each
-// section's layout root (app/admin/layout.tsx, app/study/[slug]/page.tsx)
-// rather than the global <body>, so marketing pages are unaffected.
-export const youngSerif = Young_Serif({
+// Admin design system, Ledger II (design/design-system). Manrope sets every
+// word in admin; IBM Plex Mono sets every number, score, count, timestamp
+// and keyboard hint. Both variables are applied at AdminShell, and
+// app/globals.css names the roles (--font-display, --font-body, --font-mono)
+// inside `.admin-theme`.
+export const manrope = Manrope({
   subsets: ["latin"],
-  weight: "400",
-  variable: "--font-young-serif",
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-manrope",
   display: "swap",
 });
 
-export const archivo = Archivo({
+export const plexMono = IBM_Plex_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-archivo",
+  weight: ["400", "500"],
+  variable: "--font-plex-mono",
   display: "swap",
 });
 
@@ -84,7 +83,7 @@ export const bricolage = Bricolage_Grotesque({
 // Marketing landing pages' body/UI face (design_handoff_landing_v2, which
 // replaced Inter here). Scoped to LandingPageShell rather than swapped into
 // tailwind's global `sans`: Inter is still the default everywhere outside
-// marketing, and the admin/survey surfaces set Archivo explicitly.
+// marketing; admin sets Manrope and the respondent study sets its own face.
 export const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-dm-sans",

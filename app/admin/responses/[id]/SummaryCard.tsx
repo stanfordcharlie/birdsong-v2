@@ -42,7 +42,7 @@ export function SummaryCard({
 
       <div className="flex min-w-0 flex-col gap-3">
         {headline ? (
-          <p className="font-serif text-[26px] leading-[1.3] tracking-[-0.01em] text-card-foreground">
+          <p className="text-[26px] leading-[1.3] tracking-[-0.01em] text-card-foreground">
             {headline}
           </p>
         ) : (
