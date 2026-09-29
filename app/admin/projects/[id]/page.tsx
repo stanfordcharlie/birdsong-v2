@@ -3,12 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { can, requireActiveOrg } from "@/lib/org";
 import { type ResponseTableRow } from "./ResponsesTable";
 import {
-  isStudyTab,
   StudyDetailView,
   type QualityMetric,
   type RespondentChip,
   type SourceBreakdownRow,
 } from "./StudyDetailView";
+import { studyTabFromParam } from "./tabs";
 import { isSystemSource } from "@/lib/interview/source";
 import { type SurveyReportRow } from "./ReportSection";
 import { type StudyFormValues } from "@/components/StudyForm";
@@ -259,7 +259,7 @@ export default async function StudyDetailPage({
       medianCompletionMs={medianCompletionMs}
       prospectCount={prospects.length}
       quality={quality}
-      initialTab={isStudyTab(tab) ? tab : "responses"}
+      initialTab={studyTabFromParam(tab)}
       sourceBreakdown={sourceBreakdown}
       initialValues={initialValues}
       latestReport={

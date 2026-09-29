@@ -24,6 +24,7 @@ import { coverageAdvisory, interviewLengthPreset, interviewLengthSummary } from 
 import { StudyForm, type StudyFormValues } from "@/components/StudyForm";
 import { ReportSection, type SurveyReportRow } from "./ReportSection";
 import { ResponsesTable, type ResponseTableRow } from "./ResponsesTable";
+import type { StudyTab } from "./tabs";
 
 export type SourceBreakdownRow = {
   source: string;
@@ -57,15 +58,6 @@ export type StudyDetailData = {
 
 /** One measure on the Interview quality card: a share of interviews, 0 to 1. */
 export type QualityMetric = { label: string; ratio: number };
-
-// The sections that swap in place. Prospects is a tab too, but it is its own
-// route, so it is never the value here.
-const STUDY_TABS = ["responses", "report", "brief"] as const;
-export type StudyTab = (typeof STUDY_TABS)[number];
-
-export function isStudyTab(value: unknown): value is StudyTab {
-  return typeof value === "string" && (STUDY_TABS as readonly string[]).includes(value);
-}
 
 // Below this a quality measure is drawn in the warn colour.
 const QUALITY_WARN_BELOW = 0.6;
