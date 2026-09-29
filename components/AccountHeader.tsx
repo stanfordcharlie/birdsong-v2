@@ -24,7 +24,7 @@ export async function AccountHeader() {
             Projects
           </Link>
           <Link
-            href="/admin/profile"
+            href="/admin/settings/profile"
             className="text-sidebar-foreground transition-colors hover:text-sidebar-active-foreground"
           >
             Company Profile

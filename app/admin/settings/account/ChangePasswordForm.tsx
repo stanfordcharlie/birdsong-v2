@@ -4,9 +4,11 @@ import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PasswordInput } from "@/components/PasswordInput";
 import { Button } from "@/components/admin/ui";
+import { text } from "@/components/admin/ui/tokens";
 import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate } from "@/components/useLoadingGate";
 import { cn } from "@/lib/utils";
+import { settingsLabelClass } from "../SettingsSection";
 
 const MIN_LENGTH = 10;
 
@@ -20,6 +22,11 @@ function strength(password: string): { level: 0 | 1 | 2 | 3; label: string } {
   if (password.length >= 12 && kinds >= 2) return { level: 2, label: "Good" };
   return { level: 1, label: "Okay" };
 }
+
+// PasswordInput is shared with the sign-in screens, so its height and ring
+// are set from here rather than in it.
+const passwordFieldClass =
+  "h-[38px] rounded-[var(--ds-radius-control)] border-[color:hsl(var(--ds-border))] text-[14px]";
 
 export function ChangePasswordForm() {
   const [newPassword, setNewPassword] = useState("");
@@ -58,12 +65,24 @@ export function ChangePasswordForm() {
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5">
-          <span className="type-body-sm font-medium">New password</span>
-          <PasswordInput value={newPassword} onChange={setNewPassword} required minLength={MIN_LENGTH} />
+          <span className={settingsLabelClass}>New password</span>
+          <PasswordInput
+            value={newPassword}
+            onChange={setNewPassword}
+            required
+            minLength={MIN_LENGTH}
+            className={passwordFieldClass}
+          />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="type-body-sm font-medium">Confirm</span>
-          <PasswordInput value={confirmPassword} onChange={setConfirmPassword} required minLength={MIN_LENGTH} />
+          <span className={settingsLabelClass}>Confirm</span>
+          <PasswordInput
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            required
+            minLength={MIN_LENGTH}
+            className={passwordFieldClass}
+          />
         </label>
       </div>
 
@@ -73,11 +92,16 @@ export function ChangePasswordForm() {
             {[1, 2, 3].map((segment) => (
               <span
                 key={segment}
-                className={cn("h-1 w-10 rounded-pill", meter.level >= segment ? "bg-primary" : "bg-border")}
+                className={cn(
+                  "h-1 w-10 rounded-[var(--ds-radius-chip)]",
+                  meter.level >= segment
+                    ? "bg-[color:hsl(var(--ds-accent))]"
+                    : "bg-[color:hsl(var(--ds-bg-track))]"
+                )}
               />
             ))}
           </div>
-          <span className={cn("type-body-sm", mismatch || error ? "text-destructive" : "text-muted-foreground")}>
+          <span className={cn("text-[13px]", mismatch || error ? "text-destructive" : text.muted2)}>
             {error ?? (mismatch ? "Passwords do not match" : success ? "Password updated" : meter.label)}
           </span>
         </div>

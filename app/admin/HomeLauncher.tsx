@@ -4,11 +4,15 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/admin/ui";
 import { bg, border, radius, shadow, text } from "@/components/admin/ui/tokens";
+import { LAUNCHER_SEED_KEY } from "@/lib/study-brief/types";
 import { cn } from "@/lib/utils";
 
+const NEW_STUDY_PATH = "/admin/projects/new";
+
 // The study launcher under the greeting. It is an entry point rather than a
-// feature: it navigates to study creation and nothing the visitor types is
-// sent anywhere, which is what it did before this was one 56px input.
+// feature: it navigates to study creation and sends nothing itself. What was
+// typed is left in sessionStorage for the new study page, which makes it the
+// first message of the conversation.
 
 function SparkleIcon() {
   return (
@@ -35,6 +39,16 @@ export function HomeLauncher({ href }: { href: string }) {
 
   function submit(e: FormEvent) {
     e.preventDefault();
+    const typed = value.trim();
+    // Only when this leads to study creation: a member's launcher goes to
+    // Projects, where nothing would read it.
+    if (typed && href.startsWith(NEW_STUDY_PATH)) {
+      try {
+        window.sessionStorage.setItem(LAUNCHER_SEED_KEY, typed);
+      } catch {
+        // Storage is unavailable. The page opens on its own first question.
+      }
+    }
     router.push(href);
   }
 

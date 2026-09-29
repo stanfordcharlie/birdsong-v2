@@ -278,7 +278,7 @@ No hover motion beyond colour. No transitions on layout.
   search with a `⌘K` hint, the Workspace nav (Home, Live, Leads, Projects), Active
   studies with a plus, then the account row with a gear (Lucide `Settings`, 16px, 1.5px
   stroke) that opens Settings. The account name opens a menu for Company profile, Team
-  and Sign out. Active item: `bg` ground, `shadow-active-nav`, `ink` at 700, and no
+  (both Settings sections) and Sign out. Active item: `bg` ground, `shadow-active-nav`, `ink` at 700, and no
   outline or border of its own.
 - **Top bar** (`AdminShell`): 56px, bottom border. Breadcrumb left, actions right. The
   shell derives a breadcrumb from the route; a page replaces it with `PageTopBar`.
@@ -299,6 +299,67 @@ No hover motion beyond colour. No transitions on layout.
 - **Study detail:** title with its badge and a meta line, stat row, section tabs with the
   search field and a toggle at the right end, the responses table beside the Interview
   quality card.
+- **New study:** two panels filling everything under the top bar. The top bar carries
+  "Use the form instead" (secondary, to `?mode=form`, the step-by-step wizard) and
+  "Create study" (primary, disabled until the brief has what a study requires).
+- **Settings:** a 220px sub-nav beside the section. The top bar reads "Settings /
+  {section}" with Sign out on the right.
+
+### New study
+
+`app/admin/projects/new`. The conversation is the page; the wizard it replaced is the same
+address with `?mode=form`.
+
+| Part | Spec |
+|---|---|
+| Conversation panel | `1fr`, right border, content capped at 720px, 32px 40px padding. The thread is the only scrolling region |
+| Birdsong turn | 32px `ink` tile on `radius-chip` with four `accent-bright` bars, then the text at 15px / 1.55, 14px apart |
+| Admin turn | Right-aligned, `bg-track`, 12px 16px padding, max 500px, `radius-card` with a 4px bottom-right corner |
+| Quick replies | Under a Birdsong turn, only where the answer is a choice. 30px, `radius-chip`, 1px border, 12px/700 in `muted` |
+| Replying | The tile and a five-bar `Waveform` with `live`, in place of the next turn |
+| Input | `ChatInput`, capped at 640px, in a `shrink-0` row under the thread with a top border. It never moves |
+| Brief panel | 440px (360px below `xl`), `bg-sidebar`, 28px padding, 16px between cards, scrolls on its own |
+| Brief header | "Study brief" at 12px/700 uppercase in `muted-2`, "Editable anytime" at 12px opposite |
+| Brief card | `bg`, 1px border, `radius-card`, 16px 18px padding, 12px/700 `muted-2` label. Unfilled: dashed border in `border-dashed` and "Waiting on your answer" in `muted-3` |
+| Signals | A numbered list, each number a 22px `accent-weak` chip in mono 11px |
+| Length | `FilterTabs` over the three presets, labelled by minutes |
+| Thank you gift | A 38px dollar field, "No gift", then the brand chips once there is an amount |
+
+Every card is click-to-edit in place. A field edited by hand belongs to the admin from
+then on: later suggestions from the conversation never overwrite it.
+
+The brief is kept in `sessionStorage` under the draft id in the address (`?draft=`), so a
+refresh restores the conversation and the brief.
+
+### Settings
+
+`app/admin/settings/layout.tsx` draws the frame; each section is a route under it.
+`/admin/settings` opens on Company profile, and `/admin/profile` redirects there.
+
+| Part | Spec |
+|---|---|
+| Sub-nav | 220px, 1px right border, 24px 14px padding, 2px between items. Sticky under the top bar |
+| Sub-nav item | 34px, `radius-chip`, 13px/600 in `muted`. Active: `bg-track`, `ink` at 700 |
+| Sections | Company profile, Account, Notifications, Integrations, Team. One is listed only when it has content for the person looking |
+| Content | 28px 32px padding. Every section but Company profile caps at 900px |
+| Section title | 26px/800, -0.03em, with at most one 13px `muted-2` line under it |
+| Setting row | A 260px left column (15px/800 title, one 13px `muted-2` line) and the control in a `Card`, rows separated by a hairline |
+| Fields | 38px, `radius-control`, 1px border |
+
+**Company profile** is a grid: content `1fr`, a 300px right column. The Edit with AI bar
+is 46px on `radius-control` with the accent sparkle and an `ink` Apply button inside it.
+Each group is a `Card` with the 44px `bg-sidebar` header and an accent Edit link that
+opens the fields in place. The right column holds the Logo card: a 48px tile, Replace and
+Remove. The top bar gains a Complete badge (`accent-weak`) and Fill with AI.
+
+**Integrations** is one `Card` per vendor: a 40px tile, the name at 14px/700, a status
+line with a 6px dot (`accent` connected, `muted-3` not), and Manage. The tile is a letter
+on the vendor's brand colour until the official mark is in `public/logos`: `#FF7A59` for
+HubSpot, `#4A154B` for Slack. **Those two are the only colours in admin that are not
+tokens, and they appear nowhere else.** A logo is never drawn by hand.
+
+A secret (the Slack webhook, the HubSpot token) is never sent to the browser or
+rendered. A page shows whether one is set.
 
 ---
 
@@ -326,6 +387,7 @@ writes a colour, a radius or a shadow of its own.
 | `EmptyState` | One sentence, one optional action, no chrome |
 | `StatusDot` | The live dot |
 | `FloatingBar`, `FloatingBarButton` | `label`, children. The ink pill of actions, pinned bottom centre of its positioned ancestor. Exactly one button is `primary`. The only pill in admin |
+| `ChatInput` | `value`, `onChange`, `onSend`, `label`, `placeholder`, `disabled`. The 52px chat bar on `radius-card` with `shadow-input` and the accent send button. Enter sends, Shift+Enter makes a new line, and it grows to six lines |
 | `Waveform` | `seed`, `bars` (24), `live`, `tone` light / ink / muted, `height`, `barWidth` (3), `align` center / end. Deterministic from the seed |
 | `RelativeTime` | `date`, `align`, `prefix`. Every timestamp a person reads, in mono, exactly as `formatRelativeTime` returns it |
 | `CollapsibleSection` | Set-once configuration on a detail page |

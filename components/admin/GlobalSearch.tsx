@@ -41,7 +41,7 @@ const PAGES: { href: string; label: string; description: string; also: string[] 
   { href: "/admin/live", label: "Live", description: "Interviews happening right now", also: ["in progress", "now"] },
   { href: "/admin/projects", label: "Projects", description: "All of your studies", also: ["studies", "study", "research"] },
   { href: "/admin/projects/new", label: "New study", description: "Start a study", also: ["create", "brief", "start"] },
-  { href: "/admin/profile", label: "Company profile", description: "What you sell and who you sell to", also: ["company", "icp", "value proposition"] },
+  { href: "/admin/settings/profile", label: "Company profile", description: "What you sell and who you sell to", also: ["company", "icp", "value proposition"] },
   { href: "/admin/settings", label: "Settings", description: "Account, email, password, notifications, sample data", also: ["account", "slack", "preferences"] },
   { href: "/admin/settings/team", label: "Team", description: "Who is in your workspace", also: ["members", "invite", "teammates", "workspace"] },
 ];

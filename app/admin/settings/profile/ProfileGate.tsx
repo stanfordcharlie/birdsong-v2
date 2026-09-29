@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CompanyProfileSetupFlow } from "./CompanyProfileSetupFlow";
+import { CompanyProfileSetupFlow } from "../../profile/CompanyProfileSetupFlow";
 import { CompanyProfileView, type CompanyProfileValues } from "./CompanyProfileView";
 import { AiFillFlow } from "./AiFillFlow";
-import { EmptyState, PageHeader, PageShell } from "@/components/admin/ui";
+import { EmptyState } from "@/components/admin/ui";
 import { PASTE_EXTRACTION_FIELDS } from "@/lib/profile-onboarding/company-profile-fields";
+import { SettingsSection } from "../SettingsSection";
 
 type AiFillResult = {
   mergedData: Record<string, string>;
@@ -77,10 +78,9 @@ export function ProfileGate({
   if (readOnly) {
     if (!hasExistingData) {
       return (
-        <PageShell>
-          <PageHeader eyebrow="Account" title="Company profile" />
+        <SettingsSection title="Company profile">
           <EmptyState title="No company profile yet. An owner or admin can set one up." />
-        </PageShell>
+        </SettingsSection>
       );
     }
     return (
@@ -99,20 +99,25 @@ export function ProfileGate({
   }
 
   if (!hasExistingData || aiFillResult) {
+    // The setup flow draws its own full-bleed rail and cancels the shell's
+    // padding to do it, so it takes the whole width: data-settings-bare is
+    // what tells the Settings frame to put its sub-nav away.
     return (
-      <CompanyProfileSetupFlow
-        orgId={orgId}
-        initialData={aiFillResult ? aiFillResult.mergedData : setupInitialData}
-        aiDraftedKeys={aiFillResult?.draftedKeys}
-        startAtStep={aiFillResult ? 0 : undefined}
-        thinResultNote={aiFillResult?.thinNote}
-        onRequestAiFill={() => setMode("ai-fill")}
-        onDone={() => {
-          setAiFillResult(null);
-          setJustFinishedSetup(true);
-          router.refresh();
-        }}
-      />
+      <div data-settings-bare>
+        <CompanyProfileSetupFlow
+          orgId={orgId}
+          initialData={aiFillResult ? aiFillResult.mergedData : setupInitialData}
+          aiDraftedKeys={aiFillResult?.draftedKeys}
+          startAtStep={aiFillResult ? 0 : undefined}
+          thinResultNote={aiFillResult?.thinNote}
+          onRequestAiFill={() => setMode("ai-fill")}
+          onDone={() => {
+            setAiFillResult(null);
+            setJustFinishedSetup(true);
+            router.refresh();
+          }}
+        />
+      </div>
     );
   }
 

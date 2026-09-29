@@ -377,7 +377,7 @@ export function AdminSidebar({
             className="absolute bottom-full left-0 right-0 z-50 mb-2 flex flex-col rounded-[var(--ds-radius-control)] border border-[color:hsl(var(--ds-border))] bg-[color:hsl(var(--ds-bg))] p-1 [box-shadow:var(--ds-shadow-input)]"
           >
             {[
-              { href: "/admin/profile", label: "Company profile" },
+              { href: "/admin/settings/profile", label: "Company profile" },
               { href: "/admin/settings/team", label: "Team" },
             ].map((item) => (
               <Link

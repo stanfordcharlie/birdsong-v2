@@ -1,5 +1,6 @@
 import { AddSampleDataButton, RemoveSampleDataButton } from "@/components/SampleDataControls";
 import { adminButtonVariants } from "@/components/admin/ui";
+import { text } from "@/components/admin/ui/tokens";
 import { cn } from "@/lib/utils";
 
 // The card body for the Sample data row: one state when the demo study is
@@ -11,11 +12,11 @@ export function SampleDataCard({
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <p className="type-body font-medium">
+      <div className="flex min-w-0 flex-col gap-[3px]">
+        <p className="text-[14px] font-semibold">
           {sample ? "Demo study is in your workspace" : "No demo study in your workspace"}
         </p>
-        <p className="type-body-sm text-muted-foreground">
+        <p className={cn("text-[13px]", text.muted2)}>
           {sample
             ? `“${sample.title}” · ${sample.responseCount} test ${sample.responseCount === 1 ? "response" : "responses"}`
             : "Add one to see the dashboard with data in it."}

@@ -1,17 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Textarea } from "@/components/ui/textarea";
-import { Button, PageHeader, PageShell } from "@/components/admin/ui";
+import { Button } from "@/components/admin/ui";
+import { bg, border, radius, text } from "@/components/admin/ui/tokens";
 import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate } from "@/components/useLoadingGate";
 import { buildPasteExtractionPrompt } from "@/lib/profile-onboarding/company-profile-fields";
+import { cn } from "@/lib/utils";
+import { SettingsTopBarExtras } from "../SettingsChrome";
+import { SettingsSection } from "../SettingsSection";
 
 const PROMPT = buildPasteExtractionPrompt();
 
+const STEP_LABEL = cn("text-[13px] font-bold", text.ink);
+
 // Two-part "fill this out with your AI" screen: copy a prompt, paste the
 // answer back. Extraction only, never a direct DB write, never navigation
-// on its own — the caller (ProfileGate) decides what to do with the result.
+// on its own: the caller (ProfileGate) decides what to do with the result.
 export function AiFillFlow({
   onCancel,
   onExtracted,
@@ -52,40 +57,53 @@ export function AiFillFlow({
   }
 
   return (
-    <PageShell>
-      <PageHeader
-        eyebrow="Account"
-        title="Fill with AI"
-        // The one instruction the two steps below cannot carry on their own.
-        meta="Copy the prompt into a chat that knows your company, then paste its answer back."
-        actions={
-          <Button type="button" variant="secondary" onClick={onCancel}>
-            Cancel
-          </Button>
-        }
-      />
+    <SettingsSection
+      title="Fill with AI"
+      // The one instruction the two steps below cannot carry on their own.
+      description="Copy the prompt into a chat that knows your company, then paste its answer back."
+    >
+      <SettingsTopBarExtras>
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          Cancel
+        </Button>
+      </SettingsTopBarExtras>
 
-      <div className="admin-measure flex flex-col gap-8">
+      <div className="flex flex-col gap-8">
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="type-eyebrow">1. Copy the prompt</h2>
+            <h2 className={STEP_LABEL}>1. Copy the prompt</h2>
             <Button type="button" variant="secondary" size="sm" onClick={handleCopy}>
               {copied ? "Copied" : "Copy prompt"}
             </Button>
           </div>
-          <pre className="type-code whitespace-pre-wrap rounded-control bg-chip px-4 py-3">{PROMPT}</pre>
+          <pre
+            className={cn(
+              "whitespace-pre-wrap px-4 py-3 font-mono text-[12px] leading-[1.5]",
+              radius.control,
+              bg.track,
+              text.ink2
+            )}
+          >
+            {PROMPT}
+          </pre>
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="type-eyebrow">2. Paste the answer</h2>
-          <Textarea
+          <h2 className={STEP_LABEL}>2. Paste the answer</h2>
+          <textarea
             value={pastedText}
             onChange={(e) => setPastedText(e.target.value)}
             placeholder="Paste the answer"
             rows={12}
-            className="type-code resize-none"
+            className={cn(
+              "focus-ring w-full resize-none border px-3 py-2 font-mono text-[12px] leading-[1.5] placeholder:text-[color:hsl(var(--ds-muted-3))]",
+              radius.control,
+              border.base,
+              bg.base,
+              text.ink
+            )}
           />
-          {error && <p className="type-body-sm text-destructive">{error}</p>}
+          {error && <p className="text-[13px] text-destructive">{error}</p>}
           <div className="flex justify-end">
             <Button type="button" onClick={handleExtract} disabled={extracting || !pastedText.trim()}>
               {extracting && showLoader && <BirdLoader size={18} label={false} />}
@@ -94,6 +112,6 @@ export function AiFillFlow({
           </div>
         </section>
       </div>
-    </PageShell>
+    </SettingsSection>
   );
 }

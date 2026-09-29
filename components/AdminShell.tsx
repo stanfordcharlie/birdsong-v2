@@ -19,9 +19,14 @@ const SECTIONS: { prefix: string; crumbs: Crumb[] }[] = [
   { prefix: "/admin/leads", crumbs: [{ label: "Leads" }] },
   { prefix: "/admin/responses", crumbs: [{ label: "Leads", href: "/admin/leads" }, { label: "Lead" }] },
   { prefix: "/admin/live", crumbs: [{ label: "Live" }] },
-  { prefix: "/admin/settings/team", crumbs: [{ label: "Settings", href: "/admin/settings" }, { label: "Team" }] },
+  // The Settings layout draws these itself once it mounts; they are here so
+  // the bar reads the same in the frame before it does.
+  { prefix: "/admin/settings/profile", crumbs: [{ label: "Settings" }, { label: "Company profile" }] },
+  { prefix: "/admin/settings/account", crumbs: [{ label: "Settings" }, { label: "Account" }] },
+  { prefix: "/admin/settings/notifications", crumbs: [{ label: "Settings" }, { label: "Notifications" }] },
+  { prefix: "/admin/settings/integrations", crumbs: [{ label: "Settings" }, { label: "Integrations" }] },
+  { prefix: "/admin/settings/team", crumbs: [{ label: "Settings" }, { label: "Team" }] },
   { prefix: "/admin/settings", crumbs: [{ label: "Settings" }] },
-  { prefix: "/admin/profile", crumbs: [{ label: "Settings", href: "/admin/settings" }, { label: "Company profile" }] },
   { prefix: "/admin/styleguide", crumbs: [{ label: "Styleguide" }] },
 ];
 

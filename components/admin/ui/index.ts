@@ -46,3 +46,4 @@ export { CollapsibleSection } from "./CollapsibleSection";
 export { FloatingBar, FloatingBarButton } from "./FloatingBar";
 export { Waveform } from "./Waveform";
 export { PageTopBar, Crumbs, TopBarContent, TopBarSlotContext, type Crumb } from "./PageTopBar";
+export { ChatInput } from "./ChatInput";
