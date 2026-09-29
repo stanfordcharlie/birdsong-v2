@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Settings } from "lucide-react";
 import { GlobalSearch } from "@/components/admin/GlobalSearch";
 import { SignOutButton } from "./SignOutButton";
 import { cn } from "@/lib/utils";
@@ -77,13 +78,11 @@ function ProjectsIcon() {
   );
 }
 
+// Lucide's Settings, the gear everyone already knows. absoluteStrokeWidth
+// keeps the stroke at 1.5px on screen: the icon is drawn on a 24 unit grid
+// and rendered at 16.
 function GearIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <circle cx="8" cy="8" r="2.2" />
-      <path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2" />
-    </svg>
-  );
+  return <Settings size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" />;
 }
 
 // The wordmark tile: four bars of the waveform on an ink ground.
@@ -118,6 +117,15 @@ const NAV_ITEM = "flex h-[36px] items-center gap-[10px] rounded-[var(--ds-radius
 const NAV_IDLE =
   "font-semibold text-[color:hsl(var(--ds-muted))] hover:text-[color:hsl(var(--ds-ink))]";
 const MONO = "[font-family:var(--font-mono)]";
+
+// A link clicked with the pointer gives its focus up once the click has
+// landed. Left focused, it is promoted to :focus-visible by the next key
+// press (a shortcut, a screenshot chord) and the ring appears around the
+// item that is already marked active. A keyboard activation reports
+// detail 0 and keeps its focus, and its ring.
+function releasePointerFocus(event: React.MouseEvent<HTMLElement>) {
+  if (event.detail > 0) event.currentTarget.blur();
+}
 
 function under(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -190,6 +198,7 @@ export function AdminSidebar({
     <aside className="sticky top-0 flex h-screen w-[240px] shrink-0 flex-col gap-[18px] border-r border-[color:hsl(var(--ds-border))] bg-[color:hsl(var(--ds-bg-sidebar))] px-[14px] pb-[14px] pt-[18px] text-[14px] text-[color:hsl(var(--ds-ink))]">
       <Link
         href="/admin"
+        onClick={releasePointerFocus}
         className={cn(FOCUS, "flex items-center gap-[10px] rounded-[var(--ds-radius-chip)] px-2 py-1")}
       >
         <Mark />
@@ -213,6 +222,7 @@ export function AdminSidebar({
               key={item.href}
               href={item.href}
               aria-current={item.active ? "page" : undefined}
+              onClick={releasePointerFocus}
               className={cn(FOCUS, NAV_ITEM, item.active ? ACTIVE : NAV_IDLE)}
             >
               <Icon />
@@ -277,6 +287,7 @@ export function AdminSidebar({
                 href={`/admin/projects/${study.id}`}
                 title={study.title}
                 aria-current={active ? "page" : undefined}
+                onClick={releasePointerFocus}
                 className={cn(
                   FOCUS,
                   "flex h-[34px] shrink-0 items-center gap-[10px] rounded-[var(--ds-radius-chip)] px-[10px] text-[13px]",
@@ -348,6 +359,7 @@ export function AdminSidebar({
           href="/admin/settings"
           aria-label="Settings"
           aria-current={onSettings ? "page" : undefined}
+          onClick={releasePointerFocus}
           className={cn(
             FOCUS,
             "ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--ds-radius-chip)]",

@@ -67,6 +67,9 @@ are intentionally forked. **Neither side edits the other's copy.**
 Loaded in `lib/fonts.ts` as `manrope` and `plexMono`, applied at `AdminShell`. The role
 variables exist only inside `.admin-theme`.
 
+Manrope and IBM Plex Mono are the only two faces in admin. Nothing else loads or renders
+on this surface.
+
 Scores, counts, timestamps, turn numbers and keyboard hints are mono. Everything else is
 the sans. A number in the body face is a mistake; the one exception is the stat value,
 which is a display number and is set in `.ds-stat`.
@@ -124,15 +127,27 @@ One dark ground, `--ds-ink`, reserved for the worth-a-call card and the floating
 | `--ds-danger` | `#dc2626`, a dot, never a fill |
 | `--ds-on-ink` / `--ds-on-ink-muted` | `#ffffff` / `#94a3b8` |
 
-| State | Dot | Ground | Text |
-|---|---|---|---|
-| New | `status-new` | `status-new-bg` | `status-new-text` |
-| Contacted | `muted-2` | `bg-track` | `ink-3` |
-| Meeting | `warn` | `warn-bg-badge` | `warn-text` |
-| In HubSpot | `accent` | `accent-weak` | `accent` |
-| Live | `accent` | `accent-weak` | `accent` |
-| Draft | `muted-3` | `bg-track` | `ink-3` |
-| Failed | `danger` | none | inherits |
+The `Badge` states, all eleven. The label comes from the state, never from the call site.
+
+| `state` | Label | Dot | Ground | Text |
+|---|---|---|---|---|
+| `new` | New | `status-new` | `status-new-bg` | `status-new-text` |
+| `assigned` | Assigned | `muted-2` | `bg-track` | `ink-3` |
+| `contacted` | Contacted | `muted-2` | `bg-track` | `ink-3` |
+| `nurture` | Nurture | `muted-2` | `bg-track` | `ink-3` |
+| `meeting` | Meeting | `warn` | `warn-bg-badge` | `warn-text` |
+| `qualified` | Qualified | `accent` | `accent-weak` | `accent` |
+| `disqualified` | Disqualified | `muted-3` | `bg-track` | `ink-3` |
+| `hubspot` | In HubSpot | `accent` | `accent-weak` | `accent` |
+| `live` | Live | `accent` | `accent-weak` | `accent` |
+| `draft` | Draft | `muted-3` | `bg-track` | `ink-3` |
+| `failed` | Failed | `danger` | none | inherits |
+
+`LEAD_STATUS_BADGE_STATE` maps each lead status to its state. An archived study has no
+state: it is `<Badge variant="outline">Archived</Badge>`.
+
+A status inside a table row is lighter than a badge: a 6px dot and a 12px/700 label on
+no ground (the study page's Status column).
 
 ### Aliases
 
@@ -204,7 +219,8 @@ a colour. New work uses `.ds-*`.
 | `--ds-row-h` | `60px` | Two-line table row. 54 one-line, 42 header |
 | `--ds-container-max` | `none` | Pages use the full width; Home caps itself |
 
-Content is padded 28px top and bottom, 32px at the sides, by `AdminShell`.
+Content is padded 28px top and bottom, 32px at the sides, by `AdminShell`. Home adds
+12px and 16px of its own to reach 40px and 48px, and caps its content at 1080px.
 
 ## Radius, shadow, timing, focus
 
@@ -226,11 +242,33 @@ Content is padded 28px top and bottom, 32px at the sides, by `AdminShell`.
 | `--ds-duration-pulse` | `1800ms` | Live dot pulse |
 
 **Focus.** One rule: `.focus-ring` gives `:focus-visible` a 2px ring in `--ds-accent` at
-a 2px offset. Never remove an outline without adding this.
+a 2px offset. Never remove an outline without adding this. Nothing in admin draws a ring
+or an outline on `:focus` alone (`.admin-theme :focus:not(:focus-visible)` clears it), and
+a sidebar link clicked with the pointer gives its focus up, so the active item never
+picks up a ring from the next key press.
 
-**Motion means live.** `.ds-wave-bar` and `.ds-pulse` run only on something that is live;
-`.ds-enter` runs once per page load. All three are gated on
-`prefers-reduced-motion: no-preference`.
+## Motion
+
+Motion means live. The resting state of every element is its final frame, and every
+animation class is bound only inside `@media (prefers-reduced-motion: no-preference)`,
+so reduced motion shows the final state with nothing moving.
+
+| Class | Keyframes | Timing | Where |
+|---|---|---|---|
+| `.ds-enter` | `ds-enter`, fade up 10px | `--ds-duration-enter`, `--ds-ease-out` | Cards on page load, once. Stagger with `--ds-enter-delay`, 80ms per card in reading order |
+| `.ds-ring-draw` | `ds-ring-draw`, dashoffset from `--ds-ring-length` | `--ds-duration-count`, `--ds-ease-out` | The worth-a-call ring. Shares its card's `--ds-enter-delay` |
+| `.ds-wave-bar` | `ds-wave`, scaleY 25% to 100% | `--ds-duration-wave`, per-bar `--ds-wave-delay` | `Waveform` with `live` |
+| `.ds-pulse` | `ds-pulse`, a ring out to 6px | `--ds-duration-pulse` | `StatusDot` with `pulse` |
+
+Home is the page that uses all four: the greeting, the worth-a-call card, Needs you and
+Live now enter at 0, 80, 160 and 240ms; the ring draws in and the card's four figures
+count up together over `--ds-duration-count`; the Live now dot pulses and the row
+waveforms breathe only while an interview is running. The count-up is the one piece
+driven by script (`app/admin/HomeWorthACall.tsx`). It reads `--ds-duration-count`, renders
+the final numbers on the server, and does not start at all under
+`prefers-reduced-motion: reduce`.
+
+No hover motion beyond colour. No transitions on layout.
 
 ---
 
@@ -238,13 +276,29 @@ a 2px offset. Never remove an outline without adding this.
 
 - **Sidebar** (`AdminSidebar`): 240px on `bg-sidebar` with a right border. Wordmark,
   search with a `⌘K` hint, the Workspace nav (Home, Live, Leads, Projects), Active
-  studies with a plus, then the account row with a gear that opens Settings. The account
-  name opens a menu for Company profile, Team and Sign out. Active item: `bg` ground,
-  `shadow-active-nav`, `ink` at 700.
+  studies with a plus, then the account row with a gear (Lucide `Settings`, 16px, 1.5px
+  stroke) that opens Settings. The account name opens a menu for Company profile, Team
+  and Sign out. Active item: `bg` ground, `shadow-active-nav`, `ink` at 700, and no
+  outline or border of its own.
 - **Top bar** (`AdminShell`): 56px, bottom border. Breadcrumb left, actions right. The
   shell derives a breadcrumb from the route; a page replaces it with `PageTopBar`.
 - **Bare routes** (login, signup, forgot and reset password) get neither, and are outside
   `.admin-theme`. The list lives in `lib/admin-routes.ts`, shared with `middleware.ts`.
+
+## Page anatomy
+
+- **Home:** greeting, the study launcher (one 56px input on `radius-card` with
+  `shadow-input`), the worth-a-call card beside Needs you, then Live now. Nothing else.
+- **Leads:** stat row, segmented tabs and filters on one line, the full-width table,
+  the floating bulk bar.
+- **Lead detail:** score tile, name, section tabs, transcript left, details right, the
+  floating action bar.
+- **Projects:** title beside the search field, tabs, a three-column grid of study cards
+  (112px flat cover with the study's waveform, `accent-weak` live and `bg-track` draft),
+  archived studies as 64px rows, a dashed New study card.
+- **Study detail:** title with its badge and a meta line, stat row, section tabs with the
+  search field and a toggle at the right end, the responses table beside the Interview
+  quality card.
 
 ---
 
@@ -258,22 +312,22 @@ writes a colour, a radius or a shadow of its own.
 |---|---|
 | `PageShell` | The container. Every admin page's outermost element |
 | `PageHeader` | `eyebrow`, `title`, `badge`, `meta`, `subtitle`, `actions`. Strips a terminal period |
-| `PageTopBar` | `crumbs`, `actions`. Renders into the shell's top bar |
+| `PageTopBar` | `crumbs: { label, href? }[]`, `actions`. Draws nothing in place: it portals into the shell's top bar. The primary action is last in `actions` and the only accent fill |
 | `Button` | `variant` primary / secondary / dashed / ink / ghost, `size` default (34px) / sm (30px), `kbd` |
 | `Card` | `padding` default / compact / flush, `interactive`, `header`, `headerAction` |
 | `StatRow` | `{ label, value, emphasis?, note?, delta?, href? }[]`. One joined bar |
 | `FilterTabs` | Segmented control with counts, for one choice over a list |
-| `SectionTabs` | Text tabs on a baseline, for the sections of a page |
-| `Badge` | `state`: new, contacted, meeting, hubspot, live, draft, failed |
-| `ScoreChip` | `score`, `variant` score / fit, `size` default / sm / hero |
+| `SectionTabs` | `tabs: { value, label, count?, href? }[]`, `value`, `onChange`, `label`, `trailing`. Text tabs on a hairline, 2px accent underline on the active one. A tab with `href` is a link; `trailing` is the right end of the row |
+| `Badge` | `state`, one of the eleven in the table above. `variant` with children for anything that is not a status |
+| `ScoreChip` | `score`, `variant` score / fit, `size` default (32 by 28) / sm (28 by 24) / hero (56px). An unscored row shows the empty glyph on no ground |
 | `SearchInput` | 34px, icon left, optional mono `hint` right |
-| `DataTable` | Header, rows, frame, empty state, sorting, `rowHref`. `density` stacked (60px) / default (54px) |
-| `StackedCell` | The two-line cell: primary over secondary, both ellipsized |
+| `DataTable` | `columns`, `rows`, `rowKey`, `rowHref`, `rowClassName`, `density` stacked (60px) / default (54px), `layout` auto / fixed, `gridTemplate`, `stickyHeader`, `sort` and `onSort`, `empty`, `footer` |
+| `StackedCell` | `primary`, `secondary`, `className`. The two-line cell: 15px/700 over 12px `muted-2`, both ellipsized |
 | `EmptyState` | One sentence, one optional action, no chrome |
 | `StatusDot` | The live dot |
-| `FloatingBar`, `FloatingBarButton` | The ink pill of actions. Exactly one `primary` |
-| `Waveform` | `seed`, `bars`, `live`, `tone`. Deterministic from the seed |
-| `RelativeTime` | Every timestamp a person reads, in mono |
+| `FloatingBar`, `FloatingBarButton` | `label`, children. The ink pill of actions, pinned bottom centre of its positioned ancestor. Exactly one button is `primary`. The only pill in admin |
+| `Waveform` | `seed`, `bars` (24), `live`, `tone` light / ink / muted, `height`, `barWidth` (3), `align` center / end. Deterministic from the seed |
+| `RelativeTime` | `date`, `align`, `prefix`. Every timestamp a person reads, in mono, exactly as `formatRelativeTime` returns it |
 | `CollapsibleSection` | Set-once configuration on a detail page |
 | `ScoreBadge` | The older name for a lead `ScoreChip`. Kept for its call sites |
 
@@ -287,9 +341,22 @@ the state table does not cover. A status passes `state`.
 `accent-weak` with accent text, below 7 takes `bg-track` with `ink-3`. 7 is the
 threshold in `lib/leads.ts`. `variant="fit"` is always neutral.
 
-`DataTable` holds no state: the admin home renders it from a server component. Sorting
-lives in `useTableSort`, a client hook beside it. `density="compact"` is accepted and
-renders as `default`; Ledger II has two row heights.
+`DataTable` holds no state, so a server component can render it. Sorting lives in
+`useTableSort`, a client hook beside it. `density="compact"` is accepted and renders as
+`default`; Ledger II has two row heights.
+
+`Column` is `{ key, header, cell, align?, width?, truncate?, title?, sortable?,
+sortValue?, ariaSort?, rowLabel? }`. `width` is a named px step (`xxs` 40, `xs` 64, `sm`
+96, `md` 128, `lg` 176) or a fraction below 1. A table drawn to a mockup passes
+`gridTemplate` instead (`"minmax(0,1.4fr) minmax(0,1fr) 56px 56px 120px 80px"`): every
+row is laid out on it with 16px between columns and 20px at the ends, and column `width`
+is ignored. `footer` is one last row inside the frame, under a hairline ("Show all 14").
+
+`Waveform` animates only with `live`. A study cover draws it static at 36 bars, 5px
+wide, `align="end"`, in `light` for a live study and `muted` for a draft.
+
+`RelativeTime` tightens the word gap: a space in a mono face is a full character cell,
+which set "5d ago" with what read as two spaces.
 
 ---
 
@@ -311,7 +378,7 @@ renders as `default`; Ledger II has two row heights.
   section.
 - Nothing respondent-facing mentions leads, scores or sales.
 - Stat labels are nouns, two words: "Worth a call", "Unworked", "Meetings booked".
-- Buttons are verbs: "Push to HubSpot", "Copy call script".
+- Buttons are verbs: "Push to HubSpot", "Copy call script", "Triage the 4".
 - No subtitles under page titles. If a sentence explains a control, the control is wrong.
 
 `EMPTY_VALUE` in `lib/format.ts` is the single empty-cell glyph. Import it; never type

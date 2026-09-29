@@ -3,12 +3,9 @@ import { interviewLengthPreset, interviewLengthSummary } from "@/lib/studies/int
 import { createClient } from "@/lib/supabase/server";
 import { can, requireActiveOrg } from "@/lib/org";
 import { WORTH_A_CALL_SCORE_MIN } from "@/lib/leads";
-import { Button, PageHeader, PageShell } from "@/components/admin/ui";
+import { Button, PageShell, PageTopBar } from "@/components/admin/ui";
 import { ExportStudiesButton } from "./ExportStudiesButton";
 import { StudiesList, type StudyListItem } from "./StudiesList";
-
-// How many slices each card's activity row divides a study's lifetime into.
-const ACTIVITY_BARS = 32;
 
 export default async function AdminDashboardPage({
   searchParams,
@@ -50,7 +47,23 @@ export default async function AdminDashboardPage({
       };
 
   const rows = responseRows ?? [];
-  const now = Date.now();
+
+  // Each study's roster, for the card's progress bar and its pending count.
+  // Status only: nothing else about a prospect is drawn here.
+  const { data: prospectRows } = surveyIds.length
+    ? await supabase.from("prospects").select("survey_id, status").in("survey_id", surveyIds)
+    : { data: [] as { survey_id: string | null; status: string }[] };
+
+  const prospectsBySurvey = new Map<string, { total: number; started: number; completed: number; pending: number }>();
+  for (const row of prospectRows ?? []) {
+    if (!row.survey_id) continue;
+    const tally = prospectsBySurvey.get(row.survey_id) ?? { total: 0, started: 0, completed: 0, pending: 0 };
+    tally.total += 1;
+    if (row.status === "started") tally.started += 1;
+    else if (row.status === "completed") tally.completed += 1;
+    else if (row.status === "pending") tally.pending += 1;
+    prospectsBySurvey.set(row.survey_id, tally);
+  }
 
   const bySurvey = new Map<string, typeof rows>();
   for (const row of rows) {
@@ -64,17 +77,7 @@ export default async function AdminDashboardPage({
     // Rows arrive newest-first, so the first one is the latest response.
     const lastResponseAt = own[0]?.created_at ?? null;
 
-    // The activity row: the study's lifetime cut into equal slices, one
-    // response tally per slice. Derived from the created_at values already
-    // fetched for the counts, so it costs no extra query.
-    const start = new Date(survey.created_at).getTime();
-    const span = Math.max(1, now - start);
-    const activity = new Array<number>(ACTIVITY_BARS).fill(0);
-    for (const row of own) {
-      const at = new Date(row.created_at).getTime();
-      const slice = Math.min(ACTIVITY_BARS - 1, Math.max(0, Math.floor(((at - start) / span) * ACTIVITY_BARS)));
-      activity[slice] += 1;
-    }
+    const roster = prospectsBySurvey.get(survey.id);
 
     return {
       id: survey.id,
@@ -86,7 +89,10 @@ export default async function AdminDashboardPage({
       completedCount: own.filter((r) => r.completed).length,
       qualifiedCount: own.filter((r) => r.completed && (r.lead_score ?? 0) >= WORTH_A_CALL_SCORE_MIN).length,
       lastResponseAt,
-      activity,
+      prospectCount: roster?.total ?? 0,
+      prospectsStarted: roster?.started ?? 0,
+      prospectsCompleted: roster?.completed ?? 0,
+      prospectsPending: roster?.pending ?? 0,
       createdAt: survey.created_at,
       archivedAt: survey.archived_at,
     };
@@ -96,8 +102,8 @@ export default async function AdminDashboardPage({
 
   return (
     <PageShell>
-      <PageHeader
-        title="Projects"
+      <PageTopBar
+        crumbs={[{ label: "Projects" }]}
         actions={
           <>
             <ExportStudiesButton surveys={items} />

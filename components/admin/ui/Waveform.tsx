@@ -39,6 +39,11 @@ const TONE = {
  * interview that is running now and nothing else. `tone` follows the ground:
  * `light` on white, `ink` on the ink card, `muted` for a study that is not
  * collecting.
+ *
+ * `barWidth` is 3 everywhere but a study cover, which draws its wave at 5.
+ * `align="end"` stands the bars on a baseline, for a wave sitting at the
+ * bottom of a cover; a live wave stays centred, because it breathes from
+ * its middle.
  */
 export function Waveform({
   seed,
@@ -46,6 +51,8 @@ export function Waveform({
   live = false,
   tone = "light",
   height = 24,
+  barWidth = 3,
+  align = "center",
   className,
 }: {
   seed: string | number;
@@ -54,6 +61,9 @@ export function Waveform({
   tone?: "light" | "ink" | "muted";
   /** The tallest bar, in px. */
   height?: number;
+  /** Bar width in px. */
+  barWidth?: number;
+  align?: "center" | "end";
   className?: string;
 }) {
   const next = mulberry32(hashSeed(seed));
@@ -66,15 +76,16 @@ export function Waveform({
   return (
     <span
       aria-hidden
-      className={cn("inline-flex shrink-0 items-center gap-[3px]", className)}
+      className={cn("inline-flex shrink-0 gap-[3px]", align === "end" ? "items-end" : "items-center", className)}
       style={{ height }}
     >
       {levels.map((bar, i) => (
         <span
           key={i}
-          className={cn("block w-[3px] rounded-[var(--ds-radius-chip)]", TONE[tone], live && "ds-wave-bar")}
+          className={cn("block shrink-0 rounded-[var(--ds-radius-chip)]", TONE[tone], live && "ds-wave-bar")}
           style={
             {
+              width: barWidth,
               height: `${Math.round(bar.level * 100)}%`,
               "--ds-wave-delay": `-${bar.delay}ms`,
             } as React.CSSProperties

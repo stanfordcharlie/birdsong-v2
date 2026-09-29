@@ -17,28 +17,22 @@ export default function AdminHomeLoading() {
     return <LoadingScreen statusText="Getting your workspace ready" />;
   }
 
-  // Mirrors the page: header, composer, the study card beside the side
-  // column, the checklist.
+  // Mirrors the page: greeting, launcher, the worth-a-call card beside
+  // Needs you, then Live now.
   return (
     <PageShell>
-      <div className="mb-8 flex items-center justify-between gap-6">
-        <Skeleton className="h-9 w-64" />
-        <div className="flex items-center gap-2">
-          <Skeleton className="hidden h-9 w-56 rounded-control sm:block" />
-          <Skeleton className="h-10 w-28 rounded-pill" />
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-8">
-        <Skeleton className="h-20 w-full rounded-card" />
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          <Skeleton className="h-72 w-full rounded-card lg:col-span-2" />
-          <div className="flex flex-col gap-8">
-            <Skeleton className="h-40 w-full rounded-card" />
-            <Skeleton className="h-24 w-full rounded-card" />
+      <div className="px-4 pt-3">
+        <div className="flex max-w-[1080px] flex-col gap-7">
+          <div className="flex flex-col gap-[18px]">
+            <Skeleton className="h-9 w-72" />
+            <Skeleton className="h-[56px] w-full rounded-card" />
           </div>
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+            <Skeleton className="h-[192px] w-full rounded-card" />
+            <Skeleton className="h-[192px] w-full rounded-card" />
+          </div>
+          <Skeleton className="h-[108px] w-full rounded-card" />
         </div>
-        <Skeleton className="h-14 w-full rounded-card" />
       </div>
     </PageShell>
   );

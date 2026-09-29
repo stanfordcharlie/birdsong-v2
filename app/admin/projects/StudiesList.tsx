@@ -5,16 +5,20 @@ import Link from "next/link";
 import {
   Badge,
   Button,
-  Card,
   EmptyState,
   FilterTabs,
   RelativeTime,
   SearchInput,
-  StatusDot,
+  Waveform,
 } from "@/components/admin/ui";
+import { bg, border, radius, text } from "@/components/admin/ui/tokens";
 import { EMPTY_VALUE, formatDate, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { StudyRowActions } from "./StudyRowActions";
+
+// Built from design/mockups/Projects.html: live and draft studies as cards
+// with a flat cover carrying the study's waveform, archived studies as
+// compact rows, and a dashed card that starts a new study.
 
 export type StudyListItem = {
   id: string;
@@ -23,13 +27,17 @@ export type StudyListItem = {
   status: string;
   /** The length preset, as "Standard · about 10 min". */
   lengthSummary: string;
+  /** Interviews started, test runs left out. */
   responseCount: number;
   completedCount: number;
   /** Completed and scored at or above the worth-a-call line. */
   qualifiedCount: number;
   lastResponseAt: string | null;
-  /** Responses per equal slice of the study's lifetime, oldest first. */
-  activity: number[];
+  /** Prospects on the study's roster. Zero when it has none. */
+  prospectCount: number;
+  prospectsStarted: number;
+  prospectsCompleted: number;
+  prospectsPending: number;
   createdAt: string;
   archivedAt: string | null;
 };
@@ -43,19 +51,9 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "archived", label: "Archived" },
 ];
 
-// Shared by the tab counts and the grid so a tab can never promise a number
-// the grid then contradicts.
-function matchesStatus(survey: StudyListItem, filter: StatusFilter): boolean {
-  const isArchived = survey.archivedAt !== null;
-  // Archived studies live only under their own tab. "All" is everything
-  // still in play (live plus draft), so an archived study never sits beside
-  // the ones being worked on.
-  if (filter === "archived") return isArchived;
-  if (isArchived) return false;
-  if (filter === "all") return true;
-  if (filter === "live") return survey.status === "live";
-  return survey.status !== "live";
-}
+// More archived studies than this and they move from the grid's last column
+// to their own rows beneath it.
+const ARCHIVED_IN_COLUMN_MAX = 2;
 
 type Status = "live" | "draft" | "archived";
 
@@ -64,124 +62,196 @@ function statusOf(survey: StudyListItem): Status {
   return survey.status === "live" ? "live" : "draft";
 }
 
-function StatusBadge({ status }: { status: Status }) {
-  if (status === "live") {
-    return (
-      <Badge variant="live">
-        <StatusDot live />
-        Live
-      </Badge>
-    );
-  }
+// Shared by the tab counts and the grid so a tab can never promise a number
+// the grid then contradicts.
+function matchesStatus(survey: StudyListItem, filter: StatusFilter): boolean {
+  return filter === "all" || statusOf(survey) === filter;
+}
+
+const MONO = "font-mono tabular-nums";
+
+function Actions({ survey }: { survey: StudyListItem }) {
   return (
-    <Badge variant={status === "draft" ? "draft" : "outline"}>
-      {status === "draft" ? "Draft" : "Archived"}
-    </Badge>
+    <StudyRowActions
+      surveyId={survey.id}
+      internalName={survey.title}
+      slug={survey.slug}
+      status={survey.status}
+      archivedAt={survey.archivedAt}
+      responseCount={survey.responseCount}
+    />
   );
 }
 
-// Response volume across the study's lifetime, one bar per slice. A study
-// with nothing to show draws the same row at the baseline so every card has
-// the same anatomy and the grid keeps its rhythm.
-function ActivityBars({ activity, live }: { activity: number[]; live: boolean }) {
-  const max = Math.max(0, ...activity);
+function CardStat({ label, value, accent }: { label: string; value: React.ReactNode; accent?: boolean }) {
   return (
-    <div aria-hidden className="flex h-4 items-end gap-1">
-      {activity.map((count, i) => {
-        const ratio = max > 0 ? count / max : 0;
-        return (
-          <span
-            key={i}
-            className={cn(
-              "w-1.5 flex-none rounded-pill",
-              count > 0 ? (live ? "bg-brand-live" : "bg-faint") : "bg-border"
-            )}
-            style={{ height: `${Math.max(12.5, ratio * 100)}%` }}
-          />
-        );
-      })}
+    <div className="flex flex-col gap-0.5">
+      <dt className={cn("text-[12px]", text.muted2)}>{label}</dt>
+      <dd className={cn(MONO, "text-[16px] font-medium", accent && text.accent)}>{value}</dd>
+    </div>
+  );
+}
+
+// Completed, then in progress, over everyone on the roster.
+function ProspectBar({ survey }: { survey: StudyListItem }) {
+  const share = (count: number) => `${(count / survey.prospectCount) * 100}%`;
+  return (
+    <div
+      role="img"
+      aria-label={`${survey.prospectsCompleted} of ${survey.prospectCount} prospects completed, ${survey.prospectsStarted} in progress`}
+      className={cn("flex h-[6px] overflow-hidden rounded-full", bg.track)}
+    >
+      <span className={bg.accent} style={{ width: share(survey.prospectsCompleted) }} />
+      <span className={bg.accentSoft} style={{ width: share(survey.prospectsStarted) }} />
     </div>
   );
 }
 
 function StudyCard({ survey, canManage }: { survey: StudyListItem; canManage: boolean }) {
-  const status = statusOf(survey);
+  const live = statusOf(survey) === "live";
   const completion = survey.responseCount > 0 ? survey.completedCount / survey.responseCount : null;
 
   return (
-    <Card interactive className="relative flex flex-col gap-5">
-      <div className="flex flex-col gap-1">
-        <div className="flex items-start justify-between gap-3">
-          {/* The title is the card's link, stretched over the whole card;
-              the actions menu sits above it so its clicks stay its own. */}
-          <h2 className="type-heading min-w-0">
-            <Link
-              href={`/admin/projects/${survey.id}`}
-              className="focus-ring rounded-control after:absolute after:inset-0 after:rounded-card"
-            >
-              {survey.title}
-            </Link>
-          </h2>
-          <div className="relative z-10 flex shrink-0 items-center gap-1">
-            <StatusBadge status={status} />
-            {canManage && (
-              <StudyRowActions
-                surveyId={survey.id}
-                internalName={survey.title}
-                slug={survey.slug}
-                status={survey.status}
-                archivedAt={survey.archivedAt}
-                responseCount={survey.responseCount}
-              />
-            )}
-          </div>
-        </div>
-        <p className="type-meta">
-          {survey.lengthSummary}
-          {" · "}created {formatDate(survey.createdAt)}
-        </p>
-      </div>
-
-      <dl className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
-        <div className="flex items-baseline gap-1.5">
-          <dd className="type-metric-value">{survey.responseCount}</dd>
-          <dt className="type-meta">responses</dt>
-        </div>
-        <div className="flex items-baseline gap-1.5">
-          <dd className="font-archivo text-sm font-semibold tabular-nums">
-            {completion === null ? EMPTY_VALUE : formatPercent(completion)}
-          </dd>
-          <dt className="type-meta">completion</dt>
-        </div>
-        <div className="flex items-baseline gap-1.5">
-          <dd
-            className={cn(
-              "font-archivo text-sm font-semibold tabular-nums",
-              survey.qualifiedCount > 0 && "text-brand-text"
-            )}
-          >
-            {survey.qualifiedCount}
-          </dd>
-          <dt className="type-meta">qualified</dt>
-        </div>
-      </dl>
-
-      <ActivityBars activity={survey.activity} live={status === "live"} />
-
-      <p className="type-meta">
-        {survey.lastResponseAt ? (
-          <>
-            Last response <RelativeTime date={survey.lastResponseAt} />
-          </>
-        ) : status === "draft" ? (
-          "Not sent yet"
-        ) : (
-          "No responses yet"
+    <li className="relative min-w-0">
+      <Link
+        href={`/admin/projects/${survey.id}`}
+        className={cn(
+          "focus-ring flex h-full flex-col overflow-hidden border transition-colors hover:border-[color:hsl(var(--ds-border-dashed))]",
+          radius.card,
+          border.base,
+          bg.base
         )}
-      </p>
-    </Card>
+      >
+        <div className={cn("flex h-[112px] items-end px-5 pb-5", live ? bg.accentWeak : bg.track)}>
+          <Waveform
+            seed={survey.id}
+            bars={36}
+            barWidth={5}
+            height={46}
+            align="end"
+            tone={live ? "light" : "muted"}
+            className="max-w-full overflow-hidden"
+          />
+        </div>
+
+        <div className="flex flex-1 flex-col gap-[14px] px-5 pb-5 pt-[18px]">
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="ds-card-title min-w-0">{survey.title}</h2>
+            <Badge state={live ? "live" : "draft"} className="shrink-0" />
+          </div>
+          <p className={cn("text-[12px]", text.muted2)}>
+            {survey.lengthSummary} · created {formatDate(survey.createdAt)}
+          </p>
+
+          {live && (
+            <dl className="grid grid-cols-3 gap-3">
+              <CardStat label="Responses" value={survey.responseCount} />
+              <CardStat
+                label="Completion"
+                value={completion === null ? EMPTY_VALUE : formatPercent(completion)}
+              />
+              <CardStat label="Worth a call" value={survey.qualifiedCount} accent />
+            </dl>
+          )}
+
+          {live && survey.prospectCount > 0 && <ProspectBar survey={survey} />}
+
+          <p className={cn("mt-auto text-[12px]", text.muted2)}>
+            {survey.lastResponseAt ? (
+              <>
+                Last response <RelativeTime date={survey.lastResponseAt} />
+              </>
+            ) : live ? (
+              "No responses yet"
+            ) : (
+              "Not sent yet"
+            )}
+            {survey.prospectsPending > 0 && (
+              <>
+                {" · "}
+                <span className={MONO}>{survey.prospectsPending}</span>{" "}
+                {survey.prospectsPending === 1 ? "prospect" : "prospects"} pending
+              </>
+            )}
+          </p>
+        </div>
+      </Link>
+      {canManage && (
+        <div className="absolute right-3 top-3 z-10">
+          <Actions survey={survey} />
+        </div>
+      )}
+    </li>
   );
 }
+
+function ArchivedRow({ survey, canManage }: { survey: StudyListItem; canManage: boolean }) {
+  return (
+    <li className="relative min-w-0">
+      <Link
+        href={`/admin/projects/${survey.id}`}
+        className={cn(
+          "focus-ring flex h-[64px] items-center gap-[14px] border px-[18px] transition-colors hover:border-[color:hsl(var(--ds-border-dashed))]",
+          canManage && "pr-[52px]",
+          radius.card,
+          border.base,
+          bg.base
+        )}
+      >
+        <span
+          aria-hidden
+          className={cn("flex h-[40px] w-[40px] shrink-0 items-end justify-center pb-[10px]", radius.control, bg.track)}
+        >
+          <Waveform seed={survey.id} bars={4} height={16} align="end" tone="muted" className="gap-[2px]" />
+        </span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate text-[14px] font-bold">{survey.title}</span>
+          <span className={cn("truncate text-[12px]", text.muted2)}>
+            Archived · <span className={MONO}>{survey.responseCount}</span>{" "}
+            {survey.responseCount === 1 ? "response" : "responses"} ·{" "}
+            <span className={MONO}>{survey.qualifiedCount}</span> worth a call
+          </span>
+        </span>
+      </Link>
+      {canManage && (
+        <div className="absolute right-3 top-1/2 z-10 -translate-y-1/2">
+          <Actions survey={survey} />
+        </div>
+      )}
+    </li>
+  );
+}
+
+function NewStudyCard({ href, className }: { href: string; className?: string }) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "focus-ring flex min-h-[64px] items-center justify-center gap-2 border border-dashed px-[18px] py-4 text-[14px] font-bold transition-colors hover:bg-[color:hsl(var(--ds-bg-sidebar))]",
+        radius.card,
+        border.dashed,
+        text.muted,
+        className
+      )}
+    >
+      <svg
+        aria-hidden
+        width="14"
+        height="14"
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      >
+        <path d="M8 3v10M3 8h10" />
+      </svg>
+      New study
+    </Link>
+  );
+}
+
+const GRID = "grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3";
 
 export function StudiesList({
   surveys,
@@ -190,12 +260,12 @@ export function StudiesList({
   newStudyHref,
 }: {
   surveys: StudyListItem[];
-  // Deep-link from the admin home, e.g. ?status=live.
+  // Deep-link, e.g. ?status=live.
   initialStatusFilter?: StatusFilter;
   // From can(role, "study:edit"/"study:delete") on the server. False hides
   // the per-study menu: a member reads the list and opens studies.
   canManage?: boolean;
-  /** Where the empty state sends someone; null hides its action. */
+  /** Where New study goes; null hides it. */
   newStudyHref: string | null;
 }) {
   const [query, setQuery] = useState("");
@@ -221,57 +291,90 @@ export function StudiesList({
     return counts;
   }, [surveys]);
 
-  if (surveys.length === 0) {
-    return (
-      <EmptyState
-        className="py-2"
-        title="No studies yet. Start one and Birdsong runs the interviews."
-        action={
-          newStudyHref ? (
-            <Button asChild>
-              <Link href={newStudyHref}>New study</Link>
-            </Button>
-          ) : undefined
-        }
-      />
-    );
-  }
+  const cards = filtered.filter((survey) => statusOf(survey) !== "archived");
+  const archived = filtered.filter((survey) => statusOf(survey) === "archived");
+  const searching = query.trim() !== "";
+  const showNewStudy = newStudyHref !== null && statusFilter !== "archived" && !searching;
+  // Beside the cards while there are few enough to share a column with the
+  // New study card; beneath the grid otherwise.
+  const archivedInColumn = cards.length > 0 && archived.length > 0 && archived.length <= ARCHIVED_IN_COLUMN_MAX;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <FilterTabs
-          label="Filter studies by status"
-          tabs={FILTERS.map((f) => ({ ...f, count: statusCounts[f.value] }))}
-          value={statusFilter}
-          onChange={setStatusFilter}
-        />
-        <SearchInput
-          value={query}
-          onChange={setQuery}
-          placeholder="Search studies"
-          label="Search studies by name"
-          className="sm:w-72 sm:flex-none"
-        />
+    <div className="flex flex-col gap-[22px]">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h1 className={cn("ds-h1", text.ink)}>Projects</h1>
+        {surveys.length > 0 && (
+          <SearchInput
+            value={query}
+            onChange={setQuery}
+            placeholder="Search studies"
+            label="Search studies by name"
+            className="h-[36px] sm:w-[280px] sm:flex-none"
+          />
+        )}
       </div>
 
-      {filtered.length === 0 ? (
+      {surveys.length === 0 ? (
         <EmptyState
           className="py-2"
-          title={
-            statusFilter === "all" && !query && statusCounts.archived > 0
-              ? "Nothing live or in draft. Archived studies are under the Archived tab."
-              : "No studies match."
+          title="No studies yet. Start one and Birdsong runs the interviews."
+          action={
+            newStudyHref ? (
+              <Button asChild>
+                <Link href={newStudyHref}>New study</Link>
+              </Button>
+            ) : undefined
           }
         />
       ) : (
-        <ul className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {filtered.map((survey) => (
-            <li key={survey.id} className="min-w-0">
-              <StudyCard survey={survey} canManage={canManage} />
-            </li>
-          ))}
-        </ul>
+        <>
+          <FilterTabs
+            label="Filter studies by status"
+            tabs={FILTERS.map((f) => ({ ...f, count: statusCounts[f.value] }))}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            className="self-start"
+          />
+
+          {filtered.length === 0 && <EmptyState className="py-2" title="No studies match." />}
+
+          {(cards.length > 0 || showNewStudy) && (
+            <ul className={GRID}>
+              {cards.map((survey) => (
+                <StudyCard key={survey.id} survey={survey} canManage={canManage} />
+              ))}
+              {archivedInColumn ? (
+                <li className="min-w-0">
+                  <ul className="flex h-full flex-col gap-3">
+                    {archived.map((survey) => (
+                      <ArchivedRow key={survey.id} survey={survey} canManage={canManage} />
+                    ))}
+                    {showNewStudy && newStudyHref && (
+                      <li className="flex min-h-[64px] flex-1">
+                        <NewStudyCard href={newStudyHref} className="flex-1" />
+                      </li>
+                    )}
+                  </ul>
+                </li>
+              ) : (
+                showNewStudy &&
+                newStudyHref && (
+                  <li className="flex min-w-0">
+                    <NewStudyCard href={newStudyHref} className="flex-1" />
+                  </li>
+                )
+              )}
+            </ul>
+          )}
+
+          {!archivedInColumn && archived.length > 0 && (
+            <ul className={GRID}>
+              {archived.map((survey) => (
+                <ArchivedRow key={survey.id} survey={survey} canManage={canManage} />
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </div>
   );

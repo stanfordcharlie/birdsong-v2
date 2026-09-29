@@ -777,6 +777,13 @@ select {
   }
 }
 
+/* Admin focus is for the keyboard. Nothing in admin draws a ring or an
+   outline on :focus alone: an element focused by the pointer shows its own
+   state (active, hover) and nothing more. */
+.admin-theme :focus:not(:focus-visible) {
+  outline: none;
+}
+
 /* --- Admin motion (Ledger II) ---
    Motion means live. The wave and the pulse run only on an element that is
    marked live, and only under prefers-reduced-motion: no-preference; the
@@ -809,6 +816,14 @@ select {
     transform: none;
   }
 }
+/* The worth-a-call ring on Home draws in from empty. --ds-ring-length is the
+   circumference, set on the element; the arc's resting dashoffset is its
+   final one. */
+@keyframes ds-ring-draw {
+  from {
+    stroke-dashoffset: var(--ds-ring-length);
+  }
+}
 @media (prefers-reduced-motion: no-preference) {
   .ds-wave-bar {
     animation: ds-wave var(--ds-duration-wave) ease-in-out infinite;
@@ -820,6 +835,11 @@ select {
   /* One pass on page load. Stagger with --ds-enter-delay, 80ms per card. */
   .ds-enter {
     animation: ds-enter var(--ds-duration-enter) var(--ds-ease-out) both;
+    animation-delay: var(--ds-enter-delay, 0ms);
+  }
+  /* Starts with its card: the same delay the card's enter carries. */
+  .ds-ring-draw {
+    animation: ds-ring-draw var(--ds-duration-count) var(--ds-ease-out) both;
     animation-delay: var(--ds-enter-delay, 0ms);
   }
 }

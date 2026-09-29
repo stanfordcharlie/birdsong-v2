@@ -12,6 +12,11 @@ import { EMPTY_VALUE, formatAbsolute, formatRelativeTime } from "@/lib/format";
  * "8/24/2026, 3:17:53 PM" in a wide cell, which is neither scannable nor
  * precise enough to be worth the width.
  *
+ * The text is exactly what `formatRelativeTime` returns. A space in a mono
+ * face is a full character cell, which set "5d ago" with what read as two
+ * spaces between the number and the word, so the word gap is pulled back to
+ * the width a space has in the sans.
+ *
  * `suppressHydrationWarning` because the text is computed from Date.now(),
  * which can land on either side of a minute boundary between the server
  * render and hydration.
@@ -40,9 +45,9 @@ export function RelativeTime({
       title={formatAbsolute(parsed)}
       suppressHydrationWarning
       // Mono, like every timestamp in admin. The size is the call site's.
-      className={cn("font-mono", align === "right" && "block text-right", className)}
+      className={cn("font-mono [word-spacing:-0.3em]", align === "right" && "block text-right", className)}
     >
-      {prefix && <span className="text-faint">{prefix} </span>}
+      {prefix && <span className="text-faint [word-spacing:normal]">{prefix} </span>}
       {formatRelativeTime(parsed)}
     </time>
   );

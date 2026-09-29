@@ -2,13 +2,18 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { can, requireActiveOrg } from "@/lib/org";
 import { type ResponseTableRow } from "./ResponsesTable";
-import { StudyDetailView, type RespondentChip, type SourceBreakdownRow } from "./StudyDetailView";
+import {
+  isStudyTab,
+  StudyDetailView,
+  type QualityMetric,
+  type RespondentChip,
+  type SourceBreakdownRow,
+} from "./StudyDetailView";
 import { isSystemSource } from "@/lib/interview/source";
 import { type SurveyReportRow } from "./ReportSection";
 import { type StudyFormValues } from "@/components/StudyForm";
 import { countWorthACall } from "@/lib/leads";
-import { loadProspectRoster, prospectDisplayName, prospectLastActivity } from "./prospects/query";
-import type { ProspectsPreviewData } from "./ProspectsPreview";
+import { loadProspectRoster } from "./prospects/query";
 import {
   parseCustomRespondentFieldDefs,
   parseEnabledRespondentFields,
@@ -16,12 +21,24 @@ import {
   parsePresetFieldRequired,
 } from "@/lib/studies/respondent-fields";
 
+// An interview that has not finished is still running if it started inside
+// this window: twice the longest length preset. Past it, the respondent has
+// left it unfinished.
+const LIVE_WINDOW_MS = 30 * 60 * 1000;
+
+function countQuestions(messages: unknown): number {
+  if (!Array.isArray(messages)) return 0;
+  return messages.filter((m) => (m as { role?: unknown })?.role === "assistant").length;
+}
+
 export default async function StudyDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, { tab }] = await Promise.all([params, searchParams]);
   const supabase = await createClient();
   const { orgId, role } = await requireActiveOrg();
 
@@ -112,35 +129,6 @@ export default async function StudyDetailPage({
       ? Math.round((completedResponses.length / responseList.length) * 100)
       : null;
 
-  // created_at is the moment the interview started, and the Leads queue's
-  // own "Completed" column reads this field too. Rows arrive newest-first
-  // from the query above.
-  const lastResponseAt = completedResponses[0]?.created_at ?? null;
-
-  // Outreach at a glance: the funnel counts and the five prospects with the
-  // most recent activity, drawn with the roster page's own cells.
-  const byActivity = [...prospects].sort(
-    (x, y) => new Date(prospectLastActivity(y)).getTime() - new Date(prospectLastActivity(x)).getTime()
-  );
-  const prospectsPreview: ProspectsPreviewData = {
-    total: prospects.length,
-    counts: {
-      pending: prospects.filter((p) => p.status === "pending").length,
-      started: prospects.filter((p) => p.status === "started").length,
-      completed: prospects.filter((p) => p.status === "completed").length,
-      removed: prospects.filter((p) => p.instantly_removed_at !== null).length,
-    },
-    rows: byActivity.slice(0, 5).map((p) => ({
-      id: p.id,
-      name: prospectDisplayName(p),
-      company: p.company_name,
-      status: p.status,
-      instantlyRemovedAt: p.instantly_removed_at,
-      instantlyError: p.instantly_error,
-      lastActivity: prospectLastActivity(p),
-    })),
-  };
-
   // How long a real interview takes, to check the length preset's promise
   // against. completed_at exists only on rows finished since it was added,
   // and seeded interviews are excluded (their timing is the script's, not a
@@ -162,6 +150,7 @@ export default async function StudyDetailPage({
   // first, then the value derived from a work email domain. The email domain
   // is carried separately so the table can render it as the muted fallback it
   // is rather than passing it off as a company the respondent gave us.
+  const now = Date.now();
   const responseRows: ResponseTableRow[] = responseList.map((r) => {
     const customValues = (r.custom_field_values as Record<string, unknown> | null) ?? {};
     const email = r.respondent_email ?? "";
@@ -169,6 +158,10 @@ export default async function StudyDetailPage({
     return {
       id: r.id,
       name: r.respondent_name,
+      title:
+        typeof customValues.job_title === "string" && customValues.job_title.trim()
+          ? customValues.job_title
+          : null,
       company:
         typeof customValues.company === "string" && customValues.company.trim()
           ? customValues.company
@@ -178,11 +171,36 @@ export default async function StudyDetailPage({
             : null,
       emailDomain: atIndex > -1 ? email.slice(atIndex + 1) || null : null,
       leadScore: r.lead_score,
-      status: r.status ?? "new",
-      completed: r.completed,
+      fitScore: r.fit_score,
+      state: r.completed
+        ? "completed"
+        : now - new Date(r.created_at).getTime() <= LIVE_WINDOW_MS
+          ? "live"
+          : "ended",
+      turn: r.completed ? 0 : countQuestions(r.messages),
       createdAt: r.created_at,
     };
   });
+
+  // Interview quality, from columns the page already reads. Two of the three
+  // measures the card could carry: why an interview ended is not stored, so
+  // "ended early for evasive answers" cannot be told apart from finishing.
+  const withPainPoint = completedResponses.filter(
+    (r) => Array.isArray(r.pain_points) && r.pain_points.length > 0
+  ).length;
+  const quality: QualityMetric[] = [];
+  if (responseList.length > 0) {
+    quality.push({
+      label: "Finish the interview",
+      ratio: completedResponses.length / responseList.length,
+    });
+  }
+  if (completedResponses.length > 0) {
+    quality.push({
+      label: "Name a pain point",
+      ratio: withPainPoint / completedResponses.length,
+    });
+  }
 
   // Every response row is a "start" (created the moment the interview
   // begins), so grouping the same responseList by source gives starts and
@@ -228,6 +246,7 @@ export default async function StudyDetailPage({
           .filter((segment) => segment && segment.trim())
           .join(" · "),
         interviewLength: survey.interview_length,
+        createdAt: survey.created_at,
         questionGuide: survey.question_guide ?? "",
         respondentChips,
         publishPublic: survey.publish_public ?? false,
@@ -237,9 +256,10 @@ export default async function StudyDetailPage({
       inProgressCount={responseList.length - completedResponses.length}
       worthACallCount={worthACallCount}
       completionRate={completionRate}
-      lastResponseAt={lastResponseAt}
       medianCompletionMs={medianCompletionMs}
-      prospects={prospectsPreview}
+      prospectCount={prospects.length}
+      quality={quality}
+      initialTab={isStudyTab(tab) ? tab : "responses"}
       sourceBreakdown={sourceBreakdown}
       initialValues={initialValues}
       latestReport={

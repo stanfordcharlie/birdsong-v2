@@ -31,6 +31,7 @@ export const bg = {
   ink: "bg-[color:hsl(var(--ds-ink))]",
   accent: "bg-[color:hsl(var(--ds-accent))]",
   accentWeak: "bg-[color:hsl(var(--ds-accent-weak))]",
+  accentSoft: "bg-[color:hsl(var(--ds-accent-soft))]",
   accentBright: "bg-[color:hsl(var(--ds-accent-bright))]",
   statusNew: "bg-[color:hsl(var(--ds-status-new-bg))]",
   warnBadge: "bg-[color:hsl(var(--ds-warn-bg-badge))]",

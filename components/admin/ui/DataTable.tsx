@@ -118,6 +118,7 @@ export function DataTable<Row>({
   sort,
   onSort,
   empty,
+  footer,
   className,
 }: {
   columns: Column<Row>[];
@@ -157,6 +158,11 @@ export function DataTable<Row>({
   onSort?: (key: string) => void;
   /** One sentence and, optionally, one action. */
   empty: { title: string; action?: React.ReactNode };
+  /**
+   * A last row inside the frame, under a hairline: "Show all 14". Not
+   * rendered with the empty state.
+   */
+  footer?: React.ReactNode;
   className?: string;
 }) {
   if (rows.length === 0) {
@@ -310,6 +316,9 @@ export function DataTable<Row>({
           })}
         </tbody>
       </table>
+      {footer !== undefined && footer !== null && (
+        <div className={cn("border-t", border.base)}>{footer}</div>
+      )}
     </div>
   );
 }

@@ -2,16 +2,34 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card } from "@/components/admin/ui";
+import { Button } from "@/components/admin/ui";
+import { bg, border, radius, shadow, text } from "@/components/admin/ui/tokens";
+import { cn } from "@/lib/utils";
 
-// The Home page's client piece: the composer under the greeting. It is an
-// entry point rather than a feature: a launcher that navigates to study
-// creation, not a chat thread, so nothing the visitor types is sent
-// anywhere. It is also the page's only way to start a study, so its button
-// carries the same "New study" label as the studies index and the nav. The
-// header's search field is components/admin/GlobalSearch.
+// The study launcher under the greeting. It is an entry point rather than a
+// feature: it navigates to study creation and nothing the visitor types is
+// sent anywhere, which is what it did before this was one 56px input.
 
-export function HomeComposer({ href }: { href: string }) {
+function SparkleIcon() {
+  return (
+    <svg
+      aria-hidden
+      width="18"
+      height="18"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={cn("shrink-0", text.accent)}
+    >
+      <path d="M8 2v3M8 11v3M2 8h3M11 8h3M4 4l2 2M10 10l2 2M12 4l-2 2M6 10l-2 2" />
+    </svg>
+  );
+}
+
+export function HomeLauncher({ href }: { href: string }) {
   const router = useRouter();
   const [value, setValue] = useState("");
 
@@ -21,20 +39,35 @@ export function HomeComposer({ href }: { href: string }) {
   }
 
   return (
-    <Card padding="compact">
-      <form onSubmit={submit} className="flex items-center gap-3">
+    <form onSubmit={submit}>
+      {/* The frame is the label, so a click anywhere in it focuses the
+          field, and the focus ring is drawn on the frame. */}
+      <label
+        className={cn(
+          "flex h-[56px] items-center gap-3 border pl-[18px] pr-2",
+          radius.card,
+          border.base,
+          bg.base,
+          shadow.input,
+          "focus-within:ring-2 focus-within:ring-[hsl(var(--ds-focus))] focus-within:ring-offset-2"
+        )}
+      >
+        <SparkleIcon />
         <input
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          aria-label="Describe what you want to learn from your customers"
+          aria-label="Describe a new study"
           placeholder="What do you want to learn from your customers?"
-          className="type-body focus-ring h-9 min-w-0 flex-1 rounded-control bg-transparent px-2 placeholder:text-faint"
+          className={cn(
+            "min-w-0 flex-1 border-0 bg-transparent text-[15px] outline-none placeholder:text-[color:hsl(var(--ds-muted-3))]",
+            text.ink
+          )}
         />
-        <Button type="submit" size="sm">
-          New study
+        <Button type="submit" variant="ink" className="h-[40px] px-4">
+          Start a study
         </Button>
-      </form>
-    </Card>
+      </label>
+    </form>
   );
 }
