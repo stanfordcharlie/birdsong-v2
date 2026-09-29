@@ -236,7 +236,6 @@ const ALIASES: [string, string][] = [
   ["--ds-input", "--ds-border"],
   ["--ds-primary", "--ds-ink"],
   ["--ds-destructive", "--ds-danger"],
-  ["--ds-success", "--ds-accent"],
   ["--ds-warning", "--ds-warn"],
   ["--ds-indigo", "--ds-status-new"],
 ];

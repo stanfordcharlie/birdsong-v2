@@ -16,6 +16,7 @@ import {
   LAUNCHER_SEED_KEY,
   coerceFieldValue,
   isBriefFieldKey,
+  isFieldFilled,
   isReadyToCreate,
   sanitizeBrief,
   type BriefFieldKey,
@@ -23,10 +24,12 @@ import {
 } from "@/lib/study-brief/types";
 import { cn } from "@/lib/utils";
 import {
+  BRIEF_FIELD_LABELS,
   BriefPanel,
   DEFAULT_RESPONDENT_CHOICES,
   RESPONDENT_FIELD_KEYS,
   respondentFieldDefs,
+  type AiWrites,
   type RespondentChoices,
 } from "./BriefPanel";
 import { createStudy } from "./createStudy";
@@ -172,6 +175,14 @@ export function NewStudyConversation({
   const [slug, setSlug] = useState<string | null>(null);
   const [respondent, setRespondent] = useState<RespondentChoices>(DEFAULT_RESPONDENT_CHOICES);
   const [guideCache, setGuideCache] = useState<GuideCache | null>(null);
+  // Which fields the AI wrote and when. This is the only thing that tells
+  // an AI write apart from a manual edit: editField never touches it, and
+  // the brief itself carries no flag. Not persisted with the draft, so a
+  // refresh restores the fields without replaying their flashes.
+  const [aiWrites, setAiWrites] = useState<AiWrites>({});
+  // "Roles filled. Sponsor updated", for the polite live region. Keyed so
+  // the same sentence twice in a row is still announced.
+  const [announcement, setAnnouncement] = useState<{ id: number; text: string } | null>(null);
 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -254,6 +265,27 @@ export function NewStudyConversation({
         ? (data.brief_patch as Record<string, unknown>)
         : {};
     const { patch } = sanitizePatch(rawPatch, new Set(latest.current.manualKeys));
+
+    // The fields this reply actually changed, against the brief as it stood
+    // when the reply landed. A patch that repeats a value is not a write.
+    const briefBefore = latest.current.brief;
+    const changed = (Object.keys(patch) as BriefFieldKey[]).filter(
+      (key) => JSON.stringify(patch[key]) !== JSON.stringify(briefBefore[key])
+    );
+    if (changed.length > 0) {
+      const at = Date.now();
+      setAiWrites((prev) => {
+        const next = { ...prev };
+        for (const key of changed) next[key] = at;
+        return next;
+      });
+      setAnnouncement({
+        id: at,
+        text: changed
+          .map((key) => `${BRIEF_FIELD_LABELS[key]} ${isFieldFilled(briefBefore, key) ? "updated" : "filled"}`)
+          .join(". "),
+      });
+    }
 
     setBrief((prev) => applyPatch(prev, patch));
     setMessages([...next, { role: "assistant", content: reply }]);
@@ -526,11 +558,16 @@ export function NewStudyConversation({
           </div>
         </section>
 
+        <div aria-live="polite" className="sr-only">
+          {announcement && <p key={announcement.id}>{announcement.text}</p>}
+        </div>
+
         <BriefPanel
           brief={brief}
           slug={slug}
           respondent={respondent}
           notice={notice}
+          aiWrites={aiWrites}
           onEdit={editField}
           onSlugChange={(value) => setSlug(value.trim() ? value : null)}
           onRespondentChange={setRespondent}

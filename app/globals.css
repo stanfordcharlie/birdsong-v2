@@ -292,9 +292,15 @@
 
   --ds-destructive: var(--ds-danger);
   --ds-destructive-foreground: var(--ds-on-ink);
-  --ds-success: var(--ds-accent);
+  /* Success. A real green, apart from the teal accent: "this is done" rather
+     than "act here". The new study brief's filled fields read it, and the
+     legacy success aliases resolve to it. success-text is 6.8:1 on
+     success-weak; muted-2 is 4.5:1 on it, so a label keeps its colour. */
+  --ds-success: 142.1 76.2% 36.3%;       /* #15803d */
+  --ds-success-weak: 138 76% 97%;        /* #f0fdf4 */
+  --ds-success-text: 143.8 61.2% 20.2%;  /* #166534 */
   --ds-success-foreground: var(--ds-on-ink);
-  --ds-success-bg: var(--ds-accent-weak);
+  --ds-success-bg: var(--ds-success-weak);
   --ds-warning: var(--ds-warn);
   --ds-warning-foreground: var(--ds-warn-text);
   --ds-indigo: var(--ds-status-new);

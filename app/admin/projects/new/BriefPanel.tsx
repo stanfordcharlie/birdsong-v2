@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FilterTabs } from "@/components/admin/ui";
 import { bg, border, radius, text } from "@/components/admin/ui/tokens";
 import {
@@ -19,7 +19,13 @@ import {
   type CustomRespondentFieldDef,
 } from "@/lib/studies/respondent-fields";
 import { slugify } from "@/lib/studies/slugify";
-import { GIFT_AMOUNT_MAX, type BriefFieldKey, type StudyBrief } from "@/lib/study-brief/types";
+import {
+  GIFT_AMOUNT_MAX,
+  REQUIRED_TO_CREATE,
+  isFieldFilled,
+  type BriefFieldKey,
+  type StudyBrief,
+} from "@/lib/study-brief/types";
 import { cn } from "@/lib/utils";
 
 const WAITING = "Waiting on your answer";
@@ -49,6 +55,44 @@ export function respondentFieldDefs(choices: RespondentChoices): CustomResponden
 const LABEL = cn("text-[12px] font-bold", text.muted2);
 const HINT = cn("text-[12px]", text.muted2);
 
+// The success tokens (app/globals.css, .admin-theme) as class names. Spelled
+// here rather than in components/admin/ui/tokens.ts because this panel is
+// their only reader so far; move them there when a second one appears.
+const SUCCESS = {
+  ground: "bg-[color:hsl(var(--ds-success-weak))]",
+  border: "border-[color:hsl(var(--ds-success))]",
+  ink: "text-[color:hsl(var(--ds-success))]",
+  text: "text-[color:hsl(var(--ds-success-text))]",
+} as const;
+
+/** The short label each field is announced by: "Roles filled". */
+export const BRIEF_FIELD_LABELS: Record<BriefFieldKey, string> = {
+  internalName: "Internal name",
+  externalTitle: "Title",
+  sponsor: "Sponsor",
+  audienceRoles: "Roles",
+  audienceCompanies: "Companies",
+  audienceIndustry: "Industry",
+  researchQuestion: "Research question",
+  topic: "Public topic",
+  signals: "Signals",
+  offLimits: "Off limits",
+  publicDescription: "Public description",
+  length: "Length",
+  giftAmount: "Gift",
+  giftBrand: "Gift brand",
+};
+
+/** When the AI last wrote each field, by the page's clock. Absent = never. */
+export type AiWrites = Partial<Record<BriefFieldKey, number>>;
+
+/** The latest AI write among a card's fields, or 0 when there is none. */
+function latestWrite(writes: AiWrites, keys: readonly BriefFieldKey[]): number {
+  return keys.reduce((latest, key) => Math.max(latest, writes[key] ?? 0), 0);
+}
+
+const FLASH_MS = 600;
+
 const fieldClass = cn(
   "focus-ring w-full border px-[10px] py-[7px] text-[14px] leading-[1.5] placeholder:text-[color:hsl(var(--ds-muted-3))]",
   radius.chip,
@@ -57,28 +101,85 @@ const fieldClass = cn(
   text.ink
 );
 
-/** One brief card. Dashed while it is still waiting on an answer. */
+/**
+ * One brief card. Dashed while it is still waiting on an answer; on the
+ * success ground with a check once it has one. `filled` is always derived
+ * from the value by the caller, never stored, so the two cannot disagree.
+ *
+ * `flashAt` is the clock reading of the last AI write to this card. When it
+ * changes, the ground flashes from a stronger green down to the filled
+ * style, so an admin reading the thread sees which box just moved. Manual
+ * edits never set it. Under reduced motion the style changes in place.
+ *
+ * `neutral` is for a card that always has content (the respondent details
+ * choices), which would otherwise be green forever and mean nothing.
+ */
 function BriefCard({
   label,
   filled,
+  flashAt = 0,
+  neutral = false,
   hint,
   children,
 }: {
   label: string;
   filled: boolean;
+  flashAt?: number;
+  neutral?: boolean;
   hint?: string;
   children: React.ReactNode;
 }) {
+  const ref = useRef<HTMLElement>(null);
+  const success = filled && !neutral;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!flashAt || !el || !success) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const styles = getComputedStyle(el);
+    const strong = styles.getPropertyValue("--ds-success").trim();
+    const weak = styles.getPropertyValue("--ds-success-weak").trim();
+    if (!strong || !weak) return;
+    const animation = el.animate(
+      [{ backgroundColor: `hsl(${strong} / 0.28)` }, { backgroundColor: `hsl(${weak})` }],
+      { duration: FLASH_MS, easing: "ease-out" }
+    );
+    return () => animation.cancel();
+  }, [flashAt, success]);
+
   return (
     <section
+      ref={ref}
+      data-filled={success ? "true" : undefined}
       className={cn(
-        "flex flex-col gap-[6px] border px-[18px] py-4",
+        "flex flex-col gap-[6px] border px-[18px] py-4 transition-colors motion-reduce:transition-none",
         radius.card,
-        bg.base,
-        filled ? border.base : cn("border-dashed", border.dashed)
+        success
+          ? cn(SUCCESS.ground, SUCCESS.border)
+          : cn(bg.base, filled ? border.base : cn("border-dashed", border.dashed))
       )}
     >
-      <h3 className={LABEL}>{label}</h3>
+      <div className="flex items-start justify-between gap-3">
+        <h3 className={LABEL}>{label}</h3>
+        {success && (
+          <span className={cn("flex h-[16px] w-[16px] shrink-0 items-center justify-center", SUCCESS.ink)}>
+            <svg
+              aria-hidden
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m5 12 5 5L20 7" />
+            </svg>
+            <span className="sr-only">Filled</span>
+          </span>
+        )}
+      </div>
       {children}
       {hint && <p className={HINT}>{hint}</p>}
     </section>
@@ -337,11 +438,14 @@ export function BriefPanel({
   slug,
   respondent,
   notice,
+  aiWrites,
   onEdit,
   onSlugChange,
   onRespondentChange,
 }: {
   brief: StudyBrief;
+  /** When the AI last wrote each field. Drives the flash, never the state. */
+  aiWrites: AiWrites;
   /** The link as typed, or null while it follows the title. */
   slug: string | null;
   respondent: RespondentChoices;
@@ -353,7 +457,17 @@ export function BriefPanel({
   onRespondentChange: (choices: RespondentChoices) => void;
 }) {
   const link = slugify(slug ?? brief.externalTitle);
-  const audienceFilled = Boolean(brief.audienceRoles || brief.audienceCompanies || brief.audienceIndustry);
+  const filled = (key: BriefFieldKey) => isFieldFilled(brief, key);
+  const audienceKeys = ["audienceRoles", "audienceCompanies", "audienceIndustry"] as const;
+  const audienceFilled = audienceKeys.some(filled);
+  const wroteAt = (...keys: BriefFieldKey[]) => latestWrite(aiWrites, keys);
+
+  // The required fields, which is what Create study waits on. The optional
+  // ones (off limits, length, gift, description) have defaults and are not
+  // counted, so the number reads as distance from Create.
+  const requiredTotal = REQUIRED_TO_CREATE.length;
+  const requiredFilled = REQUIRED_TO_CREATE.filter(filled).length;
+  const allFilled = requiredFilled === requiredTotal;
 
   return (
     <aside
@@ -364,7 +478,15 @@ export function BriefPanel({
       )}
     >
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className={cn("text-[12px] font-bold uppercase tracking-[0.04em]", text.muted2)}>Study brief</h2>
+        <div className="flex items-baseline gap-[10px]">
+          <h2 className={cn("text-[12px] font-bold uppercase tracking-[0.04em]", text.muted2)}>Study brief</h2>
+          {/* Not a live region: the AI fill announcement already says what
+              changed, and a second announcement of the count would double it. */}
+          <span className={cn("text-[12px]", allFilled ? cn("font-bold", SUCCESS.text) : text.muted2)}>
+            <span className="font-mono">{requiredFilled}</span> of{" "}
+            <span className="font-mono">{requiredTotal}</span> filled
+          </span>
+        </div>
         <span className={HINT}>Editable anytime</span>
       </div>
 
@@ -385,7 +507,8 @@ export function BriefPanel({
 
       <BriefCard
         label="Internal name"
-        filled={Boolean(brief.internalName)}
+        filled={filled("internalName")}
+        flashAt={wroteAt("internalName")}
         hint="Respondents never see this."
       >
         <Editable
@@ -396,7 +519,11 @@ export function BriefPanel({
         />
       </BriefCard>
 
-      <BriefCard label="Respondent-facing title" filled={Boolean(brief.externalTitle)}>
+      <BriefCard
+        label="Respondent-facing title"
+        filled={filled("externalTitle")}
+        flashAt={wroteAt("externalTitle")}
+      >
         <Editable
           label="respondent-facing title"
           value={brief.externalTitle}
@@ -405,11 +532,15 @@ export function BriefPanel({
         />
       </BriefCard>
 
-      <BriefCard label="Sponsor" filled={Boolean(brief.sponsor)}>
+      <BriefCard label="Sponsor" filled={filled("sponsor")} flashAt={wroteAt("sponsor")}>
         <Editable label="sponsor" value={brief.sponsor} onCommit={(v) => onEdit("sponsor", v)} />
       </BriefCard>
 
-      <BriefCard label="What we want to learn" filled={Boolean(brief.researchQuestion)}>
+      <BriefCard
+        label="What we want to learn"
+        filled={filled("researchQuestion")}
+        flashAt={wroteAt("researchQuestion")}
+      >
         <Editable
           multiline
           label="what we want to learn"
@@ -420,13 +551,18 @@ export function BriefPanel({
 
       <BriefCard
         label="Public topic"
-        filled={Boolean(brief.topic)}
+        filled={filled("topic")}
+        flashAt={wroteAt("topic")}
         hint="What respondents are told the study is about."
       >
         <Editable multiline label="public topic" value={brief.topic} onCommit={(v) => onEdit("topic", v)} />
       </BriefCard>
 
-      <BriefCard label="Who we want to hear from" filled={audienceFilled}>
+      <BriefCard
+        label="Who we want to hear from"
+        filled={audienceFilled}
+        flashAt={wroteAt(...audienceKeys)}
+      >
         <div className="flex flex-col gap-[6px]">
           {(
             [
@@ -443,7 +579,11 @@ export function BriefPanel({
         </div>
       </BriefCard>
 
-      <BriefCard label="What makes someone worth a call" filled={brief.signals.length > 0}>
+      <BriefCard
+        label="What makes someone worth a call"
+        filled={filled("signals")}
+        flashAt={wroteAt("signals")}
+      >
         <Editable
           multiline
           label="what makes someone worth a call, one per line"
@@ -453,11 +593,11 @@ export function BriefPanel({
         />
       </BriefCard>
 
-      <BriefCard label="Off limits" filled={Boolean(brief.offLimits)}>
+      <BriefCard label="Off limits" filled={filled("offLimits")} flashAt={wroteAt("offLimits")}>
         <Editable multiline label="off limits" value={brief.offLimits} onCommit={(v) => onEdit("offLimits", v)} />
       </BriefCard>
 
-      <BriefCard label="Length" filled={brief.length !== null}>
+      <BriefCard label="Length" filled={filled("length")} flashAt={wroteAt("length")}>
         <FilterTabs<InterviewLength | "">
           label="Interview length"
           className="self-start"
@@ -473,13 +613,18 @@ export function BriefPanel({
         </p>
       </BriefCard>
 
-      <BriefCard label="Thank you gift" filled={brief.giftAmount !== null}>
+      <BriefCard
+        label="Thank you gift"
+        filled={filled("giftAmount")}
+        flashAt={wroteAt("giftAmount", "giftBrand")}
+      >
         <GiftControls amount={brief.giftAmount} brand={brief.giftBrand} onEdit={onEdit} />
       </BriefCard>
 
       <BriefCard
         label="Public description"
-        filled={Boolean(brief.publicDescription)}
+        filled={filled("publicDescription")}
+        flashAt={wroteAt("publicDescription")}
         hint="Optional. Shown on the landing page."
       >
         <Editable
@@ -499,7 +644,7 @@ export function BriefPanel({
         />
       </BriefCard>
 
-      <BriefCard label="Respondent details" filled hint="Name and email are always collected.">
+      <BriefCard label="Respondent details" filled neutral hint="Name and email are always collected.">
         <div className="flex flex-col gap-2 pt-1">
           {RESPONDENT_FIELD_KEYS.map((key) => {
             const choice = respondent[key];
