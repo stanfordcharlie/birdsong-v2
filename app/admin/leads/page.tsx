@@ -37,10 +37,22 @@ export default async function LeadsPage({
   // applied is the shared lead-queue one: responses on archived studies are
   // excluded at the database (lib/lead-queue.ts), so every count on this
   // page derives from the same set.
-  const [{ responses, fitRows, error }, members] = await Promise.all([
+  const [{ responses, fitRows, error }, members, { data: pushRows }] = await Promise.all([
     fetchLeadQueue(supabase),
     listMembers(orgId),
+    // The sync's own bookkeeping (lib/hubspot-sync.ts writes
+    // hubspot_synced_at on a successful push). Read beside the queue rather
+    // than added to its select, so the queue query stays what every other
+    // count on this page derives from. Same client, same read policy.
+    supabase
+      .from("responses")
+      .select("id, hubspot_synced_at")
+      .eq("completed", true)
+      .not("hubspot_synced_at", "is", null),
   ]);
+  const hubspotSyncedAtById = new Map(
+    (pushRows ?? []).map((row) => [row.id, row.hubspot_synced_at])
+  );
   const fitById = new Map(
     (fitRows ?? []).map((r) => [r.id, { score: r.fit_score, confidence: r.fit_confidence, reasoning: r.fit_reasoning }])
   );
@@ -79,6 +91,7 @@ export default async function LeadsPage({
       createdAt: r.created_at,
       isTest: r.is_test,
       source: r.source,
+      hubspotSyncedAt: hubspotSyncedAtById.get(r.id) ?? null,
     };
   });
 

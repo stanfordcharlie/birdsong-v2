@@ -61,6 +61,8 @@ export type LeadItem = {
   createdAt: string;
   isTest: boolean;
   source: string | null;
+  /** When the response last pushed to HubSpot. Null until a push succeeds. */
+  hubspotSyncedAt: string | null;
 };
 
 export type QueueMember = { id: string; name: string };
@@ -111,8 +113,8 @@ function tabMatches(lead: LeadItem, tab: QueueTab, me: string): boolean {
 }
 
 // The mockup's grid: checkbox, Respondent, Company, Score, Fit, Status,
-// Assignee, Last activity.
-const GRID_TEMPLATE = "24px minmax(0,1.6fr) minmax(0,1.3fr) 56px 56px 120px 150px 110px";
+// Assignee, HubSpot, Last activity.
+const GRID_TEMPLATE = "24px minmax(0,1.6fr) minmax(0,1.3fr) 56px 56px 120px 150px 104px 110px";
 
 const ALL_STUDIES_VALUE = "__all__";
 
@@ -362,15 +364,16 @@ export function LeadsQueue({
     if (!res.ok) {
       throw new Error(data?.error || data?.reason || `HubSpot returned ${res.status}`);
     }
-    if (data?.advancedTo === "contacted") {
-      setLeads((prev) =>
-        prev.map((row) =>
-          row.id === lead.id
-            ? { ...row, leadStatus: "contacted", lastActivityAt: new Date().toISOString() }
-            : row
-        )
-      );
-    }
+    const now = new Date().toISOString();
+    setLeads((prev) =>
+      prev.map((row) =>
+        row.id === lead.id
+          ? data?.advancedTo === "contacted"
+            ? { ...row, leadStatus: "contacted", lastActivityAt: now, hubspotSyncedAt: now }
+            : { ...row, hubspotSyncedAt: now }
+          : row
+      )
+    );
   }
 
   // Bulk actions run the single-lead action for each selected lead, in
@@ -532,6 +535,23 @@ export function LeadsQueue({
           </Button>
         );
       },
+    },
+    // The push is manual, so the column says whether it has happened and
+    // when, never that the record is in step with the CRM.
+    {
+      key: "hubspot",
+      header: "HubSpot",
+      sortable: true,
+      sortValue: (lead) => (lead.hubspotSyncedAt ? new Date(lead.hubspotSyncedAt).getTime() : null),
+      cell: (lead) =>
+        lead.hubspotSyncedAt ? (
+          <StackedCell
+            primary={<span className="text-[12px] font-semibold">Pushed</span>}
+            secondary={<RelativeTime date={lead.hubspotSyncedAt} className="ds-mono-count" />}
+          />
+        ) : (
+          <span className={cn("block truncate text-[12px] font-semibold", text.muted3)}>Not pushed</span>
+        ),
     },
     {
       key: "activity",
