@@ -2,7 +2,7 @@ import { caveat, instrumentSans, instrumentSerif, sourceSerif } from "@/lib/font
 import { cn } from "@/lib/utils";
 
 /**
- * Root wrapper for `/` in the v2 direction (design_handoff_birdsong_landing,
+ * Root wrapper for /landing-old, the v2 direction (design_handoff_birdsong_landing,
  * `Birdsong Landing v2.dc.html`).
  *
  * Replaces GreenShell here rather than extending it: v2 swapped the entire

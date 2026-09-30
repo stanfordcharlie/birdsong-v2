@@ -40,6 +40,13 @@ const config: Config = {
         // arbitrary min-*/max-* variants off entirely, and those classes then
         // emit nothing at all rather than failing loudly.
         "hp-wide": "900px",
+        // Home landing page, sky direction (`/`). The same 900px
+        // cutoff as hp-wide above, deliberately duplicated under its own
+        // name: it is where the hero's 300px card column has room beside the
+        // headline, and where the CTA/section padding steps up. The two
+        // surfaces are separate directions on the same route and either may
+        // move its breakpoint without dragging the other with it.
+        "bsl-wide": "900px",
         // Respondent question screen (app/survey/[slug]): height tiers that
         // compact the column so a short laptop window still fits the whole
         // screen without scrolling. Raw media queries, since Tailwind screens
@@ -190,7 +197,7 @@ const config: Config = {
         },
 
         // Home landing page redesign (design_handoff_birdsong_landing) —
-        // `/` only. A separate palette from `landing` above, not an
+        // /landing-old only. A separate palette from `landing` above, not an
         // extension of it: the root route was redesigned on its own and
         // /customer-success, /reports and the legal pages still render the
         // older one. See the --ln-* block in app/globals.css.
@@ -214,7 +221,7 @@ const config: Config = {
         },
 
         // Home landing page, v2 direction (design_handoff_birdsong_landing,
-        // `Birdsong Landing v2.dc.html`) — `/` only. Kept apart from `ln`
+        // `Birdsong Landing v2.dc.html`) — /landing-old only. Kept apart from `ln`
         // above because those tokens are also what the public research
         // report pages render on. See the --hp-* block in app/globals.css.
         hp: {
@@ -241,6 +248,65 @@ const config: Config = {
           "note-yellow": "rgb(var(--hp-note-yellow) / <alpha-value>)",
           bubble: "rgb(var(--hp-bubble) / <alpha-value>)",
         },
+
+        // Home landing page, sky direction (design_handoff_birdsong_landing,
+        // `Birdsong Landing.dc.html`) — `/` only. A fourth marketing
+        // namespace; see the --bsl-* block in app/globals.css for why it is
+        // not folded into `hp` above.
+        bsl: {
+          cream: {
+            DEFAULT: "rgb(var(--bsl-cream) / <alpha-value>)",
+            soft: "rgb(var(--bsl-cream-soft) / <alpha-value>)",
+            dim: "rgb(var(--bsl-cream-dim) / <alpha-value>)",
+            alt: "rgb(var(--bsl-cream-alt) / <alpha-value>)",
+          },
+          nav: "rgb(var(--bsl-nav) / <alpha-value>)",
+          card: "rgb(var(--bsl-card) / <alpha-value>)",
+          ink: "rgb(var(--bsl-ink) / <alpha-value>)",
+          body: {
+            DEFAULT: "rgb(var(--bsl-body) / <alpha-value>)",
+            soft: "rgb(var(--bsl-body-soft) / <alpha-value>)",
+          },
+          muted: "rgb(var(--bsl-muted) / <alpha-value>)",
+          faint: "rgb(var(--bsl-faint) / <alpha-value>)",
+          line: {
+            DEFAULT: "rgb(var(--bsl-line) / <alpha-value>)",
+            soft: "rgb(var(--bsl-line-soft) / <alpha-value>)",
+            card: "rgb(var(--bsl-card-line) / <alpha-value>)",
+          },
+          forest: {
+            DEFAULT: "rgb(var(--bsl-forest) / <alpha-value>)",
+            deep: "rgb(var(--bsl-forest-deep) / <alpha-value>)",
+          },
+          sage: {
+            DEFAULT: "rgb(var(--bsl-sage) / <alpha-value>)",
+            mid: "rgb(var(--bsl-sage-mid) / <alpha-value>)",
+          },
+          bubble: "rgb(var(--bsl-bubble) / <alpha-value>)",
+          butter: {
+            DEFAULT: "rgb(var(--bsl-butter) / <alpha-value>)",
+            soft: "rgb(var(--bsl-butter-soft) / <alpha-value>)",
+          },
+          sand: {
+            DEFAULT: "rgb(var(--bsl-sand) / <alpha-value>)",
+            soft: "rgb(var(--bsl-sand-soft) / <alpha-value>)",
+          },
+          sky: {
+            DEFAULT: "rgb(var(--bsl-sky) / <alpha-value>)",
+            mid: "rgb(var(--bsl-sky-mid) / <alpha-value>)",
+            pale: "rgb(var(--bsl-sky-pale) / <alpha-value>)",
+          },
+          horizon: "rgb(var(--bsl-horizon) / <alpha-value>)",
+          live: "rgb(var(--bsl-live) / <alpha-value>)",
+          "cta-frame": "rgb(var(--bsl-cta-frame) / <alpha-value>)",
+          "cta-panel": "rgb(var(--bsl-cta-panel) / <alpha-value>)",
+          well: {
+            DEFAULT: "rgb(var(--bsl-well) / <alpha-value>)",
+            dot: "rgb(var(--bsl-well-dot) / <alpha-value>)",
+            line: "rgb(var(--bsl-well-line) / <alpha-value>)",
+          },
+          flock: "rgb(var(--bsl-flock) / <alpha-value>)",
+        },
       },
       borderRadius: {
         card: "var(--ds-radius-card)",
@@ -255,6 +321,10 @@ const config: Config = {
         "hp-note-deep": "0 10px 30px rgba(27, 31, 28, 0.16)",
         "hp-mock": "0 20px 60px rgba(27, 31, 28, 0.12)",
         "hp-badge": "3px 3px 0 #1b1f1c",
+        // The three cards inside the sky direction's demo well on `/`.
+        // A hairline top highlight plus a wide, high-offset ambient shadow —
+        // the handoff gives it as one value and every card uses it.
+        "bsl-card": "0 1px 0 rgba(0, 0, 0, 0.03), 0 24px 48px -28px rgba(40, 50, 40, 0.3)",
         // The one admin card elevation. No page defines its own.
         card: "var(--ds-shadow-card)",
         "card-hover": "var(--ds-shadow-card-hover)",
@@ -330,6 +400,29 @@ const config: Config = {
           "sans-serif",
         ],
         "hp-hand": ["var(--font-caveat)", "cursive"],
+
+        // Home landing page, sky direction (`/`). Instrument Serif
+        // carries every headline, the nav wordmark and the fit score; Caveat
+        // sets the two handwritten annotations. Separate names from the
+        // hp-* trio above even where the face is the same, so moving one
+        // direction off a face does not touch the other. Applied at SkyShell.
+        "bsl-serif": ["var(--font-instrument-serif)", "Georgia", "serif"],
+        // system-ui ahead of the Helvetica stack that hp-sans uses, because
+        // that is the handoff's own fallback and the page has glyphs
+        // Instrument Sans does not ship — the "Book a demo →" arrow among
+        // them. On macOS that resolves to SF Pro, whose U+2192 is 2px
+        // narrower than Helvetica Neue's; with the Helvetica stack the two
+        // CTAs measured 2.3px wide against the reference.
+        "bsl-sans": ["var(--font-instrument-sans)", "system-ui", "sans-serif"],
+        "bsl-hand": ["var(--font-caveat)", "cursive"],
+        // The "→" in the three CTAs. Instrument Sans has no U+2192, so the
+        // glyph comes from a fallback either way — but next/font bakes a
+        // metrics-adjusted local face into --font-instrument-sans and *that*
+        // is what gets used, drawing an arrow 2.3px wider and visibly heavier
+        // than the reference's. Naming system-ui directly reproduces the
+        // handoff's own stack, so the arrow resolves the same way its
+        // prototype does, on every platform rather than just this one.
+        "bsl-glyph": ["system-ui", "sans-serif"],
       },
     },
   },

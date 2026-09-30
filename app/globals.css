@@ -387,7 +387,8 @@
   --lp-butter-bg: #f6efd8;
 }
 
-/* --- Home landing page (design_handoff_birdsong_landing, `/` only) ---
+/* --- Home landing page, v2 direction (design_handoff_birdsong_landing,
+   /landing-old only) ---
    A third marketing palette, separate from --lp-* above. The redesign gave
    the root route its own visual language — cream canvas, forest green,
    black-outlined sticker cards with hard offset shadows — while
@@ -425,7 +426,8 @@
      rather than new values for it: --ln-* is shared with the public research
      report pages (app/reports/[slug], components/research/report/*), and the
      v2 palette is close enough to look like a fix and different enough to
-     restyle them. `/` is the only surface on --hp-*. */
+     restyle them. /landing-old is the only surface on --hp-*, since the sky
+     direction took over `/`. */
   --hp-cream: 248 244 236;
   --hp-card: 251 249 244;
   --hp-tint: 239 233 220;
@@ -455,6 +457,81 @@
      at the bottom. Clamped so it stays usable on a short laptop and stops
      growing on a tall monitor. */
   --hp-panel: clamp(560px, calc(100vh - 144px), 860px);
+}
+
+/* --- Home landing page, sky direction (design_handoff_birdsong_landing,
+   `(9:30:26)…/Birdsong Landing.dc.html`) — `/` only ---
+
+   A fourth marketing palette. It is *not* a variant of --hp-* above, even
+   though the two share a route's worth of copy: every value is a few points
+   off (cream #f6f3ec vs #f8f4ec, forest #3b6246 vs #3a6046), and the sky,
+   butter, sand and CTA-panel families have no --hp-* counterpart at all.
+   Repointing --hp-* to these would have restyled the v2 direction rather
+   than replacing it, so the two sets sit side by side: --bsl-* paints `/`,
+   --hp-* still paints /landing-old.
+
+   Space-separated R G B channels, not hex, for the same reason --hp-* is:
+   a var holding a hex string cannot take Tailwind's `/opacity` modifier, and
+   this design leans on it hard — the hero's glass card stack is three
+   different alphas of --bsl-cream, the CTA's glass button is a fourth, and
+   the hero readability scrim is an alpha of --bsl-ink. */
+:root {
+  /* Page and card grounds */
+  --bsl-cream: 246 243 236;
+  --bsl-cream-soft: 241 237 227; /* hero subhead on the sky */
+  --bsl-cream-dim: 233 228 216; /* CTA subhead on the dark panel */
+  --bsl-cream-alt: 236 230 217; /* "Log in" button fill */
+  --bsl-nav: 236 232 222; /* scrolled nav bar fill, at .96 */
+  --bsl-card: 255 253 248;
+
+  /* Ink and text */
+  --bsl-ink: 28 31 26;
+  --bsl-body: 58 63 56;
+  --bsl-body-soft: 74 80 72;
+  --bsl-muted: 90 96 88;
+  --bsl-faint: 138 143 134;
+
+  /* Hairlines */
+  --bsl-line: 217 210 195; /* nav border, stage progress track */
+  --bsl-line-soft: 221 214 200; /* the steps section's top rule */
+  --bsl-card-line: 228 221 205;
+
+  /* Forest */
+  --bsl-forest: 59 98 70;
+  --bsl-forest-deep: 47 79 56; /* the routed fit-score card */
+
+  /* Sage */
+  --bsl-sage: 201 220 198;
+  --bsl-sage-mid: 143 179 138;
+  --bsl-bubble: 238 243 236; /* AI transcript bubble */
+
+  /* Butter and sand */
+  --bsl-butter: 201 169 59;
+  --bsl-butter-soft: 232 199 122;
+  --bsl-sand: 221 211 195; /* participant avatar */
+  --bsl-sand-soft: 241 235 223; /* participant transcript bubble */
+
+  /* Sky — the hero's vertical gradient, top to horizon */
+  --bsl-sky: 63 115 163;
+  --bsl-sky-mid: 91 141 184;
+  --bsl-sky-pale: 143 176 196;
+  --bsl-horizon: 217 201 166;
+
+  /* The live-interview status dot */
+  --bsl-live: 194 65 45;
+
+  /* CTA: the outer letterbox and the panel's base fill under its glows */
+  --bsl-cta-frame: 22 26 23;
+  --bsl-cta-panel: 58 64 59;
+
+  /* The demo well: dotted paper the three cards sit on */
+  --bsl-well: 235 229 216;
+  --bsl-well-dot: 214 206 189;
+  --bsl-well-line: 224 217 202;
+
+  /* The flock's silhouette — near-black, warmer than --bsl-ink, so the birds
+     read as distance against the sky rather than as page furniture. */
+  --bsl-flock: 34 30 24;
 }
 
 /* ---------------------------------------------------------------------------
@@ -2078,7 +2155,8 @@ select {
   }
 }
 
-/* --- Home landing page (design_handoff_birdsong_landing, `/` only) ---
+/* --- Home landing page, v2 direction (design_handoff_birdsong_landing,
+   /landing-old only) ---
    Three things Tailwind utilities cannot express, everything else on the
    page is utility classes. Names are ln-prefixed to stay clear of the
    --lp-* landing system's own .lp-* rules. */
@@ -2133,7 +2211,7 @@ select {
 
 
 /* ── Home landing page v2 (design_handoff_birdsong_landing) ───────────────
-   Two 188px rules-grids and one responsive override. Everything else on `/`
+   Two 188px rules-grids and one responsive override. Everything else there
    is Tailwind utilities; these are here because a repeating linear-gradient
    pair and a `!important` under a max-width don't express as classes. */
 
@@ -2575,4 +2653,74 @@ html[data-intro="play"].hp-intro-go .hp-i-word {
 }
 html[data-intro="play"].hp-intro-go .hp-i-navnote {
   animation: hp-i-navnote 1s ease-out 3.9s both;
+}
+
+/* --- Home landing page, sky direction (`/`) : motion ---
+   Three loops and one entry animation, all of which need a per-element
+   duration or delay and so cannot be Tailwind utilities. Everything else on
+   the page is utility classes. Names are bsl-prefixed to stay clear of the
+   --lp-* landing system's .lp-* rules and the v2 home's .hp-* ones.
+
+   Each rule is bound to its class only under prefers-reduced-motion:
+   no-preference — the same arrangement .ws-note and the survey's .sq-* use.
+   The handoff is explicit that reduced motion freezes the birds and the
+   waveform; because the keyframes are never bound in that case, the birds
+   sit at their authored position and the waveform bars stand at full height
+   rather than collapsing to the 30% the loop starts from. The demo timeline
+   is the other half of that, and is handled in JS (ConversationSection pins
+   `step` at 9, the routed state) since a media query cannot stop an
+   interval. */
+
+/* The flock. Both the hero's 15 birds and the CTA's 6 share this; each
+   element sets its own --bsl-dur and --bsl-delay, and the negative delays
+   are what stop 15 birds from beating in unison. */
+@keyframes bsl-drift {
+  0% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(18px, -10px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+/* Transcript bubbles and buying-signal rows, as each one lands. Runs once on
+   mount; React keys the bubbles by index, so an already-mounted bubble keeps
+   its DOM node and does not replay when the next one arrives. */
+@keyframes bsl-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The live-interview waveform's 7 bars, the pulsing red status dot, and the
+   typing indicator's ellipsis — one keyframe, three call sites, which is why
+   it scales rather than translating. */
+@keyframes bsl-wave {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bsl-bird {
+    animation: bsl-drift var(--bsl-dur) ease-in-out var(--bsl-delay) infinite;
+  }
+  .bsl-in {
+    animation: bsl-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .bsl-wave {
+    animation: bsl-wave var(--bsl-dur) ease-in-out var(--bsl-delay) infinite;
+  }
 }
