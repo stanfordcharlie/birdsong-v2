@@ -8,16 +8,29 @@ import {
   Button,
   DataTable,
   EmptyState,
+  FileDropOverlay,
   FilterTabs,
   PageHeader,
   PageShell,
   RelativeTime,
   SearchInput,
+  SelectBox,
   StatRow,
+  useFileDrop,
+  validateFileDrop,
   type Column,
+  type FileDropValidation,
   type FilterTab,
 } from "@/components/admin/ui";
+import { border, radius } from "@/components/admin/ui/tokens";
+import { cn } from "@/lib/utils";
 import { EMPTY_VALUE } from "@/lib/format";
+import {
+  CSV_ACCEPT,
+  CSV_INPUT_ACCEPT,
+  MAX_IMPORT_FILE_BYTES,
+  MAX_IMPORT_FILE_LABEL,
+} from "@/lib/prospects/import-limits";
 import type { ImportResult } from "@/app/api/prospects/import/route";
 import { PROSPECT_STATUSES, ProspectSequenceCell, ProspectStatusBadge, prospectStatusLabel } from "./cells";
 
@@ -157,38 +170,6 @@ function RowLinkActions({ row }: { row: ProspectRow }) {
   );
 }
 
-// A native checkbox tinted with the primary colour. The admin kit has no
-// checkbox primitive yet, and one input with accent-color is not worth
-// forking one for: every evergreen browser themes it consistently enough.
-function SelectBox({
-  checked,
-  indeterminate = false,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  indeterminate?: boolean;
-  onChange: (checked: boolean) => void;
-  label: string;
-}) {
-  const ref = useRef<HTMLInputElement>(null);
-  // `indeterminate` is a DOM property, not an attribute, so it has to be set
-  // imperatively. The header box uses it for "some of these rows".
-  useEffect(() => {
-    if (ref.current) ref.current.indeterminate = indeterminate;
-  }, [indeterminate]);
-  return (
-    <input
-      ref={ref}
-      type="checkbox"
-      checked={checked}
-      onChange={(event) => onChange(event.target.checked)}
-      aria-label={label}
-      className="focus-ring block h-4 w-4 cursor-pointer rounded accent-primary"
-    />
-  );
-}
-
 // The bar that replaces the filter row while something is checked. One
 // count, one action, one way out. Delete runs one request per prospect
 // against the same route a single delete would use, so the ownership check
@@ -320,6 +301,16 @@ function SelectionBar({
   );
 }
 
+// What a refused file is told, one line per way it can be refused. The button
+// and the drop share these, because they share the check.
+const REJECTION_COPY: Record<Exclude<FileDropValidation, { ok: true }>["reason"], string> = {
+  multiple: "Drop one CSV at a time.",
+  type: "That file is not a CSV. Export the list as CSV and try again.",
+  size: `That file is larger than ${MAX_IMPORT_FILE_LABEL}. Split the export and import it in parts.`,
+  empty: "That file is empty.",
+  none: "No file was dropped.",
+};
+
 export function ProspectsView({
   surveyId,
   surveyTitle,
@@ -405,12 +396,24 @@ export function ProspectsView({
     });
   }
 
-  async function handleFileChosen(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    // Reset immediately so choosing the same file twice in a row still fires
-    // a change event, which is what a re-import after a fix needs.
-    event.target.value = "";
-    if (!file) return;
+  /**
+   * The one import path. The Import CSV button and a dropped file both arrive
+   * here with a File, so there is a single place that validates, uploads and
+   * reports. Nothing about the parsing, the mapping or the insert changed:
+   * this is the same request the button always made.
+   */
+  async function importFile(file: File) {
+    if (importing) return;
+
+    // The same check the drop runs, so a file picked through the dialog is
+    // refused for the same reason and in the same words. The route enforces
+    // both rules again on its own side.
+    const check = validateFileDrop([file], { accept: CSV_ACCEPT, maxSize: MAX_IMPORT_FILE_BYTES });
+    if (!check.ok) {
+      setResult(null);
+      setError(REJECTION_COPY[check.reason]);
+      return;
+    }
 
     setImporting(true);
     setError(null);
@@ -432,6 +435,28 @@ export function ProspectsView({
       setImporting(false);
     }
   }
+
+  function handleFileChosen(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Reset immediately so choosing the same file twice in a row still fires
+    // a change event, which is what a re-import after a fix needs.
+    event.target.value = "";
+    if (file) void importFile(file);
+  }
+
+  // Dropping anywhere on this page's content runs the same handler. The
+  // primitive owns the dragenter/dragleave counting and the file check; the
+  // copy for a refusal is this page's.
+  const { dragging, handlers: dropHandlers } = useFileDrop({
+    accept: CSV_ACCEPT,
+    maxSize: MAX_IMPORT_FILE_BYTES,
+    onFile: (file) => void importFile(file),
+    onReject: (reason) => {
+      setResult(null);
+      setError(REJECTION_COPY[reason]);
+    },
+    disabled: importing,
+  });
 
   const importButton = (
     <Button
@@ -564,7 +589,7 @@ export function ProspectsView({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".csv,text/csv"
+        accept={CSV_INPUT_ACCEPT}
         onChange={handleFileChosen}
         className="hidden"
       />
@@ -590,7 +615,11 @@ export function ProspectsView({
         }
       />
 
-      <div className="flex flex-col gap-8">
+      {/* Everything below the header is the drop target, so a file can land
+          anywhere over the roster. `relative` is what the overlay pins to. */}
+      <div className="relative flex flex-col gap-8" {...dropHandlers}>
+        <FileDropOverlay visible={dragging && rows.length > 0} label="Drop CSV to import" />
+
         {/* Import feedback sits above the roster, where the thing it describes
             just changed. Counts, not a sentence, and the mapping underneath
             so a wrong guess is visible rather than inferred from bad data. */}
@@ -617,10 +646,28 @@ export function ProspectsView({
         )}
 
         {rows.length === 0 ? (
-          <EmptyState
-            title="No prospects on this study yet. Import an Apollo CSV to build the roster."
-            action={importButton}
-          />
+          // With nothing on the roster the empty state is the dropzone: a
+          // visible target rather than a surface that only reveals itself
+          // once something is already being dragged over it. The button
+          // stays, because clicking has to keep working and a dropzone is
+          // never the only way in.
+          <div
+            className={cn(
+              "flex flex-col items-start gap-3 border-2 border-dashed px-5 py-7 transition-colors",
+              radius.card,
+              dragging ? cn(border.accent, "bg-[color:hsl(var(--ds-accent-weak))]") : border.dashed
+            )}
+          >
+            <EmptyState
+              title="No prospects on this study yet. Import an Apollo CSV to build the roster."
+              action={importButton}
+              className="py-0"
+            />
+            <p className="ds-caption text-[color:hsl(var(--ds-ink-3))]">or drag a CSV here</p>
+            <p role="status" aria-live="polite" className="sr-only">
+              {dragging ? "Drop CSV to import" : ""}
+            </p>
+          </div>
         ) : (
           <>
             <StatRow

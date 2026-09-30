@@ -31,6 +31,13 @@ export {
 export { useTableSort } from "./useTableSort";
 export { EmptyState } from "./EmptyState";
 export { SelectBox } from "./SelectBox";
+export { FileDropOverlay } from "./FileDropOverlay";
+export {
+  useFileDrop,
+  validateFileDrop,
+  type FileDropAccept,
+  type FileDropValidation,
+} from "./useFileDrop";
 export {
   Badge,
   BADGE_STATES,

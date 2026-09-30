@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { orgErrorResponse, requireActiveOrg } from "@/lib/org";
 import { generateProspectToken } from "@/lib/prospects/token";
 import { parseCsv } from "@/lib/prospects/csv";
+import { MAX_IMPORT_FILE_BYTES } from "@/lib/prospects/import-limits";
 import {
   buildColumnMapping,
   isImportableEmail,
@@ -20,11 +21,12 @@ import type { Json } from "@/types/database";
 // check (so org scoping is the database's job, not this route's) and for the
 // insert (so the owner-only policy on prospects applies).
 
-// A single upload is one operator action on one Apollo export. The cap is
+// A single upload is one operator action on one Apollo export. The row cap is
 // here so a mis-picked file cannot turn into a very long transaction; it is
-// well above a normal list pull.
+// well above a normal list pull. The byte cap is shared with the page, which
+// checks it before spending an upload (lib/prospects/import-limits.ts).
 const MAX_ROWS = 5000;
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_FILE_BYTES = MAX_IMPORT_FILE_BYTES;
 
 export type ImportResult = {
   created: number;
