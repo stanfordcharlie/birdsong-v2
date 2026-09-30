@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { INTERVIEW_LENGTHS } from "@/lib/studies/interview-length";
+import { OPTIONAL_RESPONDENT_FIELDS } from "@/lib/studies/respondent-fields";
 import {
   BRIEF_FIELD_KEYS,
   coerceFieldValue,
@@ -64,6 +65,9 @@ const PATCH_PROPERTIES: Record<BriefFieldKey, Record<string, unknown>> = {
   length: { type: "string", enum: [...INTERVIEW_LENGTHS] },
   giftAmount: { type: "number" },
   giftBrand: STRING,
+  // An empty array is a real answer here, not a missing one: it means name
+  // and email are all this study asks for.
+  respondentFields: { type: "array", items: { type: "string", enum: [...OPTIONAL_RESPONDENT_FIELDS] } },
 };
 
 export const CONVERSE_TOOL: Anthropic.Tool = {

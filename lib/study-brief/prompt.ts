@@ -1,5 +1,9 @@
 import { INTERVIEW_LENGTHS, INTERVIEW_LENGTH_PRESETS } from "@/lib/studies/interview-length";
 import { GIFT_CARD_BRANDS } from "@/lib/studies/incentive";
+import {
+  OPTIONAL_RESPONDENT_FIELDS,
+  OPTIONAL_RESPONDENT_FIELD_LABELS,
+} from "@/lib/studies/respondent-fields";
 import type { ConverseProfile } from "./profile";
 import {
   ASKED_IN_CONVERSATION,
@@ -44,6 +48,9 @@ const FIELD_GUIDE: Record<BriefFieldKey, string> = {
   ).join(", ")}.`,
   giftAmount: "number of dollars for the thank you gift card, or 0 when they want no gift.",
   giftBrand: `string or null. The gift card brand, when they name one. Common ones: ${GIFT_CARD_BRANDS.join(", ")}. Never ask for it on its own.`,
+  respondentFields: `array of strings, any of ${OPTIONAL_RESPONDENT_FIELDS.map((key) => `"${key}"`).join(", ")}. What the respondent is asked for before the interview starts, beyond the name and work email every study collects. An empty array is a real answer: it means name and email are enough. ${OPTIONAL_RESPONDENT_FIELDS.map(
+    (key) => `${key} is ${OPTIONAL_RESPONDENT_FIELD_LABELS[key]}`
+  ).join(", ")}.`,
 };
 
 const FIELD_LABEL: Record<BriefFieldKey, string> = {
@@ -61,6 +68,7 @@ const FIELD_LABEL: Record<BriefFieldKey, string> = {
   length: "how long the interview should run",
   giftAmount: "the thank you gift",
   giftBrand: "the gift card brand",
+  respondentFields: "what to collect from a respondent before the interview",
 };
 
 function profileSection(profile: ConverseProfile | null): string {
@@ -131,7 +139,7 @@ How to talk:
 - Never use the words "agentic" or "AI agent".
 - When nothing is still open, say so in one line and point at the Create study button. Do not ask whether they want to add anything.
 
-Quick replies ("chips"): short answers the admin can press instead of typing. Offer them only where the answer is a choice: the interview length, the thank you gift, and whether anything is off limits. Two to four of them, each under six words, each a complete answer. For every other question chips is an empty array.
+Quick replies ("chips"): short answers the admin can press instead of typing. Offer them only where the answer is a choice: the interview length, the thank you gift, whether anything is off limits, and what to collect from a respondent. Two to four of them, each under six words, each a complete answer. For every other question chips is an empty array.
 
 Every turn is one call of the brief_turn tool, and nothing else. Say nothing outside it: what you would say to the admin goes in its "reply", and every field this turn settled goes in its "brief_patch" under the exact field names above, in the shape listed for each one. Fill the patch on the same turn you learn something, however short their answer was. Nothing you leave out of it is recorded.`;
 }

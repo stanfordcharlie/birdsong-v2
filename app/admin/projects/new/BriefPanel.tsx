@@ -15,6 +15,7 @@ import {
   giftCardPhrase,
 } from "@/lib/studies/incentive";
 import {
+  OPTIONAL_RESPONDENT_FIELDS,
   OPTIONAL_RESPONDENT_FIELD_LABELS,
   type CustomRespondentFieldDef,
 } from "@/lib/studies/respondent-fields";
@@ -81,6 +82,7 @@ export const BRIEF_FIELD_LABELS: Record<BriefFieldKey, string> = {
   length: "Length",
   giftAmount: "Gift",
   giftBrand: "Gift brand",
+  respondentFields: "What we collect",
 };
 
 /** When the AI last wrote each field, by the page's clock. Absent = never. */
@@ -595,6 +597,55 @@ export function BriefPanel({
 
       <BriefCard label="Off limits" filled={filled("offLimits")} flashAt={wroteAt("offLimits")}>
         <Editable multiline label="off limits" value={brief.offLimits} onCommit={(v) => onEdit("offLimits", v)} />
+      </BriefCard>
+
+      {/* Name and work email are not offered: every study collects them, so
+          they are stated rather than chosen. The four that follow are the
+          study's own, and an empty set is a real answer, which is why this
+          card reads "Name and email only" rather than sitting empty. */}
+      <BriefCard
+        label="What we collect"
+        filled={filled("respondentFields")}
+        flashAt={wroteAt("respondentFields")}
+        hint="Asked before the interview starts. Name and work email always."
+      >
+        <div className="flex flex-wrap gap-1.5">
+          {OPTIONAL_RESPONDENT_FIELDS.map((field) => {
+            const chosen = brief.respondentFields?.includes(field) ?? false;
+            return (
+              <button
+                key={field}
+                type="button"
+                aria-pressed={chosen}
+                onClick={() => {
+                  const current = brief.respondentFields ?? [];
+                  const next = chosen
+                    ? current.filter((value) => value !== field)
+                    : OPTIONAL_RESPONDENT_FIELDS.filter(
+                        (value) => value === field || current.includes(value)
+                      );
+                  onEdit("respondentFields", next);
+                }}
+                className={cn(
+                  "focus-ring border px-[10px] py-[5px] text-[13px] font-semibold transition-colors",
+                  radius.pill,
+                  chosen
+                    ? cn(border.accent, "bg-[color:hsl(var(--ds-accent-weak))]", text.accent)
+                    : cn(border.base, text.muted2, "hover:text-[color:hsl(var(--ds-ink))]")
+                )}
+              >
+                {OPTIONAL_RESPONDENT_FIELD_LABELS[field]}
+              </button>
+            );
+          })}
+        </div>
+        <p className={brief.respondentFields !== null ? HINT : cn("text-[14px]", text.muted3)}>
+          {brief.respondentFields === null
+            ? WAITING
+            : brief.respondentFields.length === 0
+              ? "Name and email only."
+              : `Name, email and ${brief.respondentFields.length} more.`}
+        </p>
       </BriefCard>
 
       <BriefCard label="Length" filled={filled("length")} flashAt={wroteAt("length")}>

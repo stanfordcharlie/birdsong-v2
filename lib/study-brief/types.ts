@@ -1,4 +1,8 @@
 import { isInterviewLength, type InterviewLength } from "@/lib/studies/interview-length";
+import {
+  OPTIONAL_RESPONDENT_FIELDS,
+  type OptionalRespondentField,
+} from "@/lib/studies/respondent-fields";
 import { normalizeGiftCardBrand } from "@/lib/studies/incentive";
 import { slugify } from "@/lib/studies/slugify";
 
@@ -37,6 +41,17 @@ export type StudyBrief = {
   giftAmount: number | null;
   /** surveys.gift_card_brand. Only stored with an amount. */
   giftBrand: string | null;
+  /**
+   * The optional details the respondent is asked for on the way in, beyond
+   * the name and work email every study collects (surveys.custom_fields, via
+   * lib/studies/respondent-fields.ts).
+   *
+   * Null and empty mean different things here, which is why this field is
+   * nullable where `signals` is not: null is "not asked yet", and an empty
+   * array is the admin's answer that name and email are enough. Only null
+   * leaves the conversation with something still to ask.
+   */
+  respondentFields: OptionalRespondentField[] | null;
 };
 
 export const BRIEF_FIELD_KEYS = [
@@ -54,6 +69,7 @@ export const BRIEF_FIELD_KEYS = [
   "length",
   "giftAmount",
   "giftBrand",
+  "respondentFields",
 ] as const satisfies readonly (keyof StudyBrief)[];
 
 export type BriefFieldKey = (typeof BRIEF_FIELD_KEYS)[number];
@@ -77,6 +93,7 @@ export const EMPTY_BRIEF: StudyBrief = {
   length: null,
   giftAmount: null,
   giftBrand: null,
+  respondentFields: null,
 };
 
 /**
@@ -105,12 +122,16 @@ export const REQUIRED_TO_CREATE = [
 export const ASKED_IN_CONVERSATION = [
   ...REQUIRED_TO_CREATE,
   "offLimits",
+  "respondentFields",
   "length",
   "giftAmount",
 ] as const satisfies readonly BriefFieldKey[];
 
 export function isFieldFilled(brief: StudyBrief, key: BriefFieldKey): boolean {
   const value = brief[key];
+  // The one field whose empty array is an answer: "name and email are
+  // enough" has to be distinguishable from "nobody has said yet".
+  if (key === "respondentFields") return value !== null;
   if (Array.isArray(value)) return value.length > 0;
   if (typeof value === "string") return value.trim().length > 0;
   return value !== null && value !== undefined;
@@ -201,6 +222,20 @@ export function coerceFieldValue(key: BriefFieldKey, value: unknown): StudyBrief
     case "giftBrand":
       if (value === null) return null;
       return typeof value === "string" ? normalizeGiftCardBrand(value) : undefined;
+    case "respondentFields": {
+      if (value === null) return null;
+      // A single key on its own is taken as a list of one, the same
+      // forgiveness signals gets, since both are lists the model can
+      // collapse when there is only one item.
+      const items = typeof value === "string" ? [value] : value;
+      if (!Array.isArray(items)) return undefined;
+      const known = items.filter((item): item is OptionalRespondentField =>
+        (OPTIONAL_RESPONDENT_FIELDS as readonly string[]).includes(item as string)
+      );
+      // Order and duplicates are the model's; the study stores them in the
+      // one order the form shows them in.
+      return OPTIONAL_RESPONDENT_FIELDS.filter((field) => known.includes(field));
+    }
   }
 }
 

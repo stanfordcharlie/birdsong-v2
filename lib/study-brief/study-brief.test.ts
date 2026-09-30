@@ -188,6 +188,7 @@ const BRIEF: StudyBrief = {
   length: "deep",
   giftAmount: 15,
   giftBrand: "Amazon",
+  respondentFields: ["job_title", "company"],
 };
 
 const GUIDE: StructuredGuide = {
@@ -269,8 +270,30 @@ describe("mapToStudy", () => {
     });
   });
 
-  it("writes the wizard's default respondent fields, then the guide's, never twice", () => {
+  it("writes what the conversation was told to collect, then the guide's, never twice", () => {
     expect(payload.custom_fields).toEqual([
+      { key: "job_title", label: "Job title", required: false },
+      { key: "company", label: "Company name", required: false },
+      { key: "custom_team_size", label: "Team size", required: false },
+    ]);
+  });
+
+  it("collects name and email only when that was the answer", () => {
+    const bare = mapToStudy({ brief: { ...BRIEF, respondentFields: [] }, guide: GUIDE, transcript: TRANSCRIPT });
+    // The guide's own invention still lands; its "phone" recommendation does
+    // not, because the admin was asked and left phone out.
+    expect(bare.custom_fields).toEqual([{ key: "custom_team_size", label: "Team size", required: false }]);
+  });
+
+  it("does not let the guide put back a preset the admin declined", () => {
+    // GUIDE recommends "phone"; this brief asks for job title and company.
+    expect((payload.custom_fields as { key: string }[]).map((f) => f.key)).not.toContain("phone");
+  });
+
+  it("falls back to the wizard's defaults for a brief that was never asked", () => {
+    // A draft restored from before the question existed: null, not empty.
+    const older = mapToStudy({ brief: { ...BRIEF, respondentFields: null }, guide: GUIDE, transcript: TRANSCRIPT });
+    expect(older.custom_fields).toEqual([
       ...DEFAULT_RESPONDENT_FIELDS,
       { key: "custom_team_size", label: "Team size", required: false },
     ]);
