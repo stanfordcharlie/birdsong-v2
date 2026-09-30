@@ -3,6 +3,7 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { can, requireActiveOrg } from "@/lib/org";
 import { listMembers } from "@/lib/org-team";
 import { fetchLeadActivity } from "@/lib/leads/activity";
+import { excludeDeletedResponses } from "@/lib/responses/visibility";
 import type { InterviewMessage } from "@/lib/interview/types";
 import { parseCallScript } from "@/lib/interview/call-script";
 import { EMPTY_VALUE } from "@/lib/format";
@@ -21,11 +22,9 @@ export default async function ResponseDetailPage({
   // Cookie client: the org-member read policy is what decides whether this
   // response is visible at all. Everything fetched with the service role
   // below (trail, members) happens only once that read has succeeded.
-  const { data: response } = await supabase
-    .from("responses")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  const { data: response } = await excludeDeletedResponses(
+    supabase.from("responses").select("*").eq("id", id)
+  ).maybeSingle();
 
   if (!response) {
     notFound();
@@ -50,6 +49,7 @@ export default async function ResponseDetailPage({
     setStatus: can(role, "lead:setStatus"),
     note: can(role, "lead:note"),
     pushToCrm: can(role, "response:pushToCrm"),
+    deleteResponse: can(role, "response:delete"),
   };
 
   const customValues = (response.custom_field_values as Record<string, unknown> | null) ?? {};
@@ -85,6 +85,7 @@ export default async function ResponseDetailPage({
 
   const data: ResponseDetailData = {
     responseId: response.id,
+    surveyId: response.survey_id,
     survey: survey ? { id: survey.id, title: survey.title } : null,
     respondentName: response.respondent_name,
     // Kept as three fields rather than one joined line: the header sets the

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { StatusDot, Waveform } from "@/components/admin/ui";
 import { bg, border, radius, text } from "@/components/admin/ui/tokens";
 import { createClient } from "@/lib/supabase/client";
+import { excludeDeletedResponses } from "@/lib/responses/visibility";
 import {
   isStudyPresence,
   PRESENCE_STALE_MS,
@@ -96,10 +97,9 @@ export function HomeLive({ studies, enterDelayMs }: { studies: HomeLiveStudy[]; 
     if (missing.length === 0) return;
     let cancelled = false;
     const supabase = createClient();
-    supabase
-      .from("responses")
-      .select("id, created_at")
-      .in("id", missing)
+    excludeDeletedResponses(
+      supabase.from("responses").select("id, created_at").in("id", missing)
+    )
       .then(({ data }) => {
         if (cancelled || !data) return;
         setStartedAt((prev) => {

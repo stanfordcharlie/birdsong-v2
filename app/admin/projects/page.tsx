@@ -2,6 +2,7 @@ import Link from "next/link";
 import { interviewLengthPreset, interviewLengthSummary } from "@/lib/studies/interview-length";
 import { createClient } from "@/lib/supabase/server";
 import { can, requireActiveOrg } from "@/lib/org";
+import { excludeDeletedResponses } from "@/lib/responses/visibility";
 import { WORTH_A_CALL_SCORE_MIN } from "@/lib/leads";
 import { Button, PageShell, PageTopBar } from "@/components/admin/ui";
 import { ExportStudiesButton } from "./ExportStudiesButton";
@@ -36,12 +37,13 @@ export default async function AdminDashboardPage({
   // this pulls one row per response across this admin's surveys in a single
   // query and tallies it here.
   const { data: responseRows } = surveyIds.length
-    ? await supabase
-        .from("responses")
-        .select("survey_id, created_at, completed, lead_score")
-        .in("survey_id", surveyIds)
-        .eq("is_test", false)
-        .order("created_at", { ascending: false })
+    ? await excludeDeletedResponses(
+        supabase
+          .from("responses")
+          .select("survey_id, created_at, completed, lead_score")
+          .in("survey_id", surveyIds)
+          .eq("is_test", false)
+      ).order("created_at", { ascending: false })
     : {
         data: [] as { survey_id: string; created_at: string; completed: boolean; lead_score: number | null }[],
       };

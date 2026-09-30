@@ -30,6 +30,7 @@ export {
 } from "./DataTable";
 export { useTableSort } from "./useTableSort";
 export { EmptyState } from "./EmptyState";
+export { SelectBox } from "./SelectBox";
 export {
   Badge,
   BADGE_STATES,

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { excludeDeletedResponses } from "@/lib/responses/visibility";
 import { orgErrorResponse, requireOrgPermission } from "@/lib/org";
 
 // PATCH /api/surveys/[id]
@@ -110,11 +111,17 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Study not found" }, { status: 404 });
   }
 
-  const { count, error: countError } = await supabase
-    .from("responses")
-    .select("id", { count: "exact", head: true })
-    .eq("survey_id", id)
-    .eq("is_test", false);
+  // Deleted responses do not hold a study back: what the guard protects is
+  // the data the admin can still see, and a study whose only responses were
+  // deleted reads as empty on its own page. Hard-deleting the study does
+  // cascade those rows away for good, which is the admin's call to make.
+  const { count, error: countError } = await excludeDeletedResponses(
+    supabase
+      .from("responses")
+      .select("id", { count: "exact", head: true })
+      .eq("survey_id", id)
+      .eq("is_test", false)
+  );
 
   if (countError) {
     console.error("[surveys/[id] DELETE] response count failed:", countError);

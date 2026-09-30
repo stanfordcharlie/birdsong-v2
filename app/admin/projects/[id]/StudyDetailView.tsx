@@ -299,7 +299,7 @@ export function StudyDetailView({
   sourceBreakdown: SourceBreakdownRow[] | null;
   // From can() on the server. False hides the affordance; the routes and RLS
   // behind each one refuse regardless.
-  permissions: { edit: boolean; generateReport: boolean; publishReport: boolean };
+  permissions: { edit: boolean; deleteResponses: boolean; generateReport: boolean; publishReport: boolean };
 }) {
   const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<StudyTab>(initialTab);
@@ -472,7 +472,12 @@ export function StudyDetailView({
               quality.length > 0 && "xl:grid-cols-[minmax(0,1fr)_300px]"
             )}
           >
-            <ResponsesTable responses={responses} query={query} worthOnly={worthOnly} />
+            <ResponsesTable
+              responses={responses}
+              query={query}
+              worthOnly={worthOnly}
+              canDelete={permissions.deleteResponses}
+            />
             {quality.length > 0 && <QualityCard metrics={quality} />}
           </div>
 

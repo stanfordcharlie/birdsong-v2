@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Badge, Button, PageHeader, PageShell, RelativeTime } from "@/components/admin/ui";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveOrg } from "@/lib/org";
+import { excludeDeletedResponses } from "@/lib/responses/visibility";
 import type { InterviewMessage } from "@/lib/interview/types";
 import { LiveTranscript } from "./LiveTranscript";
 
@@ -18,11 +19,14 @@ export default async function LiveResponsePage({ params }: { params: Promise<{ i
   // Cookie-authenticated client, so the org-member read policy on responses
   // is what scopes this row to the caller's organization. It is the same
   // predicate Realtime re-evaluates for the subscription in LiveTranscript.
-  const { data: response } = await supabase
-    .from("responses")
-    .select("id, respondent_name, respondent_email, messages, completed, created_at, is_test, surveys(title)")
-    .eq("id", id)
-    .maybeSingle();
+  // A deleted response 404s here as it does everywhere else: the row is
+  // still in the database, but nothing in admin links to it or renders it.
+  const { data: response } = await excludeDeletedResponses(
+    supabase
+      .from("responses")
+      .select("id, respondent_name, respondent_email, messages, completed, created_at, is_test, surveys(title)")
+      .eq("id", id)
+  ).maybeSingle();
 
   // Also the not-yours case: RLS returns no row rather than an error, and a
   // 404 is the right answer either way.

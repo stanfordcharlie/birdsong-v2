@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { excludeDeletedResponses } from "@/lib/responses/visibility";
 import { userDisplayName } from "@/lib/user-name";
 import type { Database } from "@/types/database";
 import type { DisqualifyReason, LeadActivityType, LeadStatus } from "@/lib/leads/state";
@@ -36,11 +37,11 @@ export function isUuid(value: unknown): value is string {
  */
 export async function loadLeadRow(responseId: string, admin: Client = createAdminClient()): Promise<LeadRow | null> {
   if (!isUuid(responseId)) return null;
-  const { data, error } = await admin
-    .from("responses")
-    .select("id, org_id, lead_status, assigned_to")
-    .eq("id", responseId)
-    .maybeSingle();
+  // A deleted response accepts no lead action: this returns null and the
+  // caller answers "not found", the same as for an id that never existed.
+  const { data, error } = await excludeDeletedResponses(
+    admin.from("responses").select("id, org_id, lead_status, assigned_to").eq("id", responseId)
+  ).maybeSingle();
   if (error) throw error;
   if (!data) return null;
   return { id: data.id, orgId: data.org_id, leadStatus: data.lead_status, assignedTo: data.assigned_to };

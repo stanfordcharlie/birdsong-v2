@@ -1,6 +1,7 @@
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { can, getActiveOrg } from "@/lib/org";
 import { excludeArchivedStudies } from "@/lib/lead-queue";
+import { excludeDeletedEmbeddedResponses, excludeDeletedResponses } from "@/lib/responses/visibility";
 import { AdminChrome } from "@/components/AdminChrome";
 import type { SidebarData, SidebarStudy } from "@/components/AdminSidebar";
 import { SearchShortcut } from "@/components/admin/SearchShortcut";
@@ -45,20 +46,23 @@ export default async function AdminLayout({
         // filter on the embed narrows what is counted (test responses out,
         // as the Projects page tallies them) without dropping a study that
         // has none.
-        supabase
-          .from("surveys")
-          .select("id, title, status, responses(count)")
-          .eq("org_id", org.orgId)
-          .is("archived_at", null)
-          .eq("responses.is_test", false)
-          .order("created_at", { ascending: false }),
-        excludeArchivedStudies(
+        excludeDeletedEmbeddedResponses(
           supabase
-            .from("responses")
-            .select("id, surveys!inner(archived_at)", { count: "exact", head: true })
-            .eq("completed", true)
-            .eq("is_test", false)
-            .eq("lead_status", "new")
+            .from("surveys")
+            .select("id, title, status, responses(count)")
+            .eq("org_id", org.orgId)
+            .is("archived_at", null)
+            .eq("responses.is_test", false)
+        ).order("created_at", { ascending: false }),
+        excludeDeletedResponses(
+          excludeArchivedStudies(
+            supabase
+              .from("responses")
+              .select("id, surveys!inner(archived_at)", { count: "exact", head: true })
+              .eq("completed", true)
+              .eq("is_test", false)
+              .eq("lead_status", "new")
+          )
         ),
       ]);
 

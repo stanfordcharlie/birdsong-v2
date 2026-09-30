@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { excludeDeletedResponses } from "@/lib/responses/visibility";
 import { orgErrorResponse, requireOrgPermission } from "@/lib/org";
 import { parseCallScript } from "@/lib/interview/call-script";
 import { selectRespondentCompanyName } from "@/lib/lead-content";
@@ -34,15 +35,16 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return orgErrorResponse(err);
   }
 
-  const { data: response, error } = await supabase
-    .from("responses")
-    // One literal, not a concatenation: supabase-js infers the row type from
-    // the select string itself, and a joined expression infers as nothing.
-    .select(
-      "id, survey_id, respondent_name, respondent_email, respondent_phone, custom_field_values, lead_score, pain_points, call_script, completed, is_test, created_at"
-    )
-    .eq("id", id)
-    .maybeSingle();
+  const { data: response, error } = await excludeDeletedResponses(
+    supabase
+      .from("responses")
+      // One literal, not a concatenation: supabase-js infers the row type from
+      // the select string itself, and a joined expression infers as nothing.
+      .select(
+        "id, survey_id, respondent_name, respondent_email, respondent_phone, custom_field_values, lead_score, pain_points, call_script, completed, is_test, created_at"
+      )
+      .eq("id", id)
+  ).maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

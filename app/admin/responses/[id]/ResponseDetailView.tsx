@@ -48,6 +48,13 @@ const DURATION_MAX_MINUTES = 180;
 
 export type ResponseDetailData = {
   responseId: string;
+  /**
+   * The study this response belongs to, straight off the row. `survey` below
+   * is the looked-up study and can be null (a study deleted out from under a
+   * response); this id always exists, which is what the delete needs to know
+   * where to send the admin next.
+   */
+  surveyId: string;
   survey: { id: string; title: string } | null;
   respondentName: string | null;
   /** Job title, from the respondent's custom fields. */
@@ -96,6 +103,7 @@ type DetailRow = { label: string; value: React.ReactNode; title?: string };
 export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
   const {
     responseId,
+    surveyId,
     survey,
     respondentName,
     role,
@@ -322,6 +330,7 @@ export function ResponseDetailView({ data }: { data: ResponseDetailData }) {
         actions={
           <LeadHeaderControls
             responseId={responseId}
+            surveyId={surveyId}
             leadStatus={workflow.leadStatus}
             assignedTo={workflow.assignedTo}
             assigneeName={workflow.assigneeName}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Dialog } from "@/components/ui/dialog";
 import { Badge, Button, LEAD_STATUS_BADGE_STATE } from "@/components/admin/ui";
 import { bg, border, dot, radius, shadow, text } from "@/components/admin/ui/tokens";
 import { SelectControl } from "@/app/admin/leads/controls";
@@ -39,6 +40,7 @@ export type WorkflowPermissions = {
   setStatus: boolean;
   note: boolean;
   pushToCrm: boolean;
+  deleteResponse: boolean;
 };
 
 const FIELD = cn(
@@ -65,6 +67,7 @@ function moveLabel(from: LeadStatus, to: LeadStatus): string {
 
 export function LeadHeaderControls({
   responseId,
+  surveyId,
   leadStatus,
   assignedTo,
   assigneeName,
@@ -73,6 +76,8 @@ export function LeadHeaderControls({
   permissions,
 }: {
   responseId: string;
+  /** Where to go once this response is deleted: back to its study. */
+  surveyId: string;
   leadStatus: LeadStatus;
   assignedTo: string | null;
   assigneeName: string | null;
@@ -91,6 +96,12 @@ export function LeadHeaderControls({
   const [reason, setReason] = useState<DisqualifyReason | "">("");
   const [reasonNote, setReasonNote] = useState("");
   const moreRef = useRef<HTMLDivElement>(null);
+
+  // Deleting is the one move in this menu that leaves the page, so it asks
+  // first. Same route and same wording as the Responses tab's bulk delete.
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const open = menuOpen || disqualifying;
 
@@ -115,6 +126,27 @@ export function LeadHeaderControls({
     setDisqualifying(false);
     setReason("");
     setReasonNote("");
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch("/api/responses/delete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: [responseId] }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "Couldn't delete that response");
+      // This page reads a response the delete just hid, so staying here would
+      // land on a 404. Back to the study it belonged to, where the stats and
+      // the Responses tab have already dropped it.
+      router.push(`/admin/projects/${surveyId}`);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Couldn't delete that response");
+      setDeleting(false);
+    }
   }
 
   const options = nextStatuses(leadStatus);
@@ -231,7 +263,10 @@ export function LeadHeaderControls({
         )
       )}
 
-      {permissions.setStatus && options.length > 0 && (
+      {/* The menu opens for the status moves, for Delete, or for both: a
+          member with no status moves left still gets no menu, while an admin
+          always has Delete in it. */}
+      {((permissions.setStatus && options.length > 0) || permissions.deleteResponse) && (
         <div ref={moreRef} className="relative">
           <Button
             type="button"
@@ -248,21 +283,44 @@ export function LeadHeaderControls({
 
           {menuOpen && (
             <div role="menu" className={cn(POPOVER, "w-[220px] p-1")}>
-              {options.map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => handleMove(status)}
-                  className={cn(
-                    "focus-ring flex h-[34px] items-center px-[10px] text-left text-[13px] font-semibold hover:bg-[color:hsl(var(--ds-bg-sidebar))]",
-                    radius.chip,
-                    text.ink3
+              {permissions.setStatus &&
+                options.map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleMove(status)}
+                    className={cn(
+                      "focus-ring flex h-[34px] items-center px-[10px] text-left text-[13px] font-semibold hover:bg-[color:hsl(var(--ds-bg-sidebar))]",
+                      radius.chip,
+                      text.ink3
+                    )}
+                  >
+                    {moveLabel(leadStatus, status)}
+                  </button>
+                ))}
+              {permissions.deleteResponse && (
+                <>
+                  {permissions.setStatus && options.length > 0 && (
+                    <span aria-hidden className={cn("my-1 border-t", border.base)} />
                   )}
-                >
-                  {moveLabel(leadStatus, status)}
-                </button>
-              ))}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      closeAll();
+                      setDeleteError(null);
+                      setDeleteOpen(true);
+                    }}
+                    className={cn(
+                      "focus-ring flex h-[34px] items-center px-[10px] text-left text-[13px] font-semibold text-destructive hover:bg-[color:hsl(var(--ds-bg-sidebar))]",
+                      radius.chip
+                    )}
+                  >
+                    Delete response
+                  </button>
+                </>
+              )}
             </div>
           )}
 
@@ -311,6 +369,25 @@ export function LeadHeaderControls({
           )}
         </div>
       )}
+
+      <Dialog
+        open={deleteOpen}
+        onClose={() => !deleting && setDeleteOpen(false)}
+        title="Delete this response?"
+        description="It comes off the study's stats, the Responses tab and the Leads queue. The transcript is kept, so this can be reversed in the database. Anything already pushed to HubSpot stays in HubSpot."
+      >
+        <div className="flex flex-col gap-3">
+          {deleteError && <p className="type-body text-destructive">{deleteError}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleDelete} disabled={deleting}>
+              {deleting ? "Deleting..." : "Delete response"}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </>
   );
 }

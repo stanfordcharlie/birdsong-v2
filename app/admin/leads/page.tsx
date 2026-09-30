@@ -3,6 +3,7 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { can, requireActiveOrg } from "@/lib/org";
 import { listMembers } from "@/lib/org-team";
 import { fetchLeadQueue } from "@/lib/lead-queue";
+import { excludeDeletedResponses } from "@/lib/responses/visibility";
 import { Button, EmptyState, PageHeader, PageShell } from "@/components/admin/ui";
 import { EMPTY_VALUE } from "@/lib/format";
 import { LeadsQueue, type LeadItem } from "./LeadsQueue";
@@ -44,11 +45,13 @@ export default async function LeadsPage({
     // hubspot_synced_at on a successful push). Read beside the queue rather
     // than added to its select, so the queue query stays what every other
     // count on this page derives from. Same client, same read policy.
-    supabase
-      .from("responses")
-      .select("id, hubspot_synced_at")
-      .eq("completed", true)
-      .not("hubspot_synced_at", "is", null),
+    excludeDeletedResponses(
+      supabase
+        .from("responses")
+        .select("id, hubspot_synced_at")
+        .eq("completed", true)
+        .not("hubspot_synced_at", "is", null)
+    ),
   ]);
   const hubspotSyncedAtById = new Map(
     (pushRows ?? []).map((row) => [row.id, row.hubspot_synced_at])

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { can, requireActiveOrg } from "@/lib/org";
 import { excludeArchivedStudies } from "@/lib/lead-queue";
+import { excludeDeletedResponses } from "@/lib/responses/visibility";
 import { WORTH_A_CALL_SCORE_MIN } from "@/lib/leads";
 import { formatRelativeTime } from "@/lib/format";
 import { interviewLengthPreset } from "@/lib/studies/interview-length";
@@ -44,13 +45,15 @@ export default async function AdminHomePage() {
       // archived studies excluded at the database, test responses left out
       // as the queue leaves them out. Every count below derives from it, so
       // Home, the sidebar and Leads agree.
-      excludeArchivedStudies(
-        supabase
-          .from("responses")
-          .select(
-            "id, survey_id, lead_score, lead_status, completed, completed_at, created_at, surveys!inner(archived_at)"
-          )
-          .eq("is_test", false)
+      excludeDeletedResponses(
+        excludeArchivedStudies(
+          supabase
+            .from("responses")
+            .select(
+              "id, survey_id, lead_score, lead_status, completed, completed_at, created_at, surveys!inner(archived_at)"
+            )
+            .eq("is_test", false)
+        )
       ).order("created_at", { ascending: false }),
       supabase
         .from("survey_reports")

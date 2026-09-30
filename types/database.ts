@@ -167,6 +167,11 @@ export type Database = {
           // which is still the common path. One direction only: prospects
           // carries no response_id back.
           prospect_id: string | null;
+          // Soft delete (20260929000000_response_soft_delete.sql). Non-null
+          // means an admin removed this response: every admin read filters it
+          // out (lib/responses/visibility.ts). The row is kept, so clearing
+          // the column restores it.
+          deleted_at: string | null;
           user_id: string;
           org_id: string;
           created_at: string;
@@ -205,6 +210,7 @@ export type Database = {
           status_changed_at?: string | null;
           last_activity_at?: string;
           prospect_id?: string | null;
+          deleted_at?: string | null;
           // Populated server-side by the set_response_user_id and
           // set_response_org_id triggers (both derived from the parent
           // survey, and org_id is always overwritten); safe to omit on
@@ -247,6 +253,7 @@ export type Database = {
           status_changed_at?: string | null;
           last_activity_at?: string;
           prospect_id?: string | null;
+          deleted_at?: string | null;
           user_id?: string;
           org_id?: string;
           created_at?: string;

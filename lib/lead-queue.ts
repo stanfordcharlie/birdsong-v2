@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
+import { excludeDeletedResponses } from "@/lib/responses/visibility";
 
 /**
  * The one definition of which responses belong in the lead queue.
@@ -27,13 +28,15 @@ export function excludeArchivedStudies<Q extends { is: (column: string, value: n
 
 /** Completed, non-archived responses in lead-queue order, plus their fit columns. */
 export async function fetchLeadQueue(supabase: SupabaseClient<Database>) {
-  const { data: responses, error } = await excludeArchivedStudies(
-    supabase
-      .from("responses")
-      .select(
-        "id, respondent_name, respondent_email, custom_field_values, lead_score, status, lead_status, assigned_to, last_activity_at, pain_points, created_at, survey_id, is_test, source, surveys!inner(title, status, archived_at)"
-      )
-      .eq("completed", true)
+  const { data: responses, error } = await excludeDeletedResponses(
+    excludeArchivedStudies(
+      supabase
+        .from("responses")
+        .select(
+          "id, respondent_name, respondent_email, custom_field_values, lead_score, status, lead_status, assigned_to, last_activity_at, pain_points, created_at, survey_id, is_test, source, surveys!inner(title, status, archived_at)"
+        )
+        .eq("completed", true)
+    )
   )
     // The order the queue is worked in: hottest first, and among equals the
     // one most recently touched.
@@ -44,11 +47,13 @@ export async function fetchLeadQueue(supabase: SupabaseClient<Database>) {
   // is fetched separately so the queue keeps working before the
   // response_company_fit migration is applied: if those columns don't exist
   // yet, this query simply errors and every lead falls back to no-fit.
-  const { data: fitRows } = await excludeArchivedStudies(
-    supabase
-      .from("responses")
-      .select("id, fit_score, fit_confidence, fit_reasoning, surveys!inner(archived_at)")
-      .eq("completed", true)
+  const { data: fitRows } = await excludeDeletedResponses(
+    excludeArchivedStudies(
+      supabase
+        .from("responses")
+        .select("id, fit_score, fit_confidence, fit_reasoning, surveys!inner(archived_at)")
+        .eq("completed", true)
+    )
   );
 
   return { responses: responses ?? [], fitRows: fitRows ?? [], error };

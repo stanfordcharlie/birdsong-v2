@@ -15,6 +15,7 @@ export type OrgAction =
   | "study:view"
   | "response:view"
   | "response:update"
+  | "response:delete"
   | "response:pushToCrm"
   | "report:generate"
   | "report:publish"
@@ -40,6 +41,11 @@ const MATRIX: Record<OrgAction, readonly OrgRole[]> = {
   "study:view": EVERYONE,
   "response:view": EVERYONE,
   "response:update": EVERYONE,
+  // Removing collected data sits with study:delete rather than with the lead
+  // queue's day to day: the delete is recoverable in the database but there
+  // is no UI to undo it, so it is a management action. The database enforces
+  // the same rule (guard_response_soft_delete).
+  "response:delete": OWNER_ADMIN,
   "response:pushToCrm": EVERYONE,
   "report:generate": OWNER_ADMIN,
   "report:publish": OWNER_ADMIN,

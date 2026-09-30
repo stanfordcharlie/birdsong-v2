@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { can, requireActiveOrg } from "@/lib/org";
+import { excludeDeletedResponses } from "@/lib/responses/visibility";
 import { type ResponseTableRow } from "./ResponsesTable";
 import {
   StudyDetailView,
@@ -51,7 +52,9 @@ export default async function StudyDetailPage({
   // study would render here (with an empty response list) instead of 404ing.
   const [{ data: survey }, { data: responses }, { data: latestReport }, prospects] = await Promise.all([
     supabase.from("surveys").select("*").eq("id", id).eq("org_id", orgId).maybeSingle(),
-    supabase.from("responses").select("*").eq("survey_id", id).order("created_at", { ascending: false }),
+    excludeDeletedResponses(
+      supabase.from("responses").select("*").eq("survey_id", id)
+    ).order("created_at", { ascending: false }),
     supabase
       .from("survey_reports")
       .select("*")
@@ -179,6 +182,10 @@ export default async function StudyDetailPage({
           : "ended",
       turn: r.completed ? 0 : countQuestions(r.messages),
       createdAt: r.created_at,
+      // Only the delete confirmation reads this, to say that a pushed deal
+      // stays in HubSpot. Either id is enough: a contact synced without a
+      // deal is still something this delete does not reach.
+      hubspotSynced: r.hubspot_synced_at != null || r.hubspot_deal_id != null,
     };
   });
 
@@ -276,6 +283,7 @@ export default async function StudyDetailPage({
       completedInterviewCount={completedResponses.length}
       permissions={{
         edit: can(role, "study:edit"),
+        deleteResponses: can(role, "response:delete"),
         generateReport: can(role, "report:generate"),
         publishReport: can(role, "report:publish"),
       }}

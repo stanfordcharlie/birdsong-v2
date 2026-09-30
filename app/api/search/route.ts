@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { orgErrorResponse, requireActiveOrg } from "@/lib/org";
+import { excludeDeletedResponses } from "@/lib/responses/visibility";
 import type { SearchResults } from "@/components/admin/GlobalSearch";
 
 // The admin's global search. Two ilike lookups, run here rather than in the
@@ -53,12 +54,14 @@ export async function GET(request: Request) {
         .or(`title.ilike.${pattern},topic.ilike.${pattern},slug.ilike.${pattern}`)
         .order("created_at", { ascending: false })
         .limit(PER_GROUP),
-      supabase
-        .from("responses")
-        .select("id, respondent_name, respondent_email, lead_score, created_at, surveys(title)")
-        .eq("org_id", orgId)
-        .eq("is_test", false)
-        .or(`respondent_name.ilike.${pattern},respondent_email.ilike.${pattern}`)
+      excludeDeletedResponses(
+        supabase
+          .from("responses")
+          .select("id, respondent_name, respondent_email, lead_score, created_at, surveys(title)")
+          .eq("org_id", orgId)
+          .eq("is_test", false)
+          .or(`respondent_name.ilike.${pattern},respondent_email.ilike.${pattern}`)
+      )
         .order("created_at", { ascending: false })
         .limit(PER_GROUP),
     ]);

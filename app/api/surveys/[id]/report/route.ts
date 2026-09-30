@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { excludeDeletedResponses } from "@/lib/responses/visibility";
 import { orgErrorResponse, requireOrgPermission } from "@/lib/org";
 import { generateSurveyReport } from "@/lib/report/generate";
 import type { InterviewMessage } from "@/lib/interview/types";
@@ -63,13 +64,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Study not found" }, { status: 404 });
   }
 
-  const { data: responses, error: responsesError } = await supabase
-    .from("responses")
-    .select("messages, created_at")
-    .eq("survey_id", id)
-    .eq("completed", true)
-    .eq("is_test", false)
-    .order("created_at", { ascending: false });
+  const { data: responses, error: responsesError } = await excludeDeletedResponses(
+    supabase
+      .from("responses")
+      .select("messages, created_at")
+      .eq("survey_id", id)
+      .eq("completed", true)
+      .eq("is_test", false)
+  ).order("created_at", { ascending: false });
 
   if (responsesError) {
     console.error("[surveys/report] responses fetch failed:", responsesError);

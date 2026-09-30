@@ -1,5 +1,6 @@
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { can, getActiveOrg } from "@/lib/org";
+import { excludeDeletedResponses } from "@/lib/responses/visibility";
 import { SettingRow, SettingsSection } from "../SettingsSection";
 import { ChangeEmailForm } from "./ChangeEmailForm";
 import { ChangePasswordForm } from "./ChangePasswordForm";
@@ -24,11 +25,13 @@ export default async function AccountSettingsPage() {
       : { data: null };
 
   const { count: sampleResponseCount } = sampleSurvey
-    ? await supabase
-        .from("responses")
-        .select("id", { count: "exact", head: true })
-        .eq("survey_id", sampleSurvey.id)
-        .eq("is_test", true)
+    ? await excludeDeletedResponses(
+        supabase
+          .from("responses")
+          .select("id", { count: "exact", head: true })
+          .eq("survey_id", sampleSurvey.id)
+          .eq("is_test", true)
+      )
     : { count: null };
 
   return (
