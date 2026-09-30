@@ -146,6 +146,16 @@ function text(value: unknown, max: number): string | undefined {
 }
 
 /**
+ * One signal per line, or per semicolon where there are no line breaks. A
+ * sentence with neither stays whole: it is one signal.
+ */
+function splitSignals(value: string): string[] {
+  const lines = value.split(/\r?\n+/).filter((line) => line.trim().length > 0);
+  const parts = lines.length > 1 ? lines : value.split(";");
+  return parts.map((part) => part.replace(/^\s*[-*\u2022]\s*/, ""));
+}
+
+/**
  * The value as the brief should hold it, or undefined when it is not a
  * usable value for that field.
  */
@@ -165,8 +175,15 @@ export function coerceFieldValue(key: BriefFieldKey, value: unknown): StudyBrief
     case "publicDescription":
       return text(value, TEXT_MAX);
     case "signals": {
-      if (!Array.isArray(value)) return undefined;
-      return value
+      // The brief holds one signal per item, which is what the model is
+      // asked for and usually sends. A single string arrives often enough
+      // (one signal, or several on their own lines) that it is normalized
+      // here rather than thrown away: the field is what the right rail's
+      // "What makes someone worth a call" card reads, and losing an answer
+      // to a shape is worse than splitting it.
+      const items = typeof value === "string" ? splitSignals(value) : value;
+      if (!Array.isArray(items)) return undefined;
+      return items
         .filter((item): item is string => typeof item === "string")
         .map((item) => item.trim().slice(0, LINE_MAX).trim())
         .filter((item) => item.length > 0)

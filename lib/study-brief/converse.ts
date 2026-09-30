@@ -8,8 +8,11 @@ import {
 } from "@/lib/interview/anthropic";
 import { CLOSING_MESSAGE, TITLE_RETRY_MESSAGE } from "./prompt";
 import {
+  CONVERSE_TOOL,
+  CONVERSE_TOOL_NAME,
   applyPatch,
   parseConverseReply,
+  parseConverseToolInput,
   sanitizePatch,
   titleImpliesSales,
   type BriefPatch,
@@ -20,12 +23,19 @@ import { isConversationComplete, type BriefFieldKey, type StudyBrief } from "./t
 // One turn of the study brief conversation: one model call, parsed, checked,
 // and reduced to the reply and the patch the page may apply.
 //
-// The reply is a JSON object of a few short strings, but Sonnet 5 thinks
-// before it answers and the thinking counts against max_tokens. modelParams
-// caps the thinking at an explicit budget and asserts this ceiling leaves
-// THINKING_HEADROOM for the reply. Same numbers as brief/continue.
-export const CONVERSE_MAX_TOKENS = 4096;
-export const CONVERSE_THINKING = { effort: "low", budget: 2048 } as const;
+// The turn is a forced call of the brief_turn tool (lib/study-brief/schema.ts
+// says why). A forced tool choice may not be paired with thinking, so this
+// call thinks not at all and max_tokens is entirely output: room for a reply,
+// a handful of chips and a patch that fills every field of the brief at once,
+// which is what a pasted ICP document produces on the first turn.
+export const CONVERSE_MAX_TOKENS = 8192;
+
+/**
+ * The whole reply, for the log line of a turn that could not be used. The
+ * conversation is between Birdsong and an admin about a study they have not
+ * created yet, so no respondent has said anything that could be in here.
+ */
+export const CONVERSE_RAW_PREVIEW = 2000;
 
 export type ConverseTurn =
   | {
@@ -37,9 +47,16 @@ export type ConverseTurn =
       /** What was kept out of the patch, for the log. */
       dropped: { unknown: string[]; manual: BriefFieldKey[]; invalid: BriefFieldKey[]; title: boolean };
     }
-  | { ok: false; code: "MODEL_UNPARSEABLE"; error: string };
+  | { ok: false; code: "MODEL_UNPARSEABLE" | "MODEL_TRUNCATED"; error: string };
 
 type Log = { scope: string; requestId: string };
+
+/** What the model sent, in whichever form it arrived, so a retry can echo it. */
+type RawTurn = { toolUse: Anthropic.ToolUseBlock | null; text: string };
+
+type Attempt =
+  | { parsed: ParsedReply; raw: RawTurn }
+  | { parsed: null; raw: RawTurn; error: string; truncated: boolean };
 
 /**
  * One call and its parse. createInterviewTurn already retries a transient
@@ -51,22 +68,51 @@ async function callAndParse(
   params: Anthropic.MessageCreateParamsNonStreaming,
   log: Log,
   phase: string
-): Promise<{ parsed: ParsedReply; rawText: string } | { parsed: null; rawText: string; error: string }> {
-  const { completion, rawText } = await createInterviewTurn(client, params, {
+): Promise<Attempt> {
+  const { completion, rawText, toolUse } = await createInterviewTurn(client, params, {
     scope: log.scope,
     requestId: log.requestId,
     fields: { phase },
   });
-  const result = parseConverseReply(rawText);
-  if (result.ok) return { parsed: result.value, rawText };
+  const raw: RawTurn = { toolUse, text: rawText };
+
+  // The tool call when there is one, the text when the model answered in
+  // text regardless. A turn with neither is the empty reply that
+  // createInterviewTurn has already logged twice.
+  const result = toolUse ? parseConverseToolInput(toolUse.input) : parseConverseReply(rawText);
+  if (result.ok) return { parsed: result.value, raw };
 
   // The real failure, with what the model actually sent, for the log only.
-  logModelFailure(log.scope, log.requestId, "parse", {
+  const truncated = completion.stop_reason === "max_tokens";
+  logModelFailure(log.scope, log.requestId, truncated ? "truncated" : "parse", {
     attemptPhase: phase,
     parseError: result.error,
-    ...describeModelResponse(completion, rawText),
+    usedTool: toolUse !== null,
+    toolInput: toolUse ? JSON.stringify(toolUse.input).slice(0, CONVERSE_RAW_PREVIEW) : null,
+    ...describeModelResponse(completion, rawText, CONVERSE_RAW_PREVIEW),
   });
-  return { parsed: null, rawText, error: result.error };
+  return { parsed: null, raw, error: result.error, truncated };
+}
+
+/**
+ * The failed turn echoed back, so the model can be asked to change one thing
+ * about it. A tool call must be answered with its tool_result, so which shape
+ * this takes depends on how the reply arrived.
+ */
+function echoTurn(raw: RawTurn, instruction: string): Anthropic.MessageParam[] {
+  if (raw.toolUse) {
+    return [
+      { role: "assistant", content: [raw.toolUse] },
+      {
+        role: "user",
+        content: [{ type: "tool_result", tool_use_id: raw.toolUse.id, content: instruction }],
+      },
+    ];
+  }
+  return [
+    { role: "assistant", content: raw.text },
+    { role: "user", content: instruction },
+  ];
 }
 
 export async function runConverseTurn({
@@ -85,21 +131,32 @@ export async function runConverseTurn({
   log: Log;
 }): Promise<ConverseTurn> {
   const params: Anthropic.MessageCreateParamsNonStreaming = {
-    ...modelParams({ maxTokens: CONVERSE_MAX_TOKENS, thinking: CONVERSE_THINKING }),
+    ...modelParams({ maxTokens: CONVERSE_MAX_TOKENS, thinking: "off" }),
     system,
     messages,
+    tools: [CONVERSE_TOOL],
+    tool_choice: { type: "tool", name: CONVERSE_TOOL_NAME },
   };
 
-  // A reply that does not parse gets the same request once more. A second
-  // failure ends the turn with the brief untouched.
+  // A reply that does not parse gets the same request once more, without the
+  // admin seeing anything. A second failure ends the turn with the brief
+  // untouched; a reply cut off at max_tokens says so separately, because
+  // that one is ours to fix and not the model having a bad turn.
   let turn = await callAndParse(client, params, log, "turn");
   if (!turn.parsed) turn = await callAndParse(client, params, log, "turn_retry");
   if (!turn.parsed) {
-    return {
-      ok: false,
-      code: "MODEL_UNPARSEABLE",
-      error: "Birdsong's reply came back in a form it could not read. Your brief is unchanged. Try sending that again.",
-    };
+    return turn.truncated
+      ? {
+          ok: false,
+          code: "MODEL_TRUNCATED",
+          error: "Birdsong's reply was cut off before it finished. Your brief is unchanged. Try sending that again.",
+        }
+      : {
+          ok: false,
+          code: "MODEL_UNPARSEABLE",
+          error:
+            "Birdsong's reply came back in a form it could not read. Your brief is unchanged. Try sending that again.",
+        };
   }
 
   const { patch, dropped } = sanitizePatch(turn.parsed.briefPatch, manualKeys);
@@ -113,14 +170,7 @@ export async function runConverseTurn({
     // first reply already passed.
     const retry = await callAndParse(
       client,
-      {
-        ...params,
-        messages: [
-          ...messages,
-          { role: "assistant", content: turn.rawText },
-          { role: "user", content: TITLE_RETRY_MESSAGE },
-        ],
-      },
+      { ...params, messages: [...messages, ...echoTurn(turn.raw, TITLE_RETRY_MESSAGE)] },
       log,
       "title_retry"
     );

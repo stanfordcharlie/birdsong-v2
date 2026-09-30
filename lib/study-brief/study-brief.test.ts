@@ -10,8 +10,9 @@ import {
   mapToStudy,
   toExtractedBrief,
 } from "./mapToStudy";
-import { parseConverseReply, sanitizePatch, titleImpliesSales } from "./schema";
+import { CONVERSE_TOOL, CONVERSE_TOOL_NAME, parseConverseReply, sanitizePatch, titleImpliesSales } from "./schema";
 import {
+  BRIEF_FIELD_KEYS,
   EMPTY_BRIEF,
   isConversationComplete,
   isReadyToCreate,
@@ -108,11 +109,25 @@ describe("sanitizePatch", () => {
 
   it("drops a value its field would not take", () => {
     const { patch, dropped } = sanitizePatch(
-      { length: "forever", giftAmount: -5, signals: "not a list", topic: 12 },
+      { length: "forever", giftAmount: -5, signals: 12, topic: 12 },
       NONE
     );
     expect(patch).toEqual({});
     expect(dropped.invalid).toEqual(["length", "giftAmount", "signals", "topic"]);
+  });
+
+  it("takes the signals the model sends, list or not", () => {
+    // The card reads an array. A single string is one signal, and lines or
+    // semicolons are several; either way the answer is not thrown away.
+    expect(sanitizePatch({ signals: "Switching within two quarters" }, NONE).patch).toEqual({
+      signals: ["Switching within two quarters"],
+    });
+    expect(sanitizePatch({ signals: "- Switching soon\n- Handoff is manual" }, NONE).patch).toEqual({
+      signals: ["Switching soon", "Handoff is manual"],
+    });
+    expect(sanitizePatch({ signals: "Switching soon; handoff is manual" }, NONE).patch).toEqual({
+      signals: ["Switching soon", "handoff is manual"],
+    });
   });
 
   it("keeps valid choices and trims what it keeps", () => {
@@ -343,22 +358,37 @@ describe("brief completeness", () => {
 
 // ---------------------------------------------------------------------------
 
-function message(text: string): Anthropic.Message {
+function completion(content: unknown[], stopReason = "end_turn"): Anthropic.Message {
   return {
     id: "msg_test",
     type: "message",
     role: "assistant",
     model: "test",
-    content: [{ type: "text", text, citations: null }],
-    stop_reason: "end_turn",
+    content,
+    stop_reason: stopReason,
     stop_sequence: null,
     usage: { input_tokens: 1, output_tokens: 1 },
   } as unknown as Anthropic.Message;
 }
 
+function message(text: string, stopReason = "end_turn"): Anthropic.Message {
+  return completion([{ type: "text", text, citations: null }], stopReason);
+}
+
+/** What the model actually sends now: a forced brief_turn call. */
+function toolMessage(input: unknown, stopReason = "tool_use"): Anthropic.Message {
+  return completion([{ type: "tool_use", id: "toolu_test", name: CONVERSE_TOOL_NAME, input }], stopReason);
+}
+
 function clientReturning(...replies: string[]) {
   const create = vi.fn();
   for (const reply of replies) create.mockResolvedValueOnce(message(reply));
+  return { client: { messages: { create } } as MessagesClient, create };
+}
+
+function clientCalling(...inputs: unknown[]) {
+  const create = vi.fn();
+  for (const input of inputs) create.mockResolvedValueOnce(toolMessage(input));
   return { client: { messages: { create } } as MessagesClient, create };
 }
 
@@ -371,17 +401,46 @@ const TURN = {
 };
 
 describe("runConverseTurn", () => {
-  it("returns the reply and the patch from one call", async () => {
-    const { client, create } = clientReturning(JSON.stringify(VALID));
+  it("forces the brief_turn tool and reads the reply out of the call", async () => {
+    const { client, create } = clientCalling(VALID);
     const turn = await runConverseTurn({ client, ...TURN });
     expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0][0]).toMatchObject({
+      tools: [CONVERSE_TOOL],
+      tool_choice: { type: "tool", name: CONVERSE_TOOL_NAME },
+      thinking: { type: "disabled" },
+    });
     expect(turn).toMatchObject({ ok: true, reply: VALID.reply, patch: VALID.brief_patch, complete: false });
+  });
+
+  it("still reads a reply that arrives as text", async () => {
+    const { client } = clientReturning(JSON.stringify(VALID));
+    const turn = await runConverseTurn({ client, ...TURN });
+    expect(turn).toMatchObject({ ok: true, reply: VALID.reply, patch: VALID.brief_patch });
+  });
+
+  it("fills the brief from a one line answer, whatever shape the signals take", async () => {
+    // The failure this route had: a short answer to "what makes someone
+    // worth a call" came back as prose with no patch at all. The tool call
+    // carries the patch, and a bare string still reaches the card.
+    const { client } = clientCalling({
+      reply: "Is anything off limits?",
+      chips: [],
+      brief_patch: { signals: "Re-evaluating their warehouse this quarter" },
+      complete: false,
+    });
+    const turn = await runConverseTurn({ client, ...TURN });
+    expect(turn.ok).toBe(true);
+    if (turn.ok) expect(turn.patch.signals).toEqual(["Re-evaluating their warehouse this quarter"]);
   });
 
   it("retries once when the reply does not parse", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const { client, create } = clientReturning("not json at all", JSON.stringify(VALID));
-    const turn = await runConverseTurn({ client, ...TURN });
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce(toolMessage({ chips: [] }))
+      .mockResolvedValueOnce(toolMessage(VALID));
+    const turn = await runConverseTurn({ client: { messages: { create } } as MessagesClient, ...TURN });
     expect(create).toHaveBeenCalledTimes(2);
     expect(turn.ok).toBe(true);
     expect(error).toHaveBeenCalled();
@@ -398,15 +457,46 @@ describe("runConverseTurn", () => {
     error.mockRestore();
   });
 
-  it("regenerates a title that implies sales, once", async () => {
+  it("names a reply cut off at max_tokens as its own failure", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const create = vi.fn().mockResolvedValue(message('{"reply": "Who do you', "max_tokens"));
+    const turn = await runConverseTurn({ client: { messages: { create } } as MessagesClient, ...TURN });
+    expect(turn).toMatchObject({ ok: false, code: "MODEL_TRUNCATED" });
+    expect(error.mock.calls.flat().join(" ")).toContain('"phase":"truncated"');
+    error.mockRestore();
+  });
+
+  it("logs what the model sent when a turn cannot be used", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { client } = clientReturning("Good, noted. Anything off limits?", "still prose");
+    await runConverseTurn({ client, ...TURN });
+    const logged = error.mock.calls.flat().join(" ");
+    expect(logged).toContain("Good, noted. Anything off limits?");
+    expect(logged).toContain('"stopReason":"end_turn"');
+    expect(logged).toContain('"outputTokens":1');
+    expect(logged).toContain('"parseError"');
+    error.mockRestore();
+  });
+
+  it("regenerates a title that implies sales, once, answering its own tool call", async () => {
     const first = { ...VALID, brief_patch: { externalTitle: "Book a demo with us", topic: "Handoffs" } };
     const second = { ...VALID, brief_patch: { externalTitle: "How teams hand off work" } };
-    const { client, create } = clientReturning(JSON.stringify(first), JSON.stringify(second));
+    const { client, create } = clientCalling(first, second);
     const turn = await runConverseTurn({ client, ...TURN });
     expect(create).toHaveBeenCalledTimes(2);
     expect(turn).toMatchObject({
       ok: true,
       patch: { externalTitle: "How teams hand off work", topic: "Handoffs" },
+    });
+    // A tool call may only be followed by its tool_result.
+    const retried = create.mock.calls[1][0].messages;
+    expect(retried[retried.length - 2]).toMatchObject({
+      role: "assistant",
+      content: [{ type: "tool_use", id: "toolu_test" }],
+    });
+    expect(retried[retried.length - 1]).toMatchObject({
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: "toolu_test" }],
     });
   });
 
@@ -414,7 +504,7 @@ describe("runConverseTurn", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const first = { ...VALID, brief_patch: { externalTitle: "Book a demo with us", topic: "Handoffs" } };
     const second = { ...VALID, brief_patch: { externalTitle: "A quick sales pitch" } };
-    const { client, create } = clientReturning(JSON.stringify(first), JSON.stringify(second));
+    const { client, create } = clientCalling(first, second);
     const turn = await runConverseTurn({ client, ...TURN });
     expect(create).toHaveBeenCalledTimes(2);
     expect(turn.ok).toBe(true);
@@ -426,8 +516,7 @@ describe("runConverseTurn", () => {
   });
 
   it("never patches a field the admin edited, whatever the model returns", async () => {
-    const reply = { ...VALID, brief_patch: { internalName: "Model's name", topic: "Handoffs" } };
-    const { client } = clientReturning(JSON.stringify(reply));
+    const { client } = clientCalling({ ...VALID, brief_patch: { internalName: "Model's name", topic: "Handoffs" } });
     const turn = await runConverseTurn({
       client,
       ...TURN,
@@ -435,5 +524,19 @@ describe("runConverseTurn", () => {
     });
     expect(turn.ok).toBe(true);
     if (turn.ok) expect(turn.patch).toEqual({ topic: "Handoffs" });
+  });
+});
+
+describe("CONVERSE_TOOL", () => {
+  it("lets the model send every brief field, and nothing is required of the patch", () => {
+    const patch = (CONVERSE_TOOL.input_schema.properties as Record<string, { properties: object }>).brief_patch;
+    expect(Object.keys(patch.properties).sort()).toEqual([...BRIEF_FIELD_KEYS].sort());
+    expect(CONVERSE_TOOL.input_schema.required).toEqual(["reply", "chips", "brief_patch", "complete"]);
+  });
+
+  it("asks for the signals as a list of strings", () => {
+    const patch = (CONVERSE_TOOL.input_schema.properties as Record<string, { properties: Record<string, unknown> }>)
+      .brief_patch;
+    expect(patch.properties.signals).toEqual({ type: "array", items: { type: "string" } });
   });
 });

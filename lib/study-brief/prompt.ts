@@ -133,13 +133,7 @@ How to talk:
 
 Quick replies ("chips"): short answers the admin can press instead of typing. Offer them only where the answer is a choice: the interview length, the thank you gift, and whether anything is off limits. Two to four of them, each under six words, each a complete answer. For every other question chips is an empty array.
 
-Reply with one JSON object and nothing else. No code fence, no text before or after it:
-{
-  "reply": string, what you say to the admin this turn,
-  "chips": string[], quick replies, usually empty,
-  "brief_patch": object, only the brief fields this turn changed, using the exact field names above. Empty when nothing changed,
-  "complete": boolean, true when nothing is still open after this turn
-}`;
+Every turn is one call of the brief_turn tool, and nothing else. Say nothing outside it: what you would say to the admin goes in its "reply", and every field this turn settled goes in its "brief_patch" under the exact field names above, in the shape listed for each one. Fill the patch on the same turn you learn something, however short their answer was. Nothing you leave out of it is recorded.`;
 }
 
 /**
@@ -147,4 +141,4 @@ Reply with one JSON object and nothing else. No code fence, no text before or af
  * own reply back with this after it, and one chance to fix the title.
  */
 export const TITLE_RETRY_MESSAGE =
-  'The respondent-facing title you proposed implies a sales motive. Return the same JSON object again with a different "externalTitle" in brief_patch. It must not contain the words sales, lead, demo, buy or pitch in any form. Change nothing else.';
+  'The respondent-facing title you proposed implies a sales motive. Call brief_turn again with everything the same except a different "externalTitle" in brief_patch. It must not contain the words sales, lead, demo, buy or pitch in any form. Change nothing else.';

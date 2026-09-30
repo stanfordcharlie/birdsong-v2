@@ -36,12 +36,36 @@ export type ThinkingSetting = "off" | { effort: "low" | "medium" | "high"; budge
 
 export type ModelParams = Pick<Anthropic.MessageCreateParams, "model" | "max_tokens" | "thinking" | "output_config">;
 
-export function modelParams({ maxTokens, thinking }: { maxTokens: number; thinking: ThinkingSetting }): ModelParams {
+/**
+ * A JSON schema the reply must match (structured outputs). With one of
+ * these the model cannot answer in prose where the caller needs an object,
+ * which is the failure a freeform "reply with JSON only" instruction has:
+ * it holds most of the time and drops the envelope on a short turn. The
+ * schema rules the API accepts are narrow: every object needs
+ * `additionalProperties: false`, and length or range constraints are not
+ * allowed. Compatible with thinking; not with a forced tool choice.
+ */
+export type OutputFormat = Anthropic.JSONOutputFormat;
+
+export function modelParams({
+  maxTokens,
+  thinking,
+  format,
+}: {
+  maxTokens: number;
+  thinking: ThinkingSetting;
+  format?: OutputFormat;
+}): ModelParams {
   if (!Number.isInteger(maxTokens) || maxTokens <= 0) {
     throw new Error(`Model call misconfigured: max_tokens must be a positive integer, got ${maxTokens}`);
   }
   if (thinking === "off") {
-    return { model: INTERVIEW_MODEL, max_tokens: maxTokens, thinking: { type: "disabled" } };
+    return {
+      model: INTERVIEW_MODEL,
+      max_tokens: maxTokens,
+      thinking: { type: "disabled" },
+      ...(format ? { output_config: { format } } : {}),
+    };
   }
   const { budget, effort } = thinking;
   if (!Number.isInteger(budget) || budget < 1024) {
@@ -56,7 +80,7 @@ export function modelParams({ maxTokens, thinking }: { maxTokens: number; thinki
     model: INTERVIEW_MODEL,
     max_tokens: maxTokens,
     thinking: { type: "adaptive" },
-    output_config: { effort },
+    output_config: { effort, ...(format ? { format } : {}) },
   };
 }
 
@@ -126,15 +150,25 @@ export function describeModelError(err: unknown): ModelErrorDetails {
   return out;
 }
 
-/** What the model said about its own reply, for a reply that could not be used. */
-export function describeModelResponse(completion: Anthropic.Message, rawText: string) {
+/**
+ * What the model said about its own reply, for a reply that could not be
+ * used. `previewChars` widens the preview where the whole reply is worth
+ * reading back: only ever model output, never respondent text.
+ */
+export function describeModelResponse(
+  completion: Anthropic.Message,
+  rawText: string,
+  previewChars: number = MODEL_OUTPUT_PREVIEW
+) {
   return {
     modelRequestId: (completion as { _request_id?: string })._request_id ?? null,
     stopReason: completion.stop_reason ?? null,
     blockTypes: completion.content.map((block) => block.type),
+    inputTokens: completion.usage?.input_tokens ?? null,
     outputTokens: completion.usage?.output_tokens ?? null,
+    thinkingTokens: completion.usage?.output_tokens_details?.thinking_tokens ?? null,
     rawLength: rawText.length,
-    rawPreview: rawText.slice(0, MODEL_OUTPUT_PREVIEW),
+    rawPreview: rawText.slice(0, previewChars),
   };
 }
 
@@ -164,6 +198,11 @@ export type InterviewTurnResult = {
   completion: Anthropic.Message;
   /** Text blocks joined and trimmed. Empty when both attempts came back empty. */
   rawText: string;
+  /**
+   * The first tool_use block, for a call that forces a tool. Such a turn has
+   * no text at all, so it is this and not rawText that says the turn arrived.
+   */
+  toolUse: Anthropic.ToolUseBlock | null;
   attempts: 1 | 2;
 };
 
@@ -187,6 +226,10 @@ export function textOf(completion: Anthropic.Message): string {
     .map((block) => block.text)
     .join("")
     .trim();
+}
+
+export function toolUseOf(completion: Anthropic.Message): Anthropic.ToolUseBlock | null {
+  return completion.content.find((block): block is Anthropic.ToolUseBlock => block.type === "tool_use") ?? null;
 }
 
 export async function createInterviewTurn(
@@ -215,8 +258,9 @@ export async function createInterviewTurn(
       throw err;
     }
     const rawText = textOf(completion);
-    last = { completion, rawText, attempts: attempt };
-    if (rawText) {
+    const toolUse = toolUseOf(completion);
+    last = { completion, rawText, toolUse, attempts: attempt };
+    if (rawText || toolUse) {
       if (attempt === 2) {
         // The retry cleared it. Same shape, so the earlier failure line
         // and this one can be matched by request id.
