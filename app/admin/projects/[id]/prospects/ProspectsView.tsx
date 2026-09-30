@@ -12,6 +12,7 @@ import {
   FilterTabs,
   PageHeader,
   PageShell,
+  PageTopBar,
   RelativeTime,
   SearchInput,
   SelectBox,
@@ -46,6 +47,8 @@ export type ProspectRow = {
   instantlyRemovedAt: string | null;
   /** Why the last move attempt failed, when it did. */
   instantlyError: string | null;
+  /** The last Instantly sequence step reported sent, from their webhook. */
+  sequenceStep: number | null;
   /** The absolute tokenized survey URL, built server-side. */
   link: string;
 };
@@ -314,10 +317,18 @@ const REJECTION_COPY: Record<Exclude<FileDropValidation, { ok: true }>["reason"]
 export function ProspectsView({
   surveyId,
   surveyTitle,
+  surveyName,
   rows,
 }: {
   surveyId: string;
+  /** What the study is called to a respondent, for the link back to it. */
   surveyTitle: string;
+  /**
+   * The study's internal name, which is what its own page puts in the
+   * breadcrumb (StudyDetailView). Kept separate from surveyTitle so the two
+   * pages name the same study the same way in the bar.
+   */
+  surveyName: string;
   rows: ProspectRow[];
 }) {
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -571,7 +582,13 @@ export function ProspectsView({
       width: "md",
       truncate: true,
       title: (row) => row.instantlyError ?? undefined,
-      cell: (row) => <ProspectSequenceCell removedAt={row.instantlyRemovedAt} error={row.instantlyError} />,
+      cell: (row) => (
+        <ProspectSequenceCell
+          removedAt={row.instantlyRemovedAt}
+          error={row.instantlyError}
+          step={row.sequenceStep}
+        />
+      ),
     },
     {
       key: "link",
@@ -584,6 +601,17 @@ export function ProspectsView({
 
   return (
     <PageShell>
+      {/* Without this the shell falls back to the breadcrumb it derives from
+          the route, which stops at "Projects" and loses both the study and
+          this page. */}
+      <PageTopBar
+        crumbs={[
+          { label: "Projects", href: "/admin/projects" },
+          { label: surveyName, href: `/admin/projects/${surveyId}` },
+          { label: "Prospects" },
+        ]}
+      />
+
       {/* Outside the conditional render below so the picker survives the
           switch between the empty state and the table. */}
       <input

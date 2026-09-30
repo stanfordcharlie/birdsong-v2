@@ -43,6 +43,13 @@ export type StudyFormValues = {
   interviewLength: string;
   giftCardAmount: string;
   giftCardBrand: string;
+  /**
+   * The Instantly campaign this study's prospects are emailed from. Empty
+   * means the study is not run through Instantly: the completion path does
+   * not move anyone out of a campaign, and the webhook has nothing to match
+   * a send to (app/api/webhooks/instantly/route.ts).
+   */
+  instantlyCampaignId: string;
   collectPhone: boolean;
   collectJobTitle: boolean;
   collectCompany: boolean;
@@ -72,6 +79,7 @@ const EMPTY_VALUES: StudyFormValues = {
   interviewLength: DEFAULT_INTERVIEW_LENGTH,
   giftCardAmount: "",
   giftCardBrand: "",
+  instantlyCampaignId: "",
   collectPhone: false,
   collectJobTitle: false,
   collectCompany: false,
@@ -135,6 +143,7 @@ export function StudyForm(props: StudyFormProps) {
   );
   const [giftCardAmount, setGiftCardAmount] = useState(initial.giftCardAmount);
   const [giftCardBrand, setGiftCardBrand] = useState(initial.giftCardBrand);
+  const [instantlyCampaignId, setInstantlyCampaignId] = useState(initial.instantlyCampaignId);
   const [collectPhone, setCollectPhone] = useState(initial.collectPhone);
   const [collectJobTitle, setCollectJobTitle] = useState(initial.collectJobTitle);
   const [collectCompany, setCollectCompany] = useState(initial.collectCompany);
@@ -314,6 +323,9 @@ export function StudyForm(props: StudyFormProps) {
         gift_card_amount: giftCardAmount ? Number(giftCardAmount) : null,
         // Brand is a label beside the amount; without an amount it is not kept.
         gift_card_brand: giftCardAmount ? normalizeGiftCardBrand(giftCardBrand) : null,
+        // Trimmed, and empty means "not run through Instantly" rather than
+        // an empty string, which is what every read of it tests for.
+        instantly_campaign_id: instantlyCampaignId.trim() || null,
         // Presets stay bare strings; admin-defined fields are {key, label}
         // objects in the same array — see lib/studies/respondent-fields.ts.
         custom_fields: [...enabledFields, ...customFields] as Json,
@@ -736,6 +748,20 @@ export function StudyForm(props: StudyFormProps) {
                     {coverageAdvisory(interviewLengthPreset(interviewLength), countGuideTopics(questionGuide))}
                   </span>
                 )}
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-card-foreground">Instantly campaign ID</span>
+                <span className="text-xs text-muted-foreground">
+                  Optional. The campaign these prospects are emailed from. With it set, sends
+                  reported by Instantly move a prospect to Sent and fill the Sequence column, and a
+                  respondent who finishes is taken out of the campaign.
+                </span>
+                <Input
+                  value={instantlyCampaignId}
+                  onChange={(e) => setInstantlyCampaignId(e.target.value)}
+                  placeholder="e.g. 8f2c1b7e-0a44-4c1e-9f3a-2d6b5c7e1a90"
+                />
               </label>
 
               <label className="flex flex-col gap-1">

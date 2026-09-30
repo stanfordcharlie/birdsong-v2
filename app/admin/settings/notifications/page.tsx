@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { can, getActiveOrg } from "@/lib/org";
 import { EmptyState } from "@/components/admin/ui";
 import { SettingRow, SettingsSection } from "../SettingsSection";
+// The one set of vendor marks, already drawn for the Integrations page.
+import { SlackMark } from "../integrations/_components/logos";
 import { SlackNotificationsForm } from "./SlackNotificationsForm";
 
 export default async function NotificationSettingsPage() {
@@ -27,6 +29,7 @@ export default async function NotificationSettingsPage() {
         <div className="flex flex-col">
           <SettingRow
             title="Slack"
+            icon={<SlackMark size={16} />}
             description={
               <>
                 A message per qualified lead, posted to the channel behind this webhook.{" "}

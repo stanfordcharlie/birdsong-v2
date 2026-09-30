@@ -21,6 +21,8 @@ export type ProspectRosterRow = {
   completed_at: string | null;
   instantly_removed_at: string | null;
   instantly_error: string | null;
+  sequence_step: number | null;
+  last_sent_at: string | null;
 };
 
 export async function loadProspectRoster(
@@ -30,7 +32,7 @@ export async function loadProspectRoster(
   const { data } = await supabase
     .from("prospects")
     .select(
-      "id, token, first_name, last_name, email, title, company_name, status, created_at, started_at, completed_at, instantly_removed_at, instantly_error"
+      "id, token, first_name, last_name, email, title, company_name, status, created_at, started_at, completed_at, instantly_removed_at, instantly_error, sequence_step, last_sent_at"
     )
     .eq("survey_id", surveyId)
     .order("created_at", { ascending: false });

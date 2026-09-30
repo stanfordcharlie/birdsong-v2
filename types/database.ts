@@ -763,6 +763,10 @@ export type Database = {
           instantly_removed_at: string | null;
           instantly_job_id: string | null;
           instantly_error: string | null;
+          // What Instantly's webhook reported (20260929100000). Null until a
+          // send arrives for this person.
+          sequence_step: number | null;
+          last_sent_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -786,6 +790,8 @@ export type Database = {
           instantly_removed_at?: string | null;
           instantly_job_id?: string | null;
           instantly_error?: string | null;
+          sequence_step?: number | null;
+          last_sent_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -809,6 +815,8 @@ export type Database = {
           instantly_removed_at?: string | null;
           instantly_job_id?: string | null;
           instantly_error?: string | null;
+          sequence_step?: number | null;
+          last_sent_at?: string | null;
           created_at?: string;
         };
         Relationships: [

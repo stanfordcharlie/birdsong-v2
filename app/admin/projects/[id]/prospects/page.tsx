@@ -53,6 +53,7 @@ export default async function StudyProspectsPage({
     createdAt: p.created_at,
     instantlyRemovedAt: p.instantly_removed_at,
     instantlyError: p.instantly_error,
+    sequenceStep: p.sequence_step,
     link: prospectLinkFor(origin, survey.slug, p.token),
   }));
 
@@ -60,6 +61,7 @@ export default async function StudyProspectsPage({
     <ProspectsView
       surveyId={survey.id}
       surveyTitle={survey.external_title || survey.title}
+      surveyName={survey.title}
       rows={rows}
     />
   );

@@ -36,10 +36,13 @@ export function SettingsSection({
  */
 export function SettingRow({
   title,
+  icon,
   description,
   children,
 }: {
   title: string;
+  /** A vendor's mark, where the row is about one. Sits before the title. */
+  icon?: React.ReactNode;
   description: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -51,7 +54,10 @@ export function SettingRow({
       )}
     >
       <div className="flex flex-col gap-1">
-        <h2 className={cn("text-[15px] font-extrabold leading-[1.3]", text.ink)}>{title}</h2>
+        <h2 className={cn("flex items-center gap-2 text-[15px] font-extrabold leading-[1.3]", text.ink)}>
+          {icon}
+          {title}
+        </h2>
         <p className={cn("text-[13px] leading-[1.45]", text.muted2)}>{description}</p>
       </div>
       <Card>{children}</Card>

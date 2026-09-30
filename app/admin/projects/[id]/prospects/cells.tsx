@@ -35,12 +35,26 @@ export function ProspectStatusBadge({ status }: { status: string }) {
   return <Badge variant={STATUS_VARIANTS[status] ?? "count"}>{prospectStatusLabel(status)}</Badge>;
 }
 
-// What happened in Instantly at completion. Read-only: a dot and a word
-// when they were moved out of their campaign, the failure text (full text
-// on hover, from the column's `title`) when the move failed, nothing until
-// then. Fixing a failure is a manual job in Instantly, so there is no
-// button here.
-export function ProspectSequenceCell({ removedAt, error }: { removedAt: string | null; error: string | null }) {
+// Where the prospect is in their Instantly sequence. Read-only, and in the
+// order that answers "what is happening to this person now":
+//
+//   Removed   they finished and the completion path took them out of the
+//             campaign, so the step they reached no longer matters
+//   <error>   that move failed and needs a person in Instantly (full text on
+//             hover, from the column's `title`)
+//   Step N    Instantly's webhook reported sending them step N
+//   EMPTY     nothing has been reported: not run through Instantly, or the
+//             sequence has not reached them yet
+export function ProspectSequenceCell({
+  removedAt,
+  error,
+  step,
+}: {
+  removedAt: string | null;
+  error: string | null;
+  /** The last step Instantly reported sending. Null until one arrives. */
+  step?: number | null;
+}) {
   if (removedAt) {
     return (
       <span className="flex items-center gap-1.5 whitespace-nowrap">
@@ -50,5 +64,6 @@ export function ProspectSequenceCell({ removedAt, error }: { removedAt: string |
     );
   }
   if (error) return <span className="text-destructive">{error}</span>;
+  if (step != null) return <span className="whitespace-nowrap">Step {step}</span>;
   return <>{EMPTY_VALUE}</>;
 }
