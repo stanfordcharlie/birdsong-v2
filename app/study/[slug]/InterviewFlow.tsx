@@ -26,6 +26,7 @@ import { renderEmphasis } from "@/lib/chat/render-emphasis";
 import { splitQuestion, stripBold } from "@/lib/interview/split-question";
 import { interviewDurationLabel, interviewLengthPreset } from "@/lib/studies/interview-length";
 import { stripInterviewMarkers } from "@/lib/interview/chips";
+import { interviewProgressPercent } from "./progress";
 import { useStudyPresence } from "@/lib/presence/use-study-presence";
 import { giftCardPhrase } from "@/lib/studies/incentive";
 import { newsreader, bricolage } from "@/lib/fonts";
@@ -118,12 +119,15 @@ const INTRO_BIRD_NOTES = [
 // interviewer's existing evasive-answer handling can react to normally.
 const SKIP_MESSAGE_CONTENT = "I'd rather not answer that one.";
 
-// The chat progress bar and "X of Y" counter count topics, not messages:
-// the study's length preset (lib/studies/interview-length.ts) fixes how
-// many topics the interview covers, every interviewer message carries the
-// topic it belongs to, and a follow-up never moves the bar. The same preset
-// supplies the welcome screen's "About N minutes", so the promise and the
-// progress cannot disagree.
+// The chat progress bar is a single fill over how many questions have been
+// asked against the study's length preset (./progress.ts). It carries no
+// number and no segments: a respondent is never told how many questions are
+// left, and a bar made of one pip per topic told them anyway. The preset it
+// measures against is the same one behind the welcome screen's "About N
+// minutes", so the promise and the progress cannot disagree.
+//
+// It deliberately no longer follows the ||TOPIC: n|| marker. See ./progress.ts
+// for what that cost.
 
 const EMAIL_LIVE_CHECK_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -218,6 +222,13 @@ const QUESTION_REVEAL: QuestionReveal = "pop";
 // How long the typing dots take to fade out before the question lands —
 // keep in sync with TypingDots' motion-safe:duration-150.
 const DOTS_FADE_MS = 150;
+
+// The last thing the chat screen does is fill its progress bar. Without this
+// the interview's final answer swaps straight to the thank-you screen and the
+// bar's run to 100% happens in the same commit that unmounts it, which is to
+// say never. Matches the bar's own transition; skipped entirely under
+// reduced motion, where there is no fill to watch.
+const FINAL_FILL_MS = 700;
 
 // If a respondent starts typing a follow-up thought right after sending
 // (e.g. they forgot to mention something) before the next question has
@@ -416,6 +427,12 @@ export function InterviewFlow({
   const [chips, setChips] = useState<string[]>([]);
   // Which chip (if any) is currently highlighted/pending auto-submit.
   const [pickedChipIndex, setPickedChipIndex] = useState<number | null>(null);
+  // Set the moment the server says the interview is over, a beat before the
+  // thank-you screen takes over, so the bar can finish its fill. Covers every
+  // way an interview ends: the model's own INTERVIEW_COMPLETE, the server's
+  // length wrap-up, and an early close after evasive answers, which all come
+  // back as the same complete response.
+  const [interviewFinished, setInterviewFinished] = useState(false);
   // Content of the most recent user message that failed to send, or null if
   // nothing's failed / it's since been resolved. The message itself stays in
   // `messages` (it was already appended optimistically) — this only tracks
@@ -665,6 +682,13 @@ export function InterviewFlow({
     stageRef.current?.scrollTo({ top: 0, behavior: prefersReducedMotion ? "auto" : "smooth" });
   }, [messages.length]);
 
+  // Long enough for the bar to reach 100%, and nothing under reduced motion,
+  // where the width change is instant and there is nothing to wait for.
+  async function holdForFinalFill() {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    await wait(FINAL_FILL_MS);
+  }
+
   async function waitForRespondentToPauseTyping() {
     while (isMountedRef.current) {
       const idleMs = Date.now() - lastKeystrokeAtRef.current;
@@ -913,6 +937,9 @@ export function InterviewFlow({
           );
         }
         setIsTyping(false);
+        setInterviewFinished(true);
+        await holdForFinalFill();
+        if (!isMountedRef.current) return;
         setClosingMessage(data.message);
         setStage("complete");
         setLoading(false);
@@ -2011,11 +2038,10 @@ export function InterviewFlow({
   const lastAssistantMessage = stripInterviewMarkers(
     [...messages].reverse().find((m) => m.role === "assistant")?.content ?? ""
   );
-  // Drives the progress pills and the "X of Y" counter, in topics. The
-  // preset the welcome screen quotes and the server paces on, so all three
-  // agree.
-  const targetQuestionCount = lengthPreset.topics;
-  const currentQuestionNumber = displayedTopicNumber(messages, targetQuestionCount);
+  // How full the bar is. Questions actually asked against the study's
+  // promised length; held short of the end until the interview is over.
+  const questionsAsked = messages.filter((m) => m.role === "assistant").length;
+  const progressPercent = interviewProgressPercent(questionsAsked, lengthPreset.topics, interviewFinished);
   const hasAnswer = pickedChipIndex !== null || answer.trim().length > 0;
   // A restored question was already on screen before the reload, so replaying
   // its entrance would animate in something the respondent has been reading
@@ -2098,24 +2124,25 @@ export function InterviewFlow({
               the question) so the pills transition between states with the
               spring rather than remounting. */}
           <div
-            className={cn("mb-6 flex items-center gap-3.5 short:mb-4 xshort:mb-3", reveal(0).className)} style={reveal(0).style}
+            className={cn("mb-6 flex items-center short:mb-4 xshort:mb-3", reveal(0).className)}
+            style={reveal(0).style}
             role="progressbar"
-            aria-valuemin={1}
-            aria-valuemax={targetQuestionCount}
-            aria-valuenow={currentQuestionNumber}
-            aria-label={`Topic ${currentQuestionNumber} of ${targetQuestionCount}`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progressPercent}
+            aria-label="Interview progress"
           >
-            <div aria-hidden="true" className="flex h-1.5 flex-1 gap-[5px]">
-              {Array.from({ length: targetQuestionCount }, (_, k) => (
-                <div
-                  key={k}
-                  className="sq-pip flex-1 rounded-[3px] bg-survey-border"
-                  data-state={k < currentQuestionNumber - 1 ? "done" : k === currentQuestionNumber - 1 ? "now" : "todo"}
-                />
-              ))}
-            </div>
-            <div className="whitespace-nowrap text-[13.5px] font-semibold tabular-nums text-survey-muted">
-              {currentQuestionNumber} of {targetQuestionCount}
+            <div
+              aria-hidden="true"
+              className="h-1.5 w-full overflow-hidden rounded-[3px] bg-survey-border"
+            >
+              {/* One fill, not one pip per topic: its width is the only thing
+                  that changes between questions, so the bar says how far
+                  along the interview is without saying how long it is. */}
+              <div
+                className="h-full rounded-[3px] bg-survey-accent transition-[width] duration-700 ease-out motion-reduce:transition-none"
+                style={{ width: `${progressPercent}%` }}
+              />
             </div>
           </div>
 
