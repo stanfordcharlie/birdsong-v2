@@ -1,24 +1,28 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { HomeShell } from "@/components/marketing/home/v2/HomeShell";
-import { HeroIntroGate } from "@/components/marketing/home/v2/HeroIntroGate";
-import { HomeNav } from "@/components/marketing/home/v2/HomeNav";
-import { HomeHero } from "@/components/marketing/home/v2/HomeHero";
-import { ProductSection } from "@/components/marketing/home/v2/ProductSection";
-import { CtaBanner } from "@/components/marketing/home/v2/CtaBanner";
-import { LeadComparison } from "@/components/marketing/home/v2/LeadComparison";
-import { FinalCta } from "@/components/marketing/home/v2/FinalCta";
-import { HomeFooter } from "@/components/marketing/home/v2/HomeFooter";
+import { ConversationSection } from "@/components/marketing/home/v3/ConversationSection";
+import { SkyCta } from "@/components/marketing/home/v3/SkyCta";
+import { SkyFooter } from "@/components/marketing/home/v3/SkyFooter";
+import { SkyHero } from "@/components/marketing/home/v3/SkyHero";
+import { SkyNav } from "@/components/marketing/home/v3/SkyNav";
+import { SkyShell } from "@/components/marketing/home/v3/SkyShell";
+import { StepsSection } from "@/components/marketing/home/v3/StepsSection";
 
 // Where every "Book a demo" on the page points. Still the in-page anchor the
 // design reference shipped with, which lands on the final CTA — swap for the
-// real scheduler URL and all five call sites follow.
+// real scheduler URL and all three call sites follow.
 const BOOK_DEMO_URL = "#demo";
 
 // This is the primary indexed page for the domain, so metadata here (not
 // the generic fallback in app/layout.tsx) is what search/social previews
 // actually show for usebirdsong.com.
+//
+// Deliberately unchanged by the sky redesign. It is the same sentence the
+// page has always led with, and these two strings are what the domain
+// currently ranks on — rewriting them to match the new hero's sentence case
+// would churn every search result and social preview for a typographic
+// difference nobody outside this file would notice.
 const TITLE = "Birdsong — Turn Your Audience Into Pipeline";
 const DESCRIPTION =
   "Birdsong Agents Find The Right People, Talk To Them, And Route Qualified Opportunities Straight To Your Sales Team.";
@@ -67,20 +71,15 @@ export default async function RootPage({
   }
 
   return (
-    <>
-      {/* Must precede the nav and hero in the HTML: it decides, while the
-          document is still parsing, whether they render hidden for the intro
-          or in their final state. */}
-      <HeroIntroGate />
-      <HomeShell>
-        <HomeNav bookDemoUrl={BOOK_DEMO_URL} />
-        <HomeHero bookDemoUrl={BOOK_DEMO_URL} />
-        <ProductSection />
-        <CtaBanner bookDemoUrl={BOOK_DEMO_URL} />
-        <LeadComparison />
-        <FinalCta />
-        <HomeFooter bookDemoUrl={BOOK_DEMO_URL} />
-      </HomeShell>
-    </>
+    <SkyShell>
+      <SkyNav bookDemoUrl={BOOK_DEMO_URL} />
+      <main>
+        <SkyHero bookDemoUrl={BOOK_DEMO_URL} />
+        <ConversationSection />
+        <StepsSection />
+        <SkyCta bookDemoUrl={BOOK_DEMO_URL} />
+      </main>
+      <SkyFooter />
+    </SkyShell>
   );
 }

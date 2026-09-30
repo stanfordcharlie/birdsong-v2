@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
  * The Product: a pinned pale-green panel holding four stacked white mocks,
  * paired with four steps that scroll past it.
  *
- * The only interactive thing on `/`, which is why this is the one client
+ * The only interactive thing on that page, which is why this is the one client
  * component. An IntersectionObserver with a -45%/-45% rootMargin means a step
  * becomes active once it reaches the middle band of the viewport; `active`
  * then drives both the step opacity and which mock is visible.

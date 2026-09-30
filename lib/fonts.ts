@@ -91,7 +91,7 @@ export const dmSans = DM_Sans({
 });
 
 // Home landing page redesign (design_handoff_birdsong_landing) — the display
-// face for every heading, button, eyebrow and label on `/`. Loaded as a
+// face for every heading, button, eyebrow and label on the v2 home. Loaded as a
 // variable font rather than a weight array: the design uses 400 through 800
 // and Plus Jakarta Sans ships wght 200-800 as one file on Google Fonts, so
 // the static cuts would be five downloads instead of one. Scoped to
@@ -147,7 +147,8 @@ export const sourceSerif = Source_Serif_4({
   display: "swap",
 });
 
-// Body and UI face for `/`. The static 400/500/600 cuts rather than the
+// Body and UI face for both home directions. The static 400/500/600 cuts
+// rather than the
 // variable file: the design uses exactly those three.
 export const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
@@ -156,11 +157,17 @@ export const instrumentSans = Instrument_Sans({
   display: "swap",
 });
 
-// The handwritten accents — the hero's six tilted notes and the final CTA
-// card's arrow. Weight 600 only.
+// The handwritten accents — the v2 hero's six tilted notes and final CTA
+// arrow at 600, and the sky direction's two annotations ("\u2713 Qualified",
+// "Demo booked \u2713") at 500.
+//
+// Loaded as a variable font rather than a weight array now that two surfaces
+// want different cuts: Caveat ships wght 400-700 as one file on Google Fonts,
+// so covering both costs one download instead of two. Call sites set the
+// weight explicitly — with a variable face an unstated font-weight resolves
+// to 400, which is not what either design draws.
 export const caveat = Caveat({
   subsets: ["latin"],
-  weight: ["600"],
   variable: "--font-caveat",
   display: "swap",
 });
