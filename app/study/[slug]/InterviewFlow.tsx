@@ -61,7 +61,14 @@ import { cn } from "@/lib/utils";
 // this object; nothing else reaches the browser.
 export type PublicSurvey = Pick<
   Database["public"]["Tables"]["surveys"]["Row"],
-  "id" | "title" | "external_title" | "sponsor" | "public_description" | "gift_card_amount" | "gift_card_brand" | "custom_fields"
+  | "id"
+  | "title"
+  | "external_title"
+  | "sponsor"
+  | "public_description"
+  | "gift_card_amount"
+  | "gift_card_brand"
+  | "custom_fields"
 >;
 // A resolved prospect link (/study/[slug]/[token]), or null on the generic
 // link. Everything here is either the recipient's own contact detail or the
@@ -144,7 +151,7 @@ function WelcomeCardRow({
   return (
     <div
       className={cn(
-        divided && "mb-[clamp(12px,2vh,24px)] border-b border-study-hair pb-[clamp(12px,2vh,24px)]"
+        divided && "mb-[clamp(12px,2vh,24px)] border-b border-study-hair pb-[clamp(12px,2vh,24px)]",
       )}
     >
       <div className="mb-[6px] font-study-serif text-[clamp(24px,3.2vh,34px)] leading-[1.1]">
@@ -367,9 +374,7 @@ export function InterviewFlow({
   // Test mode skips straight to the auto-start; a prospect opens on their
   // landing beat; everyone else gets the welcome screen. None of the three
   // performs a write on mount (see the start button on the landing beat).
-  const [stage, setStage] = useState<Stage>(
-    isTest ? "intro" : prospect ? "prospect" : "welcome"
-  );
+  const [stage, setStage] = useState<Stage>(isTest ? "intro" : prospect ? "prospect" : "welcome");
   // Initializers rather than a later setState, and this matters: the
   // auto-start effect calls startInterview(), which reads these values out of
   // the closure of the render it was created in. Anything written after the
@@ -378,10 +383,10 @@ export function InterviewFlow({
   // intake never asks for them. Prefilled into the same state the form would
   // have written, which is what lets startInterview stay one code path.
   const [name, setName] = useState(() =>
-    isTest ? TEST_RESPONDENT.name : prospect ? (prospect.fullName ?? "") : ""
+    isTest ? TEST_RESPONDENT.name : prospect ? (prospect.fullName ?? "") : "",
   );
   const [email, setEmail] = useState(() =>
-    isTest ? testRespondentEmail(testEmail) : prospect ? prospect.email : ""
+    isTest ? testRespondentEmail(testEmail) : prospect ? prospect.email : "",
   );
   // Whether the email field has been blurred (or a submit attempted) —
   // gates the invalid-email X so it never flashes mid-typing.
@@ -392,16 +397,16 @@ export function InterviewFlow({
   // know. Everything the record cannot fill (phone, LinkedIn, per-survey
   // custom fields) is still asked — see beginAsProspect.
   const [jobTitle, setJobTitle] = useState(() =>
-    isTest ? TEST_RESPONDENT.jobTitle : (prospect?.title ?? "")
+    isTest ? TEST_RESPONDENT.jobTitle : (prospect?.title ?? ""),
   );
   const [company, setCompany] = useState(() =>
-    isTest ? TEST_RESPONDENT.company : (prospect?.companyName ?? "")
+    isTest ? TEST_RESPONDENT.company : (prospect?.companyName ?? ""),
   );
   const [linkedin, setLinkedin] = useState(() => (isTest ? TEST_RESPONDENT.linkedin : ""));
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>(() =>
     isTest
       ? Object.fromEntries(customFieldDefs.map((field) => [field.key, TEST_RESPONDENT.customField]))
-      : {}
+      : {},
   );
   const [responseId, setResponseId] = useState<string | null>(null);
   // Proves to /api/interview/continue and /api/interview/resume that this tab
@@ -534,7 +539,7 @@ export function InterviewFlow({
     try {
       window.sessionStorage.setItem(
         activeSessionStorageKey(survey.id),
-        serializeActiveSession({ responseId: id, token, surveyId: survey.id })
+        serializeActiveSession({ responseId: id, token, surveyId: survey.id }),
       );
     } catch {
       // Resume will simply not be available in this tab.
@@ -579,7 +584,7 @@ export function InterviewFlow({
       // when there is nothing to show).
       window.localStorage.setItem(
         completionStorageKey(survey.id),
-        JSON.stringify({ closingMessage: data.message, messages: [] })
+        JSON.stringify({ closingMessage: data.message, messages: [] }),
       );
       setClosingMessage(data.message);
       setStage("complete");
@@ -618,7 +623,7 @@ export function InterviewFlow({
     try {
       pointer = parseActiveSession(
         window.sessionStorage.getItem(activeSessionStorageKey(survey.id)),
-        survey.id
+        survey.id,
       );
     } catch {
       return;
@@ -705,7 +710,11 @@ export function InterviewFlow({
   // mid-keystroke on a follow-up, then hands off from indicator to question:
   // the dots fade out, and the full question arrives in one motion (per
   // QUESTION_REVEAL).
-  async function revealAssistantMessage(content: string, nextChips: string[] = [], topic: number | null = null) {
+  async function revealAssistantMessage(
+    content: string,
+    nextChips: string[] = [],
+    topic: number | null = null,
+  ) {
     await waitForRespondentToPauseTyping();
     if (!isMountedRef.current) return;
 
@@ -737,13 +746,25 @@ export function InterviewFlow({
     if (hasPhone && parsePresetFieldRequired(survey.custom_fields, "phone") && !phone.trim()) {
       return parsePresetFieldLabel(survey.custom_fields, "phone");
     }
-    if (hasJobTitle && parsePresetFieldRequired(survey.custom_fields, "job_title") && !jobTitle.trim()) {
+    if (
+      hasJobTitle &&
+      parsePresetFieldRequired(survey.custom_fields, "job_title") &&
+      !jobTitle.trim()
+    ) {
       return parsePresetFieldLabel(survey.custom_fields, "job_title");
     }
-    if (hasCompany && parsePresetFieldRequired(survey.custom_fields, "company") && !company.trim()) {
+    if (
+      hasCompany &&
+      parsePresetFieldRequired(survey.custom_fields, "company") &&
+      !company.trim()
+    ) {
       return parsePresetFieldLabel(survey.custom_fields, "company");
     }
-    if (hasLinkedin && parsePresetFieldRequired(survey.custom_fields, "linkedin") && !linkedin.trim()) {
+    if (
+      hasLinkedin &&
+      parsePresetFieldRequired(survey.custom_fields, "linkedin") &&
+      !linkedin.trim()
+    ) {
       return parsePresetFieldLabel(survey.custom_fields, "linkedin");
     }
     for (const field of customFieldDefs) {
@@ -844,7 +865,7 @@ export function InterviewFlow({
             ...Object.fromEntries(
               customFieldDefs
                 .filter((field) => customFieldValues[field.key]?.trim())
-                .map((field) => [field.key, customFieldValues[field.key].trim()])
+                .map((field) => [field.key, customFieldValues[field.key].trim()]),
             ),
           },
         }),
@@ -872,7 +893,11 @@ export function InterviewFlow({
         writeActiveSession(data.response_id, data.token);
       }
       setStage("chat");
-      await revealAssistantMessage(data.message, data.chips ?? [], typeof data.topic === "number" ? data.topic : null);
+      await revealAssistantMessage(
+        data.message,
+        data.chips ?? [],
+        typeof data.topic === "number" ? data.topic : null,
+      );
     } catch (err) {
       setIsTyping(false);
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -895,7 +920,11 @@ export function InterviewFlow({
   // starts the survey. totalFields is computed fresh per render (see the
   // intro branch below) and closed over here, always consistent with
   // whichever optional fields this survey actually has enabled.
-  function handleFieldKeyDown(e: KeyboardEvent<HTMLInputElement>, idx: number, totalFields: number) {
+  function handleFieldKeyDown(
+    e: KeyboardEvent<HTMLInputElement>,
+    idx: number,
+    totalFields: number,
+  ) {
     if (e.key !== "Enter") return;
     e.preventDefault();
     if (idx < totalFields - 1) {
@@ -935,7 +964,7 @@ export function InterviewFlow({
             JSON.stringify({
               closingMessage: data.message,
               messages: historyForCompletion,
-            })
+            }),
           );
         }
         setIsTyping(false);
@@ -946,7 +975,11 @@ export function InterviewFlow({
         setStage("complete");
         setLoading(false);
       } else {
-        await revealAssistantMessage(data.message, data.chips ?? [], typeof data.topic === "number" ? data.topic : null);
+        await revealAssistantMessage(
+          data.message,
+          data.chips ?? [],
+          typeof data.topic === "number" ? data.topic : null,
+        );
       }
     } catch (err) {
       // Deliberately not removed from `messages` and not silently dropped:
@@ -1192,7 +1225,10 @@ export function InterviewFlow({
               />
               {showReward && (
                 <div className="flex items-center justify-between gap-[16px]">
-                  <WelcomeCardRow heading="A thank-you" body="Sent to your inbox when you finish." />
+                  <WelcomeCardRow
+                    heading="A thank-you"
+                    body="Sent to your inbox when you finish."
+                  />
                   <span className="inline-flex flex-shrink-0 items-center rounded-full border border-study-hair bg-study-chip px-[18px] py-[10px] text-[16px] font-semibold">
                     {rewardPhrase}
                   </span>
@@ -1259,7 +1295,8 @@ export function InterviewFlow({
     // does here, so the software keyboard agrees with the existing
     // Enter-advances-field handler instead of offering a generic "return"
     // that looks like it will insert a newline.
-    const enterHintFor = (idx: number): "next" | "go" => (idx < totalFieldCount - 1 ? "next" : "go");
+    const enterHintFor = (idx: number): "next" | "go" =>
+      idx < totalFieldCount - 1 ? "next" : "go";
 
     return (
       <>
@@ -1280,7 +1317,7 @@ export function InterviewFlow({
             )}
 
             <h1
-              className="study-fade m-0 mb-[clamp(10px,2vh,20px)] text-balance break-words font-study-serif text-[clamp(28px,min(5.4vh,8vw),56px)] font-normal leading-[1.02] tracking-[-0.02em]"
+              className="study-fade m-0 mb-[clamp(10px,2vh,20px)] text-balance break-words font-study-serif text-[clamp(26px,min(5.4vh,8vw),56px)] font-normal leading-[1.02] tracking-[-0.02em] short:mb-[8px]"
               style={{ "--study-delay": "0.04s" } as React.CSSProperties}
             >
               {surveyName}
@@ -1291,7 +1328,7 @@ export function InterviewFlow({
                 there is no fallback. */}
             {survey.public_description?.trim() && (
               <p
-                className="study-fade text-pretty m-0 mb-[clamp(14px,2.4vh,24px)] max-w-[620px] text-[17px] leading-[1.5]"
+                className="study-fade text-pretty m-0 mb-[clamp(14px,2.4vh,24px)] max-w-[620px] text-[17px] leading-[1.5] short:mb-[12px] short:text-[16px]"
                 style={{ "--study-delay": "0.08s" } as React.CSSProperties}
               >
                 {survey.public_description}
@@ -1299,11 +1336,11 @@ export function InterviewFlow({
             )}
 
             <SkyCard
-              className="study-fade p-[28px]"
+              className="study-intake-card study-fade p-[28px]"
               style={{ "--study-delay": "0.12s" } as React.CSSProperties}
             >
               <form onSubmit={handleIntroSubmit}>
-                <div className="flex flex-col gap-[14px]">
+                <div className="study-intake-fields flex flex-col gap-[14px]">
                   {/* Hidden, not disabled-and-shown: a prospect has already
                       told us their name and address, and rendering them greyed
                       out invites "is that right?" on a screen with no way to
@@ -1338,7 +1375,8 @@ export function InterviewFlow({
                           Work email
                         </label>
                         <p className="text-[13px] leading-[1.45] text-study-muted">
-                          This is where we&apos;ll send your {rewardPhrase} and a copy of the report.
+                          This is where we&apos;ll send your {rewardPhrase} and a copy of the
+                          report.
                         </p>
                         <input
                           id="respondent-email"
@@ -1361,7 +1399,7 @@ export function InterviewFlow({
                           className={cn(
                             FIELD_INPUT_BASE,
                             "pl-[18px] pr-[44px]",
-                            emailShowsX && "border-study-danger focus:border-study-danger"
+                            emailShowsX && "border-study-danger focus:border-study-danger",
                           )}
                         />
                         {emailOk && <CheckIcon className="absolute bottom-[15px] right-[16px]" />}
@@ -1370,128 +1408,134 @@ export function InterviewFlow({
                     </>
                   )}
 
-                  {hasPhone && (
-                    <div className="flex flex-col gap-[6px]">
-                      <label htmlFor="respondent-phone" className={FIELD_LABEL_CLASSES}>
-                        {parsePresetFieldLabel(survey.custom_fields, "phone")}
-                      </label>
-                      <input
-                        id="respondent-phone"
-                        ref={setFieldRef(phoneIdx)}
-                        type="tel"
-                        autoComplete="tel"
-                        inputMode="tel"
-                        enterKeyHint={enterHintFor(phoneIdx)}
-                        required={parsePresetFieldRequired(survey.custom_fields, "phone")}
-                        value={phone}
-                        onChange={(e) => setPhone(formatUsPhone(e.target.value))}
-                        onKeyDown={(e) => onFieldKeyDown(e, phoneIdx)}
-                        disabled={loading}
-                        className={cn(FIELD_INPUT_BASE, "px-[18px]")}
-                      />
-                    </div>
-                  )}
+                  {/* Everything past name and email pairs up two-across from
+                      `sm`. These fields are short (a phone number, a job
+                      title), the form is the gate to the whole interview, and
+                      one field per row put Start below the fold on an ordinary
+                      laptop once a study enabled more than a couple of them.
+                      DOM order is unchanged, so the Enter-advances-field
+                      sequence still runs left to right, top to bottom. */}
+                  <div className="grid grid-cols-1 gap-[14px] short:gap-[10px] sm:grid-cols-2">
+                    {hasPhone && (
+                      <div className="flex min-w-0 flex-col gap-[6px]">
+                        <label htmlFor="respondent-phone" className={FIELD_LABEL_CLASSES}>
+                          {parsePresetFieldLabel(survey.custom_fields, "phone")}
+                        </label>
+                        <input
+                          id="respondent-phone"
+                          ref={setFieldRef(phoneIdx)}
+                          type="tel"
+                          autoComplete="tel"
+                          inputMode="tel"
+                          enterKeyHint={enterHintFor(phoneIdx)}
+                          required={parsePresetFieldRequired(survey.custom_fields, "phone")}
+                          value={phone}
+                          onChange={(e) => setPhone(formatUsPhone(e.target.value))}
+                          onKeyDown={(e) => onFieldKeyDown(e, phoneIdx)}
+                          disabled={loading}
+                          className={cn(FIELD_INPUT_BASE, "px-[18px]")}
+                        />
+                      </div>
+                    )}
 
-                  {(hasJobTitle || hasCompany) && (
-                    <div
-                      className={
-                        hasJobTitle && hasCompany
-                          ? "grid grid-cols-1 gap-[14px] sm:grid-cols-2"
-                          : "flex flex-col gap-[14px]"
-                      }
-                    >
-                      {hasJobTitle && (
-                        <div className="flex min-w-0 flex-col gap-[6px]">
-                          <label htmlFor="respondent-job-title" className={FIELD_LABEL_CLASSES}>
-                            {parsePresetFieldLabel(survey.custom_fields, "job_title")}
-                          </label>
-                          <input
-                            id="respondent-job-title"
-                            ref={setFieldRef(jobTitleIdx)}
-                            type="text"
-                            autoComplete="organization-title"
-                            enterKeyHint={enterHintFor(jobTitleIdx)}
-                            required={parsePresetFieldRequired(survey.custom_fields, "job_title")}
-                            value={jobTitle}
-                            onChange={(e) => setJobTitle(e.target.value)}
-                            onKeyDown={(e) => onFieldKeyDown(e, jobTitleIdx)}
-                            disabled={loading}
-                            className={cn(FIELD_INPUT_BASE, "px-[18px]")}
-                          />
-                        </div>
-                      )}
-                      {hasCompany && (
-                        <div className="flex min-w-0 flex-col gap-[6px]">
-                          <label htmlFor="respondent-company" className={FIELD_LABEL_CLASSES}>
-                            {parsePresetFieldLabel(survey.custom_fields, "company")}
-                          </label>
-                          <input
-                            id="respondent-company"
-                            ref={setFieldRef(companyIdx)}
-                            type="text"
-                            autoComplete="organization"
-                            enterKeyHint={enterHintFor(companyIdx)}
-                            required={parsePresetFieldRequired(survey.custom_fields, "company")}
-                            value={company}
-                            onChange={(e) => setCompany(e.target.value)}
-                            onKeyDown={(e) => onFieldKeyDown(e, companyIdx)}
-                            disabled={loading}
-                            className={cn(FIELD_INPUT_BASE, "px-[18px]")}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    {(hasJobTitle || hasCompany) && (
+                      <>
+                        {hasJobTitle && (
+                          <div className="flex min-w-0 flex-col gap-[6px]">
+                            <label htmlFor="respondent-job-title" className={FIELD_LABEL_CLASSES}>
+                              {parsePresetFieldLabel(survey.custom_fields, "job_title")}
+                            </label>
+                            <input
+                              id="respondent-job-title"
+                              ref={setFieldRef(jobTitleIdx)}
+                              type="text"
+                              autoComplete="organization-title"
+                              enterKeyHint={enterHintFor(jobTitleIdx)}
+                              required={parsePresetFieldRequired(survey.custom_fields, "job_title")}
+                              value={jobTitle}
+                              onChange={(e) => setJobTitle(e.target.value)}
+                              onKeyDown={(e) => onFieldKeyDown(e, jobTitleIdx)}
+                              disabled={loading}
+                              className={cn(FIELD_INPUT_BASE, "px-[18px]")}
+                            />
+                          </div>
+                        )}
+                        {hasCompany && (
+                          <div className="flex min-w-0 flex-col gap-[6px]">
+                            <label htmlFor="respondent-company" className={FIELD_LABEL_CLASSES}>
+                              {parsePresetFieldLabel(survey.custom_fields, "company")}
+                            </label>
+                            <input
+                              id="respondent-company"
+                              ref={setFieldRef(companyIdx)}
+                              type="text"
+                              autoComplete="organization"
+                              enterKeyHint={enterHintFor(companyIdx)}
+                              required={parsePresetFieldRequired(survey.custom_fields, "company")}
+                              value={company}
+                              onChange={(e) => setCompany(e.target.value)}
+                              onKeyDown={(e) => onFieldKeyDown(e, companyIdx)}
+                              disabled={loading}
+                              className={cn(FIELD_INPUT_BASE, "px-[18px]")}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
 
-                  {hasLinkedin && (
-                    <div className="flex flex-col gap-[6px]">
-                      <label htmlFor="respondent-linkedin" className={FIELD_LABEL_CLASSES}>
-                        {parsePresetFieldLabel(survey.custom_fields, "linkedin")}
-                      </label>
-                      <input
-                        id="respondent-linkedin"
-                        ref={setFieldRef(linkedinIdx)}
-                        type="url"
-                        autoComplete="url"
-                        inputMode="url"
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        enterKeyHint={enterHintFor(linkedinIdx)}
-                        required={parsePresetFieldRequired(survey.custom_fields, "linkedin")}
-                        value={linkedin}
-                        onChange={(e) => setLinkedin(e.target.value)}
-                        onKeyDown={(e) => onFieldKeyDown(e, linkedinIdx)}
-                        disabled={loading}
-                        className={cn(FIELD_INPUT_BASE, "px-[18px]")}
-                      />
-                    </div>
-                  )}
+                    {hasLinkedin && (
+                      <div className="flex min-w-0 flex-col gap-[6px]">
+                        <label htmlFor="respondent-linkedin" className={FIELD_LABEL_CLASSES}>
+                          {parsePresetFieldLabel(survey.custom_fields, "linkedin")}
+                        </label>
+                        <input
+                          id="respondent-linkedin"
+                          ref={setFieldRef(linkedinIdx)}
+                          type="url"
+                          autoComplete="url"
+                          inputMode="url"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          enterKeyHint={enterHintFor(linkedinIdx)}
+                          required={parsePresetFieldRequired(survey.custom_fields, "linkedin")}
+                          value={linkedin}
+                          onChange={(e) => setLinkedin(e.target.value)}
+                          onKeyDown={(e) => onFieldKeyDown(e, linkedinIdx)}
+                          disabled={loading}
+                          className={cn(FIELD_INPUT_BASE, "px-[18px]")}
+                        />
+                      </div>
+                    )}
 
-                  {customFieldDefs.map((field, i) => (
-                    <div key={field.key} className="flex flex-col gap-[6px]">
-                      <label
-                        htmlFor={`respondent-custom-${field.key}`}
-                        className={FIELD_LABEL_CLASSES}
-                      >
-                        {field.required ? `${field.label} *` : field.label}
-                      </label>
-                      <input
-                        id={`respondent-custom-${field.key}`}
-                        ref={setFieldRef(customFieldIdxs[i])}
-                        type="text"
-                        enterKeyHint={enterHintFor(customFieldIdxs[i])}
-                        required={field.required === true}
-                        value={customFieldValues[field.key] ?? ""}
-                        onChange={(e) =>
-                          setCustomFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))
-                        }
-                        onKeyDown={(e) => onFieldKeyDown(e, customFieldIdxs[i])}
-                        disabled={loading}
-                        className={cn(FIELD_INPUT_BASE, "px-[18px]")}
-                      />
-                    </div>
-                  ))}
+                    {customFieldDefs.map((field, i) => (
+                      <div key={field.key} className="flex min-w-0 flex-col gap-[6px]">
+                        <label
+                          htmlFor={`respondent-custom-${field.key}`}
+                          className={FIELD_LABEL_CLASSES}
+                        >
+                          {field.required ? `${field.label} *` : field.label}
+                        </label>
+                        <input
+                          id={`respondent-custom-${field.key}`}
+                          ref={setFieldRef(customFieldIdxs[i])}
+                          type="text"
+                          enterKeyHint={enterHintFor(customFieldIdxs[i])}
+                          required={field.required === true}
+                          value={customFieldValues[field.key] ?? ""}
+                          onChange={(e) =>
+                            setCustomFieldValues((prev) => ({
+                              ...prev,
+                              [field.key]: e.target.value,
+                            }))
+                          }
+                          onKeyDown={(e) => onFieldKeyDown(e, customFieldIdxs[i])}
+                          disabled={loading}
+                          className={cn(FIELD_INPUT_BASE, "px-[18px]")}
+                        />
+                      </div>
+                    ))}
+                  </div>
 
                   {error && <StudyError>{error}</StudyError>}
                 </div>
@@ -1600,7 +1644,7 @@ export function InterviewFlow({
                             "study-fade whitespace-pre-wrap break-words px-[18px] py-[12px] text-[16px] leading-[1.55]",
                             isInterviewer
                               ? "max-w-[84%] self-start rounded-[16px_16px_16px_5px] border border-study-hair bg-study-chip"
-                              : "max-w-[76%] self-end rounded-[16px_16px_5px_16px] bg-study-ink text-study-chip"
+                              : "max-w-[76%] self-end rounded-[16px_16px_5px_16px] bg-study-ink text-study-chip",
                           )}
                           style={{ "--study-delay": `${0.03 + i * 0.05}s` } as React.CSSProperties}
                         >
@@ -1608,7 +1652,9 @@ export function InterviewFlow({
                               server already strips the ||ANSWER|| marker and
                               ||CHIPS|| block, but nothing that reaches a
                               respondent's screen relies on that. */}
-                          {isInterviewer ? renderEmphasis(stripInterviewMarkers(m.content)) : m.content}
+                          {isInterviewer
+                            ? renderEmphasis(stripInterviewMarkers(m.content))
+                            : m.content}
                         </div>
                       );
                     })}
@@ -1633,26 +1679,34 @@ export function InterviewFlow({
   // sent, but nothing that reaches a respondent's screen relies on that
   // having happened.
   const lastAssistantMessage = stripInterviewMarkers(
-    [...messages].reverse().find((m) => m.role === "assistant")?.content ?? ""
+    [...messages].reverse().find((m) => m.role === "assistant")?.content ?? "",
   );
   // How full the bar is. Questions actually asked against the study's promised
   // length; held short of the end until the interview is over.
   const questionsAsked = messages.filter((m) => m.role === "assistant").length;
-  const progressPercent = interviewProgressPercent(questionsAsked, lengthPreset.topics, interviewFinished);
+  const progressPercent = interviewProgressPercent(
+    questionsAsked,
+    lengthPreset.topics,
+    interviewFinished,
+  );
   const hasAnswer = pickedChipIndex !== null || answer.trim().length > 0;
   // A restored question was already on screen before the reload, so replaying
   // its entrance would animate in something the respondent has been reading
   // for a while. Suppressed for that first render only; the moment they
   // answer, messages.length moves past the restored count and every
   // subsequent question reveals normally.
-  const isRestoredRender = restoredMessageCount !== null && messages.length === restoredMessageCount;
+  const isRestoredRender =
+    restoredMessageCount !== null && messages.length === restoredMessageCount;
   // Staggered entrance, delayed per block (0 / .04 / .08 / .14s), on the
   // handoff's own easing. globals.css gates the animation on
   // prefers-reduced-motion; every element's resting state is its final frame.
   const reveal = (delaySeconds: number): { className?: string; style?: React.CSSProperties } =>
     isRestoredRender
       ? {}
-      : { className: "study-fade", style: { "--study-delay": `${delaySeconds}s` } as React.CSSProperties };
+      : {
+          className: "study-fade",
+          style: { "--study-delay": `${delaySeconds}s` } as React.CSSProperties,
+        };
 
   // The bolded phrase is a hint for the key-phrase mark, not part of the
   // question: extractEmphasis drops it when the model left it standing on its
@@ -1696,10 +1750,7 @@ export function InterviewFlow({
           <div key={messages.length} className="flex flex-col">
             <InterviewerRow
               on="sky"
-              className={cn(
-                "study-drop-short mb-[clamp(10px,2vh,22px)]",
-                reveal(0).className
-              )}
+              className={cn("study-drop-short mb-[clamp(10px,2vh,22px)]", reveal(0).className)}
             />
 
             {isTyping ? (
@@ -1709,7 +1760,7 @@ export function InterviewFlow({
                 aria-hidden="true"
                 className={cn(
                   "flex min-h-[180px] items-center motion-safe:transition-opacity motion-safe:duration-150",
-                  dotsLeaving && "opacity-0"
+                  dotsLeaving && "opacity-0",
                 )}
               >
                 {showBirdLoader && <ThinkingDots />}
@@ -1720,7 +1771,7 @@ export function InterviewFlow({
                   <p
                     className={cn(
                       "study-drop-short text-pretty m-0 mb-[10px] max-w-[700px] text-[clamp(17px,2.1vh,21px)] leading-[1.5]",
-                      reveal(0.04).className
+                      reveal(0.04).className,
                     )}
                     style={reveal(0.04).style}
                   >
@@ -1731,7 +1782,7 @@ export function InterviewFlow({
                 <h1
                   className={cn(
                     "m-0 mb-[clamp(16px,3vh,36px)] text-balance break-words font-study-serif text-[clamp(28px,min(6.2vh,9vw),62px)] font-normal leading-[1] tracking-[-0.015em]",
-                    reveal(0.08).className
+                    reveal(0.08).className,
                   )}
                   style={reveal(0.08).style}
                 >
@@ -1742,7 +1793,7 @@ export function InterviewFlow({
                       </strong>
                     ) : (
                       segment.text
-                    )
+                    ),
                   )}
                 </h1>
 
@@ -1838,7 +1889,11 @@ export function InterviewFlow({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-x-[12px] gap-y-[12px] sm:gap-x-[18px]">
-                      <button type="submit" disabled={!hasAnswer || loading} className={PRIMARY_BUTTON}>
+                      <button
+                        type="submit"
+                        disabled={!hasAnswer || loading}
+                        className={PRIMARY_BUTTON}
+                      >
                         {/* "Answer to continue" is the disabled label, so the
                             button says why it is not available rather than
                             just looking broken. There is no "Finish" variant:

@@ -2287,7 +2287,14 @@ select {
   /* `safe` so a stage taller than the box starts at its own top edge instead
      of centring and clipping both ends. */
   align-items: safe center;
-  overflow: hidden;
+  /* The page never scrolls — the shell above is a fixed viewport height with
+     overflow hidden — but the stage inside it must, because one screen in this
+     flow is not a fixed-height design: the intake form grows with however many
+     fields a study enables, and on a short window the whole lower half of it
+     (including Start) was being clipped with no way to reach it. Centred while
+     it fits, scrolled from the top when it does not. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: clamp(16px, 3vh, 48px) 24px clamp(8px, 2vh, 28px);
 }
 @media (min-width: 1100px) {
@@ -2297,14 +2304,24 @@ select {
   }
 }
 
-/* Touch and small windows: the design's "no scroll anywhere" is written for
-   a desktop viewport. On a phone the intake form and a long question can
-   genuinely exceed the box, and clipping them would strand the respondent
-   mid-flow, so the stage (never the page) takes the overflow there. */
-@media (max-width: 1099px), (pointer: coarse) {
+@media (pointer: coarse) {
   .study-stage {
-    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* The intake form is the one screen that can run long, so it tightens before
+   it has to scroll: the fields close up and the card loses some padding. The
+   cutoff is 900px rather than the `short` tier's 820px because a 900px-tall
+   window is exactly where a study with four optional fields was landing a few
+   pixels over. The three screens the handoff draws are unaffected — none of
+   them uses these classes. */
+@media (max-height: 900px) {
+  .study-intake-fields {
+    gap: 10px;
+  }
+  .study-intake-card {
+    padding: 20px;
   }
 }
 
