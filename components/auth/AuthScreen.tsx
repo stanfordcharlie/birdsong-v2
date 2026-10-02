@@ -22,12 +22,13 @@ import { cn } from "@/lib/utils";
 // exact regardless of surrounding token context.
 function AuthBird({ width, height, className }: { width: number; height: number; className?: string }) {
   return (
-    <svg width={width} height={height} viewBox="0 0 48 44" fill="none" aria-hidden="true" className={className}>
+    <svg width={width} height={height} viewBox="0 0 50 44" fill="none" aria-hidden="true" className={className}>
       <path
-        d="M10 40 L19.5 28.5 C11.5 27.5 5.5 21.5 5.5 13.5 C5.5 9.5 7.5 5.5 10.5 4.5 C11.5 10.5 16.5 13.5 22.5 13.5 C31.5 13.5 38.5 19.5 38.5 27.5 C38.5 29 38.2 30.4 37.6 31.8 L44.5 34.5 L36.5 35 C33.5 38.5 28.5 40.5 23 40.5 L14.5 40.5 Z"
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M7 1.5 C9 9 15 13.6 23 14 C32 14.4 37.9 21 37.3 31 L45.3 34.6 L36.4 36.5 C34 39.5 30.5 41 26 41 L7 41 L17 28.5 C8 27.5 2 21.5 2 14 C2 8.5 4 4.5 7 1.5 Z M32 22.8 A1.9 1.9 0 1 0 32 26.9 A1.9 1.9 0 1 0 32 22.8 Z"
         fill="#241f18"
       />
-      <circle cx="33" cy="25.5" r="1.8" fill="#faf8f1" />
     </svg>
   );
 }

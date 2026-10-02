@@ -7,16 +7,23 @@ export const metadata: Metadata = {
   title: "Birdsong",
   description: "AI-moderated research platform for B2B demand gen.",
   icons: {
-    // Rounded green tile with the cream bird mark. The PNG tab icons live in
-    // public/ and are wired explicitly here. The .ico is not listed: Next
-    // auto-emits its own <link> for app/favicon.ico (and serves /favicon.ico
-    // for bare browser requests) regardless of this config, so listing it too
-    // would just duplicate that link.
+    // Sky-blue tile with the cream bird mark (birdsong-skyblue-icon-2026-10).
+    // The PNG tab icons live in public/ and are wired explicitly here. The
+    // .ico is not listed: Next auto-emits its own <link> for app/favicon.ico
+    // (and serves /favicon.ico for bare browser requests) regardless of this
+    // config, so listing it too would just duplicate that link.
+    //
+    // ?v=2 on every URL: the filenames are unchanged from the green tile
+    // these replaced, and a favicon is one of the most aggressively cached
+    // things a browser holds, so without the query a returning visitor keeps
+    // the old mark in the tab. The .ico cannot carry one (Next owns that
+    // link), but it is the fallback, not what a modern browser picks.
     icon: [
-      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
-      { url: "/favicon-16.png", type: "image/png", sizes: "16x16" },
+      { url: "/favicon.svg?v=2", type: "image/svg+xml" },
+      { url: "/favicon-32.png?v=2", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16.png?v=2", type: "image/png", sizes: "16x16" },
     ],
-    apple: { url: "/apple-touch-icon.png", sizes: "180x180" },
+    apple: { url: "/apple-touch-icon.png?v=2", sizes: "180x180" },
   },
 };
 

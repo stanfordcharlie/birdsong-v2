@@ -1,38 +1,36 @@
-// Bird silhouette for the marketing landing pages
-// (design_handoff_landing_pages_full) — a different mark from the platform
-// sidebar/respondent-flow bird (components/AdminSidebar.tsx, PerchedBird),
-// drawn fresh for this handoff. Used at 24x22 (nav), 26x24 (footer), and
+// The Birdsong mark (birdsong-skyblue-icon-2026-10) as the marketing landing
+// pages draw it. Used at 24x22 (nav), 26x24 (footer), 22x20 (legal pages) and
 // 38x35 (final CTA, wrapped with the takeoff animation by LandingCta).
 //
-// The eye is a literal hole punched through the ink silhouette, filled with
-// whatever the mark is sitting on rather than a fixed light color — the
-// same trick the source file uses, which is why the footer (on --lp-surface)
-// passes a different eyeFill from the nav and CTA (on --lp-bg).
+// The eye is a hole punched through the ink silhouette — a second subpath on
+// the same `evenodd` path — so it shows whatever the mark is sitting on
+// rather than a fixed light color. This used to be a separate <circle> whose
+// fill each call site had to supply (the footer sits on --lp-surface, the nav
+// and CTA on --lp-bg); with a real cut-out none of them has to know.
 export function BirdMark({
   width = 24,
   height = 22,
-  eyeFill = "var(--lp-bg)",
   className,
 }: {
   width?: number;
   height?: number;
-  eyeFill?: string;
   className?: string;
 }) {
   return (
     <svg
       width={width}
       height={height}
-      viewBox="0 0 48 44"
+      viewBox="0 0 50 44"
       fill="none"
       aria-hidden="true"
       className={className}
     >
       <path
-        d="M10 40 L19.5 28.5 C11.5 27.5 5.5 21.5 5.5 13.5 C5.5 9.5 7.5 5.5 10.5 4.5 C11.5 10.5 16.5 13.5 22.5 13.5 C31.5 13.5 38.5 19.5 38.5 27.5 C38.5 29 38.2 30.4 37.6 31.8 L44.5 34.5 L36.5 35 C33.5 38.5 28.5 40.5 23 40.5 L14.5 40.5 Z"
+        fillRule="evenodd"
+        clipRule="evenodd"
         fill="var(--lp-ink)"
+        d="M7 1.5 C9 9 15 13.6 23 14 C32 14.4 37.9 21 37.3 31 L45.3 34.6 L36.4 36.5 C34 39.5 30.5 41 26 41 L7 41 L17 28.5 C8 27.5 2 21.5 2 14 C2 8.5 4 4.5 7 1.5 Z M32 22.8 A1.9 1.9 0 1 0 32 26.9 A1.9 1.9 0 1 0 32 22.8 Z"
       />
-      <circle cx="33" cy="25.5" r="1.8" fill={eyeFill} />
     </svg>
   );
 }

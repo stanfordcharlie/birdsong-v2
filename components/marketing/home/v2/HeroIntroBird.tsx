@@ -22,7 +22,7 @@ import { useHeroIntro } from "./useHeroIntro";
  * The notes are a sibling box rather than children so they hang in the air
  * over the headline while the bird leaves for the nav.
  *
- * Same mark as components/marketing/BirdMark.tsx (viewBox 0 0 48 44); drawn
+ * Same mark as components/marketing/BirdMark.tsx (viewBox 0 0 50 44); drawn
  * inline because the eye here is knocked out with the hero's cream and the
  * fill is the hero's ink, not the --lp-* pair that component reads.
  */
@@ -43,9 +43,9 @@ export function HeroIntroBird() {
         <div className="hp-i-bird-arrive">
           <div className="hp-i-bird-land">
             <div className="hp-i-bird-chirp">
-              <svg viewBox="0 0 48 44" width={72} height={66} fill="none" className="block">
+              <svg viewBox="0 0 50 44" width={72} height={66} fill="none" className="block">
                 <path
-                  d="M10 40 L19.5 28.5 C11.5 27.5 5.5 21.5 5.5 13.5 C5.5 9.5 7.5 5.5 10.5 4.5 C11.5 10.5 16.5 13.5 22.5 13.5 C31.5 13.5 38.5 19.5 38.5 27.5 C38.5 29 38.2 30.4 37.6 31.8 L44.5 34.5 L36.5 35 C33.5 38.5 28.5 40.5 23 40.5 L14.5 40.5 Z M34.8 25.5 A1.8 1.8 0 1 0 31.2 25.5 A1.8 1.8 0 1 0 34.8 25.5 Z"
+                  d="M7 1.5 C9 9 15 13.6 23 14 C32 14.4 37.9 21 37.3 31 L45.3 34.6 L36.4 36.5 C34 39.5 30.5 41 26 41 L7 41 L17 28.5 C8 27.5 2 21.5 2 14 C2 8.5 4 4.5 7 1.5 Z M32 22.8 A1.9 1.9 0 1 0 32 26.9 A1.9 1.9 0 1 0 32 22.8 Z"
                   fill="rgb(var(--hp-ink))"
                   fillRule="evenodd"
                 />
