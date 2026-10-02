@@ -108,15 +108,17 @@ export function SkyHeader({
   return (
     <header className="relative z-20 flex-shrink-0 px-[16px] pt-[clamp(12px,2vh,22px)] sm:px-[32px]">
       <div className="flex items-center gap-[20px] rounded-full border border-study-glass-line bg-study-glass py-[10px] pl-[16px] pr-[10px] backdrop-blur-[16px] sm:pl-[24px]">
-        <a
-          href="/"
-          className="flex flex-shrink-0 items-center gap-[10px] text-study-ink no-underline"
-        >
+        {/* Deliberately not a link. The respondent is mid-interview and the
+            study is run on a client's behalf, so handing them a route to
+            usebirdsong.com tells them who is behind it — which is the one
+            thing the interview cannot afford to volunteer. The lockup still
+            renders; it just does not navigate. */}
+        <div className="flex flex-shrink-0 items-center gap-[10px] text-study-ink">
           <BirdMark width={30} />
           <span className="font-study-display text-[19px] font-semibold tracking-[-0.02em] sm:text-[22px]">
             Birdsong
           </span>
-        </a>
+        </div>
 
         {/* The owner's preview marker. Inside the pill rather than floating in
             the corner, where it would sit on top of the theme toggle. */}
@@ -155,10 +157,11 @@ export function StudyFooter() {
   return (
     <footer className="study-footer relative z-10 flex flex-shrink-0 items-center justify-center gap-[9px] px-[32px] pb-[clamp(10px,2vh,30px)] pt-[clamp(8px,1.6vh,22px)] text-[14px] text-study-ink">
       <span>Powered by</span>
-      <a href="/" className="inline-flex items-center gap-[7px] no-underline">
+      {/* Not a link, for the same reason as the header lockup above. */}
+      <span className="inline-flex items-center gap-[7px]">
         <BirdMark width={18} />
         <span className="text-[16px] font-semibold">Birdsong</span>
-      </a>
+      </span>
     </footer>
   );
 }
