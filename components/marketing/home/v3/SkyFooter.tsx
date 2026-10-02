@@ -27,7 +27,7 @@ export function SkyFooter() {
             Terms
           </a>
           <a
-            href="https://www.linkedin.com/company/birdsong"
+            href="https://www.linkedin.com/company/birdsong-ai/?viewAsMember=true"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Birdsong on LinkedIn"
