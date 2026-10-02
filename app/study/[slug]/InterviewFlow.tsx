@@ -15,11 +15,18 @@ import {
   parseActiveSession,
   serializeActiveSession,
 } from "@/lib/interview/active-session";
-import { PerchedBird } from "@/components/marketing/PerchedBird";
-import { StudyThemeToggle } from "./StudyTheme";
-import { AmbientBackdrop, Footer, PillArrow, PoweredBy, TestModeBadge, WelcomeBird } from "./StudyChrome";
+import {
+  InterviewerRow,
+  SkyBackdrop,
+  SkyCard,
+  SkyFlock,
+  SkyHeader,
+  StudyArrow,
+  StudyError,
+  StudyFooter,
+  ThinkingDots,
+} from "./SkyChrome";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { BirdLoader } from "@/components/BirdLoader";
 import { useLoadingGate, useFlybyGate } from "@/components/useLoadingGate";
 import { emphasisSegments, extractEmphasis } from "@/lib/chat/emphasis";
 import { renderEmphasis } from "@/lib/chat/render-emphasis";
@@ -29,15 +36,21 @@ import { stripInterviewMarkers } from "@/lib/interview/chips";
 import { interviewProgressPercent } from "./progress";
 import { useStudyPresence } from "@/lib/presence/use-study-presence";
 import { giftCardPhrase } from "@/lib/studies/incentive";
-import { newsreader, bricolage } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
-// Design reference: design_handoff_survey_respondent/. Editorial palette
-// (matches the marketing pages), deliberately not the admin/shadcn stone
-// tokens (bg-primary, border-input, etc. resolve to different hex values
-// than this design calls for) — so this file uses raw elements with the
-// handoff's exact hex values throughout, the same approach the marketing
-// components already take for their own distinct palette.
+// Design reference: design_handoff_respondent_survey_sky/. The respondent
+// flow sits on the same sky as the marketing homepage: blue gradient, warm sun
+// glow, a drifting flock, a frosted pill header and frosted cream cards, with
+// Instrument Serif carrying every headline.
+//
+// Colours, radii and spacing come from the --study-* tokens (app/globals.css,
+// `.study-sky`) through the `study-*` Tailwind utilities, so all of it follows
+// the day/night toggle. Do not reintroduce raw hex here: a literal will not
+// switch, and a single one is enough to make a themed screen look broken. The
+// two that exist are on cream fills that are deliberately the same in both
+// themes, and each is marked at its call site.
+//
+// The shared chrome (sky, flock, header, card, footer) lives in ./SkyChrome.
 
 // The respondent-facing survey shape: an explicit allowlist of the only
 // fields this public Client Component is permitted to see. Derived via Pick
@@ -76,43 +89,71 @@ export type ProspectContext = {
 // different events — see the note on the start button below.
 type Stage = "prospect" | "welcome" | "intro" | "chat" | "complete";
 
-// The welcome screen (stage === "welcome") is the frozen respondent design;
-// every other stage is styled from these values rather than from its own
-// palette, so the whole flow reads as one page. All of them are lifted
-// verbatim from that screen's JSX below.
-//   bg-survey-ground / -surface / -raised   text-survey-ink / -muted / -faint
-//   border-survey-border   text-survey-accent   text-survey-danger
+// The ink pill every primary action uses: the intake's Start and the question
+// screen's Continue. Chip-coloured text on an ink fill, both of which flip
+// with the theme together.
+const PRIMARY_BUTTON =
+  "study-cta inline-flex touch-manipulation items-center gap-[10px] rounded-full bg-study-ink px-[20px] py-[15px] text-[17px] font-medium text-study-chip disabled:cursor-not-allowed disabled:opacity-35 sm:px-[26px]";
+
+const FIELD_LABEL_CLASSES = "text-[13px] font-medium text-study-muted";
+
+// The intake fields, on the same chip fill and hairline the answer box and the
+// quick-answer chips use, so the form reads as part of one card system.
 //
-// Those resolve through the --sv-* custom properties in app/globals.css,
-// which is what gives this screen a dark theme (see StudyTheme.tsx). Do not
-// reintroduce raw hex here: a literal will not switch, and a single one is
-// enough to make a themed screen look broken.
-const SURVEY_GROUND = "hsl(var(--sv-ground))";
-
-// The dark pill, matching "Let's get started" exactly (see the welcome CTA).
-const PILL_BUTTON =
-  "inline-flex touch-manipulation items-center gap-3 rounded-full bg-survey-ink px-[30px] py-4 text-[16.5px] font-semibold text-survey-ground [transition:transform_0.25s_ease,box-shadow_0.25s_ease] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[var(--sv-shadow-press)]";
-
-const RESPONDENT_BUBBLE =
-  "self-end max-w-[80%] whitespace-pre-wrap break-words rounded-2xl bg-survey-ink px-4 py-2.5 text-sm leading-relaxed text-survey-ground";
-
-const FIELD_LABEL_CLASSES = "text-[13px] font-semibold text-survey-muted";
-// Same surface the welcome screen's interviewer card uses (survey-surface on
-// a survey-border hairline with --sv-shadow-soft), just at input proportions.
-//
-// text-base (16px) is load-bearing on iOS, not just a type choice: Safari
-// auto-zooms the whole page on focus for any input under 16px and never
-// zooms back out. min-h-[48px] is the touch-target floor; on desktop the
-// py-3 + 16px line box lands exactly on it, so it changes nothing there.
+// text-[17px] is load-bearing on iOS, not just a type choice: Safari
+// auto-zooms the whole page on focus for any input under 16px and never zooms
+// back out. min-h-[48px] is the touch-target floor; on desktop the padding and
+// line box already clear it, so it changes nothing there.
 const FIELD_INPUT_BASE =
-  "w-full min-w-0 min-h-[48px] rounded-[14px] border border-survey-border bg-survey-surface py-3 text-base text-survey-ink placeholder:text-survey-faint focus:border-survey-muted focus:outline-none focus:ring-[3px] focus:ring-survey-ink/[0.07] disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full min-w-0 min-h-[48px] rounded-[16px] border border-study-hair bg-study-chip py-[12px] text-[17px] text-study-ink placeholder:text-study-muted/75 focus:border-study-muted focus:outline-none disabled:cursor-not-allowed disabled:opacity-60";
 
-// Same bird, different perch: 48x46 (vs the marketing default 40x38) and
-// its own two-note arrangement, per the handoff.
-const INTRO_BIRD_NOTES = [
-  { glyph: "♪", top: "-7px", left: "41px", fontSize: "18px", delaySeconds: 0 },
-  { glyph: "♫", top: "2px", left: "50px", fontSize: "14px", delaySeconds: 1.1 },
-];
+// The welcome H1 at the handoff's size, with two concessions it does not make
+// itself: a width term, and a ceiling that gives way to a long title.
+//
+// The handoff sizes this on viewport height alone (9.5vh), which is right for
+// the desktop screen it draws and wrong on a phone, where 9.5vh of an 844px
+// screen is an 80px headline in a 390px-wide column — four words a line, and
+// the CTA pushed under the fold. min() with a vw term is what holds it; on
+// any window wide enough to show the interviewer card the vh term is still
+// the smaller of the two, so the reference renders unchanged.
+//
+// The ceiling is the long-title case: titles are usually short (the AI
+// suggestion flow caps at ~8 words), but an admin can type anything, and this
+// heading sits on a screen that must not scroll. It only starts shrinking past
+// a length the handoff's own title does not reach.
+function welcomeTitleFontSize(title: string): string {
+  const MAX_PX = 104;
+  const MIN_PX = 32;
+  const SHRINK_AFTER = 56;
+  const PX_PER_CHAR = 1.1;
+  const ceiling = Math.max(MIN_PX, MAX_PX - Math.max(0, title.length - SHRINK_AFTER) * PX_PER_CHAR);
+  return `clamp(${MIN_PX}px, min(9.5vh, 11vw), ${ceiling}px)`;
+}
+
+// One row of the welcome card: a serif heading over a line of muted body text,
+// with a hairline under all but the last.
+function WelcomeCardRow({
+  heading,
+  body,
+  divided = false,
+}: {
+  heading: string;
+  body: string;
+  divided?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        divided && "mb-[clamp(12px,2vh,24px)] border-b border-study-hair pb-[clamp(12px,2vh,24px)]"
+      )}
+    >
+      <div className="mb-[6px] font-study-serif text-[clamp(24px,3.2vh,34px)] leading-[1.1]">
+        {heading}
+      </div>
+      <div className="text-[17px] leading-[1.55] text-study-muted">{body}</div>
+    </div>
+  );
+}
 
 // No skip sentinel exists in the interview prompt/model (out of scope to
 // add one here), so Skip sends a plain, natural-reading reply the
@@ -169,44 +210,6 @@ function formatUsPhone(value: string): string {
 
 function wait(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
-}
-
-// Below this, a visual-viewport shrink is the URL bar collapsing or a
-// find-in-page bar, not a keyboard — re-anchoring the stage for those would
-// be a visible jolt for no reason.
-const KEYBOARD_MIN_INSET_PX = 120;
-
-// How much of the layout viewport the on-screen keyboard is covering, or 0
-// when it's closed.
-//
-// No CSS unit reports this. dvh shrinks for browser toolbars but *not* for
-// the keyboard — on iOS the keyboard is painted over the layout viewport
-// without resizing it at all — so the pinned-to-the-bottom composer ends up
-// underneath it. window.visualViewport is the only API that describes the
-// box the respondent can actually see, hence measuring here and handing the
-// number to CSS as a custom property. offsetTop is subtracted because iOS
-// scrolls the visual viewport within the layout viewport when focusing a
-// field near the bottom; without it the inset reads short by that amount.
-function useKeyboardInset() {
-  const [inset, setInset] = useState(0);
-
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => {
-      const covered = window.innerHeight - vv.height - vv.offsetTop;
-      setInset(covered > KEYBOARD_MIN_INSET_PX ? Math.round(covered) : 0);
-    };
-    update();
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
-    return () => {
-      vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
-    };
-  }, []);
-
-  return inset;
 }
 
 // How incoming interviewer questions arrive. Flip in one line:
@@ -270,7 +273,7 @@ function CheckIcon({ className }: { className?: string }) {
     >
       <path
         d="M5 12.5l4.5 4.5L19 7.5"
-        stroke="hsl(var(--sv-accent))"
+        stroke="rgb(var(--study-ink))"
         strokeWidth="2.4"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -297,7 +300,7 @@ function XIcon({ className }: { className?: string }) {
     >
       <path
         d="M6.5 6.5l11 11M17.5 6.5l-11 11"
-        stroke="hsl(var(--sv-danger))"
+        stroke="rgb(var(--study-danger))"
         strokeWidth="2.4"
         strokeLinecap="round"
       />
@@ -452,15 +455,16 @@ export function InterviewFlow({
   // stage specifically since `loading` is also true later, during ordinary
   // in-chat sends, which get the mini loader instead (see showBirdLoader).
   const showIntroFlyby = useFlybyGate(stage === "intro" && loading, "survey-start");
-  // Mini loader between questions, and on the Retry button after a failed
-  // send. Both share the same 300ms "nothing first" gate; the mini loader
-  // itself takes over TypingDots' old spot rather than adding a screen
-  // takeover, per the design handoff's "not a takeover" placement rule.
+  // Typing indicator between questions, and on the Retry button after a
+  // failed send. Both share the same 300ms "nothing first" gate, so a fast
+  // answer shows nothing at all rather than a flash of it. What they render
+  // is ThinkingDots (see ./SkyChrome) — the shared BirdLoader is drawn for
+  // the eggshell surfaces and disappears on the night sky.
   const showBirdLoader = useLoadingGate(isTyping);
   const showRetryLoader = useLoadingGate(loading && !!failedMessage);
   const answerInputRef = useRef<HTMLTextAreaElement>(null);
-  // The chat stage's scroll box once the keyboard is up (see the
-  // .survey-stage rules in globals.css) — scrolled back to the top when a
+  // The question screen's stage box (see the .study-stage rules in
+  // globals.css) — scrolled back to the top when a
   // new question lands so the question, not the middle of the composer, is
   // what the respondent sees.
   const stageRef = useRef<HTMLDivElement>(null);
@@ -652,8 +656,6 @@ export function InterviewFlow({
     // state it needs, and re-running this is never correct.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const keyboardInset = useKeyboardInset();
 
   // autoFocus lives on the name input, which a prospect never sees, so the
   // remainder-of-the-intake form would otherwise open with nothing focused.
@@ -1040,503 +1042,194 @@ export function InterviewFlow({
   }
 
   const surveyName = survey.external_title || survey.title;
+  // The preset's minutes, and nothing derived from a question count.
+  const metaLine = interviewDurationLabel(lengthPreset);
+  const rewardPhrase = giftCardPhrase(survey.gift_card_amount, survey.gift_card_brand);
+  // The incentive's show/hide flag is the amount itself: a study with no
+  // amount set has no reward to promise, and every line that mentions one
+  // (the welcome card's row, its pill, the intake's helper text and the
+  // thank-you clause) drops together.
+  const showReward = survey.gift_card_amount != null;
 
-  // Welcome screen — the redesign in design_handoff_survey_welcome. Single
-  // centered column in Birdsong's editorial brand system: eggshell ground
-  // with drifting washes/notes, bird-and-sticker cluster, Bricolage display
-  // title, interviewer speech bubble, ink pill CTA, powered-by footer. All
-  // exact values (colors, type, spacing, motion) are from the handoff README.
-  // Tapping the CTA advances to "intro" (the intake fields), unchanged.
-  // The prospect landing beat: the welcome screen, addressed to someone whose
-  // name we know. Same ground, same ambient layer, same bird-and-sticker
-  // cluster, same pill, same footer — an invited prospect and a cold visitor
-  // should not be able to tell they are looking at two different screens.
+  // The welcome beat, for both the anonymous link and an invited prospect's.
+  //
+  // One render, not two near-identical ones: an invited prospect and a cold
+  // visitor must not be able to tell they are looking at different screens,
+  // and the previous pair of copies had already drifted. What actually
+  // differs is the greeting, the respondent-facing description (a prospect
+  // was already shown it before this screen existed), and what the button
+  // does — so those are the only things branched on.
   //
   // NOTHING ON THIS SCREEN WRITES. No fetch, no route call, no Anthropic
   // call, on mount or on render. It is safe to load as many times as a mail
   // scanner, a preview pane or a curious recipient cares to load it; the
   // interview begins at the button and nowhere else.
-  //
-  // COPY: every line here is lifted from the anonymous welcome screen rather
-  // than written fresh, so the two screens cannot drift into making different
-  // promises about the same study. The one addition is the greeting.
-  if (stage === "prospect" && prospect) {
-    // The preset's minutes, and nothing derived from a question count.
-    const metaLine: string | null = interviewDurationLabel(lengthPreset);
-
-    // Same continuous-clamp treatment the welcome heading uses, so a long
-    // study name behaves identically on both screens.
-    const TITLE_MAX_PX = 58;
-    const TITLE_MIN_PX = 26;
-    const TITLE_SHRINK_AFTER = 20;
-    const TITLE_PX_PER_CHAR = 1.1;
-    const titleCeilingPx = Math.max(
-      TITLE_MIN_PX,
-      TITLE_MAX_PX - Math.max(0, surveyName.length - TITLE_SHRINK_AFTER) * TITLE_PX_PER_CHAR
-    );
-    const titleFontSize = `clamp(${TITLE_MIN_PX}px, 10vw, ${titleCeilingPx}px)`;
+  if (stage === "welcome" || (stage === "prospect" && prospect)) {
+    const landed = stage === "prospect" && prospect !== null;
 
     return (
-      <div
-        className={cn(
-          bricolage.variable,
-          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-survey-ink"
-        )}
-        style={{ background: SURVEY_GROUND }}
-      >
-        <TestModeBadge isTest={isTest} />
-        <StudyThemeToggle offsetForBadge={isTest} />
-        <AmbientBackdrop />
+      <>
+        <SkyBackdrop />
+        <SkyFlock />
+        <SkyHeader isTest={isTest} />
 
-        <main className="relative flex flex-1 items-center justify-center px-5 pb-4 pt-6 sm:px-8 sm:pb-5 sm:pt-7">
-          <div className="flex w-full max-w-[640px] flex-col items-center text-center">
-            {/* Bird + sticker cluster (decorative), identical to the welcome
-                screen including the gift-card sticker's bottom-margin
-                allowance for its overhang. */}
-            <div
-              aria-hidden="true"
-              className={cn(
-                "sw-rev relative h-[64px] w-[180px]",
-                survey.gift_card_amount ? "mb-5" : "mb-1.5"
-              )}
-            >
-              <span
-                className="sw-clusternote-a absolute left-[52px] top-0 text-[17px]"
-                style={{ color: "hsl(var(--sv-accent))", opacity: 0 }}
-              >
-                &#9834;
-              </span>
-              <span
-                className="sw-clusternote-b absolute left-[96px] top-4 text-[14px]"
-                style={{ color: "hsl(var(--sv-faint))", opacity: 0 }}
-              >
-                &#9835;
-              </span>
-              <WelcomeBird
-                width={46}
-                height={42}
-                fill="hsl(var(--sv-ink))"
-                eyeFill="hsl(var(--sv-ground))"
-                className="sw-bird absolute bottom-0 left-[62px]"
-              />
-              {survey.gift_card_amount ? (
-                <div
-                  className="sw-sticker absolute right-[-52px] top-[-16px] h-[98px] w-[98px]"
-                  style={{ transform: "rotate(8deg)" }}
-                >
-                  <svg
-                    viewBox="0 0 100 100"
-                    className="absolute inset-0"
-                    style={{ filter: "drop-shadow(var(--sv-drop-mascot))" }}
-                  >
-                    <polygon
-                      points="100,50 83.3,63.8 85.4,85.4 63.8,83.3 50,100 36.2,83.3 14.6,85.4 16.7,63.8 0,50 16.7,36.2 14.6,14.6 36.2,16.7 50,0 63.8,16.7 85.4,14.6 83.3,36.2"
-                      fill="hsl(var(--sv-butter))"
-                      stroke="hsl(var(--sv-ink))"
-                      strokeWidth="2.5"
-                    />
-                  </svg>
-                  <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-survey-ink">
-                    <span className="text-[19px] font-bold italic">${survey.gift_card_amount}</span>
-                    {survey.gift_card_brand ? (
-                      <span className="max-w-[72px] truncate text-[10px] font-semibold tracking-[0.02em]">
-                        {survey.gift_card_brand}
-                      </span>
-                    ) : null}
-                    <span className="text-[10.5px] font-semibold tracking-[0.02em]">gift card</span>
-                  </span>
+        <main className="study-stage relative z-10">
+          {/* Two columns past 1100px, where the card has room beside the
+              headline; below that the card is dropped entirely rather than
+              stacked, per the handoff — it is orientation, and the copy and
+              the CTA carry the screen on their own. */}
+          <div className="mx-auto grid max-h-full w-full max-w-[1320px] grid-cols-1 items-center gap-[64px] study-wide:grid-cols-[minmax(0,1.35fr)_minmax(0,0.85fr)]">
+            <div className="study-fade min-w-0">
+              {/* First name alone: the prospect record often has a mangled or
+                  all-caps last name from enrichment, and "Hi Jane" is both
+                  friendlier and harder to get embarrassingly wrong. A prospect
+                  with no first name simply gets no greeting. */}
+              {landed && prospect?.firstName && (
+                <div className="mb-[14px] text-[17px] font-medium text-study-cream">
+                  Hi {prospect.firstName} &#128075;
                 </div>
-              ) : null}
-            </div>
+              )}
 
-            {/* Incentive is visual-only above (the cluster is aria-hidden), so
-                announce it once to assistive tech without changing the layout. */}
-            {survey.gift_card_amount ? (
-              <span className="sr-only">Includes a {giftCardPhrase(survey.gift_card_amount, survey.gift_card_brand)}.</span>
-            ) : null}
-
-            {/* The greeting, and the only line on this screen the anonymous
-                welcome does not have. First name alone: the record often has a
-                mangled or all-caps last name from enrichment, and "Hi Jane" is
-                both friendlier and harder to get embarrassingly wrong. A
-                prospect with no first name simply gets no greeting rather than
-                a placeholder. */}
-            {prospect.firstName && (
-              <div className="sw-rev mb-2 text-[17px] font-semibold text-survey-ink">
-                Hi {prospect.firstName} &#128075;
+              <div className="mb-[26px] text-[15px] font-medium uppercase tracking-[0.14em]">
+                A short interview &middot; {metaLine}
               </div>
-            )}
 
-            {metaLine && (
-              <div className="sw-rev mb-2 text-[15px] font-medium text-survey-muted">{metaLine}</div>
-            )}
-
-            <h1
-              className="sw-rev m-0 mb-2.5 text-balance font-bricolage font-bold leading-[1.05] tracking-[-0.025em]"
-              style={
-                {
-                  "--sw-delay": "0.08s",
-                  fontSize: titleFontSize,
-                } as React.CSSProperties
-              }
-            >
-              {surveyName}
-            </h1>
-
-            {survey.sponsor && (
-              <div
-                className="sw-rev mb-4 text-[15px] text-survey-muted"
-                style={{ "--sw-delay": "0.14s" } as React.CSSProperties}
+              <h1
+                className="m-0 mb-[clamp(14px,2.6vh,30px)] text-balance font-study-serif font-normal leading-[0.94] tracking-[-0.02em]"
+                style={{ fontSize: welcomeTitleFontSize(surveyName) }}
               >
-                Research conducted on behalf of{" "}
-                <span className="font-semibold text-survey-ink">{survey.sponsor}</span>
-              </div>
-            )}
+                {surveyName}
+              </h1>
 
-            {/* Respondent-facing description ONLY — the same rule the intro
-                stage states at length. The internal `topic` field names the
-                interview's intent, is not on PublicSurvey, and must never
-                appear on a respondent screen. When public_description is
-                unset nothing renders here; there is no fallback. */}
-            {survey.public_description?.trim() && (
-              <p
-                className="sw-rev text-pretty mb-5 max-w-[560px] text-[16px] leading-[1.5] text-survey-muted sm:text-[17px]"
-                style={{ "--sw-delay": "0.18s" } as React.CSSProperties}
-              >
-                {survey.public_description}
+              {/* RESPONDENT-FACING COPY RULE: never mention or deny sales
+                  intent. No "sales", "pitch", "leads", "not a sales call",
+                  etc. Also never claim their info is "only" used for X, or
+                  make any exclusive-use / "never shared" claim — state true
+                  things we WILL do, don't enumerate or limit what else
+                  happens. */}
+              <p className="text-pretty m-0 mb-[clamp(18px,3.4vh,40px)] max-w-[620px] text-[clamp(17px,2.2vh,22px)] leading-[1.5]">
+                {survey.sponsor && (
+                  <>
+                    Research conducted on behalf of{" "}
+                    <strong className="font-semibold">{survey.sponsor}</strong>.{" "}
+                  </>
+                )}
+                Answer in your own words; there are no wrong answers.
               </p>
-            )}
 
-            <div
-              className="sw-rev mb-5 flex flex-col items-center gap-2"
-              style={{ "--sw-delay": "0.22s" } as React.CSSProperties}
-            >
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-survey-ink">
-                  <WelcomeBird width={15} height={13} fill="hsl(var(--sv-ground))" />
-                </span>
-                <span className="text-[12.5px] font-semibold tracking-[0.04em] text-survey-faint">
-                  YOUR INTERVIEWER
+              {/* Respondent-facing description ONLY — never the internal
+                  `topic` field, which names the interview's intent and is not
+                  even present on PublicSurvey. Shown on the prospect's landing
+                  beat, which is where it has always appeared; there is no
+                  fallback when it is unset. */}
+              {landed && survey.public_description?.trim() && (
+                <p className="text-pretty m-0 mb-[clamp(18px,3.4vh,40px)] max-w-[620px] text-[17px] leading-[1.5]">
+                  {survey.public_description}
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-[16px]">
+                <button
+                  type="button"
+                  onClick={landed ? beginAsProspect : () => setStage("intro")}
+                  disabled={landed && loading}
+                  // text-[#1f1c18]: the cream fill is the same cream in both
+                  // themes, so its label has to be the day ink in both themes
+                  // too — text-study-ink would turn cream-on-cream at night.
+                  className="study-cta inline-flex touch-manipulation items-center gap-[10px] rounded-[14px] bg-study-cream px-[30px] py-[20px] text-[19px] font-medium text-[#1f1c18] disabled:cursor-not-allowed disabled:opacity-35"
+                >
+                  {/* Same label on both screens. A prospect who already began
+                      and came back still sees "Let's get started": the start
+                      call picks their conversation up where it left off rather
+                      than beginning a second one, so a label promising a fresh
+                      start would be the inaccurate one. */}
+                  Let&apos;s get started <StudyArrow />
+                </button>
+
+                <span className="max-w-[260px] text-[14px] leading-[1.5]">
+                  By continuing, you agree to our{" "}
+                  <a
+                    href="/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline [text-underline-offset:3px] hover:opacity-80"
+                  >
+                    Terms
+                  </a>{" "}
+                  and{" "}
+                  <a
+                    href="/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline [text-underline-offset:3px] hover:opacity-80"
+                  >
+                    Privacy Policy
+                  </a>
+                  .
                 </span>
               </div>
-              <div
-                className="text-pretty max-w-[560px] rounded-[18px] border border-survey-border bg-survey-surface px-[26px] py-3 text-[16.5px] leading-[1.55]"
-                style={{ boxShadow: "var(--sv-shadow-soft)" }}
-              >
-                {/* RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
-                    No "sales", "pitch", "leads", "not a sales call", etc. Also
-                    never claim their info is "only" used for X, or make any
-                    exclusive-use / "never shared" claim — state true things
-                    we WILL do, don't enumerate or limit what else happens. */}
-                This is a short, relaxed conversation about how you work. Answer in your own words; there are
-                no wrong answers.
-              </div>
-            </div>
-
-            <div
-              className="sw-rev flex flex-col items-center"
-              style={{ "--sw-delay": "0.3s" } as React.CSSProperties}
-            >
-              <button
-                type="button"
-                onClick={beginAsProspect}
-                disabled={loading}
-                className={PILL_BUTTON}
-              >
-                {/* Same label as the welcome screen's CTA. A prospect who
-                    already began and came back still sees "Let's get started":
-                    the start call picks their conversation up where it left
-                    off rather than beginning a second one, so a label
-                    promising a fresh start would be the inaccurate one. */}
-                Let&apos;s get started
-                <svg width="20" height="12" viewBox="0 0 22 12" fill="none" aria-hidden="true">
-                  <path
-                    d="M1 6h18m0 0l-4-4.5M19 6l-4 4.5"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
 
               {/* A start that fails leaves the respondent on this screen with
                   the button still live, so the error has to say so here —
                   there is no later screen to show it on. */}
-              {error && <p className="mt-4 text-sm text-survey-danger">{error}</p>}
-
-              <div className="mt-3 text-[13.5px] text-survey-faint">
-                By continuing, you agree to our{" "}
-                <a
-                  href="/terms"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-survey-muted underline [text-underline-offset:3px]"
-                >
-                  Terms
-                </a>{" "}
-                and{" "}
-                <a
-                  href="/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-survey-muted underline [text-underline-offset:3px]"
-                >
-                  Privacy Policy
-                </a>
-                .
-              </div>
+              {landed && error && <StudyError className="mt-[18px]">{error}</StudyError>}
             </div>
-          </div>
-        </main>
 
-        <footer
-          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-4 pt-3"
-          style={{ "--sw-delay": "0.4s" } as React.CSSProperties}
-        >
-          <span className="text-[13.5px] text-survey-faint">Powered by</span>
-          <a href="/" className="inline-flex items-center gap-[7px]">
-            <WelcomeBird width={17} height={15} fill="hsl(var(--sv-ink))" />
-            <span className="font-bricolage text-[15px] font-bold text-survey-ink">Birdsong</span>
-          </a>
-        </footer>
-      </div>
-    );
-  }
-
-  if (stage === "welcome") {
-    // The preset's minutes, and nothing derived from a question count.
-    const metaLine: string | null = interviewDurationLabel(lengthPreset);
-
-    // Titles are usually short (the AI suggestion flow caps at ~8 words),
-    // but an admin can type anything here, and this heading is set at a
-    // large display size — long, unwrapped-friendly titles at that size
-    // stack into 3-4 lines and push the CTA off the bottom of the fold.
-    // Real clamp(), not a couple of hard breakpoints: the vw term gives
-    // genuine viewport-fluid scaling (small on phones, large on desktop),
-    // and the ceiling itself shrinks continuously as the title gets longer
-    // (only past TITLE_SHRINK_AFTER chars, so short titles are unaffected)
-    // instead of jumping between a few fixed sizes. TITLE_MIN_PX is the
-    // floor so even a very long title stays legible rather than vanishing.
-    const TITLE_MAX_PX = 58;
-    const TITLE_MIN_PX = 26;
-    const TITLE_SHRINK_AFTER = 20;
-    const TITLE_PX_PER_CHAR = 1.1;
-    const titleCeilingPx = Math.max(
-      TITLE_MIN_PX,
-      TITLE_MAX_PX - Math.max(0, surveyName.length - TITLE_SHRINK_AFTER) * TITLE_PX_PER_CHAR
-    );
-    const titleFontSize = `clamp(${TITLE_MIN_PX}px, 10vw, ${titleCeilingPx}px)`;
-
-    return (
-      <div
-        className={cn(
-          bricolage.variable,
-          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-survey-ink"
-        )}
-        style={{ background: "hsl(var(--sv-ground))" }}
-      >
-        <TestModeBadge isTest={isTest} />
-        <StudyThemeToggle offsetForBadge={isTest} />
-
-        <AmbientBackdrop />
-
-        <main className="relative flex flex-1 items-center justify-center px-5 pb-4 pt-6 sm:px-8 sm:pb-5 sm:pt-7">
-          <div className="flex w-full max-w-[640px] flex-col items-center text-center">
-            {/* Bird + sticker cluster (decorative). The gift-card sticker
-                overhangs below this box (top-[-16px] + h-[98px] on a
-                h-[64px] box), so it needs extra bottom margin to clear the
-                meta line below it — plain mb-1.5 is enough with just the
-                bird, but not with the sticker's overhang. */}
-            <div
-              aria-hidden="true"
-              className={cn(
-                "sw-rev relative h-[64px] w-[180px]",
-                survey.gift_card_amount ? "mb-5" : "mb-1.5"
-              )}
+            <SkyCard
+              className="study-fade hidden px-[36px] py-[clamp(20px,3vh,34px)] study-wide:block"
+              style={{ "--study-delay": "0.12s" } as React.CSSProperties}
             >
-              <span className="sw-clusternote-a absolute left-[52px] top-0 text-[17px]" style={{ color: "hsl(var(--sv-accent))", opacity: 0 }}>
-                &#9834;
-              </span>
-              <span className="sw-clusternote-b absolute left-[96px] top-4 text-[14px]" style={{ color: "hsl(var(--sv-faint))", opacity: 0 }}>
-                &#9835;
-              </span>
-              <WelcomeBird
-                width={46}
-                height={42}
-                fill="hsl(var(--sv-ink))"
-                eyeFill="hsl(var(--sv-ground))"
-                className="sw-bird absolute bottom-0 left-[62px]"
+              <InterviewerRow on="card" className="mb-[16px]" />
+              <WelcomeCardRow
+                heading="A one-on-one interview"
+                body="I'll ask about how you work and follow up on what you say."
+                divided
               />
-              {survey.gift_card_amount ? (
-                <div
-                  className="sw-sticker absolute right-[-52px] top-[-16px] h-[98px] w-[98px]"
-                  style={{ transform: "rotate(8deg)" }}
-                >
-                  <svg
-                    viewBox="0 0 100 100"
-                    className="absolute inset-0"
-                    style={{ filter: "drop-shadow(var(--sv-drop-mascot))" }}
-                  >
-                    <polygon
-                      points="100,50 83.3,63.8 85.4,85.4 63.8,83.3 50,100 36.2,83.3 14.6,85.4 16.7,63.8 0,50 16.7,36.2 14.6,14.6 36.2,16.7 50,0 63.8,16.7 85.4,14.6 83.3,36.2"
-                      fill="hsl(var(--sv-butter))"
-                      stroke="hsl(var(--sv-ink))"
-                      strokeWidth="2.5"
-                    />
-                  </svg>
-                  <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-survey-ink">
-                    <span className="text-[19px] font-bold italic">${survey.gift_card_amount}</span>
-                    {survey.gift_card_brand ? (
-                      <span className="max-w-[72px] truncate text-[10px] font-semibold tracking-[0.02em]">
-                        {survey.gift_card_brand}
-                      </span>
-                    ) : null}
-                    <span className="text-[10.5px] font-semibold tracking-[0.02em]">gift card</span>
+              <WelcomeCardRow
+                heading={metaLine}
+                body={`${lengthPreset.topics} ${lengthPreset.topics === 1 ? "question" : "questions"}. Pick a quick answer or type your own.`}
+                divided={showReward}
+              />
+              {showReward && (
+                <div className="flex items-center justify-between gap-[16px]">
+                  <WelcomeCardRow heading="A thank-you" body="Sent to your inbox when you finish." />
+                  <span className="inline-flex flex-shrink-0 items-center rounded-full border border-study-hair bg-study-chip px-[18px] py-[10px] text-[16px] font-semibold">
+                    {rewardPhrase}
                   </span>
                 </div>
-              ) : null}
-            </div>
-
-            {/* Incentive is visual-only above (the cluster is aria-hidden), so
-                announce it once to assistive tech without changing the layout. */}
-            {survey.gift_card_amount ? (
-              <span className="sr-only">Includes a {giftCardPhrase(survey.gift_card_amount, survey.gift_card_brand)}.</span>
-            ) : null}
-
-            {metaLine && <div className="sw-rev mb-2 text-[15px] font-medium text-survey-muted">{metaLine}</div>}
-
-            <h1
-              className="sw-rev m-0 mb-2.5 text-balance font-bricolage font-bold leading-[1.05] tracking-[-0.025em]"
-              style={
-                {
-                  "--sw-delay": "0.08s",
-                  fontSize: titleFontSize,
-                } as React.CSSProperties
-              }
-            >
-              {surveyName}
-            </h1>
-
-            {survey.sponsor && (
-              <div
-                className="sw-rev mb-4 text-[15px] text-survey-muted"
-                style={{ "--sw-delay": "0.14s" } as React.CSSProperties}
-              >
-                Research conducted on behalf of{" "}
-                <span className="font-semibold text-survey-ink">{survey.sponsor}</span>
-              </div>
-            )}
-
-            <div
-              className="sw-rev mb-5 flex flex-col items-center gap-2"
-              style={{ "--sw-delay": "0.22s" } as React.CSSProperties}
-            >
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-survey-ink">
-                  <WelcomeBird width={15} height={13} fill="hsl(var(--sv-ground))" />
-                </span>
-                <span className="text-[12.5px] font-semibold tracking-[0.04em] text-survey-faint">
-                  YOUR INTERVIEWER
-                </span>
-              </div>
-              <div
-                className="text-pretty max-w-[560px] rounded-[18px] border border-survey-border bg-survey-surface px-[26px] py-3 text-[16.5px] leading-[1.55]"
-                style={{ boxShadow: "var(--sv-shadow-soft)" }}
-              >
-                {/* RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
-                    No "sales", "pitch", "leads", "not a sales call", etc. Also
-                    never claim their info is "only" used for X, or make any
-                    exclusive-use / "never shared" claim — state true things
-                    we WILL do, don't enumerate or limit what else happens. */}
-                This is a short, relaxed conversation about how you work. Answer in your own words; there are
-                no wrong answers.
-              </div>
-            </div>
-
-            <div
-              className="sw-rev flex flex-col items-center"
-              style={{ "--sw-delay": "0.3s" } as React.CSSProperties}
-            >
-              <button
-                type="button"
-                onClick={() => setStage("intro")}
-                className="inline-flex touch-manipulation items-center gap-3 rounded-full bg-survey-ink px-[30px] py-4 text-[16.5px] font-semibold text-survey-ground [transition:transform_0.25s_ease,box-shadow_0.25s_ease] active:translate-y-0 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[var(--sv-shadow-press)]"
-              >
-                Let&apos;s get started
-                <svg width="20" height="12" viewBox="0 0 22 12" fill="none" aria-hidden="true">
-                  <path
-                    d="M1 6h18m0 0l-4-4.5M19 6l-4 4.5"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-              <div className="mt-3 text-[13.5px] text-survey-faint">
-                By continuing, you agree to our{" "}
-                <a
-                  href="/terms"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-survey-muted underline [text-underline-offset:3px]"
-                >
-                  Terms
-                </a>{" "}
-                and{" "}
-                <a
-                  href="/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-survey-muted underline [text-underline-offset:3px]"
-                >
-                  Privacy Policy
-                </a>
-                .
-              </div>
-            </div>
+              )}
+            </SkyCard>
           </div>
         </main>
 
-        <footer
-          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-4 pt-3"
-          style={{ "--sw-delay": "0.4s" } as React.CSSProperties}
-        >
-          <PoweredBy />
-        </footer>
-      </div>
+        <StudyFooter />
+      </>
     );
   }
 
+  // Intake form. Not one of the handoff's three screens, but it sits between
+  // two of them in the same route, so it is built from the same parts: the
+  // sky, the header pill, one frosted card holding the fields. The fields,
+  // their order, their validation and what is sent are untouched.
   if (stage === "intro") {
     // Test mode reaches this stage only while the auto-started interview is
-    // in flight, so there is no form to draw — just the ground, the badge and
+    // in flight, so there is no form to draw — just the sky, the header and
     // the same flyby a real run shows between Start and the first question.
-    // Wrapper, palette and error treatment are the real intro's, verbatim.
     if (isTest) {
       return (
-        <div
-          className={cn(
-            bricolage.variable,
-            newsreader.variable,
-            "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[16px] text-survey-ink"
-          )}
-          style={{ background: SURVEY_GROUND }}
-        >
+        <>
           {showIntroFlyby && <LoadingScreen statusText="Preparing your conversation" />}
-          <AmbientBackdrop />
-          <TestModeBadge isTest={isTest} />
-        <StudyThemeToggle offsetForBadge={isTest} />
-          {/* Nothing here can be retried by hand (there are no fields to fix),
-              but a start that fails must still say so rather than leaving the
-              owner on an empty ground wondering. */}
-          {error && (
-            <div className="relative mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-10 sm:px-6 sm:py-16">
-              <p className="text-sm text-survey-danger">{error}</p>
-            </div>
-          )}
-        </div>
+          <SkyBackdrop />
+          <SkyFlock />
+          <SkyHeader isTest={isTest} />
+          <main className="study-stage relative z-10 justify-center">
+            {/* Nothing here can be retried by hand (there are no fields to
+                fix), but a start that fails must still say so rather than
+                leaving the owner on an empty sky wondering. */}
+            {error && <StudyError>{error}</StudyError>}
+          </main>
+          <StudyFooter />
+        </>
       );
     }
 
@@ -1569,468 +1262,372 @@ export function InterviewFlow({
     const enterHintFor = (idx: number): "next" | "go" => (idx < totalFieldCount - 1 ? "next" : "go");
 
     return (
-      <div
-        className={cn(
-          bricolage.variable,
-          // PerchedBird's note glyphs are set in font-newsreader; the rest of
-          // this stage is the welcome screen's font-sans / font-bricolage pair.
-          newsreader.variable,
-          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[16px] text-survey-ink"
-        )}
-        style={{ background: SURVEY_GROUND }}
-      >
+      <>
         {showIntroFlyby && <LoadingScreen statusText="Preparing your conversation" />}
-        <AmbientBackdrop />
-        <TestModeBadge isTest={isTest} />
-        <StudyThemeToggle offsetForBadge={isTest} />
-        {/* Compressed hero (2026-09): the intake form is the point of this
-            screen, so the first field has to be on screen without scrolling
-            on a 1280x800 desktop. Sizes here are steps this surface already
-            uses elsewhere (28/34px are the question and completion heading
-            sizes); nothing new was added to the scale. */}
-        <div className="relative mx-auto flex w-full max-w-[600px] flex-1 flex-col justify-center px-5 py-8 sm:px-6 sm:py-10">
-          {survey.sponsor && logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={logoUrl}
-              alt={survey.sponsor}
-              className="survey-intro-rise-1 mb-4 h-8 w-auto object-contain"
-            />
-          )}
+        <SkyBackdrop />
+        <SkyFlock />
+        <SkyHeader isTest={isTest} />
 
-          {/* Incentive pill and timing meta now live on the welcome beat, so
-              they're deliberately gone from here — the intro is the intake
-              form, not a second pitch (don't show the pill twice). */}
-          {/* Welcome-screen heading treatment (Bricolage 700, -0.025em,
-              1.05 leading), held at the intro's smaller step size: the
-              display size belongs to the welcome beat, the type does not. */}
-          <h1 className="survey-intro-rise-2 mb-2.5 text-balance break-words font-bricolage text-[28px] font-bold leading-none tracking-[-0.025em] sm:text-[34px]">
-            {surveyName}
-          </h1>
+        <main className="study-stage relative z-10">
+          <div className="mx-auto w-full max-w-[720px]">
+            {survey.sponsor && logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoUrl}
+                alt={survey.sponsor}
+                className="study-fade mb-[16px] h-8 w-auto object-contain"
+              />
+            )}
 
-          {/* Respondent-facing description ONLY. Never the internal `topic`
-              field (which names the interview's intent and is not even
-              present on PublicSurvey). When public_description is unset,
-              nothing renders here; there is no fallback. */}
-          {survey.public_description?.trim() && (
-            <p className="survey-intro-rise-3 text-pretty mb-5 text-[15px] leading-[1.5] text-survey-muted sm:mb-6 sm:text-[16px]">
-              {survey.public_description}
-            </p>
-          )}
-
-          <form onSubmit={handleIntroSubmit}>
-            <div className="survey-intro-rise-4 flex flex-col gap-2.5">
-              {/* Hidden, not disabled-and-shown: a prospect has already told
-                  us their name and address, and rendering them greyed out
-                  invites "is that right?" on a screen with no way to change
-                  it. The values are still in state and still sent — see the
-                  prefill in the useState initializers.
-
-                  The perched bird is decoration anchored to the name field
-                  and goes with it; a prospect reaching this form is seeing a
-                  short remainder-of-the-intake, not the full first impression
-                  the bird was drawn for. */}
-              {asksIdentity && (
-                <>
-                <div className="relative flex flex-col gap-1">
-                  {/* The notes are absolutely placed up to ~64px right of the
-                      bird's own left edge, so at 360–430px the default
-                      right-[14px] perch pushes them against (and past) the
-                      form's right edge. Sliding the whole bird inboard on
-                      phones keeps the arrangement intact rather than clipping
-                      it; sm: restores the desktop perch exactly. */}
-                  <PerchedBird
-                    className="pointer-events-none absolute -top-[14px] right-[58px] z-[2] sm:right-[14px]"
-                    width={48}
-                    height={46}
-                    notes={INTRO_BIRD_NOTES}
-                  />
-                  <label htmlFor="respondent-name" className={FIELD_LABEL_CLASSES}>
-                    Your name
-                  </label>
-                  <input
-                    id="respondent-name"
-                    ref={setFieldRef(nameIdx)}
-                    type="text"
-                    autoComplete="name"
-                    enterKeyHint={enterHintFor(nameIdx)}
-                    autoFocus
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    onKeyDown={(e) => onFieldKeyDown(e, nameIdx)}
-                    placeholder="First and last"
-                    disabled={loading}
-                    className={cn(FIELD_INPUT_BASE, "pl-4 pr-11")}
-                  />
-                  {nameOk && <CheckIcon className="absolute bottom-4 right-[15px]" />}
-                </div>
-
-                <div className="relative flex flex-col gap-1">
-                  <label htmlFor="respondent-email" className={FIELD_LABEL_CLASSES}>
-                    Work email
-                  </label>
-                  <p className="text-[13px] text-survey-faint">
-                    This is where we&apos;ll send your{" "}
-                    {giftCardPhrase(survey.gift_card_amount, survey.gift_card_brand)} and a copy of the
-                    report.
-                  </p>
-                  <input
-                    id="respondent-email"
-                    ref={setFieldRef(emailIdx)}
-                    type="email"
-                    autoComplete="email"
-                    enterKeyHint={enterHintFor(emailIdx)}
-                    inputMode="email"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onBlur={() => setEmailTouched(true)}
-                    onKeyDown={(e) => onFieldKeyDown(e, emailIdx)}
-                    placeholder="you@yourcompany.com"
-                    disabled={loading}
-                    aria-invalid={emailShowsX}
-                    className={cn(
-                      FIELD_INPUT_BASE,
-                      "pl-4 pr-11",
-                      emailShowsX && "border-survey-danger focus:border-survey-danger"
-                    )}
-                  />
-                  {emailOk && <CheckIcon className="absolute bottom-4 right-[15px]" />}
-                  {emailShowsX && <XIcon className="absolute bottom-4 right-[15px]" />}
-                </div>
-                </>
-              )}
-
-              {hasPhone && (
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="respondent-phone" className={FIELD_LABEL_CLASSES}>
-                    {parsePresetFieldLabel(survey.custom_fields, "phone")}
-                  </label>
-                  <input
-                    id="respondent-phone"
-                    ref={setFieldRef(phoneIdx)}
-                    type="tel"
-                    autoComplete="tel"
-                    inputMode="tel"
-                    enterKeyHint={enterHintFor(phoneIdx)}
-                    required={parsePresetFieldRequired(survey.custom_fields, "phone")}
-                    value={phone}
-                    onChange={(e) => setPhone(formatUsPhone(e.target.value))}
-                    onKeyDown={(e) => onFieldKeyDown(e, phoneIdx)}
-                    disabled={loading}
-                    className={cn(FIELD_INPUT_BASE, "px-4")}
-                  />
-                </div>
-              )}
-
-              {(hasJobTitle || hasCompany) && (
-                <div
-                  className={
-                    hasJobTitle && hasCompany
-                      ? "grid grid-cols-1 gap-2.5 sm:grid-cols-2"
-                      : "flex flex-col gap-2.5"
-                  }
-                >
-                  {hasJobTitle && (
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <label htmlFor="respondent-job-title" className={FIELD_LABEL_CLASSES}>
-                        {parsePresetFieldLabel(survey.custom_fields, "job_title")}
-                      </label>
-                      <input
-                        id="respondent-job-title"
-                        ref={setFieldRef(jobTitleIdx)}
-                        type="text"
-                        autoComplete="organization-title"
-                        enterKeyHint={enterHintFor(jobTitleIdx)}
-                        required={parsePresetFieldRequired(survey.custom_fields, "job_title")}
-                        value={jobTitle}
-                        onChange={(e) => setJobTitle(e.target.value)}
-                        onKeyDown={(e) => onFieldKeyDown(e, jobTitleIdx)}
-                        disabled={loading}
-                        className={cn(FIELD_INPUT_BASE, "px-4")}
-                      />
-                    </div>
-                  )}
-                  {hasCompany && (
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <label htmlFor="respondent-company" className={FIELD_LABEL_CLASSES}>
-                        {parsePresetFieldLabel(survey.custom_fields, "company")}
-                      </label>
-                      <input
-                        id="respondent-company"
-                        ref={setFieldRef(companyIdx)}
-                        type="text"
-                        autoComplete="organization"
-                        enterKeyHint={enterHintFor(companyIdx)}
-                        required={parsePresetFieldRequired(survey.custom_fields, "company")}
-                        value={company}
-                        onChange={(e) => setCompany(e.target.value)}
-                        onKeyDown={(e) => onFieldKeyDown(e, companyIdx)}
-                        disabled={loading}
-                        className={cn(FIELD_INPUT_BASE, "px-4")}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {hasLinkedin && (
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="respondent-linkedin" className={FIELD_LABEL_CLASSES}>
-                    {parsePresetFieldLabel(survey.custom_fields, "linkedin")}
-                  </label>
-                  <input
-                    id="respondent-linkedin"
-                    ref={setFieldRef(linkedinIdx)}
-                    type="url"
-                    autoComplete="url"
-                    inputMode="url"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    enterKeyHint={enterHintFor(linkedinIdx)}
-                    required={parsePresetFieldRequired(survey.custom_fields, "linkedin")}
-                    value={linkedin}
-                    onChange={(e) => setLinkedin(e.target.value)}
-                    onKeyDown={(e) => onFieldKeyDown(e, linkedinIdx)}
-                    disabled={loading}
-                    className={cn(FIELD_INPUT_BASE, "px-4")}
-                  />
-                </div>
-              )}
-
-              {customFieldDefs.map((field, i) => (
-                <div key={field.key} className="flex flex-col gap-1">
-                  <label htmlFor={`respondent-custom-${field.key}`} className={FIELD_LABEL_CLASSES}>
-                    {field.required ? `${field.label} *` : field.label}
-                  </label>
-                  <input
-                    id={`respondent-custom-${field.key}`}
-                    ref={setFieldRef(customFieldIdxs[i])}
-                    type="text"
-                    enterKeyHint={enterHintFor(customFieldIdxs[i])}
-                    required={field.required === true}
-                    value={customFieldValues[field.key] ?? ""}
-                    onChange={(e) =>
-                      setCustomFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))
-                    }
-                    onKeyDown={(e) => onFieldKeyDown(e, customFieldIdxs[i])}
-                    disabled={loading}
-                    className={cn(FIELD_INPUT_BASE, "px-4")}
-                  />
-                </div>
-              ))}
-
-              {error && <p className="text-sm text-survey-danger">{error}</p>}
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className={cn(PILL_BUTTON, "survey-intro-rise-5 mt-5 flex w-fit")}
+            <h1
+              className="study-fade m-0 mb-[clamp(10px,2vh,20px)] text-balance break-words font-study-serif text-[clamp(28px,min(5.4vh,8vw),56px)] font-normal leading-[1.02] tracking-[-0.02em]"
+              style={{ "--study-delay": "0.04s" } as React.CSSProperties}
             >
-              {loading ? "Starting…" : "Start"}
-              <PillArrow />
-            </button>
-          </form>
+              {surveyName}
+            </h1>
 
-          {/* Desktop-only: the one hint left here describes a physical Enter
-              key, so the whole line is hidden on phones rather than leaving
-              an empty box under the button. The email field's own helper
-              text already says where the gift card goes; nothing about the
-              incentive is repeated here. */}
-          <div className="survey-intro-rise-6 mt-2.5 hidden text-balance text-[13.5px] text-survey-faint sm:block">
-            <span>Press Enter to move between fields</span>
+            {/* Respondent-facing description ONLY. Never the internal `topic`
+                field. When public_description is unset nothing renders here;
+                there is no fallback. */}
+            {survey.public_description?.trim() && (
+              <p
+                className="study-fade text-pretty m-0 mb-[clamp(14px,2.4vh,24px)] max-w-[620px] text-[17px] leading-[1.5]"
+                style={{ "--study-delay": "0.08s" } as React.CSSProperties}
+              >
+                {survey.public_description}
+              </p>
+            )}
+
+            <SkyCard
+              className="study-fade p-[28px]"
+              style={{ "--study-delay": "0.12s" } as React.CSSProperties}
+            >
+              <form onSubmit={handleIntroSubmit}>
+                <div className="flex flex-col gap-[14px]">
+                  {/* Hidden, not disabled-and-shown: a prospect has already
+                      told us their name and address, and rendering them greyed
+                      out invites "is that right?" on a screen with no way to
+                      change it. The values are still in state and still sent —
+                      see the prefill in the useState initializers. */}
+                  {asksIdentity && (
+                    <>
+                      <div className="relative flex flex-col gap-[6px]">
+                        <label htmlFor="respondent-name" className={FIELD_LABEL_CLASSES}>
+                          Your name
+                        </label>
+                        <input
+                          id="respondent-name"
+                          ref={setFieldRef(nameIdx)}
+                          type="text"
+                          autoComplete="name"
+                          enterKeyHint={enterHintFor(nameIdx)}
+                          autoFocus
+                          required
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          onKeyDown={(e) => onFieldKeyDown(e, nameIdx)}
+                          placeholder="First and last"
+                          disabled={loading}
+                          className={cn(FIELD_INPUT_BASE, "pl-[18px] pr-[44px]")}
+                        />
+                        {nameOk && <CheckIcon className="absolute bottom-[15px] right-[16px]" />}
+                      </div>
+
+                      <div className="relative flex flex-col gap-[6px]">
+                        <label htmlFor="respondent-email" className={FIELD_LABEL_CLASSES}>
+                          Work email
+                        </label>
+                        <p className="text-[13px] leading-[1.45] text-study-muted">
+                          This is where we&apos;ll send your {rewardPhrase} and a copy of the report.
+                        </p>
+                        <input
+                          id="respondent-email"
+                          ref={setFieldRef(emailIdx)}
+                          type="email"
+                          autoComplete="email"
+                          enterKeyHint={enterHintFor(emailIdx)}
+                          inputMode="email"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          onBlur={() => setEmailTouched(true)}
+                          onKeyDown={(e) => onFieldKeyDown(e, emailIdx)}
+                          placeholder="you@yourcompany.com"
+                          disabled={loading}
+                          aria-invalid={emailShowsX}
+                          className={cn(
+                            FIELD_INPUT_BASE,
+                            "pl-[18px] pr-[44px]",
+                            emailShowsX && "border-study-danger focus:border-study-danger"
+                          )}
+                        />
+                        {emailOk && <CheckIcon className="absolute bottom-[15px] right-[16px]" />}
+                        {emailShowsX && <XIcon className="absolute bottom-[15px] right-[16px]" />}
+                      </div>
+                    </>
+                  )}
+
+                  {hasPhone && (
+                    <div className="flex flex-col gap-[6px]">
+                      <label htmlFor="respondent-phone" className={FIELD_LABEL_CLASSES}>
+                        {parsePresetFieldLabel(survey.custom_fields, "phone")}
+                      </label>
+                      <input
+                        id="respondent-phone"
+                        ref={setFieldRef(phoneIdx)}
+                        type="tel"
+                        autoComplete="tel"
+                        inputMode="tel"
+                        enterKeyHint={enterHintFor(phoneIdx)}
+                        required={parsePresetFieldRequired(survey.custom_fields, "phone")}
+                        value={phone}
+                        onChange={(e) => setPhone(formatUsPhone(e.target.value))}
+                        onKeyDown={(e) => onFieldKeyDown(e, phoneIdx)}
+                        disabled={loading}
+                        className={cn(FIELD_INPUT_BASE, "px-[18px]")}
+                      />
+                    </div>
+                  )}
+
+                  {(hasJobTitle || hasCompany) && (
+                    <div
+                      className={
+                        hasJobTitle && hasCompany
+                          ? "grid grid-cols-1 gap-[14px] sm:grid-cols-2"
+                          : "flex flex-col gap-[14px]"
+                      }
+                    >
+                      {hasJobTitle && (
+                        <div className="flex min-w-0 flex-col gap-[6px]">
+                          <label htmlFor="respondent-job-title" className={FIELD_LABEL_CLASSES}>
+                            {parsePresetFieldLabel(survey.custom_fields, "job_title")}
+                          </label>
+                          <input
+                            id="respondent-job-title"
+                            ref={setFieldRef(jobTitleIdx)}
+                            type="text"
+                            autoComplete="organization-title"
+                            enterKeyHint={enterHintFor(jobTitleIdx)}
+                            required={parsePresetFieldRequired(survey.custom_fields, "job_title")}
+                            value={jobTitle}
+                            onChange={(e) => setJobTitle(e.target.value)}
+                            onKeyDown={(e) => onFieldKeyDown(e, jobTitleIdx)}
+                            disabled={loading}
+                            className={cn(FIELD_INPUT_BASE, "px-[18px]")}
+                          />
+                        </div>
+                      )}
+                      {hasCompany && (
+                        <div className="flex min-w-0 flex-col gap-[6px]">
+                          <label htmlFor="respondent-company" className={FIELD_LABEL_CLASSES}>
+                            {parsePresetFieldLabel(survey.custom_fields, "company")}
+                          </label>
+                          <input
+                            id="respondent-company"
+                            ref={setFieldRef(companyIdx)}
+                            type="text"
+                            autoComplete="organization"
+                            enterKeyHint={enterHintFor(companyIdx)}
+                            required={parsePresetFieldRequired(survey.custom_fields, "company")}
+                            value={company}
+                            onChange={(e) => setCompany(e.target.value)}
+                            onKeyDown={(e) => onFieldKeyDown(e, companyIdx)}
+                            disabled={loading}
+                            className={cn(FIELD_INPUT_BASE, "px-[18px]")}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {hasLinkedin && (
+                    <div className="flex flex-col gap-[6px]">
+                      <label htmlFor="respondent-linkedin" className={FIELD_LABEL_CLASSES}>
+                        {parsePresetFieldLabel(survey.custom_fields, "linkedin")}
+                      </label>
+                      <input
+                        id="respondent-linkedin"
+                        ref={setFieldRef(linkedinIdx)}
+                        type="url"
+                        autoComplete="url"
+                        inputMode="url"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        enterKeyHint={enterHintFor(linkedinIdx)}
+                        required={parsePresetFieldRequired(survey.custom_fields, "linkedin")}
+                        value={linkedin}
+                        onChange={(e) => setLinkedin(e.target.value)}
+                        onKeyDown={(e) => onFieldKeyDown(e, linkedinIdx)}
+                        disabled={loading}
+                        className={cn(FIELD_INPUT_BASE, "px-[18px]")}
+                      />
+                    </div>
+                  )}
+
+                  {customFieldDefs.map((field, i) => (
+                    <div key={field.key} className="flex flex-col gap-[6px]">
+                      <label
+                        htmlFor={`respondent-custom-${field.key}`}
+                        className={FIELD_LABEL_CLASSES}
+                      >
+                        {field.required ? `${field.label} *` : field.label}
+                      </label>
+                      <input
+                        id={`respondent-custom-${field.key}`}
+                        ref={setFieldRef(customFieldIdxs[i])}
+                        type="text"
+                        enterKeyHint={enterHintFor(customFieldIdxs[i])}
+                        required={field.required === true}
+                        value={customFieldValues[field.key] ?? ""}
+                        onChange={(e) =>
+                          setCustomFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                        }
+                        onKeyDown={(e) => onFieldKeyDown(e, customFieldIdxs[i])}
+                        disabled={loading}
+                        className={cn(FIELD_INPUT_BASE, "px-[18px]")}
+                      />
+                    </div>
+                  ))}
+
+                  {error && <StudyError>{error}</StudyError>}
+                </div>
+
+                <div className="mt-[20px] flex flex-wrap items-center gap-x-[18px] gap-y-[12px]">
+                  <button type="submit" disabled={loading} className={PRIMARY_BUTTON}>
+                    {loading ? "Starting…" : "Start"} <StudyArrow />
+                  </button>
+                  {/* Desktop-only: this hint describes a physical Enter key,
+                      so the whole line is hidden on phones rather than leaving
+                      an empty box under the button. */}
+                  <span className="hidden text-[14px] text-study-muted sm:inline">
+                    Press Enter to move between fields
+                  </span>
+                </div>
+              </form>
+            </SkyCard>
           </div>
-        </div>
-        <Footer />
-      </div>
+        </main>
+
+        <StudyFooter />
+      </>
     );
   }
 
-  // Completion / thank-you screen (design_handoff_survey_thanks) — matches the
-  // welcome screen's editorial system. One layout, one boolean: the
-  // showResponses toggle only mounts/unmounts the transcript below the pill;
-  // nothing above it restyles or re-lays-out between states (the fix for the
-  // old two-different-UIs bug).
+  // Thank-you screen. One layout, one boolean: the showResponses toggle only
+  // mounts/unmounts the transcript below the header row; nothing above it
+  // restyles or re-lays-out between states.
   if (stage === "complete") {
-    const hasIncentive = survey.gift_card_amount != null;
+    const answerCount = messages.filter((m) => m.role === "user").length;
+
     return (
-      <div
-        className={cn(
-          bricolage.variable,
-          "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-survey-ink"
-        )}
-        style={{ background: "hsl(var(--sv-ground))" }}
-      >
-        <TestModeBadge isTest={isTest} />
-        <StudyThemeToggle offsetForBadge={isTest} />
+      <>
+        <SkyBackdrop />
+        <SkyFlock />
+        <SkyHeader isTest={isTest} />
 
-        <AmbientBackdrop />
-
-        <main className="relative flex flex-1 items-center justify-center px-5 pb-10 pt-14 sm:px-8 sm:pb-12 sm:pt-20">
-          <div className="flex w-full max-w-[640px] flex-col items-center text-center">
-            {/* Check + sticker cluster (decorative). */}
-            <div aria-hidden="true" className="sw-rev relative mb-[22px] h-[86px] w-[180px]">
-              <span className="sw-clusternote-a absolute left-[38px] top-0 text-[17px]" style={{ color: "hsl(var(--sv-accent))", opacity: 0 }}>
-                &#9834;
-              </span>
-              <span className="sw-clusternote-b absolute left-[130px] top-[14px] text-[14px]" style={{ color: "hsl(var(--sv-faint))", opacity: 0 }}>
-                &#9835;
-              </span>
-              <span className="sw-bird absolute bottom-0 left-[53px] flex h-[74px] w-[74px] items-center justify-center rounded-full border border-survey-border bg-survey-accent-bg">
-                <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
-                  <path
-                    d="M7.5 15.5 L13 21 L23 9.5"
-                    stroke="hsl(var(--sv-accent))"
-                    strokeWidth="2.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeDasharray="26"
-                    className="sw-check"
-                  />
-                </svg>
-              </span>
-              {hasIncentive && (
-                <div
-                  className="sw-sticker absolute right-[-46px] top-[-12px] h-[92px] w-[92px]"
-                  style={{ transform: "rotate(8deg)" }}
-                >
-                  <svg
-                    viewBox="0 0 100 100"
-                    className="absolute inset-0"
-                    style={{ filter: "drop-shadow(var(--sv-drop-mascot))" }}
-                  >
-                    <polygon
-                      points="100,50 83.3,63.8 85.4,85.4 63.8,83.3 50,100 36.2,83.3 14.6,85.4 16.7,63.8 0,50 16.7,36.2 14.6,14.6 36.2,16.7 50,0 63.8,16.7 85.4,14.6 83.3,36.2"
-                      fill="hsl(var(--sv-butter))"
-                      stroke="hsl(var(--sv-ink))"
-                      strokeWidth="2.5"
-                    />
-                  </svg>
-                  <span className="absolute inset-0 flex flex-col items-center justify-center leading-[1.1] text-survey-ink">
-                    <span className="text-[18px] font-bold italic">${survey.gift_card_amount}</span>
-                    <span className="text-[10px] font-semibold tracking-[0.02em]">on its way</span>
-                  </span>
-                </div>
-              )}
+        <main className="study-stage relative z-10">
+          {/* max-h-full on a flex column, so the card below gets only the room
+              that is left over and the transcript inside it is the one thing
+              on this surface allowed to scroll. */}
+          <div
+            className="study-thanks mx-auto flex max-h-full min-h-0 w-full max-w-[860px] flex-col"
+            data-open={showResponses ? "on" : "off"}
+          >
+            <div className="study-eyebrow study-fade mb-[clamp(10px,2.4vh,24px)] text-[15px] font-medium uppercase tracking-[0.14em]">
+              Interview complete
             </div>
 
             <h1
-              className="sw-rev m-0 mb-[18px] text-balance font-bricolage text-[34px] font-bold leading-[1.06] tracking-[-0.025em] sm:text-[52px]"
-              style={{ "--sw-delay": "0.08s" } as React.CSSProperties}
+              className="study-fade m-0 mb-[clamp(12px,2.4vh,26px)] text-balance font-study-serif text-[clamp(34px,min(8.5vh,10.5vw),96px)] font-normal leading-[0.95] tracking-[-0.02em]"
+              style={{ "--study-delay": "0.06s" } as React.CSSProperties}
             >
               That&apos;s everything. Thank you.
             </h1>
 
             <p
-              className="sw-rev text-pretty m-0 mb-9 max-w-[520px] text-[16px] leading-[1.6] text-survey-muted sm:text-[17px]"
-              style={{ "--sw-delay": "0.16s" } as React.CSSProperties}
+              className="study-fade text-pretty m-0 mb-[clamp(16px,3vh,36px)] max-w-[640px] text-[clamp(17px,2.1vh,21px)] leading-[1.5]"
+              style={{ "--study-delay": "0.12s" } as React.CSSProperties}
             >
+              {/* The interviewer's own closing line, written for this
+                  respondent by the model; the reward clause is ours. */}
               {closingMessage}
-              {hasIncentive && (
+              {showReward && (
                 <>
                   {" "}
-                  The{" "}
-                  <span className="font-semibold text-survey-ink">
-                    {giftCardPhrase(survey.gift_card_amount, survey.gift_card_brand)}
-                  </span>{" "}
-                  will land in your inbox within a day or two.
+                  Your <span className="font-semibold">{rewardPhrase}</span> will land in your inbox
+                  within a day or two.
                 </>
               )}
             </p>
 
-            {/* The toggle and the transcript share one wrapper: only the
-                transcript mounts/unmounts, so the pill never moves relative to
-                the content above it. */}
-            <div
-              className="sw-rev flex w-full flex-col items-center"
-              style={{ "--sw-delay": "0.24s" } as React.CSSProperties}
-            >
-              {/* Hidden when there is no transcript to show, which happens
-                  when this tab resumed straight into an interview that was
-                  already finished: the resume payload carries the closing
-                  line, not the conversation. */}
-              {messages.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowResponses((prev) => !prev)}
-                  aria-expanded={showResponses}
-                  className="inline-flex touch-manipulation items-center gap-2.5 rounded-full border-[1.5px] border-survey-border bg-transparent px-6 py-3 text-[15px] font-semibold text-survey-muted transition-colors duration-[250ms] motion-reduce:transition-none [@media(hover:hover)]:hover:border-survey-accent [@media(hover:hover)]:hover:text-survey-accent"
-                >
-                  {showResponses ? "Hide your responses" : "See your responses"}
-                  <svg
-                    width="14"
-                    height="9"
-                    viewBox="0 0 14 9"
-                    fill="none"
-                    aria-hidden="true"
-                    className={cn(
-                      "transition-transform duration-300 motion-reduce:transition-none",
-                      showResponses && "rotate-180"
-                    )}
+            {/* Hidden when there is no transcript to show, which happens when
+                this tab resumed straight into an interview that was already
+                finished: the resume payload carries the closing line, not the
+                conversation. */}
+            {messages.length > 0 && (
+              <SkyCard
+                className="study-fade flex min-h-0 flex-col px-[28px] py-[clamp(16px,2.6vh,24px)]"
+                style={{ "--study-delay": "0.18s" } as React.CSSProperties}
+              >
+                <div className="flex flex-shrink-0 items-center gap-[16px]">
+                  <button
+                    type="button"
+                    onClick={() => setShowResponses((prev) => !prev)}
+                    aria-expanded={showResponses}
+                    className="flex flex-1 touch-manipulation items-baseline gap-[14px] text-left"
                   >
-                    <path
-                      d="M1.5 1.5 L7 7 L12.5 1.5"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-              )}
-
-              {showResponses && (
-                <div className="mt-[34px] flex w-full max-w-[600px] flex-col gap-3.5 text-left">
-                  <div
-                    className="sw-bubble mb-1 self-center text-[12.5px] font-semibold tracking-[0.08em] text-survey-faint"
-                    style={{ "--sw-bubble-delay": "0s" } as React.CSSProperties}
-                  >
-                    YOUR RESPONSES
-                  </div>
-                  {messages.map((m, i) => {
-                    const isInterviewer = m.role === "assistant";
-                    return (
-                      <div
-                        key={i}
-                        className={cn(
-                          "sw-bubble whitespace-pre-wrap break-words text-[15.5px] leading-[1.6]",
-                          isInterviewer
-                            ? "max-w-[86%] self-start rounded-[16px_16px_16px_5px] border border-survey-border bg-survey-surface px-5 py-3.5 text-survey-ink shadow-[var(--sv-shadow-bubble)]"
-                            : "max-w-[78%] self-end rounded-[16px_16px_5px_16px] bg-survey-accent px-[18px] py-3 text-survey-raised"
-                        )}
-                        style={{ "--sw-bubble-delay": `${0.05 + i * 0.07}s` } as React.CSSProperties}
-                      >
-                        {isInterviewer ? renderEmphasis(stripInterviewMarkers(m.content)) : m.content}
-                      </div>
-                    );
-                  })}
+                    <span className="font-study-serif text-[clamp(24px,3.4vh,32px)] leading-[1.1]">
+                      {showResponses ? "Hide your responses" : "See your responses"}
+                    </span>
+                    <span className="text-[15px] text-study-muted">
+                      {answerCount} {answerCount === 1 ? "answer" : "answers"}
+                    </span>
+                  </button>
                 </div>
-              )}
-            </div>
+
+                {showResponses && (
+                  <div className="mt-[18px] flex min-h-0 flex-1 flex-col gap-[12px] overflow-auto border-t border-study-hair pt-[18px]">
+                    {messages.map((m, i) => {
+                      const isInterviewer = m.role === "assistant";
+                      return (
+                        <div
+                          key={i}
+                          className={cn(
+                            "study-fade whitespace-pre-wrap break-words px-[18px] py-[12px] text-[16px] leading-[1.55]",
+                            isInterviewer
+                              ? "max-w-[84%] self-start rounded-[16px_16px_16px_5px] border border-study-hair bg-study-chip"
+                              : "max-w-[76%] self-end rounded-[16px_16px_5px_16px] bg-study-ink text-study-chip"
+                          )}
+                          style={{ "--study-delay": `${0.03 + i * 0.05}s` } as React.CSSProperties}
+                        >
+                          {/* stripInterviewMarkers is the render boundary: the
+                              server already strips the ||ANSWER|| marker and
+                              ||CHIPS|| block, but nothing that reaches a
+                              respondent's screen relies on that. */}
+                          {isInterviewer ? renderEmphasis(stripInterviewMarkers(m.content)) : m.content}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </SkyCard>
+            )}
           </div>
         </main>
 
-        <footer
-          className="sw-rev survey-footer relative flex items-center justify-center gap-2.5 px-8 pb-[34px] pt-[26px]"
-          style={{ "--sw-delay": "0.34s" } as React.CSSProperties}
-        >
-          <PoweredBy />
-        </footer>
-      </div>
+        <StudyFooter />
+      </>
     );
   }
 
-  // Question screen (design_handoff_survey_question). One column, no logo:
-  // progress pills, the interviewer speaking from a bubble, quick-answer
-  // chips, a two-row answer box, then Send / Skip. Every
-  // value (colours, radii, shadows, easings) is the handoff's, routed through
-  // the --sv-* tokens so the dark theme still holds.
+  // Question screen. One column: the interviewer's line, the question as the
+  // headline with its key phrase marked, then the frosted answer card holding
+  // the chips, the box and the two actions.
+  //
   // stripInterviewMarkers is the render boundary: the server already strips
   // the ||ANSWER|| marker and ||CHIPS|| block before this text is stored or
   // sent, but nothing that reaches a respondent's screen relies on that
@@ -2038,8 +1635,8 @@ export function InterviewFlow({
   const lastAssistantMessage = stripInterviewMarkers(
     [...messages].reverse().find((m) => m.role === "assistant")?.content ?? ""
   );
-  // How full the bar is. Questions actually asked against the study's
-  // promised length; held short of the end until the interview is over.
+  // How full the bar is. Questions actually asked against the study's promised
+  // length; held short of the end until the interview is over.
   const questionsAsked = messages.filter((m) => m.role === "assistant").length;
   const progressPercent = interviewProgressPercent(questionsAsked, lengthPreset.topics, interviewFinished);
   const hasAnswer = pickedChipIndex !== null || answer.trim().length > 0;
@@ -2049,66 +1646,39 @@ export function InterviewFlow({
   // answer, messages.length moves past the restored count and every
   // subsequent question reveals normally.
   const isRestoredRender = restoredMessageCount !== null && messages.length === restoredMessageCount;
-  // Staggered entrance: opacity 0 -> 1, translateY(14px -> 0), .6s on the
-  // reveal easing, delayed per block (0 / .06 / .18 / .24 / .3 / .4s).
-  // globals.css gates the animation on prefers-reduced-motion.
+  // Staggered entrance, delayed per block (0 / .04 / .08 / .14s), on the
+  // handoff's own easing. globals.css gates the animation on
+  // prefers-reduced-motion; every element's resting state is its final frame.
   const reveal = (delaySeconds: number): { className?: string; style?: React.CSSProperties } =>
     isRestoredRender
       ? {}
-      : { className: "sq-rev", style: { "--sq-delay": `${delaySeconds}s` } as React.CSSProperties };
+      : { className: "study-fade", style: { "--study-delay": `${delaySeconds}s` } as React.CSSProperties };
 
-  // The bolded phrase is a hint for the marker highlight, not part of the
-  // question: extractEmphasis drops it when the model left it standing on
-  // its own, splitQuestion then finds the question sentence as before, and
-  // emphasisSegments bolds the phrase in place only if it is really there.
+  // The bolded phrase is a hint for the key-phrase mark, not part of the
+  // question: extractEmphasis drops it when the model left it standing on its
+  // own, splitQuestion then finds the question sentence as before, and
+  // emphasisSegments marks the phrase in place only if it is really there.
   const emphasis = extractEmphasis(lastAssistantMessage);
   const { lead, question } = splitQuestion(emphasis.message);
   const segments = emphasisSegments(stripBold(question), emphasis.phrase);
 
   return (
-    <div
-      className={cn(
-        bricolage.variable,
-        "survey-viewport relative flex flex-col overflow-x-hidden font-sans text-[16px] text-survey-ink"
-      )}
-      data-keyboard={keyboardInset > 0 ? "open" : undefined}
-      style={
-        {
-          background: SURVEY_GROUND,
-          "--kb-inset": `${keyboardInset}px`,
-        } as React.CSSProperties
-      }
-    >
-      <AmbientBackdrop />
-      <TestModeBadge isTest={isTest} />
-      <StudyThemeToggle offsetForBadge={isTest} />
+    <>
+      <SkyBackdrop />
+      <SkyFlock />
+      <SkyHeader isTest={isTest} progressPercent={progressPercent} />
 
-      {/* On phones the fixed theme toggle (and, for an owner preview, the
-          test-mode pill above it) sits in the top-right corner where the
-          progress label would be, so the stage starts below them. From sm up
-          the column is centred with room on both sides and the handoff's
-          24px top padding applies. */}
-      <div
-        ref={stageRef}
-        className={cn(
-          "survey-stage relative flex flex-1 justify-center px-5 pb-3 sm:px-8 sm:pt-6 short:pb-2 short:sm:pt-4",
-          isTest ? "pt-[104px]" : "pt-[64px]"
-        )}
-      >
-        {/* my-auto rather than items-center on the stage: auto margins
-            center the column when there's room and collapse to 0 when it
-            overflows, so a scrolling stage starts at the top of the
-            question instead of clipping it. */}
-        <div className="my-auto flex w-full max-w-[680px] flex-col">
-          {/* Hidden live regions, always mounted (a live region only fires
-              if it exists before its content changes). Two separate regions
-              on purpose: the question region's content is derived from
+      <main ref={stageRef} className="study-stage relative z-10">
+        <div className="mx-auto w-full max-w-[860px]">
+          {/* Hidden live regions, always mounted (a live region only fires if
+              it exists before its content changes). Two separate regions on
+              purpose: the question region's content is derived from
               `messages`, which updates exactly once per question, so each
               question is announced once, in full, regardless of the visual
-              entrance. The status region handles transient state (typing,
-              send failure); it flips to "" when the question lands, and an
-              empty update announces nothing. Politeness is deliberate: no
-              assertive interruptions anywhere. */}
+              entrance. The status region handles transient state (typing, send
+              failure); it flips to "" when the question lands, and an empty
+              update announces nothing. Politeness is deliberate: no assertive
+              interruptions anywhere. */}
           <div aria-live="polite" aria-atomic="true" className="sr-only">
             {stripBold(lastAssistantMessage)}
           </div>
@@ -2120,218 +1690,196 @@ export function InterviewFlow({
                 : ""}
           </div>
 
-          {/* Progress. Mounted once for the whole chat stage (not keyed on
-              the question) so the pills transition between states with the
-              spring rather than remounting. */}
-          <div
-            className={cn("mb-6 flex items-center short:mb-4 xshort:mb-3", reveal(0).className)}
-            style={reveal(0).style}
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={progressPercent}
-            aria-label="Interview progress"
-          >
-            <div
-              aria-hidden="true"
-              className="h-1.5 w-full overflow-hidden rounded-[3px] bg-survey-border"
-            >
-              {/* One fill, not one pip per topic: its width is the only thing
-                  that changes between questions, so the bar says how far
-                  along the interview is without saying how long it is. */}
-              <div
-                className="h-full rounded-[3px] bg-survey-accent transition-[width] duration-700 ease-out motion-reduce:transition-none"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-          </div>
-
           {/* Keyed on messages.length so the staggered entrance replays once
               per new question. The key changes only when a message is
-              appended, never mid-animation, so the reveal can't double-fire.
-              While the interviewer is "typing" the same block shows the
-              avatar and an empty bubble carrying the loader, so the layout
-              holds its shape between questions. */}
+              appended, never mid-animation, so the reveal can't double-fire. */}
           <div key={messages.length} className="flex flex-col">
-            <div className={cn("mb-4 flex items-start gap-3.5 short:mb-3 xshort:mb-2.5", reveal(0.06).className)} style={reveal(0.06).style}>
+            <InterviewerRow
+              on="sky"
+              className={cn(
+                "study-drop-short mb-[clamp(10px,2vh,22px)]",
+                reveal(0).className
+              )}
+            />
+
+            {isTyping ? (
+              // Holds roughly the height the question will take, so the
+              // handoff from indicator to question is not a jump.
               <div
                 aria-hidden="true"
-                className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-survey-ink"
-                style={{ boxShadow: "var(--sv-shadow-avatar)" }}
+                className={cn(
+                  "flex min-h-[180px] items-center motion-safe:transition-opacity motion-safe:duration-150",
+                  dotsLeaving && "opacity-0"
+                )}
               >
-                <WelcomeBird width={24} height={22} fill="hsl(var(--sv-ground))" className="sw-bird" />
-                <span
-                  className="sq-avatar-note absolute right-[-6px] top-[-10px] text-[15px]"
-                  style={{ color: "hsl(var(--sv-accent))", opacity: 0 }}
-                >
-                  &#9834;
-                </span>
+                {showBirdLoader && <ThinkingDots />}
               </div>
-              <div className="min-w-0 flex-1">
-                <div
-                  className="rounded-[4px_22px_22px_22px] border border-survey-border bg-survey-surface px-6 pb-5 pt-[18px] short:pb-4 short:pt-3.5 xshort:px-5 xshort:pb-3.5 xshort:pt-3"
-                  style={{ boxShadow: "var(--sv-shadow-speech)" }}
-                >
-                  {isTyping ? (
-                    <div
-                      aria-hidden="true"
-                      className={cn(
-                        "flex min-h-[40px] items-center motion-safe:transition-opacity motion-safe:duration-150",
-                        dotsLeaving && "opacity-0"
-                      )}
-                    >
-                      {showBirdLoader && <BirdLoader />}
-                    </div>
-                  ) : (
-                    <>
-                      {lead && (
-                        <div className="text-pretty mb-2.5 text-[16px] leading-[1.55] text-survey-muted short:mb-2 short:text-[15px] xshort:text-[14px] xshort:leading-[1.5]">
-                          {stripBold(lead)}
-                        </div>
-                      )}
-                      <h1 className="m-0 text-balance break-words font-bricolage text-[24px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[28px] short:sm:text-[24px] xshort:sm:text-[22px]">
-                        {segments.map((segment, i) =>
-                          segment.bold ? (
-                            <span key={i} className="sq-mark">
-                              {segment.text}
-                            </span>
-                          ) : (
-                            segment.text
-                          )
-                        )}
-                      </h1>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {!isTyping && (
+            ) : (
               <>
+                {lead && (
+                  <p
+                    className={cn(
+                      "study-drop-short text-pretty m-0 mb-[10px] max-w-[700px] text-[clamp(17px,2.1vh,21px)] leading-[1.5]",
+                      reveal(0.04).className
+                    )}
+                    style={reveal(0.04).style}
+                  >
+                    {stripBold(lead)}
+                  </p>
+                )}
+
+                <h1
+                  className={cn(
+                    "m-0 mb-[clamp(16px,3vh,36px)] text-balance break-words font-study-serif text-[clamp(28px,min(6.2vh,9vw),62px)] font-normal leading-[1] tracking-[-0.015em]",
+                    reveal(0.08).className
+                  )}
+                  style={reveal(0.08).style}
+                >
+                  {segments.map((segment, i) =>
+                    segment.bold ? (
+                      <strong key={i} className="study-mark">
+                        {segment.text}
+                      </strong>
+                    ) : (
+                      segment.text
+                    )
+                  )}
+                </h1>
+
                 {failedMessage && (
-                  <div className="mb-5 flex flex-col items-end gap-1.5">
-                    <div className={cn(RESPONDENT_BUBBLE, "opacity-60")}>{failedMessage}</div>
-                    <div className="flex items-center gap-2 text-xs text-survey-danger">
+                  <div className="mb-[16px] flex flex-col items-end gap-[8px]">
+                    <div className="max-w-[76%] self-end whitespace-pre-wrap break-words rounded-[16px_16px_5px_16px] bg-study-ink px-[18px] py-[12px] text-[16px] leading-[1.55] text-study-chip opacity-60">
+                      {failedMessage}
+                    </div>
+                    <StudyError className="flex items-center gap-[10px]">
                       <span>Failed to send</span>
                       <button
                         type="button"
                         onClick={retrySend}
                         disabled={loading}
                         aria-label="Retry sending your answer"
-                        className="inline-flex min-h-[44px] touch-manipulation items-center px-2 font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-survey-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:opacity-80"
+                        className="font-semibold underline [text-underline-offset:3px] disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:opacity-80"
                       >
                         {loading ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            {showRetryLoader && <BirdLoader size={18} label={false} />}
-                            Retrying…
+                          <span className="inline-flex items-center gap-[8px]">
+                            {showRetryLoader && <ThinkingDots label={false} />}
+                            Retrying&#8230;
                           </span>
                         ) : (
                           "Retry"
                         )}
                       </button>
-                    </div>
+                    </StudyError>
                   </div>
                 )}
 
-                <form onSubmit={handleSend} className="flex flex-col">
-                  {chips.length > 0 && (
-                    // Wrap, not horizontal scroll: a scroller hides options
-                    // off the right edge and its swipe competes with
-                    // scrolling the stage when the keyboard is up.
-                    <div className={cn("mb-3 short:mb-2.5", reveal(0.18).className)} style={reveal(0.18).style}>
-                      <div className="flex flex-wrap gap-2.5 short:gap-2">
-                        {chips.map((chip, i) => {
-                          const picked = pickedChipIndex === i;
-                          return (
+                <form onSubmit={handleSend}>
+                  <SkyCard
+                    className={cn("study-answer-card p-[20px] sm:p-[28px]", reveal(0.14).className)}
+                    style={reveal(0.14).style}
+                  >
+                    {chips.length > 0 && (
+                      <>
+                        <div className="study-drop-short mb-[12px] text-[13px] font-medium uppercase tracking-[0.12em] text-study-muted">
+                          Pick one, or say it your way
+                        </div>
+                        {/* Wrap, not horizontal scroll: a scroller hides
+                            options off the right edge and its swipe competes
+                            with scrolling the stage when the keyboard is up. */}
+                        <div className="mb-[14px] flex flex-wrap gap-[10px] sm:mb-[18px]">
+                          {chips.map((chip, i) => (
                             <button
                               key={i}
                               type="button"
                               onClick={() => handleChipTap(i)}
                               disabled={loading}
                               aria-label={`Quick answer: ${chip}`}
-                              aria-pressed={picked}
-                              className="sq-chip inline-flex min-h-[44px] touch-manipulation items-center break-words rounded-full border-[1.5px] border-survey-border bg-survey-surface px-5 py-3 text-left text-[15.5px] font-medium text-survey-ink short:min-h-[40px] short:px-4 short:py-2.5 xshort:min-h-[36px] xshort:py-2 xshort:text-[15px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-survey-accent focus-visible:ring-offset-2 focus-visible:ring-offset-survey-ground disabled:cursor-not-allowed"
+                              aria-pressed={pickedChipIndex === i}
+                              className="study-chip touch-manipulation break-words rounded-full border border-study-hair bg-study-chip px-[18px] py-[9px] text-left sm:px-[20px] sm:py-[11px] text-[16px] font-medium text-study-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-study-ink focus-visible:ring-offset-2 focus-visible:ring-offset-transparent disabled:cursor-not-allowed"
                             >
-                              <span className="sq-tick" aria-hidden="true">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                  <path
-                                    d="M2.5 7.5l3 3 6-6.5"
-                                    stroke="currentColor"
-                                    strokeWidth="1.8"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                </svg>
-                              </span>
                               {chip}
                             </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className={cn("relative mb-3 short:mb-2.5", reveal(0.24).className)} style={reveal(0.24).style}>
-                    <textarea
-                      ref={answerInputRef}
-                      aria-label="Your answer"
-                      placeholder={chips.length > 0 ? "Or type your own answer" : "Type your answer"}
-                      value={answer}
-                      onChange={(e) => {
-                        setAnswer(e.target.value);
-                        lastKeystrokeAtRef.current = Date.now();
-                      }}
-                      onKeyDown={handleAnswerKeyDown}
-                      rows={2}
-                      disabled={loading}
-                      enterKeyHint="send"
-                      // Two rows, scrolling past that: the handoff's fixed
-                      // height is what keeps the whole screen inside 100vh.
-                      // text-[17px] also clears iOS Safari's 16px auto-zoom
-                      // threshold.
-                      className="block w-full touch-manipulation resize-none overflow-y-auto rounded-[20px] border-[1.5px] border-survey-border bg-survey-surface px-[22px] pb-[34px] pt-4 text-[17px] leading-[1.55] text-survey-ink short:pb-[26px] short:pt-3 short:text-[16px] xshort:pb-[22px] xshort:pt-2.5 [transition:border-color_0.2s_ease,box-shadow_0.2s_ease] placeholder:text-survey-faint focus:border-survey-ink focus:outline-none focus:ring-4 focus:ring-survey-ink/[0.08] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
-                      style={{ boxShadow: "var(--sv-shadow-soft)" }}
-                    />
-                    {answer.length > 0 && (
-                      <div aria-hidden="true" className="pointer-events-none absolute bottom-3.5 right-[18px] text-[12.5px] tabular-nums text-survey-faint short:bottom-2.5 xshort:bottom-2">
-                        {answer.length} chars
-                      </div>
+                          ))}
+                        </div>
+                      </>
                     )}
-                  </div>
 
-                  <div className={cn("flex flex-wrap items-center gap-x-[18px] gap-y-3", reveal(0.3).className)} style={reveal(0.3).style}>
-                    <button
-                      type="submit"
-                      disabled={!hasAnswer || loading}
-                      className={cn(
-                        "inline-flex touch-manipulation items-center gap-3 rounded-full px-7 py-4 text-[16.5px] font-semibold short:py-3 short:text-[16px] xshort:px-6 xshort:py-2.5 [transition:transform_0.25s_ease,box-shadow_0.25s_ease,background-color_0.25s_ease,color_0.25s_ease] motion-reduce:transition-none",
-                        hasAnswer
-                          ? "bg-survey-ink text-survey-ground active:translate-y-0 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[var(--sv-shadow-press)]"
-                          : "cursor-not-allowed bg-survey-border text-survey-muted",
-                        loading && "cursor-not-allowed opacity-60"
+                    <div className="relative mb-[14px] sm:mb-[20px]">
+                      <textarea
+                        ref={answerInputRef}
+                        aria-label="Your answer"
+                        placeholder={
+                          chips.length > 0 ? "…or type it your own way" : "Type your answer"
+                        }
+                        value={answer}
+                        onChange={(e) => {
+                          setAnswer(e.target.value);
+                          lastKeystrokeAtRef.current = Date.now();
+                        }}
+                        onKeyDown={handleAnswerKeyDown}
+                        rows={2}
+                        disabled={loading}
+                        enterKeyHint="send"
+                        // Two rows, scrolling past that: the handoff's fixed
+                        // height is what keeps the whole screen inside 100vh.
+                        // 18px also clears iOS Safari's 16px auto-zoom
+                        // threshold, as does the 16px the short-viewport rule
+                        // drops it to.
+                        className="study-answer-box block w-full touch-manipulation resize-none overflow-y-auto rounded-[16px] border border-study-hair bg-study-chip px-[20px] pb-[32px] pt-[16px] text-[18px] leading-[1.55] text-study-ink placeholder:text-study-muted/75 focus:border-study-muted focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                      />
+                      {answer.length > 0 && (
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute bottom-[12px] right-[16px] text-[13px] tabular-nums text-study-muted"
+                        >
+                          {answer.length} chars
+                        </span>
                       )}
-                    >
-                      Send
-                      <PillArrow />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSkip}
-                      disabled={loading}
-                      className="ml-auto flex min-h-[44px] touch-manipulation items-center text-[14px] text-survey-muted underline [text-underline-offset:3px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:text-survey-ink"
-                    >
-                      Skip
-                    </button>
-                  </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-[12px] gap-y-[12px] sm:gap-x-[18px]">
+                      <button type="submit" disabled={!hasAnswer || loading} className={PRIMARY_BUTTON}>
+                        {/* "Answer to continue" is the disabled label, so the
+                            button says why it is not available rather than
+                            just looking broken. There is no "Finish" variant:
+                            the interviewer decides when the conversation is
+                            over (follow-ups are spent as the answers warrant),
+                            so this screen genuinely does not know which
+                            question is the last one. */}
+                        {hasAnswer ? "Continue" : "Answer to continue"} <StudyArrow />
+                      </button>
+
+                      {/* Hidden on phones as well as on short windows: the
+                          line describes a physical Enter key, and a software
+                          keyboard's send key is already labelled by
+                          enterKeyHint below. */}
+                      <span className="study-drop-short hidden text-[14px] text-study-muted sm:inline">
+                        <kbd className="rounded-[6px] border border-study-hair bg-study-chip px-[7px] py-[2px] font-sans text-[13px]">
+                          Enter &#8629;
+                        </kbd>{" "}
+                        to send &middot; Shift+Enter for a new line
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={handleSkip}
+                        disabled={loading}
+                        className="ml-auto touch-manipulation text-[15px] text-study-muted underline [text-underline-offset:3px] disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:hover:text-study-ink"
+                      >
+                        Skip this one
+                      </button>
+                    </div>
+                  </SkyCard>
                 </form>
-                {error && <p className="mt-3 text-sm text-survey-danger">{error}</p>}
+
+                {error && !failedMessage && <StudyError className="mt-[12px]">{error}</StudyError>}
               </>
             )}
           </div>
         </div>
-      </div>
+      </main>
 
-      <Footer className={reveal(0.4).className} style={reveal(0.4).style} />
-    </div>
+      <StudyFooter />
+    </>
   );
 }

@@ -1,16 +1,23 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { bricolage, instrumentSans, instrumentSerif } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
 // Theme state for the respondent survey only. The tokens themselves live in
-// app/globals.css under `.survey-theme`; this decides which of the two sets
-// that class resolves to.
+// app/globals.css under `.study-sky`; this decides which of the two sets that
+// class resolves to.
 //
-// Light always wins by default. prefers-color-scheme is deliberately not
-// consulted: a respondent on a dark-set phone still opens the survey in light,
-// and dark is reached only by tapping the toggle. That keeps the first
-// impression of the conversation identical for everyone.
+// The design calls them day and night (design_handoff_respondent_survey_sky);
+// they are this component's existing light and dark, renamed in the copy a
+// respondent reads and nowhere else — the stored value, the data attribute and
+// the token selector are all unchanged, so a tab that stored "dark" before the
+// restyle still opens on night.
+//
+// Day always wins by default. prefers-color-scheme is deliberately not
+// consulted: a respondent on a dark-set phone still opens the survey on the
+// day sky, and night is reached only by tapping the toggle. That keeps the
+// first impression of the conversation identical for everyone.
 type Theme = "light" | "dark";
 
 // sessionStorage, not localStorage — the app deliberately keeps nothing
@@ -42,6 +49,50 @@ export function useStudyTheme() {
   const ctx = useContext(ThemeContext);
   if (!ctx) throw new Error("useStudyTheme must be used inside StudyThemeProvider");
   return ctx;
+}
+
+// Below this, a visual-viewport shrink is the URL bar collapsing or a
+// find-in-page bar, not a keyboard — re-anchoring the screen for those would
+// be a visible jolt for no reason.
+const KEYBOARD_MIN_INSET_PX = 120;
+
+// How much of the layout viewport the on-screen keyboard is covering, or 0
+// when it is closed.
+//
+// No CSS unit reports this. dvh shrinks for browser toolbars but *not* for the
+// keyboard — on iOS the keyboard is painted over the layout viewport without
+// resizing it at all — so a composer pinned to the bottom of a 100dvh shell
+// ends up underneath it. window.visualViewport is the only API that describes
+// the box the respondent can actually see, hence measuring here and handing
+// the number to CSS as a custom property (see the .study-viewport
+// [data-keyboard="open"] rules in app/globals.css). offsetTop is subtracted
+// because iOS scrolls the visual viewport within the layout viewport when
+// focusing a field near the bottom; without it the inset reads short by that
+// amount.
+//
+// It lives on the provider rather than on one screen because every screen in
+// the flow is the same fixed-height shell, and two of them (the intake form
+// and the question) take typing.
+function useKeyboardInset() {
+  const [inset, setInset] = useState(0);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const covered = window.innerHeight - vv.height - vv.offsetTop;
+      setInset(covered > KEYBOARD_MIN_INSET_PX ? Math.round(covered) : 0);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+
+  return inset;
 }
 
 export function StudyThemeProvider({
@@ -78,14 +129,34 @@ export function StudyThemeProvider({
 
   const value = useMemo(() => ({ theme, toggle }), [theme, toggle]);
 
+  const keyboardInset = useKeyboardInset();
+
   return (
     <ThemeContext.Provider value={value}>
       <div
-        className={cn("survey-theme", className)}
-        // Only dark needs stamping — the base `.survey-theme` rule is already
-        // the light palette, so light is the absence of an override.
+        className={cn(
+          // The three faces the homepage ships, scoped here rather than in
+          // app/layout.tsx so admin and the marketing pages never download
+          // them for a surface they do not render.
+          instrumentSerif.variable,
+          instrumentSans.variable,
+          bricolage.variable,
+          "study-sky font-study-sans text-study-cream antialiased",
+          className
+        )}
+        // Only night needs stamping — the base `.study-sky` rule is already
+        // the day palette, so day is the absence of an override.
         data-theme={theme === "dark" ? "dark" : undefined}
-        style={style}
+        data-keyboard={keyboardInset > 0 ? "open" : undefined}
+        style={{
+          "--kb-inset": `${keyboardInset}px`,
+          // The gradient, and the .6s cross-fade the toggle rides. Both
+          // tokens flip with data-theme, so the transition is the whole
+          // change: no second background, no fade-through-white.
+          background: "var(--study-sky)",
+          transition: "background 0.6s ease",
+          ...style,
+        } as React.CSSProperties}
       >
         {children}
       </div>
@@ -95,12 +166,12 @@ export function StudyThemeProvider({
 
 function SunIcon() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="4.2" stroke="currentColor" strokeWidth="1.7" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="4.2" stroke="currentColor" strokeWidth="1.8" />
       <path
-        d="M12 2.6v2.2M12 19.2v2.2M4.3 4.3l1.6 1.6M18.1 18.1l1.6 1.6M2.6 12h2.2M19.2 12h2.2M4.3 19.7l1.6-1.6M18.1 5.9l1.6-1.6"
+        d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"
         stroke="currentColor"
-        strokeWidth="1.7"
+        strokeWidth="1.8"
         strokeLinecap="round"
       />
     </svg>
@@ -111,48 +182,42 @@ function MoonIcon() {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
-        d="M20 13.4A8.2 8.2 0 1 1 10.6 4a6.6 6.6 0 0 0 9.4 9.4z"
+        d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"
         stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
+        strokeWidth="1.8"
         strokeLinejoin="round"
       />
     </svg>
   );
 }
 
-// Sits in the top corner opposite the test-mode badge, at the same inset, so
-// the two never collide when an owner is previewing. Deliberately quiet: this
-// is a respondent's conversation, and a control they are unlikely to want
-// should not compete with the question they are being asked.
-export function StudyThemeToggle({
-  className,
-  // The Test-mode badge owns right-4/top-4 during an owner preview, so the
-  // toggle drops below it rather than sitting on top of it.
-  offsetForBadge = false,
-}: {
-  className?: string;
-  offsetForBadge?: boolean;
-}) {
+/**
+ * The day/night switch, which lives in the header pill (SkyChrome's
+ * SkyHeader) rather than floating in a corner of the sky.
+ *
+ * Ink fill with a chip-coloured glyph, in both themes: because both tokens
+ * flip together the button reads as near-black on the day sky and as cream at
+ * night, which is the one control on the screen that should swap rather than
+ * hold its colour. A moon by day and a sun at night — the icon is the
+ * destination, not the current state, and the label says the same thing.
+ */
+export function StudyThemeToggle({ className }: { className?: string }) {
   const { theme, toggle } = useStudyTheme();
-  const goingTo = theme === "dark" ? "light" : "dark";
+  const goingTo = theme === "dark" ? "day" : "night";
 
   return (
     <button
       type="button"
       onClick={toggle}
-      aria-label={`Switch to ${goingTo} mode`}
-      title={`Switch to ${goingTo} mode`}
+      aria-label={`Switch to ${goingTo}`}
+      title={`Switch to ${goingTo}`}
       className={cn(
-        "fixed right-4 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-survey-border bg-survey-surface text-survey-muted transition-colors",
-        offsetForBadge ? "top-[58px]" : "top-4",
-        "hover:text-survey-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-survey-accent focus-visible:ring-offset-2",
-        // Matches the ring-offset to the page rather than to white, which is
-        // what keeps the focus ring readable in both themes.
-        "focus-visible:ring-offset-survey-ground",
+        "flex h-[44px] w-[44px] flex-shrink-0 items-center justify-center rounded-full bg-study-ink text-study-chip",
+        // The ring offset follows the sky rather than white, which is what
+        // keeps the focus ring readable in both themes.
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-study-cream focus-visible:ring-offset-2 focus-visible:ring-offset-transparent",
         className
       )}
-      style={{ boxShadow: "var(--sv-shadow-soft)" }}
     >
       {theme === "dark" ? <SunIcon /> : <MoonIcon />}
     </button>

@@ -1,13 +1,16 @@
-import { caveat, instrumentSans, instrumentSerif } from "@/lib/fonts";
+import { bricolage, caveat, instrumentSans, instrumentSerif } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
 /**
  * Root wrapper for the sky direction (design_handoff_birdsong_landing,
  * `Birdsong Landing.dc.html`), which renders at `/`.
  *
- * Three faces, not the v2 home's four: this direction sets the "Birdsong"
- * wordmark in Instrument Serif along with every other headline, so Source
- * Serif 4 is not loaded here at all.
+ * Four faces. Instrument Serif carries every headline, Instrument Sans every
+ * other word, Caveat nothing at the moment (v4 removed both handwritten
+ * annotations, and it stays loaded here because the face is scoped per-shell
+ * and the demo well is the obvious next place for one), and Bricolage
+ * Grotesque exactly one string: the nav wordmark, which v5 moved off the
+ * serif. Source Serif 4 — the v2 home's wordmark face — is not loaded here.
  *
  * Scoped here rather than in app/layout.tsx for the same reason HomeShell
  * scopes its own — admin, the respondent survey and the other marketing
@@ -22,8 +25,13 @@ import { cn } from "@/lib/utils";
  * the hero copy 9px up the page. Resetting once here is the fix; the explicit
  * leading-* utilities at the call sites still win over it.
  *
- * overflow-x-clip, not -hidden: the hero flock's right-most birds sit at 86%
- * with their own width past that, and `hidden` on one axis would quietly turn
+ * The bsl-page class is a marker, not a style: app/globals.css hangs the
+ * overscroll canvas colour off `html:has(.bsl-page)` so that scrolling up past
+ * the top of the hero shows more sky rather than the cream canvas.
+ *
+ * overflow-x-clip, not -hidden: the hero flock's right-most birds sit at 94%
+ * with their own width past that, the load intro starts every one of them a
+ * further 62vw off the left edge, and `hidden` on one axis would quietly turn
  * this into a scroll container and break the nav's `fixed` positioning.
  */
 export function SkyShell({ children }: { children: React.ReactNode }) {
@@ -33,7 +41,8 @@ export function SkyShell({ children }: { children: React.ReactNode }) {
         instrumentSerif.variable,
         instrumentSans.variable,
         caveat.variable,
-        "min-h-screen scroll-smooth overflow-x-clip bg-bsl-cream font-bsl-sans leading-[normal] text-bsl-ink antialiased"
+        bricolage.variable,
+        "bsl-page min-h-screen scroll-smooth overflow-x-clip bg-bsl-cream font-bsl-sans leading-[normal] text-bsl-ink antialiased"
       )}
     >
       {children}

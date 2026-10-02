@@ -5,6 +5,7 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sanitizeSource } from "@/lib/interview/source";
 import { InterviewFlow, type ProspectContext, type PublicSurvey } from "./InterviewFlow";
+import { SkyBackdrop, SkyCard, SkyFlock, SkyHeader, StudyFooter } from "./SkyChrome";
 import { StudyThemeProvider } from "./StudyTheme";
 
 // The survey entry screen, shared by the two routes that can reach it:
@@ -139,20 +140,26 @@ export async function StudyEntry({
   // the study closed sees the closed notice, not their landing page.
   if (survey.archived_at) {
     return (
-      <StudyThemeProvider className="font-sans survey-viewport flex flex-col items-center justify-center gap-3 bg-survey-ground px-6 text-center">
-        {/* RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
-            No "sales", "pitch", "leads", "not a sales call", etc. Also never
-            claim their info is "only" used for X, or make any exclusive-use
-            / "never shared" claim — state true things we WILL do, don't
-            enumerate or limit what else happens. */}
-        <div className="max-w-[420px] rounded-[18px] border border-survey-border bg-survey-surface px-7 py-8 shadow-[var(--sv-shadow-soft)]">
-          <h1 className="font-spectral text-[22px] font-medium text-survey-ink">
-            This study is no longer accepting responses
-          </h1>
-          <p className="mt-2.5 text-[15px] leading-[1.6] text-survey-muted">
-            Thanks for your interest. This conversation has been closed.
-          </p>
-        </div>
+      <StudyThemeProvider className="study-viewport relative">
+        <SkyBackdrop />
+        <SkyFlock />
+        <SkyHeader />
+        <main className="study-stage relative z-10 justify-center">
+          {/* RESPONDENT-FACING COPY RULE: never mention or deny sales intent.
+              No "sales", "pitch", "leads", "not a sales call", etc. Also never
+              claim their info is "only" used for X, or make any exclusive-use
+              / "never shared" claim — state true things we WILL do, don't
+              enumerate or limit what else happens. */}
+          <SkyCard className="study-fade max-w-[520px] px-[36px] py-[clamp(20px,3vh,34px)]">
+            <h1 className="m-0 font-study-serif text-[clamp(28px,4vh,38px)] font-normal leading-[1.1]">
+              This study is no longer accepting responses
+            </h1>
+            <p className="mt-[10px] text-[17px] leading-[1.55] text-study-muted">
+              Thanks for your interest. This conversation has been closed.
+            </p>
+          </SkyCard>
+        </main>
+        <StudyFooter />
       </StudyThemeProvider>
     );
   }
@@ -195,11 +202,11 @@ export async function StudyEntry({
   };
 
   return (
-    // survey-viewport, not min-h-screen: 100vh on iOS Safari is the
-    // toolbars-hidden height, so a min-h-screen wrapper would keep the
-    // document taller than the visible area and reintroduce the scroll
-    // InterviewFlow's own dvh sizing exists to remove.
-    <StudyThemeProvider className="font-archivo survey-viewport bg-survey-ground">
+    // study-viewport, not min-h-screen: every screen in this flow is fixed at
+    // one viewport with no page scroll (see the .study-viewport rules in
+    // app/globals.css), and 100vh on iOS Safari is the toolbars-hidden height,
+    // so the sizing there is dvh with a vh fallback.
+    <StudyThemeProvider className="study-viewport relative">
       <InterviewFlow
         survey={publicSurvey}
         slug={slug}

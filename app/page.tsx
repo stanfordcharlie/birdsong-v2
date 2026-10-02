@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ConversationSection } from "@/components/marketing/home/v3/ConversationSection";
+import { SkyBand } from "@/components/marketing/home/v3/SkyBand";
 import { SkyCta } from "@/components/marketing/home/v3/SkyCta";
-import { SkyFooter } from "@/components/marketing/home/v3/SkyFooter";
 import { SkyHero } from "@/components/marketing/home/v3/SkyHero";
 import { SkyNav } from "@/components/marketing/home/v3/SkyNav";
 import { SkyShell } from "@/components/marketing/home/v3/SkyShell";
@@ -74,12 +74,18 @@ export default async function RootPage({
     <SkyShell>
       <SkyNav bookDemoUrl={BOOK_DEMO_URL} />
       <main>
-        <SkyHero bookDemoUrl={BOOK_DEMO_URL} />
-        <ConversationSection />
-        <StepsSection />
+        {/* The first three sections share one sky gradient and are transparent
+            themselves, so they have to stay inside SkyBand and in this order —
+            the ramp is in percentages of their combined height. The CTA is
+            outside it and paints its own closing ramp, and renders the footer
+            itself rather than the page doing it. */}
+        <SkyBand>
+          <SkyHero bookDemoUrl={BOOK_DEMO_URL} />
+          <ConversationSection />
+          <StepsSection />
+        </SkyBand>
         <SkyCta bookDemoUrl={BOOK_DEMO_URL} />
       </main>
-      <SkyFooter />
     </SkyShell>
   );
 }

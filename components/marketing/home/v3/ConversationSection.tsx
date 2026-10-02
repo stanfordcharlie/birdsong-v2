@@ -32,8 +32,6 @@ import { ROUTED_STEP, STAGES, STEP_COUNT, STEP_MS, stageOf } from "./demoContent
 const LEAD =
   "Birdsong runs AI-moderated research studies with your market. People share what they're struggling with, in their own words. The ones ready to buy go straight to your reps, with the full transcript attached.";
 
-const BULLETS = ["No cold outreach", "Voice or chat", "Synced to your CRM"];
-
 export function ConversationSection() {
   const [step, setStep] = useState(0);
   const [reduced, setReduced] = useState(false);
@@ -56,30 +54,42 @@ export function ConversationSection() {
   const current = stageOf(step);
 
   return (
-    <section id="how" className="bg-bsl-cream px-[24px] pb-[112px] pt-[128px] bsl-wide:px-[48px]">
-      <div className="mx-auto flex max-w-[1480px] flex-col gap-[64px]">
+    <section
+      id="how"
+      className="relative bg-transparent px-[24px] pb-[112px] pt-[72px] bsl-wide:px-[48px]"
+    >
+      {/* A cream haze behind the header, not a band with edges. The section is
+          transparent on the shared sky, and this is what buys the headline
+          enough contrast to be ink rather than cream without putting a lid on
+          the gradient. It starts 80px above the section so the fade-in begins
+          while still over the hero, and at 380px tall it has run out well
+          before the demo well — which wants the blue behind it. Peaks at 55%:
+          past about 60% the top edge of the haze starts to read as a line. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-[-80px] h-[380px]"
+        style={{
+          backgroundImage:
+            "linear-gradient(180deg, rgba(246,243,236,0) 0%, rgba(246,243,236,.42) 30%, rgba(246,243,236,.55) 55%, rgba(246,243,236,.42) 78%, rgba(246,243,236,0) 100%)",
+        }}
+      />
+
+      <div className="relative mx-auto flex max-w-[1480px] flex-col gap-[64px]">
         {/* Header. auto-fit with a min of min(100%, 480px) so the two columns
             sit side by side above ~1070px and collapse to one below it,
             without a breakpoint to maintain. */}
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,480px),1fr))] items-end gap-x-[72px] gap-y-[40px]">
           <div>
-            <div className="mb-[20px] w-max origin-bottom-left rotate-[-4deg] font-bsl-hand text-[34px] font-medium text-bsl-forest">
-              Demo booked ✓
-            </div>
             <h2 className="m-0 text-balance font-bsl-serif text-[clamp(52px,6.2vw,104px)] font-normal leading-[0.95] tracking-[-0.025em] text-bsl-ink">
-              Pipeline starts with a <em className="italic text-bsl-forest">real</em> conversation.
+              Pipeline starts with a <em className="italic text-bsl-forest-ink">real</em>{" "}
+              conversation.
             </h2>
           </div>
           <div className="flex max-w-[560px] flex-col gap-[20px]">
-            <p className="m-0 text-pretty text-[21px] leading-[1.5] text-bsl-body">{LEAD}</p>
-            <div className="flex flex-wrap gap-[28px] text-[15px] text-bsl-muted">
-              {BULLETS.map((b) => (
-                <span key={b} className="flex items-center gap-[8px]">
-                  <span aria-hidden className="h-[6px] w-[6px] rounded-full bg-bsl-forest" />
-                  {b}
-                </span>
-              ))}
-            </div>
+            {/* Full ink, not the softer --bsl-body the same paragraph used on
+                cream. It is sitting on sky now, and --bsl-body did not hold up
+                against the blue showing through the haze. */}
+            <p className="m-0 text-pretty text-[21px] leading-[1.5] text-bsl-ink">{LEAD}</p>
           </div>
         </div>
 
@@ -138,8 +148,7 @@ export function ConversationSection() {
           <div
             className="min-w-0 flex-[2_1_600px] rounded-[28px] border border-bsl-well-line bg-bsl-well p-[22px]"
             style={{
-              backgroundImage:
-                "radial-gradient(rgb(var(--bsl-well-dot)) 1.2px, transparent 1.2px)",
+              backgroundImage: "radial-gradient(rgb(var(--bsl-well-dot)) 1.2px, transparent 1.2px)",
               backgroundSize: "18px 18px",
             }}
           >

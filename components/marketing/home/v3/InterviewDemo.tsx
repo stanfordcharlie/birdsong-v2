@@ -31,7 +31,7 @@ import {
  */
 
 const CARD =
-  "rounded-[18px] border border-bsl-line-card bg-bsl-card shadow-bsl-card";
+  "rounded-[18px] border border-bsl-line-card bg-bsl-card shadow-bsl-demo-card";
 const LABEL = "text-[12px] font-semibold uppercase tracking-[0.08em]";
 
 function clamp(n: number, lo: number, hi: number) {

@@ -54,6 +54,14 @@ const config: Config = {
         // `short:sm:` rule is emitted after, and wins over, its `sm:` base.
         short: { raw: "(max-height: 820px)" },
         xshort: { raw: "(max-height: 700px)" },
+        // Respondent survey, sky direction (/study/[slug]). The width at which
+        // the welcome screen's interviewer card has room beside the headline;
+        // below it the card is dropped, the flock is hidden and the stage
+        // loses its 72px gutters. A named screen for the reason given under
+        // hp-wide above: the object-form screens here switch Tailwind's
+        // arbitrary min-*/max-* variants off, so `min-[1100px]:` would emit
+        // nothing at all rather than failing loudly.
+        "study-wide": "1100px",
       },
       colors: {
         // Legacy tokens, left as-is — see app/globals.css for why.
@@ -260,7 +268,6 @@ const config: Config = {
             dim: "rgb(var(--bsl-cream-dim) / <alpha-value>)",
             alt: "rgb(var(--bsl-cream-alt) / <alpha-value>)",
           },
-          nav: "rgb(var(--bsl-nav) / <alpha-value>)",
           card: "rgb(var(--bsl-card) / <alpha-value>)",
           ink: "rgb(var(--bsl-ink) / <alpha-value>)",
           body: {
@@ -277,6 +284,7 @@ const config: Config = {
           forest: {
             DEFAULT: "rgb(var(--bsl-forest) / <alpha-value>)",
             deep: "rgb(var(--bsl-forest-deep) / <alpha-value>)",
+            ink: "rgb(var(--bsl-forest-ink) / <alpha-value>)",
           },
           sage: {
             DEFAULT: "rgb(var(--bsl-sage) / <alpha-value>)",
@@ -298,14 +306,38 @@ const config: Config = {
           },
           horizon: "rgb(var(--bsl-horizon) / <alpha-value>)",
           live: "rgb(var(--bsl-live) / <alpha-value>)",
-          "cta-frame": "rgb(var(--bsl-cta-frame) / <alpha-value>)",
-          "cta-panel": "rgb(var(--bsl-cta-panel) / <alpha-value>)",
           well: {
             DEFAULT: "rgb(var(--bsl-well) / <alpha-value>)",
             dot: "rgb(var(--bsl-well-dot) / <alpha-value>)",
             line: "rgb(var(--bsl-well-line) / <alpha-value>)",
           },
           flock: "rgb(var(--bsl-flock) / <alpha-value>)",
+        },
+
+        // Respondent survey, sky direction
+        // (design_handoff_respondent_survey_sky) — /study/[slug] only. Its own
+        // namespace rather than a reuse of bsl-* above: the two surfaces share
+        // a look and a sky, not a palette, and this one has a second theme
+        // (night) that the homepage does not. See the --study-* block in
+        // app/globals.css.
+        study: {
+          // Text on the sky.
+          cream: "rgb(var(--study-cream) / <alpha-value>)",
+          // Text on the frosted cards, and the fill of every dark control.
+          ink: "rgb(var(--study-ink) / <alpha-value>)",
+          muted: "rgb(var(--study-muted) / <alpha-value>)",
+          // Chip and input fill, and the text colour on an ink fill.
+          chip: "rgb(var(--study-chip) / <alpha-value>)",
+          hair: "rgb(var(--study-hair) / <alpha-value>)",
+          highlight: "rgb(var(--study-highlight) / <alpha-value>)",
+          danger: "rgb(var(--study-danger) / <alpha-value>)",
+          flock: "rgb(var(--study-flock) / <alpha-value>)",
+          // Alpha is part of these four, so they carry whole values and have
+          // no <alpha-value> slot.
+          card: "var(--study-card)",
+          "card-line": "var(--study-card-line)",
+          glass: "var(--study-glass)",
+          "glass-line": "var(--study-glass-line)",
         },
       },
       borderRadius: {
@@ -322,9 +354,25 @@ const config: Config = {
         "hp-mock": "0 20px 60px rgba(27, 31, 28, 0.12)",
         "hp-badge": "3px 3px 0 #1b1f1c",
         // The three cards inside the sky direction's demo well on `/`.
+        // Named -demo-card, not -card: a key that also exists in
+        // theme.colors makes `shadow-<key>` ambiguous, and the colour
+        // utility wins, which silently paints an opaque shadow in that
+        // colour. Same reason the nav shadow below is not called bsl-nav.
         // A hairline top highlight plus a wide, high-offset ambient shadow —
         // the handoff gives it as one value and every card uses it.
-        "bsl-card": "0 1px 0 rgba(0, 0, 0, 0.03), 0 24px 48px -28px rgba(40, 50, 40, 0.3)",
+        "bsl-demo-card": "0 1px 0 rgba(0, 0, 0, 0.03), 0 24px 48px -28px rgba(40, 50, 40, 0.3)",
+        // The sky direction's nav pill. A single wide, downward, heavily
+        // negative-spread shadow: the bar is frosted glass with no fill of
+        // its own, so this is what separates it from the sky rather than any
+        // edge of the bar itself.
+        "bsl-nav": "0 8px 30px -12px rgba(20, 40, 60, 0.25)",
+        // The respondent survey's frosted cards, and the lift its primary
+        // buttons take on hover. Named -float/-press rather than -card/-cta:
+        // `study.card` is a colour key, and a shadow sharing a colour's name
+        // resolves to the colour, which silently paints an opaque block (see
+        // the bsl-demo-card note above).
+        "study-float": "0 30px 60px rgba(20, 30, 45, 0.18)",
+        "study-press": "0 12px 26px rgba(20, 24, 30, 0.22)",
         // The one admin card elevation. No page defines its own.
         card: "var(--ds-shadow-card)",
         "card-hover": "var(--ds-shadow-card-hover)",
@@ -414,6 +462,10 @@ const config: Config = {
         // narrower than Helvetica Neue's; with the Helvetica stack the two
         // CTAs measured 2.3px wide against the reference.
         "bsl-sans": ["var(--font-instrument-sans)", "system-ui", "sans-serif"],
+        // The nav wordmark, and nothing else on the page. v5 moved "Birdsong"
+        // off Instrument Serif onto Bricolage Grotesque 700, so the mark no
+        // longer shares a face with the headlines it sits above.
+        "bsl-display": ["var(--font-bricolage)", "system-ui", "sans-serif"],
         "bsl-hand": ["var(--font-caveat)", "cursive"],
         // The "→" in the three CTAs. Instrument Sans has no U+2192, so the
         // glyph comes from a fallback either way — but next/font bakes a
@@ -423,6 +475,21 @@ const config: Config = {
         // handoff's own stack, so the arrow resolves the same way its
         // prototype does, on every platform rather than just this one.
         "bsl-glyph": ["system-ui", "sans-serif"],
+
+        // Respondent survey, sky direction (/study/[slug]). The same three
+        // faces the homepage ships, under their own names so either surface
+        // can move off one without dragging the other: Instrument Serif for
+        // every headline, Instrument Sans for everything else, and Bricolage
+        // Grotesque for the one "Birdsong" wordmark in the header pill.
+        // Applied at StudyThemeProvider.
+        "study-serif": ["var(--font-instrument-serif)", "Georgia", "serif"],
+        "study-sans": ["var(--font-instrument-sans)", "system-ui", "sans-serif"],
+        "study-display": ["var(--font-bricolage)", "system-ui", "sans-serif"],
+        // The "→" in the CTAs. Instrument Sans ships no U+2192, and the
+        // metrics-adjusted local face next/font bakes into the variable draws
+        // a heavier arrow than the reference; naming system-ui directly is
+        // what reproduces the handoff's own stack. See bsl-glyph above.
+        "study-glyph": ["system-ui", "sans-serif"],
       },
     },
   },

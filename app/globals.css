@@ -481,7 +481,6 @@
   --bsl-cream-soft: 241 237 227; /* hero subhead on the sky */
   --bsl-cream-dim: 233 228 216; /* CTA subhead on the dark panel */
   --bsl-cream-alt: 236 230 217; /* "Log in" button fill */
-  --bsl-nav: 236 232 222; /* scrolled nav bar fill, at .96 */
   --bsl-card: 255 253 248;
 
   /* Ink and text */
@@ -499,6 +498,10 @@
   /* Forest */
   --bsl-forest: 59 98 70;
   --bsl-forest-deep: 47 79 56; /* the routed fit-score card */
+  /* The italic "real" in the conversation headline. Darker than either of the
+     two above, because v4 moved that headline off cream and onto the shared
+     sky, where --bsl-forest stopped separating from the blue behind it. */
+  --bsl-forest-ink: 36 67 47;
 
   /* Sage */
   --bsl-sage: 201 220 198;
@@ -511,18 +514,58 @@
   --bsl-sand: 221 211 195; /* participant avatar */
   --bsl-sand-soft: 241 235 223; /* participant transcript bubble */
 
-  /* Sky — the hero's vertical gradient, top to horizon */
+  /* Sky — still named for the discrete fills that reference them (the hero's
+     flat fallback, the CTA frame sweep). The two long ramps below are what
+     actually paint the page. */
   --bsl-sky: 63 115 163;
   --bsl-sky-mid: 91 141 184;
   --bsl-sky-pale: 143 176 196;
   --bsl-horizon: 217 201 166;
 
+  /* The two sky ramps, stored whole rather than as a dozen single-use colour
+     tokens. Each is one continuous object — a dawn and a dusk — whose stops
+     only mean anything in sequence; naming #86abc8 on its own would imply it
+     is a palette member something else could reach for, and nothing does.
+
+     --bsl-sky-band is the v4 "one continuous sky": a single absolute layer
+     behind the hero, the conversation section and the steps, which is why
+     those three are transparent. It lands on cream (#f6f3ec) at 80% and holds
+     it to the end, so the steps section finishes on the page background with
+     no seam to line up. */
+  --bsl-sky-band: linear-gradient(
+    180deg,
+    #3f73a3 0%,
+    #5b8db8 16%,
+    #6f9bc0 30%,
+    #86abc8 42%,
+    #a3bfd2 54%,
+    #c4d3da 64%,
+    #e2e3dc 72%,
+    #f6f3ec 80%,
+    #f6f3ec 100%
+  );
+
+  /* --bsl-cta-sky is the closing dusk, and is the inverse journey: it starts
+     on the same cream the steps section ended on and climbs back into deep
+     blue. The stops are in px, not percentages, so the cream-to-blue handoff
+     happens at a fixed distance from the section's top edge however tall the
+     CTA gets. */
+  --bsl-cta-sky: linear-gradient(
+    180deg,
+    #f6f3ec 0px,
+    #eeede6 50px,
+    #d9e0df 110px,
+    #b9cdd8 170px,
+    #93b4ce 230px,
+    #7aa3c5 290px,
+    #5b8db8 420px,
+    #4a7fb0 600px,
+    #355f89 900px,
+    #2c4f73 100%
+  );
+
   /* The live-interview status dot */
   --bsl-live: 194 65 45;
-
-  /* CTA: the outer letterbox and the panel's base fill under its glows */
-  --bsl-cta-frame: 22 26 23;
-  --bsl-cta-panel: 58 64 59;
 
   /* The demo well: dotted paper the three cards sit on */
   --bsl-well: 235 229 216;
@@ -532,6 +575,87 @@
   /* The flock's silhouette — near-black, warmer than --bsl-ink, so the birds
      read as distance against the sky rather than as page furniture. */
   --bsl-flock: 34 30 24;
+}
+
+/* ---------------------------------------------------------------------------
+   Respondent survey, sky direction (--study-*).
+   Spec: design_handoff_respondent_survey_sky/README.md.
+
+   The survey flow now sits on the same sky the marketing homepage does, so
+   this is a second, parallel token set to the --sv-* block above rather than
+   a repaint of it: --sv-* still paints the admin wizard's preview panel
+   (components/NewStudyWizard.tsx), which is a different surface with its own
+   release schedule. Nothing reads from both.
+
+   Day/night here are the handoff's two themes, and they map onto the
+   existing light/dark switch (StudyTheme.tsx) one-to-one: `day` is the base
+   rule, `night` is `[data-theme="dark"]`. prefers-color-scheme stays
+   deliberately unconsulted for the same reason it is in --sv-*: everyone's
+   first impression of the conversation is the same one.
+
+   Triplets where Tailwind needs the <alpha-value> slot (--study-cream, -ink,
+   -muted, -chip, -hair, -flock, -highlight, -danger); whole colour values
+   where the alpha is part of the design and never varies (the frosted card,
+   the header glass, the two sky washes).
+   --------------------------------------------------------------------------- */
+.study-sky {
+  /* Text on the sky. The same cream in both themes — the sky is dark enough
+     at night that inverting it would be a second, dimmer cream for no gain. */
+  --study-cream: 247 242 232;
+
+  /* Text on the frosted cards. Flips; everything else on a card follows it. */
+  --study-ink: 31 28 24;
+  --study-muted: 93 87 77;
+
+  /* Chip / input fill, and the hairline that bounds them. */
+  --study-chip: 255 254 250;
+  --study-hair: 220 215 204;
+
+  /* The key phrase in a question, and the only colour that is the same value
+     in both themes by design: it is the one warm accent on either sky. */
+  --study-highlight: 255 207 163;
+
+  /* Error text, always rendered on --study-chip (never straight on the sky,
+     where neither theme's red clears contrast against the gradient). */
+  --study-danger: 169 56 36;
+
+  /* The flock's silhouette. Near-black by day, and darker still at night so
+     the birds read as cut-outs against the dusk rather than as grey shapes. */
+  --study-flock: 31 28 24;
+
+  --study-card: rgba(241, 239, 233, 0.94);
+  --study-card-line: rgba(255, 255, 255, 0.7);
+  --study-glass: rgba(255, 255, 255, 0.16);
+  --study-glass-line: rgba(255, 255, 255, 0.42);
+
+  /* The ground itself, and the sun glow that sits on top of it. One gradient
+     object, stored whole: its stops only mean anything in sequence. */
+  --study-sky: linear-gradient(180deg, #3c6a99 0%, #4d7cab 38%, #6a8fb3 68%, #97a6b2 100%);
+  --study-glow: rgba(247, 231, 196, 0.85);
+}
+
+.study-sky[data-theme="dark"] {
+  --study-ink: 241 236 226;
+  --study-muted: 179 185 198;
+  --study-chip: 34 48 74;
+  --study-hair: 51 66 94;
+  --study-danger: 255 169 153;
+  --study-flock: 10 15 24;
+  --study-card: rgba(24, 33, 50, 0.9);
+  --study-card-line: rgba(255, 255, 255, 0.12);
+  --study-glass: rgba(255, 255, 255, 0.07);
+  --study-glass-line: rgba(255, 255, 255, 0.18);
+  --study-sky: linear-gradient(180deg, #0e1726 0%, #15233a 45%, #1f3150 80%, #2b3c58 100%);
+  --study-glow: rgba(196, 210, 240, 0.28);
+}
+
+/* The browser's own chrome (form controls, scrollbars, the overscroll gutter)
+   follows the theme, same as the --sv-* surface above. */
+.study-sky {
+  color-scheme: light;
+}
+.study-sky[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 /* ---------------------------------------------------------------------------
@@ -2129,6 +2253,224 @@ select {
   }
 }
 
+/* --- Respondent survey, sky direction (design_handoff_respondent_survey_sky)
+   ---
+   The layout contract for all four screens: one viewport-tall column that
+   never scrolls the page. Header and footer are flex-shrink:0, the stage
+   between them takes what is left, and the only internal scroll the design
+   allows is the thank-you screen's expanded transcript.
+
+   The tokens these read live in the `.study-sky` block near the top of this
+   file. Everything here is scoped under .study-sky for the same reason: the
+   two respondent surfaces (this and the older --sv-* one, still rendered by
+   the admin wizard's preview) must not be able to reach each other. */
+
+/* 100vh on iOS Safari is the toolbars-hidden height, so a 100vh shell is
+   taller than what is actually on screen; dvh tracks the real box. The vh
+   line is the fallback for browsers without dvh. */
+.study-viewport {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+@supports (height: 100dvh) {
+  .study-viewport {
+    height: 100dvh;
+  }
+}
+
+.study-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  /* `safe` so a stage taller than the box starts at its own top edge instead
+     of centring and clipping both ends. */
+  align-items: safe center;
+  overflow: hidden;
+  padding: clamp(16px, 3vh, 48px) 24px clamp(8px, 2vh, 28px);
+}
+@media (min-width: 1100px) {
+  .study-stage {
+    padding-left: 72px;
+    padding-right: 72px;
+  }
+}
+
+/* Touch and small windows: the design's "no scroll anywhere" is written for
+   a desktop viewport. On a phone the intake form and a long question can
+   genuinely exceed the box, and clipping them would strand the respondent
+   mid-flow, so the stage (never the page) takes the overflow there. */
+@media (max-width: 1099px), (pointer: coarse) {
+  .study-stage {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Keyboard open (data-keyboard + --kb-inset, measured from visualViewport in
+   InterviewFlow). Nothing in CSS shrinks for the on-screen keyboard, so the
+   shell is capped to the measured visible box and the stage re-anchored to
+   the top: a centred column inside a full-height page puts the composer
+   behind the keyboard. */
+.study-viewport[data-keyboard="open"] {
+  height: calc(100vh - var(--kb-inset, 0px));
+}
+@supports (height: 100dvh) {
+  .study-viewport[data-keyboard="open"] {
+    height: calc(100dvh - var(--kb-inset, 0px));
+  }
+}
+.study-viewport[data-keyboard="open"] .study-stage {
+  align-items: flex-start;
+  overflow-y: auto;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+/* "Powered by Birdsong" is the first thing worth sacrificing for composer
+   room on a 380px-tall visible box. */
+.study-viewport[data-keyboard="open"] .study-footer {
+  display: none;
+}
+
+/* No lingering tap flash, and no hover skin left stuck on a chip after it has
+   been tapped. The hover styles themselves are gated per call site. */
+.study-sky button,
+.study-sky a,
+.study-sky textarea,
+.study-sky input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The flock is decoration with a cost: below 1100px the sky is mostly behind
+   the content, and birds start landing on the headline. */
+@media (max-width: 1099px) {
+  .study-flock {
+    display: none;
+  }
+}
+
+/* Quick-answer chip. Picked is aria-pressed, which is also what a screen
+   reader announces, so the state has one source of truth. */
+.study-chip {
+  transition:
+    transform 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease;
+}
+@media (hover: hover) {
+  .study-chip:not(:disabled):hover {
+    transform: translateY(-1px);
+    border-color: rgb(var(--study-muted));
+  }
+}
+.study-chip[aria-pressed="true"] {
+  background: rgb(var(--study-ink));
+  color: rgb(var(--study-chip));
+  border-color: rgb(var(--study-ink));
+}
+
+/* The lift every primary button takes on hover, and nothing when it is
+   disabled — a button that rises under the cursor and then refuses the click
+   is worse than one that does not move. */
+@media (hover: hover) {
+  .study-cta:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 26px rgba(20, 24, 30, 0.22);
+  }
+}
+.study-cta {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease;
+}
+
+/* The key phrase in a question: bold and underlined in --study-highlight,
+   never italic. The 3px rule and 8px offset are what keep it reading as a
+   deliberate mark rather than as a link. */
+.study-mark {
+  font-weight: 700;
+  color: rgb(var(--study-highlight));
+  text-decoration: underline;
+  text-decoration-color: rgb(var(--study-highlight));
+  text-decoration-thickness: 3px;
+  text-underline-offset: 8px;
+}
+
+/* Short viewports: the pieces the handoff drops first, in its own order —
+   the interviewer row, the lead-in, the chip label and the Enter hint. All
+   four are orientation, not content: the question, the chips, the box and
+   the two buttons stay. */
+@media (max-height: 680px) {
+  .study-drop-short {
+    display: none !important;
+  }
+  /* What is left tightens rather than scrolling: the answer card loses its
+     generous padding and the box drops a type step, which is what buys the
+     two buttons their room on a 650px-tall window. */
+  .study-answer-card {
+    padding: 20px !important;
+  }
+  .study-answer-box {
+    padding: 12px 18px 26px !important;
+    font-size: 16px !important;
+  }
+  /* The thank-you eyebrow is the one line worth losing to give an open
+     transcript its height. */
+  .study-thanks[data-open="on"] .study-eyebrow {
+    display: none !important;
+  }
+}
+
+@keyframes study-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The whole flock drifts as one group, so the birds hold their formation. */
+@keyframes study-glide {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(14px, -8px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Staggered entrance; per-block delay set inline via --study-delay. `both`
+     holds a block at opacity 0 through its delay so it stays hidden until its
+     turn. Every element's resting state is its final frame, which is what
+     makes the reduced-motion case below a plain removal. */
+  .study-fade {
+    animation: study-fade-up 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: var(--study-delay, 0s);
+  }
+  .study-glide {
+    animation: study-glide 16s ease-in-out infinite;
+  }
+}
+
+/* The handoff's reduced-motion rule is "all animations and transitions", not
+   just the decorative loops — including the theme cross-fade and the chip and
+   button state changes. Scoped to this surface rather than global. */
+@media (prefers-reduced-motion: reduce) {
+  .study-sky,
+  .study-sky * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 /* --- Ambient music-note bob (app/admin/HomeSections.tsx) ---
    Bound to its class only under prefers-reduced-motion: no-preference (the
    same pattern the animations above use), so reduced-motion users get a
@@ -2655,6 +2997,29 @@ html[data-intro="play"].hp-intro-go .hp-i-navnote {
   animation: hp-i-navnote 1s ease-out 3.9s both;
 }
 
+/* --- Home landing page, sky direction (`/`) : the overscroll canvas ---
+   The rubber-band area you get by scrolling up past the top takes its colour
+   from the canvas, which is normally body's --background — cream. On a page
+   that opens on deep sky that showed as a pale band above the hero every time
+   someone flicked upward. Painting the canvas the sky's own top colour makes
+   the overscroll read as more sky instead.
+
+   Setting it on <html> is what moves it to the canvas: once the root element
+   has a background of its own, body's stops being propagated there and simply
+   paints as an ordinary box behind the page, where SkyBand and the sections
+   cover it anyway.
+
+   :has() rather than a class on <body>, because the body class comes from the
+   root layout and is shared with admin, the respondent survey and every other
+   marketing page. Hanging the rule off a marker that SkyShell sets keeps it
+   with the one page that wants it, and it leaves with that page.
+
+   The far end of the page closes on #2c4f73, deep enough that an overscroll
+   past the bottom reads as sky too rather than needing a second colour. */
+html:has(.bsl-page) {
+  background-color: rgb(var(--bsl-sky));
+}
+
 /* --- Home landing page, sky direction (`/`) : motion ---
    Three loops and one entry animation, all of which need a per-element
    duration or delay and so cannot be Tailwind utilities. Everything else on
@@ -2713,6 +3078,75 @@ html[data-intro="play"].hp-intro-go .hp-i-navnote {
   }
 }
 
+/* --- The load intro (v4) ---
+   Runs once, on first paint, and never again: the sun comes up, the flock
+   arrives from off the lower left, and the hero's copy rises into place under
+   a nav that drops in last.
+
+   Every one of these is `both`-filled from an invisible start, which is
+   exactly why they are bound inside the no-preference query like everything
+   above. A reduced-motion visitor never has the rule applied, so the elements
+   sit at their natural, visible state — there is no separate "disabled"
+   branch to keep in sync, and no risk of the page loading blank because an
+   animation that was supposed to reveal it never ran. */
+
+/* The sun glow behind the hero. Slow and alone: it is the only thing moving
+   for the first 0.9s, before any copy arrives. */
+@keyframes bsl-sun {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* The flock's arrival. Birds enter from off the left edge, below the fold,
+   and settle — 80% of the way through they slightly overshoot their mark
+   (6px right, 4px up, 1deg) so landing reads as deceleration rather than a
+   stop. The distance is in vw/vh so the entry starts off-screen at any size. */
+@keyframes bsl-fly-in {
+  0% {
+    opacity: 0;
+    transform: translate(-62vw, 22vh) rotate(-8deg) scale(0.7);
+  }
+  12% {
+    opacity: 1;
+  }
+  80% {
+    transform: translate(6px, -4px) rotate(1deg) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Hero copy and the feature panel, staggered 0.9s to 1.7s by the call sites. */
+@keyframes bsl-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The nav, which comes from above rather than below — it is arriving at the
+   top edge, not rising off the page like the copy. */
+@keyframes bsl-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .bsl-bird {
     animation: bsl-drift var(--bsl-dur) ease-in-out var(--bsl-delay) infinite;
@@ -2722,5 +3156,25 @@ html[data-intro="play"].hp-intro-go .hp-i-navnote {
   }
   .bsl-wave {
     animation: bsl-wave var(--bsl-dur) ease-in-out var(--bsl-delay) infinite;
+  }
+  .bsl-sun {
+    animation: bsl-sun 2.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  /* The fly-in sits on a wrapper around .bsl-bird rather than on the bird
+     itself: both animate `transform`, and one element cannot run an entry and
+     an infinite drift on the same property. Nesting lets the drift start
+     immediately underneath while the wrapper is still flying in, which is
+     what makes the birds look like they are beating their way across rather
+     than sliding in rigid and then starting to move. */
+  .bsl-fly {
+    animation: bsl-fly-in var(--bsl-dur) cubic-bezier(0.25, 0.6, 0.25, 1)
+      var(--bsl-delay) both;
+  }
+  .bsl-rise {
+    animation: bsl-rise var(--bsl-dur) cubic-bezier(0.2, 0.7, 0.2, 1)
+      var(--bsl-delay) both;
+  }
+  .bsl-drop {
+    animation: bsl-drop 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) 1.5s both;
   }
 }
