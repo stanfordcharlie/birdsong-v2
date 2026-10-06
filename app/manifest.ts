@@ -1,8 +1,9 @@
 import type { MetadataRoute } from "next";
 
 // Web app manifest, served at /manifest.webmanifest with an auto-injected
-// <link rel="manifest">. Icons are the black bird mark on white
-// (public/brand/birdsong-mark-black.svg), rendered at 192 and 512.
+// <link rel="manifest">. Icons are the cream bird on ink (#F7F2E8 on
+// #36322C, the brand sheet's dark lockup), rendered at 192 and 512 from
+// public/brand/birdsong-mark-black.svg.
 //
 // These two stay as files in public/ rather than moving to Next's app/icon
 // convention with the others: a manifest has to name its icons by URL, and
