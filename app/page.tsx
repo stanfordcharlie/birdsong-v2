@@ -123,7 +123,15 @@ export default async function HomePage({
         <p style={{ margin: 0 }}>Hi,</p>
 
         <p style={{ margin: 0 }}>
-          I&#39;m <a href="https://www.linkedin.com/in/charlie-cohen/">Charlie</a>. I started
+          I&#39;m{" "}
+          <a
+            href="https://www.linkedin.com/in/charlie-cohen/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Charlie
+          </a>
+          . I started
           my career as an SDR, and nothing made my day like an inbound lead. No ninth
           follow-up, no &#8220;take me off your list.&#8221;
         </p>
