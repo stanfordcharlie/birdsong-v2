@@ -5,13 +5,36 @@
  *
  * Ported from homepage-letter/index.html. Everything outside this file is
  * inline on the page, which mirrors the approved reference one-for-one; the
- * two rules that cannot be expressed inline — the link colours and the
- * 560px breakpoint — live here.
+ * rules that cannot be expressed inline — the link colours, the 560px
+ * breakpoint and the two themes — live here.
+ *
+ * Themes. The six colours the letter uses are custom properties on .root
+ * (--hl-*, "homepage letter"), and every inline colour on the page reads one
+ * of them, so switching theme is a matter of redefining the six. Light is the
+ * base. Dark applies two ways, and the dark block is written twice because a
+ * CSS module has no way to share one declaration list between the two:
+ *
+ *   1. The visitor's OS asks for dark and nothing on the page says otherwise
+ *      (`:not([data-theme="light"])`). Pure CSS, so a dark-set visitor gets
+ *      dark on the very first paint with no script involved.
+ *   2. The visitor chose dark with the toggle (`[data-theme="dark"]`). The
+ *      inline script at the top of the page stamps the stored choice onto
+ *      .root while the HTML is still parsing, before anything paints.
+ *
+ * The attribute lives on .root, never on <html> or <body>: the admin,
+ * respondent and landing surfaces each theme themselves and must not see it.
  */
 
 .root {
-  background: #ffffff;
-  color: #1c1c1c;
+  --hl-bg: #ffffff;
+  --hl-text: #1c1c1c;
+  --hl-muted: #555555;
+  --hl-link: #3a6046;
+  --hl-link-hover: #1f3a28;
+  --hl-border: #1c1c1c;
+
+  background: var(--hl-bg);
+  color: var(--hl-text);
   font-size: 18px;
   line-height: 1.65;
   padding: 64px 24px 96px;
@@ -21,19 +44,107 @@
   flex-direction: column;
 }
 
+@media (prefers-color-scheme: dark) {
+  .root:not([data-theme="light"]) {
+    --hl-bg: #141414;
+    --hl-text: #e8e6e1;
+    --hl-muted: #9a9893;
+    --hl-link: #8fc79a;
+    --hl-link-hover: #b5dcbe;
+    --hl-border: #5a5a57;
+  }
+}
+
+.root[data-theme="dark"] {
+  --hl-bg: #141414;
+  --hl-text: #e8e6e1;
+  --hl-muted: #9a9893;
+  --hl-link: #8fc79a;
+  --hl-link-hover: #b5dcbe;
+  --hl-border: #5a5a57;
+}
+
 /* Scoped to the letter rather than set on bare `a`: app/globals.css is
    shared with every other surface. */
 .root a {
-  color: #3a6046;
+  color: var(--hl-link);
 }
 
 .root a:hover {
-  color: #1f3a28;
+  color: var(--hl-link-hover);
+}
+
+/* The theme toggle. Plain text pinned to the bottom-right corner of the
+   viewport, in the letter's own face and muted ink. It carries the page
+   background so letter text scrolling under it stays legible; no border,
+   shadow or pill. The env() terms keep it clear of the iPhone home bar
+   (app/layout.tsx sets viewport-fit: cover, which is what makes them
+   non-zero). */
+.toggle {
+  position: fixed;
+  right: calc(20px + env(safe-area-inset-right, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 1;
+  margin: 0;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--hl-bg);
+  color: var(--hl-muted);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.65;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  text-decoration: underline;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--hl-link);
+  outline-offset: 2px;
+}
+
+/* The label names the mode you would switch to. Both labels are in the
+   markup and the theme picks one, so the right word is on screen from the
+   first paint rather than after hydration. */
+.toLight {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .root:not([data-theme="light"]) .toDark {
+    display: none;
+  }
+  .root:not([data-theme="light"]) .toLight {
+    display: inline;
+  }
+}
+
+.root[data-theme="dark"] .toDark {
+  display: none;
+}
+
+.root[data-theme="dark"] .toLight {
+  display: inline;
 }
 
 @media (max-width: 560px) {
   .root {
-    padding: 32px 20px 64px;
+    /* Extra room at the foot so the fixed toggle (16px inset plus its own
+       ~41px) cannot sit over the buttons or the last line when the page is
+       scrolled to the bottom. */
+    padding: 32px 20px calc(96px + env(safe-area-inset-bottom, 0px));
     font-size: 17px;
+  }
+
+  .toggle {
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 }
