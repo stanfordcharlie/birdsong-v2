@@ -55,11 +55,19 @@ const SAMPLE_REPORT_URL =
 
 // Rows of the "short version" box. Two columns that wrap to one under the
 // label's 140px basis.
-const SHORT_VERSION: ReadonlyArray<[label: string, value: string]> = [
+//
+// The third field underlines the value. It is emphasis, not a link: no
+// colour of its own, no hover, no pointer. The underline is on the value
+// span rather than a nested element so it runs across every wrapped line,
+// which is what the row does at phone width.
+const SHORT_VERSION: ReadonlyArray<
+  [label: string, value: string, underline?: boolean]
+> = [
   ["What it is", "Interviews that find buyers with a real problem"],
   [
     "What you get",
     "More pipeline, more inbound leads (scored, with call notes), and reports on your market",
+    true,
   ],
 ];
 
@@ -177,10 +185,17 @@ export default async function HomePage({
           }}
         >
           <span style={{ fontWeight: 700 }}>The short version</span>
-          {SHORT_VERSION.map(([label, value]) => (
+          {SHORT_VERSION.map(([label, value, underline]) => (
             <div key={label} style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px" }}>
               <span style={{ flex: "0 0 140px", color: "#555555" }}>{label}</span>
-              <span style={{ flex: "1 1 260px" }}>{value}</span>
+              <span
+                style={{
+                  flex: "1 1 260px",
+                  textDecoration: underline ? "underline" : undefined,
+                }}
+              >
+                {value}
+              </span>
             </div>
           ))}
         </div>
