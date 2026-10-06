@@ -145,8 +145,14 @@ export default async function HomePage({
         </p>
 
         <p style={{ margin: 0 }}>
-          <a href="https://learn.g2.com/lead-generation-statistics">G2</a> says inbound leads
-          close at 14.6%, versus 1.7% for outbound.
+          <a
+            href="https://learn.g2.com/lead-generation-statistics"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            G2
+          </a>{" "}
+          says inbound leads close at 14.6%, versus 1.7% for outbound.
         </p>
 
         <p style={{ margin: 0 }}>
