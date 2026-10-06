@@ -7,6 +7,7 @@ import { Settings } from "lucide-react";
 import { GlobalSearch } from "@/components/admin/GlobalSearch";
 import { SignOutButton } from "./SignOutButton";
 import { cn } from "@/lib/utils";
+import { BirdsongMark } from "@/components/brand/BirdsongMark";
 
 // Built from design/mockups/Sidebar.html. 240px, fixed: there is no collapsed
 // state. Every colour, radius and shadow is a Ledger II token (app/globals.css,
@@ -85,18 +86,19 @@ function GearIcon() {
   return <Settings size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" />;
 }
 
-// The wordmark tile: four bars of the waveform on an ink ground.
+// The wordmark tile: the bird mark on an ink ground, in the 24x24 square the
+// waveform tile it replaced occupied, so the lockup beside it does not move.
+// The bird is drawn in --ds-accent-bright, the colour the waveform bars were:
+// the tile is ink, and a black mark on ink is not a mark.
 function Mark() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden className="shrink-0">
-      <rect width="24" height="24" rx="7" fill="hsl(var(--ds-ink))" />
-      <g fill="hsl(var(--ds-accent-bright))">
-        <rect x="5" y="10" width="2.4" height="4" rx="1.2" />
-        <rect x="9" y="6" width="2.4" height="12" rx="1.2" />
-        <rect x="13" y="8.5" width="2.4" height="7" rx="1.2" />
-        <rect x="17" y="11" width="2.4" height="2" rx="1" />
-      </g>
-    </svg>
+    <span
+      aria-hidden
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px]"
+      style={{ background: "hsl(var(--ds-ink))", color: "hsl(var(--ds-accent-bright))" }}
+    >
+      <BirdsongMark size={15} />
+    </span>
   );
 }
 

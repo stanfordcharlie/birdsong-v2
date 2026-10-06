@@ -1,4 +1,4 @@
-import { BirdMark } from "./BirdMark";
+import { BirdsongMark } from "@/components/brand/BirdsongMark";
 
 /**
  * Nav: a fixed translucent pill, in one state, over everything.
@@ -42,7 +42,7 @@ export function SkyNav({ bookDemoUrl }: { bookDemoUrl: string }) {
           href="#top"
           className="flex shrink-0 items-center gap-[8px] text-current bsl-wide:gap-[10px]"
         >
-          <BirdMark width={34} className="h-auto w-[26px] bsl-wide:w-[34px]" />
+          <BirdsongMark size={34} className="h-auto w-[26px] bsl-wide:w-[34px]" />
           {/* The wordmark is the page's one piece of Bricolage Grotesque —
               every other heading is Instrument Serif. Tight at -0.03em, which
               at 23px is what keeps it reading as a mark rather than a word. */}

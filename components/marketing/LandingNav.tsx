@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BirdMark } from "./BirdMark";
+import { BirdsongMark } from "@/components/brand/BirdsongMark";
 
 // Sticky frosted capsule nav, shared between both landing pages
 // (design_handoff_landing_pages_full) — only the cross-link differs.
@@ -47,7 +47,11 @@ export function LandingNav({
           hard-shadowed at both sizes. */}
       <div className="lp-navpill flex items-center justify-between gap-6 rounded-full border-2 border-landing-ink bg-[rgba(255,254,250,0.92)] py-[9px] pl-6 pr-[11px] shadow-[4px_4px_0_var(--lp-ink)] backdrop-blur-[18px] group-data-[scrolled=1]/nav:bg-[rgba(255,254,250,0.97)] group-data-[scrolled=1]/nav:py-2 group-data-[scrolled=1]/nav:pl-[22px] group-data-[scrolled=1]/nav:pr-2.5 group-data-[scrolled=1]/nav:shadow-[6px_6px_0_var(--lp-ink)] lp-nav:pl-5">
         <Link href={homeHref} className="flex items-center gap-[11px]">
-          <BirdMark className="shrink-0 motion-safe:animate-[lp-bob_7s_ease_infinite]" />
+          <BirdsongMark
+            size={24}
+            height={22}
+            className="shrink-0 text-landing-ink motion-safe:animate-[lp-bob_7s_ease_infinite]"
+          />
           <span className="font-bricolage text-[23px] font-bold tracking-[-0.03em]">Birdsong</span>
         </Link>
         {/* ≤920px (design_handoff_landing_mobile): the text links overflowed

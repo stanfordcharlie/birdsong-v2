@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BirdMark } from "./BirdMark";
+import { BirdsongMark } from "@/components/brand/BirdsongMark";
 
 // Final CTA (design_handoff_landing_pages_full): the bird takes off on
 // reveal, leaving three staggered trailing notes, above a big headline
@@ -17,7 +17,11 @@ export function LandingCta({
     <section className="mx-auto max-w-[1480px] px-6 pb-[140px] pt-5 md:px-10">
       <div data-reveal className="relative text-center">
         <div className="relative inline-block">
-          <BirdMark width={38} height={35} className="lp-cta-bird mx-auto mb-[22px] block" />
+          <BirdsongMark
+            size={38}
+            height={35}
+            className="lp-cta-bird mx-auto mb-[22px] block text-landing-ink"
+          />
           <span
             className="lp-cta-trail-1 absolute left-[52%] top-0 text-[16px] text-landing-green opacity-0"
             aria-hidden="true"

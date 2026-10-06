@@ -1,4 +1,4 @@
-import { BirdMark } from "./BirdMark";
+import { BirdsongMark } from "@/components/brand/BirdsongMark";
 import {
   INVITE,
   MESSAGES,
@@ -67,7 +67,7 @@ function Avatar({ ai }: { ai: boolean }) {
       }`}
     >
       {ai ? (
-        <BirdMark width={17} />
+        <BirdsongMark size={17} />
       ) : (
         <span className="text-[12px] font-semibold">{PARTICIPANT_INITIALS}</span>
       )}

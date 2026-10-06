@@ -1,7 +1,7 @@
-import Image from "next/image";
 import { hpPrimary, hpSecondary } from "./buttons";
 import { HeroIntroBird } from "./HeroIntroBird";
 import { HERO_ATTR, PERCH_ATTR } from "./heroIntro";
+import { BirdsongMark } from "@/components/brand/BirdsongMark";
 
 /**
  * Hero: a three-column grid on a 188px rules-grid, copy centred in the middle
@@ -69,7 +69,7 @@ export function HomeHero({ bookDemoUrl }: { bookDemoUrl: string }) {
         <div className="hp-i-eyebrow inline-flex flex-wrap items-center justify-center gap-[8px] text-[17px] text-hp-body">
           Interview-led pipeline for{" "}
           <span className="inline-flex items-center gap-[6px] font-medium text-hp-green">
-            <Image src="/birdsong-logo.png" alt="" width={18} height={18} className="rounded-[4px]" />
+            <BirdsongMark size={18} height={18} />
             B2B revenue teams
           </span>
         </div>

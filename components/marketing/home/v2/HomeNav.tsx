@@ -1,5 +1,5 @@
-import Image from "next/image";
 import { NAV_BIRD_ATTR } from "./heroIntro";
+import { BirdsongMark } from "@/components/brand/BirdsongMark";
 
 /**
  * Nav: a sticky frosted-glass pill rather than a full-width bar.
@@ -36,14 +36,11 @@ export function HomeNav({ bookDemoUrl }: { bookDemoUrl: string }) {
     <div className="sticky top-0 z-50 px-[12px] pt-[12px] hp-wide:px-[16px] hp-wide:pt-[16px]">
       <div className="hp-i-pill mx-auto flex max-w-[960px] items-center gap-[2px] rounded-full border border-hp-ink/[0.07] bg-hp-cream/[0.62] py-[10px] pl-[12px] pr-[5px] shadow-[0_6px_24px_rgba(27,31,28,0.08)] backdrop-blur-[18px] hp-wide:gap-[10px] hp-wide:py-[12px] hp-wide:pl-[28px] hp-wide:pr-[12px]">
         <a href="#top" className="relative flex shrink-0 items-center gap-[6px] hp-wide:gap-[10px]">
-          <Image
-            src="/birdsong-logo.png"
-            alt="Birdsong"
-            width={30}
+          <BirdsongMark
+            size={30}
             height={30}
-            priority
             {...{ [NAV_BIRD_ATTR]: "" }}
-            className="hp-i-navbird block h-[26px] w-[26px] rounded-[6px] hp-wide:h-[30px] hp-wide:w-[30px] hp-wide:rounded-[7px]"
+            className="hp-i-navbird block h-[26px] w-[26px] text-hp-ink hp-wide:h-[30px] hp-wide:w-[30px]"
           />
           <span className="hp-i-word font-hp-wordmark text-[20px] font-bold leading-none tracking-[-0.015em] hp-wide:text-[23px]">
             Birdsong

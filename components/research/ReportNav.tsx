@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BirdMark } from "@/components/marketing/BirdMark";
+import { BirdsongMark } from "@/components/brand/BirdsongMark";
 
 /**
  * The report page's top bar: a flat, full-width band rather than the
@@ -18,7 +18,7 @@ export function ReportNav() {
       <div className="mx-auto flex h-[84px] max-w-[1480px] items-center justify-between gap-6 px-6 md:px-10">
         <div className="flex items-center gap-4">
           <Link href="/" className="flex items-center gap-[11px] no-underline">
-            <BirdMark className="shrink-0" />
+            <BirdsongMark size={24} height={22} className="shrink-0 text-landing-ink" />
             <span className="font-bricolage text-[24px] font-bold tracking-[-0.03em] text-landing-ink">
               Birdsong
             </span>

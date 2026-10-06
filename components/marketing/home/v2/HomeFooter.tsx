@@ -1,18 +1,12 @@
-import Image from "next/image";
 import { hpPrimary } from "./buttons";
+import { BirdsongMark } from "@/components/brand/BirdsongMark";
 
 /** Footer: oversized wordmark, three link columns, bottom rule. */
 export function HomeFooter({ bookDemoUrl }: { bookDemoUrl: string }) {
   return (
     <footer className="mx-auto flex max-w-[1200px] flex-col gap-[40px] px-[24px] pb-[40px] hp-wide:gap-[56px]">
       <a href="#top" className="flex items-center gap-[16px]">
-        <Image
-          src="/birdsong-logo.png"
-          alt="Birdsong"
-          width={64}
-          height={64}
-          className="block rounded-[14px]"
-        />
+        <BirdsongMark size={64} height={64} className="block text-hp-ink" />
         <span className="font-hp-wordmark text-[clamp(44px,4.6vw,66px)] font-bold leading-none tracking-[-0.02em]">
           Birdsong
         </span>

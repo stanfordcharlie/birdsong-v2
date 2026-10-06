@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LandingPageShell } from "./LandingPageShell";
 import { LandingFooter } from "./LandingFooter";
-import { BirdMark } from "./BirdMark";
+import { BirdsongMark } from "@/components/brand/BirdsongMark";
 
 // Shared chrome for the static legal pages (/terms, /privacy). Reuses the
 // marketing ground, fonts, and footer via LandingPageShell, but deliberately
@@ -22,7 +22,7 @@ export function LegalPage({
     <LandingPageShell>
       <header className="mx-auto max-w-[720px] px-6 pt-10 md:px-8">
         <Link href="/" className="inline-flex items-center gap-2.5">
-          <BirdMark width={22} height={20} />
+          <BirdsongMark size={22} height={20} className="text-landing-ink" />
           <span className="font-spectral text-[21px] font-medium text-landing-ink">Birdsong</span>
         </Link>
       </header>

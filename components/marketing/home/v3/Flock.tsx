@@ -1,4 +1,4 @@
-import { BirdMark } from "./BirdMark";
+import { BirdsongMark } from "@/components/brand/BirdsongMark";
 
 /**
  * The drifting flocks — 12 birds across the top of the hero's sky, 6 more
@@ -107,8 +107,8 @@ function FlockLayer({
               } as React.CSSProperties
             }
           >
-            <BirdMark
-              width={size}
+            <BirdsongMark
+              size={size}
               className="block"
               style={{ transform: `rotate(${rotate}deg)`, opacity: opacity(size) }}
             />

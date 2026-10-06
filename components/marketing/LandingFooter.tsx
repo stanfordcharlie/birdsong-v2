@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BirdMark } from "./BirdMark";
+import { BirdsongMark } from "@/components/brand/BirdsongMark";
 
 // Shared footer (design_handoff_landing_pages_full). Only the cross-link
 // and the one-line description differ between the two pages.
@@ -34,7 +34,7 @@ export function LandingFooter({
       >
         <div>
           <Link href={isLanding ? "#top" : "/"} className="flex items-center gap-[11px]">
-            <BirdMark width={26} height={24} />
+            <BirdsongMark size={26} height={24} className="text-landing-ink" />
             <span className="font-bricolage text-[26px] font-medium tracking-[-0.008em]">
               Birdsong
             </span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { BirdMark } from "@/components/marketing/home/v3/BirdMark";
+import { BirdsongMark } from "@/components/brand/BirdsongMark";
 import { cn } from "@/lib/utils";
 import { StudyThemeToggle } from "./StudyTheme";
 
@@ -14,7 +14,7 @@ import { StudyThemeToggle } from "./StudyTheme";
 // cannot switch, and one is enough to make a themed screen look broken. The
 // two exceptions are both deliberate and marked at their call site.
 //
-// The mark itself is the homepage's BirdMark, not a second copy: matching the
+// The mark itself is the shared BirdsongMark, not a second copy: matching the
 // marketing page is the whole point of this restyle, and that component draws
 // the eye as a hole on an `evenodd` path with `currentColor` as its fill, so
 // the same element works on the sky, on cream and on an ink circle without
@@ -72,9 +72,9 @@ export function SkyFlock() {
     >
       <div className="study-glide absolute inset-0">
         {FLOCK.map(([left, top, width], i) => (
-          <BirdMark
+          <BirdsongMark
             key={i}
-            width={width}
+            size={width}
             className="absolute"
             style={{ left: `${left}%`, top: `${top}px` }}
           />
@@ -114,7 +114,7 @@ export function SkyHeader({
             thing the interview cannot afford to volunteer. The lockup still
             renders; it just does not navigate. */}
         <div className="flex flex-shrink-0 items-center gap-[10px] text-study-ink">
-          <BirdMark width={30} />
+          <BirdsongMark size={30} />
           <span className="font-study-display text-[19px] font-semibold tracking-[-0.02em] sm:text-[22px]">
             Birdsong
           </span>
@@ -159,7 +159,7 @@ export function StudyFooter() {
       <span>Powered by</span>
       {/* Not a link, for the same reason as the header lockup above. */}
       <span className="inline-flex items-center gap-[7px]">
-        <BirdMark width={18} />
+        <BirdsongMark size={18} />
         <span className="text-[16px] font-semibold">Birdsong</span>
       </span>
     </footer>
@@ -221,7 +221,7 @@ export function InterviewerRow({ on, className }: { on: "card" | "sky"; classNam
             : "h-[34px] w-[34px] bg-study-cream text-[#1f1c18]"
         )}
       >
-        <BirdMark width={isCard ? 18 : 17} />
+        <BirdsongMark size={isCard ? 18 : 17} />
       </span>
       <span
         className={cn(

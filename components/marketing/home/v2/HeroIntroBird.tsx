@@ -22,7 +22,7 @@ import { useHeroIntro } from "./useHeroIntro";
  * The notes are a sibling box rather than children so they hang in the air
  * over the headline while the bird leaves for the nav.
  *
- * Same mark as components/marketing/BirdMark.tsx (viewBox 0 0 50 44); drawn
+ * Same mark as components/brand/BirdsongMark.tsx (viewBox 0 0 50 44); drawn
  * inline because the eye here is knocked out with the hero's cream and the
  * fill is the hero's ink, not the --lp-* pair that component reads.
  */

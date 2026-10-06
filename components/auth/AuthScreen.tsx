@@ -10,6 +10,7 @@ import {
 } from "react";
 import { bricolage } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
+import { BirdsongMark } from "@/components/brand/BirdsongMark";
 
 // Shared chrome + field primitives for the admin auth screens
 // (design_handoff_auth). Same eggshell editorial system as the survey
@@ -17,21 +18,10 @@ import { cn } from "@/lib/utils";
 // (globals.css) so motion is consistent and honors prefers-reduced-motion.
 // Presentation only — LoginForm / SignupForm own all auth behavior.
 
-// The Birdsong bird mark, inked with an eggshell eye. Inlined (rather than the
-// marketing BirdMark, whose fills read from landing tokens) so the fills are
-// exact regardless of surrounding token context.
-function AuthBird({ width, height, className }: { width: number; height: number; className?: string }) {
-  return (
-    <svg width={width} height={height} viewBox="0 0 50 44" fill="none" aria-hidden="true" className={className}>
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M7 1.5 C9 9 15 13.6 23 14 C32 14.4 37.9 21 37.3 31 L45.3 34.6 L36.4 36.5 C34 39.5 30.5 41 26 41 L7 41 L17 28.5 C8 27.5 2 21.5 2 14 C2 8.5 4 4.5 7 1.5 Z M32 22.8 A1.9 1.9 0 1 0 32 26.9 A1.9 1.9 0 1 0 32 22.8 Z"
-        fill="#241f18"
-      />
-    </svg>
-  );
-}
+// The mark is pinned to ink rather than inheriting: the wordmark lockup it
+// sits in tints to #3a6046 on hover, and the bird did not travel with it
+// before this shared the marketing component.
+const AUTH_MARK = { color: "#241f18" } as const;
 
 export function AuthScreen({
   heading,
@@ -96,7 +86,7 @@ export function AuthScreen({
       {/* Header: top-left logo lockup, links to the marketing landing. */}
       <header className="sw-rev relative px-9 py-3">
         <Link href="/" className="inline-flex items-center gap-2.5 [@media(hover:hover)]:hover:text-[#3a6046]">
-          <AuthBird width={22} height={20} className="sw-bird" />
+          <BirdsongMark size={22} height={20} className="sw-bird" style={AUTH_MARK} />
           <span className="font-bricolage text-[20px] font-bold tracking-[-0.01em]">Birdsong</span>
         </Link>
       </header>
@@ -120,7 +110,12 @@ export function AuthScreen({
             <span className="sw-clusternote-b absolute left-[66px] top-[14px] text-[13px]" style={{ color: "#a89d88", opacity: 0 }}>
               &#9835;
             </span>
-            <AuthBird width={40} height={37} className="sw-bird absolute bottom-0 left-10" />
+            <BirdsongMark
+            size={40}
+            height={37}
+            className="sw-bird absolute bottom-0 left-10"
+            style={AUTH_MARK}
+          />
           </div>
 
           <h1
