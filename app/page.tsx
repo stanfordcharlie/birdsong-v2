@@ -56,12 +56,11 @@ const SAMPLE_REPORT_URL =
 // Rows of the "short version" box. Two columns that wrap to one under the
 // label's 140px basis.
 //
-// The third field underlines the value. It is emphasis, not a link: no
-// colour of its own, no hover, no pointer. The underline is on the value
-// span rather than a nested element so it runs across every wrapped line,
-// which is what the row does at phone width.
+// The third field bolds the row, label and value both. It is the line the
+// box is there for, and weight is the only emphasis the letter uses
+// anywhere else (the one bold sentence in the fourth paragraph).
 const SHORT_VERSION: ReadonlyArray<
-  [label: string, value: string, underline?: boolean]
+  [label: string, value: string, bold?: boolean]
 > = [
   ["What it is", "Interviews that find buyers with a real problem"],
   [
@@ -191,17 +190,18 @@ export default async function HomePage({
           }}
         >
           <span style={{ fontWeight: 700 }}>The short version</span>
-          {SHORT_VERSION.map(([label, value, underline]) => (
-            <div key={label} style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px" }}>
+          {SHORT_VERSION.map(([label, value, bold]) => (
+            <div
+              key={label}
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "4px 16px",
+                fontWeight: bold ? 700 : undefined,
+              }}
+            >
               <span style={{ flex: "0 0 140px", color: "#555555" }}>{label}</span>
-              <span
-                style={{
-                  flex: "1 1 260px",
-                  textDecoration: underline ? "underline" : undefined,
-                }}
-              >
-                {value}
-              </span>
+              <span style={{ flex: "1 1 260px" }}>{value}</span>
             </div>
           ))}
         </div>
