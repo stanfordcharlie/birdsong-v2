@@ -1,31 +1,27 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { ConversationSection } from "@/components/marketing/home/v3/ConversationSection";
-import { SkyBand } from "@/components/marketing/home/v3/SkyBand";
-import { SkyCta } from "@/components/marketing/home/v3/SkyCta";
-import { SkyHero } from "@/components/marketing/home/v3/SkyHero";
-import { SkyNav } from "@/components/marketing/home/v3/SkyNav";
-import { SkyShell } from "@/components/marketing/home/v3/SkyShell";
-import { StepsSection } from "@/components/marketing/home/v3/StepsSection";
+import { Courier_Prime } from "next/font/google";
+import styles from "./page.module.css";
 
-// Where every "Book a demo" on the page points. Still the in-page anchor the
-// design reference shipped with, which lands on the final CTA — swap for the
-// real scheduler URL and all three call sites follow.
-const BOOK_DEMO_URL = "#demo";
-
-// This is the primary indexed page for the domain, so metadata here (not
-// the generic fallback in app/layout.tsx) is what search/social previews
-// actually show for usebirdsong.com.
+// Scoped to this page, deliberately not added to lib/fonts.ts: the letter is
+// the only surface in the app set in a typewriter face, and lib/fonts.ts is
+// shared with admin, the respondent study and the landing pages.
 //
-// Deliberately unchanged by the sky redesign. It is the same sentence the
-// page has always led with, and these two strings are what the domain
-// currently ranks on — rewriting them to match the new hero's sentence case
-// would churn every search result and social preview for a typographic
-// difference nobody outside this file would notice.
-const TITLE = "Birdsong — Turn Your Audience Into Pipeline";
-const DESCRIPTION =
-  "Birdsong Agents Find The Right People, Talk To Them, And Route Qualified Opportunities Straight To Your Sales Team.";
+// 400 and 700, normal and italic: the four faces the reference stylesheet
+// links. next/font has no way to ask for only three of the four.
+const courierPrime = Courier_Prime({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+  display: "swap",
+});
+
+// The homepage is the primary indexed page for the domain, so these two
+// strings (not the generic fallback in app/layout.tsx) are what search and
+// social previews show for usebirdsong.com.
+const TITLE = "Birdsong";
+const DESCRIPTION = "A letter from Charlie, who built Birdsong.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -43,7 +39,33 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootPage({
+// The one live Birdsong-run study, and the published report from the study
+// before it. Both are real pages on this domain rather than placeholders.
+// The letter offers to show the reader an interview and a report, so each
+// link has to actually be one; the design reference shipped with a slug
+// placeholder and a bare "#" in these two spots.
+//
+// The interview link is the only Birdsong-sponsored study that is live and
+// unarchived. If it is ever closed, this link renders the "no longer
+// accepting responses" screen and wants repointing.
+const SAMPLE_INTERVIEW_URL =
+  "/study/how-sales-teams-build-and-manage-pipeline-today-nv1e0s";
+const SAMPLE_REPORT_URL =
+  "/reports/how-revops-teams-handle-lead-routing-and-crm-hygiene-0wtui4";
+
+// Rows of the "short version" box. Two columns that wrap to one under the
+// label's 140px basis.
+const SHORT_VERSION: ReadonlyArray<[label: string, value: string]> = [
+  ["What it is", "Interviews that find buyers with a real problem"],
+  [
+    "What you get",
+    "More pipeline, more inbound leads (scored, with call notes), and reports on your market",
+  ],
+];
+
+const MUTED = { color: "#555555", fontSize: 15 } as const;
+
+export default async function HomePage({
   searchParams,
 }: {
   searchParams: Promise<{ code?: string }>;
@@ -53,39 +75,129 @@ export default async function RootPage({
   // Site URL config forces the redirect back to the site root instead, the
   // ?code= lands here still unexchanged. Forward it to the callback route so
   // the session actually gets created rather than stranding the user, logged
-  // out, on the marketing page with a raw code in the URL.
+  // out, on the letter with a raw code in the URL.
+  //
+  // This is the whole reason the page is async rather than fully static: it
+  // carried over from the landing page that used to render at `/`, and
+  // dropping it with the move would have quietly broken confirmation links.
+  // The landing page's other root behaviour, bouncing a signed-in visitor to
+  // /admin, did not carry over. The letter is meant to be readable by anyone
+  // who types the domain, signed in or not.
   const { code } = await searchParams;
   if (code) {
     redirect(`/api/auth/callback?code=${encodeURIComponent(code)}&next=/admin`);
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Signed-in visitors landing on the public marketing URL (bare domain,
-  // bookmark, back button) belong in the app, not looking at the pitch.
-  if (user) {
-    redirect("/admin");
-  }
-
   return (
-    <SkyShell>
-      <SkyNav bookDemoUrl={BOOK_DEMO_URL} />
-      <main>
-        {/* The first three sections share one sky gradient and are transparent
-            themselves, so they have to stay inside SkyBand and in this order —
-            the ramp is in percentages of their combined height. The CTA is
-            outside it and paints its own closing ramp, and renders the footer
-            itself rather than the page doing it. */}
-        <SkyBand>
-          <SkyHero bookDemoUrl={BOOK_DEMO_URL} />
-          <ConversationSection />
-          <StepsSection />
-        </SkyBand>
-        <SkyCta bookDemoUrl={BOOK_DEMO_URL} />
-      </main>
-    </SkyShell>
+    <div
+      className={`${styles.root} ${courierPrime.className}`}
+      style={{ fontFamily: `${courierPrime.style.fontFamily}, 'Courier New', monospace` }}
+    >
+      <div
+        style={{
+          maxWidth: 620,
+          width: "100%",
+          margin: "0 auto 48px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 22,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+          <Image
+            src="/charlie.jpg"
+            alt="Charlie"
+            width={96}
+            height={96}
+            priority
+            style={{ objectFit: "cover", display: "block" }}
+          />
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <span style={{ fontWeight: 700 }}>Birdsong</span>
+            <span style={MUTED}>usebirdsong.com · San Francisco</span>
+          </div>
+        </div>
+
+        <span style={MUTED}>October 2026</span>
+
+        <p style={{ margin: 0 }}>Hi,</p>
+
+        <p style={{ margin: 0 }}>
+          I&#39;m <a href="https://www.linkedin.com/in/charlie-cohen/">Charlie</a>. I started
+          out my career as an SDR, and nothing made my day like an inbound lead. Someone
+          actually wanted to talk to you. No ninth follow-up, no &#8220;take me off your
+          list.&#8221;
+        </p>
+
+        <p style={{ margin: 0 }}>
+          <a href="https://learn.g2.com/lead-generation-statistics">G2</a> says inbound leads
+          close at 14.6%, compared to 1.7% for outbound. Even if the real gap is half that,
+          it&#39;s a big one.
+        </p>
+
+        <p style={{ margin: 0 }}>
+          But you can&#39;t make people raise their hand. So I built Birdsong. It uses AI to
+          run short interviews with people in your market, like a researcher would.{" "}
+          <b>
+            When someone mentions a problem you solve, they go straight to your reps with
+            notes on what they said.
+          </b>{" "}
+          Every answer, including theirs, turns into a report you can publish.
+        </p>
+
+        <p style={{ margin: 0 }}>
+          The AI does the digging. Your reps get calls that start from something real, and
+          you get more pipeline without just raising your ad budget.
+        </p>
+
+        <p style={{ margin: 0 }}>
+          If that sounds useful, check out what an interview looks like{" "}
+          <a href={SAMPLE_INTERVIEW_URL}>here</a>.
+        </p>
+
+        <p style={{ margin: 0 }}>
+          Charlie
+          <br />
+          <a href="mailto:charlie@usebirdsong.com">charlie@usebirdsong.com</a>
+        </p>
+
+        <div
+          style={{
+            border: "1px solid #1c1c1c",
+            padding: 22,
+            marginTop: 16,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            fontSize: 16,
+          }}
+        >
+          <span style={{ fontWeight: 700 }}>The short version</span>
+          {SHORT_VERSION.map(([label, value]) => (
+            <div key={label} style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px" }}>
+              <span style={{ flex: "0 0 140px", color: "#555555" }}>{label}</span>
+              <span style={{ flex: "1 1 260px" }}>{value}</span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 20 }}>
+          <a
+            href="/product"
+            style={{
+              background: "#3a6046",
+              color: "#ffffff",
+              textDecoration: "none",
+              padding: "14px 24px",
+              borderRadius: 4,
+              fontWeight: 700,
+            }}
+          >
+            Check out the product
+          </a>
+          <a href={SAMPLE_REPORT_URL}>See a sample report</a>
+        </div>
+      </div>
+    </div>
   );
 }

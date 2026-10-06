@@ -262,7 +262,7 @@ export default async function CustomerSuccessPage() {
         heading="Trying to reach buyers you do not know yet?"
         subtext="Birdsong turns interview-led market research into qualified pipeline for your demand gen team."
         linkLabel="For demand gen"
-        href="/"
+        href="/product"
       />
       <LandingCta
         headlinePre="Hear what your customers are"

@@ -22,6 +22,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: base, lastModified: new Date(), changeFrequency: "weekly", priority: 1 },
+    // The product pitch. It rendered at `/` until the founder letter took
+    // the root; listed in its own right so the move does not drop the page
+    // every existing search result points at out of the sitemap.
+    { url: `${base}/product`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${base}/reports`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${base}/customer-success`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/privacy`, changeFrequency: "yearly", priority: 0.2 },

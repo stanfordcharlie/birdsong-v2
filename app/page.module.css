@@ -1,0 +1,39 @@
+/*
+ * The founder letter at `/`. Page-scoped on purpose: nothing else on the
+ * site is set in Courier Prime on plain white, and the admin, respondent
+ * and landing design systems must not see any of this.
+ *
+ * Ported from homepage-letter/index.html. Everything outside this file is
+ * inline on the page, which mirrors the approved reference one-for-one; the
+ * two rules that cannot be expressed inline — the link colours and the
+ * 560px breakpoint — live here.
+ */
+
+.root {
+  background: #ffffff;
+  color: #1c1c1c;
+  font-size: 18px;
+  line-height: 1.65;
+  padding: 64px 24px 96px;
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scoped to the letter rather than set on bare `a`: app/globals.css is
+   shared with every other surface. */
+.root a {
+  color: #3a6046;
+}
+
+.root a:hover {
+  color: #1f3a28;
+}
+
+@media (max-width: 560px) {
+  .root {
+    padding: 32px 20px 64px;
+    font-size: 17px;
+  }
+}
