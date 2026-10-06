@@ -38,10 +38,22 @@
   font-size: 18px;
   line-height: 1.65;
   padding: 64px 24px 96px;
-  min-height: 100vh;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+
+  /* The letter, not the document, is what scrolls. Sized to the viewport
+     (dvh so iOS Safari's collapsing toolbar does not hide the foot) with its
+     own scroller, so the document never has anything to scroll and the
+     rubber-band past either end, which would reveal the body's white behind
+     a dark letter, cannot happen. overscroll-behavior stops the bounce
+     chaining out of the letter for the same reason. The viewport-fixed
+     toggle is unaffected. */
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: none;
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -52,6 +64,7 @@
     --hl-link: #8fc79a;
     --hl-link-hover: #b5dcbe;
     --hl-border: #5a5a57;
+    color-scheme: dark;
   }
 }
 
@@ -62,6 +75,14 @@
   --hl-link: #8fc79a;
   --hl-link-hover: #b5dcbe;
   --hl-border: #5a5a57;
+  color-scheme: dark;
+}
+
+/* The root is focused on load so the keyboard scrolls it (see THEME_SCRIPT
+   in page.tsx). That focus is a scrolling convenience, not something to
+   draw a ring around. */
+.root:focus {
+  outline: none;
 }
 
 /* Scoped to the letter rather than set on bare `a`: app/globals.css is

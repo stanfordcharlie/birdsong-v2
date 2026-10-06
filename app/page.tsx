@@ -89,9 +89,16 @@ const HOME_THEME_KEY = "birdsong-home-theme";
 // OS setting on its own, with no script. The attribute lands on the letter's
 // root only, never on <html>: the other surfaces theme themselves.
 //
+// It also focuses the root. The root, not the document, is the scroll
+// container (see .root in page.module.css), and the keyboard scrolls
+// whichever scroller holds focus, so without this the arrow keys and Space
+// would do nothing until the visitor clicked into the letter. tabIndex -1 on
+// the root makes it focusable without adding a tab stop, and .root:focus
+// draws no outline.
+//
 // try/catch covers localStorage throwing in a locked-down browser, in which
 // case the page simply follows the OS.
-const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("${HOME_THEME_KEY}");if(t==="dark"||t==="light"){document.currentScript.parentNode.setAttribute("data-theme",t)}}catch(e){}})();`;
+const THEME_SCRIPT = `(function(){var r=document.currentScript.parentNode;try{var t=localStorage.getItem("${HOME_THEME_KEY}");if(t==="dark"||t==="light"){r.setAttribute("data-theme",t)}}catch(e){}try{r.focus({preventScroll:true})}catch(e){}})();`;
 
 export default async function HomePage({
   searchParams,
@@ -124,6 +131,7 @@ export default async function HomePage({
       className={`${styles.root} ${courierPrime.className}`}
       style={{ fontFamily: `${courierPrime.style.fontFamily}, 'Courier New', monospace` }}
       suppressHydrationWarning
+      tabIndex={-1}
     >
       <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       <div
