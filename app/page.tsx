@@ -49,7 +49,7 @@ export const metadata: Metadata = {
 // unarchived. If it is ever closed, this link renders the "no longer
 // accepting responses" screen and wants repointing.
 const SAMPLE_INTERVIEW_URL =
-  "/study/how-sales-teams-build-and-manage-pipeline-today-nv1e0s";
+  "https://www.usebirdsong.com/study/how-sales-teams-build-and-manage-pipeline-today-nv1e0s";
 const SAMPLE_REPORT_URL =
   "/reports/how-revops-teams-handle-lead-routing-and-crm-hygiene-0wtui4";
 
@@ -124,35 +124,31 @@ export default async function HomePage({
 
         <p style={{ margin: 0 }}>
           I&#39;m <a href="https://www.linkedin.com/in/charlie-cohen/">Charlie</a>. I started
-          out my career as an SDR, and nothing made my day like an inbound lead. Someone
-          actually wanted to talk to you. No ninth follow-up, no &#8220;take me off your
-          list.&#8221;
+          my career as an SDR, and nothing made my day like an inbound lead. No ninth
+          follow-up, no &#8220;take me off your list.&#8221;
         </p>
 
         <p style={{ margin: 0 }}>
           <a href="https://learn.g2.com/lead-generation-statistics">G2</a> says inbound leads
-          close at 14.6%, compared to 1.7% for outbound. Even if the real gap is half that,
-          it&#39;s a big one.
+          close at 14.6%, versus 1.7% for outbound.
         </p>
 
         <p style={{ margin: 0 }}>
-          But you can&#39;t make people raise their hand. So I built Birdsong. It uses AI to
-          run short interviews with people in your market, like a researcher would.{" "}
+          You can&#39;t make people raise their hand, so I built Birdsong. It uses AI to
+          interview people in your market, like a researcher would.{" "}
           <b>
             When someone mentions a problem you solve, they go straight to your reps with
             notes on what they said.
           </b>{" "}
-          Every answer, including theirs, turns into a report you can publish.
+          Every answer goes into a report you can publish.
         </p>
 
         <p style={{ margin: 0 }}>
-          The AI does the digging. Your reps get calls that start from something real, and
-          you get more pipeline without just raising your ad budget.
+          The AI does the digging, so your reps get calls that start from something real.
         </p>
 
         <p style={{ margin: 0 }}>
-          If that sounds useful, check out what an interview looks like{" "}
-          <a href={SAMPLE_INTERVIEW_URL}>here</a>.
+          Curious? See what an interview looks like <a href={SAMPLE_INTERVIEW_URL}>here</a>.
         </p>
 
         <p style={{ margin: 0 }}>
