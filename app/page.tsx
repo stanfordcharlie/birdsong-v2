@@ -3,7 +3,6 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { Courier_Prime } from "next/font/google";
 import styles from "./page.module.css";
-import { HomeThemeToggle } from "./HomeThemeToggle";
 
 // Scoped to this page, deliberately not added to lib/fonts.ts: the letter is
 // the only surface in the app set in a typewriter face, and lib/fonts.ts is
@@ -71,34 +70,7 @@ const SHORT_VERSION: ReadonlyArray<
   ],
 ];
 
-// Every colour on the page reads one of the --hl-* properties page.module.css
-// defines on the root, so the dark theme is a matter of redefining those six.
-const MUTED = { color: "var(--hl-muted)", fontSize: 15 } as const;
-
-// localStorage key for the toggle's remembered theme. Defined here, in the
-// server component, and handed to HomeThemeToggle as a prop rather than
-// exported from it: a value imported from a "use client" module into a server
-// component arrives as a client-reference proxy, which the template below
-// would stringify as "[object Object]".
-const HOME_THEME_KEY = "birdsong-home-theme";
-
-// Applies the visitor's remembered theme before the letter paints. Rendered
-// as the root's first child, so the browser runs it while still parsing,
-// ahead of every piece of letter markup. It only acts when the toggle has
-// stored a choice; with nothing stored, page.module.css already follows the
-// OS setting on its own, with no script. The attribute lands on the letter's
-// root only, never on <html>: the other surfaces theme themselves.
-//
-// It also focuses the root. The root, not the document, is the scroll
-// container (see .root in page.module.css), and the keyboard scrolls
-// whichever scroller holds focus, so without this the arrow keys and Space
-// would do nothing until the visitor clicked into the letter. tabIndex -1 on
-// the root makes it focusable without adding a tab stop, and .root:focus
-// draws no outline.
-//
-// try/catch covers localStorage throwing in a locked-down browser, in which
-// case the page simply follows the OS.
-const THEME_SCRIPT = `(function(){var r=document.currentScript.parentNode;try{var t=localStorage.getItem("${HOME_THEME_KEY}");if(t==="dark"||t==="light"){r.setAttribute("data-theme",t)}}catch(e){}try{r.focus({preventScroll:true})}catch(e){}})();`;
+const MUTED = { color: "#555555", fontSize: 15 } as const;
 
 export default async function HomePage({
   searchParams,
@@ -124,16 +96,10 @@ export default async function HomePage({
   }
 
   return (
-    // suppressHydrationWarning: THEME_SCRIPT may stamp data-theme on this
-    // element before React hydrates it, and the server HTML has no such
-    // attribute. Scoped to this one element's attributes.
     <div
       className={`${styles.root} ${courierPrime.className}`}
       style={{ fontFamily: `${courierPrime.style.fontFamily}, 'Courier New', monospace` }}
-      suppressHydrationWarning
-      tabIndex={-1}
     >
-      <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       <div
         style={{
           maxWidth: 620,
@@ -214,7 +180,7 @@ export default async function HomePage({
 
         <div
           style={{
-            border: "1px solid var(--hl-border)",
+            border: "1px solid #1c1c1c",
             padding: 22,
             marginTop: 16,
             display: "flex",
@@ -234,7 +200,7 @@ export default async function HomePage({
                 fontWeight: bold ? 700 : undefined,
               }}
             >
-              <span style={{ flex: "0 0 140px", color: "var(--hl-muted)" }}>{label}</span>
+              <span style={{ flex: "0 0 140px", color: "#555555" }}>{label}</span>
               <span style={{ flex: "1 1 260px" }}>{value}</span>
             </div>
           ))}
@@ -257,8 +223,6 @@ export default async function HomePage({
           <a href={SAMPLE_REPORT_URL}>See a sample report</a>
         </div>
       </div>
-
-      <HomeThemeToggle storageKey={HOME_THEME_KEY} />
     </div>
   );
 }
