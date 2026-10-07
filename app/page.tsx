@@ -138,8 +138,8 @@ export default async function HomePage({
           >
             Charlie
           </a>
-          . I started
-          my career as an SDR, and nothing made my day like an inbound lead.
+          . After university I took a job as an SDR at an early-stage startup, and nothing
+          made my day like an inbound lead.
         </p>
 
         <p style={{ margin: 0 }}>
