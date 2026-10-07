@@ -139,8 +139,7 @@ export default async function HomePage({
             Charlie
           </a>
           . I started
-          my career as an SDR, and nothing made my day like an inbound lead. No ninth
-          follow-up, no &#8220;take me off your list.&#8221;
+          my career as an SDR, and nothing made my day like an inbound lead.
         </p>
 
         <p style={{ margin: 0 }}>
@@ -155,11 +154,14 @@ export default async function HomePage({
         </p>
 
         <p style={{ margin: 0 }}>
-          You can&#39;t make people raise their hand, so I built Birdsong. It uses AI to
-          interview people in your market, like a researcher would.{" "}
+          The thing is, you can&#39;t make people raise their hand, so I built Birdsong.
+        </p>
+
+        <p style={{ margin: 0 }}>
+          It uses AI to interview prospects in your market, like a researcher would.{" "}
           <b>
-            When someone mentions a problem you solve, they go straight to your reps with
-            notes on what they said.
+            When someone mentions a problem you solve in the interview, they go straight to
+            your reps with notes on what they said.
           </b>{" "}
           Every answer goes into a report you can publish.
         </p>
