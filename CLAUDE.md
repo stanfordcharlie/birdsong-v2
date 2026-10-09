@@ -14,3 +14,9 @@ sets are intentionally forked and neither side edits the other's copy.
 When using `createAdminClient()` (service role, bypasses RLS) to read data on behalf
 of an unauthenticated or differently-scoped caller, always select the exact columns
 needed — never `select("*")`. See the comment in `lib/supabase/admin.ts`.
+
+## Deploys
+
+Never run the Vercel CLI, directly or through npx, package scripts, or shell scripts.
+Deploys happen automatically on push to main. If you need env vars, logs, or deployment
+info, stop and ask Charlie.
